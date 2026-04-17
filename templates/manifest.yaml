@@ -1,0 +1,12 @@
+schema_version: 1
+generated: {{date}}
+last_updated: {{date}}
+prd_source: "{{docs_root}}/prd.md"
+
+pieces: []
+
+coverage:
+  total_prd_sections: 0
+  covered_sections: 0
+  uncovered_sections: []
+  percentage: 0

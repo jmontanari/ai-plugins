@@ -1,0 +1,4 @@
+# spec-flow — project-level config
+# Created automatically on first session. Edit to match your project layout.
+docs_root: docs
+worktrees_root: worktrees
