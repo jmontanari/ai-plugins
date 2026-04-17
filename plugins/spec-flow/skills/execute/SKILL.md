@@ -1,11 +1,11 @@
 ---
 name: execute
-description: Use when a plan is approved and ready for implementation. Orchestrates TDD phases with dedicated agents per step (red, build, verify, refactor), runs QA gates between phases, and triggers a 5-agent final review before merging. The main window writes zero implementation code.
+description: Use when a plan is approved and ready for implementation. Orchestrates each phase via a single implementer agent that runs in TDD mode or Implement mode based on the plan's track (config/infra/glue code uses Implement mode, behavior-bearing code uses TDD), runs QA gates between phases, and triggers a 5-agent final review before merging. The main window writes zero implementation code. Use this whenever the user wants to execute, implement, or run a spec-flow plan — regardless of whether the plan uses TDD or not.
 ---
 
-# Execute — Orchestrate TDD Implementation
+# Execute — Orchestrate Plan Implementation
 
-Execute an approved plan phase by phase using dedicated agents for each TDD step, with QA gates at every boundary and a 5-agent final review before merge.
+Execute an approved plan phase by phase using dedicated agents for each step. Each phase runs in Mode: TDD or Mode: Implement based on the plan's chosen track, with QA gates at every boundary and a 5-agent final review before merge.
 
 ## Step 0: Load Config
 
@@ -30,6 +30,20 @@ You (the main window) are a PURE CONDUCTOR. You:
 
 You write ZERO implementation code. All code comes from subagents.
 
+## Pre-Loop: Mark Piece as Implementing
+
+Before the first phase runs (and only on a fresh start, not a resume), update the manifest on `main` to mark this piece's status as `implementing`. Skip if it's already `implementing` (resumed session).
+
+```bash
+git checkout main
+# update manifest.yaml: set this piece's status to "implementing"
+git add docs/manifest.yaml
+git commit -m "manifest: mark <piece-name> as implementing"
+git checkout spec/<piece-name>
+```
+
+This makes `status` report an accurate picture — a piece is `implementing` while execute is in progress, and flips to `done` after the final merge.
+
 ## Per-Phase Loop
 
 For each phase in plan.md (skip phases where all checkboxes are [x]):
@@ -40,7 +54,19 @@ For each phase in plan.md (skip phases where all checkboxes are [x]):
 git tag spec/<piece-name>-phase-N-start
 ```
 
+### Step 1a: Detect Phase Mode
+
+Inspect the phase's checkboxes in plan.md to determine the mode flag passed to the implementer agent:
+
+- Phase contains `[TDD-Red]` → **Mode: TDD**. Run Step 2 (Red) first, then Step 3 (Implement in TDD mode), then Steps 4 → 5 → 6.
+- Phase contains `[Implement]` and NO `[TDD-Red]` → **Mode: Implement**. Skip Step 2. Run Step 3 (Implement in Implement mode), then Step 4, then Step 5 only if the phase has a `[Refactor]` checkbox, then Step 6.
+- Both markers present, or neither: plan is malformed. Escalate to human.
+
+The orchestrator branches mechanically on the checkbox; it does not decide which mode applies. The mode decision was made by the plan author. The Implement mode exists for phases where TDD doesn't fit (config, infra, scaffolding, glue code, docs-as-code).
+
 ### Step 2: TDD-Red — Write Failing Tests
+
+*(Mode: TDD only)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/tdd-red.md`
 2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns
@@ -56,27 +82,33 @@ git tag spec/<piece-name>-phase-N-start
    - Check failure messages: do they indicate missing features (good) or setup errors (bad)?
    - If setup errors: the agent wrote bad tests. Retry once with error output. If still failing for wrong reason: escalate.
 
-### Step 3: Build — Write Minimal Code
+### Step 3: Implement — Write the Code
 
-1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/builder.md`
-2. Compose prompt with: failing test output (verbatim), plan [Build] tasks, architecture constraints
-3. For tasks marked [P] (parallel): dispatch multiple Agent calls concurrently
+*(Both modes. The mode flag determines the agent's oracle of done.)*
+
+1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/implementer.md`
+2. Compose prompt. The FIRST line MUST be the mode flag:
+   - `Mode: TDD` — include verbatim failing-test output as the oracle, plan [Build] tasks, spec ACs, architecture constraints, pattern pointers
+   - `Mode: Implement` — include the plan's `[Verify]` command and expected output as the oracle, plan [Implement] tasks, spec ACs, architecture constraints, pattern pointers
+3. For tasks marked [P] (parallel): dispatch multiple Agent calls concurrently, each with the same mode flag.
    - **Merge check:** After all parallel agents complete, verify no file conflicts. If conflicts: reject, re-dispatch sequentially, flag as plan defect.
 4. Dispatch:
    ```
    Agent({
-     description: "Build: implement Phase N",
-     prompt: <composed>,
+     description: "Implement (Mode: TDD|Implement): Phase N",
+     prompt: <composed, with Mode: flag on line 1>,
      model: "sonnet"
    })
    ```
-5. **Validate:** Run full test suite. Confirm GREEN.
-   - **Circuit breaker:** If not green after 2 attempts, escalate to human.
+5. **Validate:** Run the mode's oracle.
+   - Mode: TDD — full test suite must be GREEN.
+   - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
+6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict), escalate — do not retry blindly.
 
 ### Step 4: Verify — Confirm Correctness
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/verify.md`
-2. Compose prompt with: full pytest output, spec ACs for this phase
+2. Compose prompt with: the verification output for this phase (full test suite output for Mode: TDD, or the plan's `[Verify]` command output for Mode: Implement) and spec ACs for this phase
 3. Dispatch:
    ```
    Agent({
@@ -85,17 +117,21 @@ git tag spec/<piece-name>-phase-N-start
      model: "sonnet"
    })
    ```
-4. **Validate test integrity:** Diff test files between the Red step tag and now:
+4. **Validate test integrity (Mode: TDD only):** Diff test files between the Red step tag and now:
    ```bash
    git diff spec/<piece-name>-phase-N-start..HEAD -- tests/
    ```
    If test files were modified since the Red step (and not by the Red agent): REJECT. Agent cheating detected.
-5. Parse verify report. If gaps found: decide whether to loop back to Red (add tests) or escalate.
+5. Parse verify report. If gaps found:
+   - Mode: TDD — decide whether to loop back to Red (add tests) or escalate.
+   - Mode: Implement — loop back to Step 3 with the gaps as additional context, or escalate.
 
 ### Step 5: Refactor — Clean Up
 
+*(Mode: TDD always; Mode: Implement only if the phase has a `[Refactor]` checkbox)*
+
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/refactor.md`
-2. Compose prompt with: list of phase files, test suite command, quality principles
+2. Compose prompt with: list of phase files, the mode's verification command (full test suite for Mode: TDD, plan's `[Verify]` command for Mode: Implement), quality principles
 3. Dispatch:
    ```
    Agent({
@@ -105,7 +141,7 @@ git tag spec/<piece-name>-phase-N-start
    })
    ```
 4. **Validate:**
-   - Run test suite: still green?
+   - Re-run the phase's verification command: still passing?
    - Check scope: `git diff --name-only` shows only phase files changed?
    - If out-of-scope files modified: reject the refactor, revert.
 
@@ -212,8 +248,10 @@ Update `docs/manifest.yaml` on main: piece status → `done`, update coverage se
 
 - Agent reports BLOCKED → escalate to human
 - 3+ QA loops on same finding → escalate (architectural issue)
-- Builder can't go green in 2 attempts → escalate
-- Test files modified during Build/Refactor → reject and escalate
+- Implementer can't pass its oracle (green tests in Mode: TDD, plan `[Verify]` command in Mode: Implement) after 2 attempts → escalate
+- Missing or invalid `Mode:` flag in the implementer's prompt → the orchestrator must not dispatch; fix the composition
+- Phase has both `[TDD-Red]` and `[Implement]` markers, or neither → escalate (malformed plan)
+- Test files modified during Implement (Mode: TDD) or Refactor → reject and escalate
 - Parallel agents modify shared file → reject, re-dispatch sequentially
 - Merge conflicts → escalate
 
@@ -227,4 +265,4 @@ Progress tracked via [x] checkboxes in plan.md:
 
 ## Graceful Degradation
 
-If the Agent tool is unavailable, perform all steps sequentially in the main window. The TDD doctrine and QA checklists still apply. This loses context isolation but preserves workflow gates.
+If the Agent tool is unavailable, perform all steps sequentially in the main window. The mode-specific doctrine (TDD or Implement) and QA checklists still apply. This loses context isolation but preserves workflow gates.

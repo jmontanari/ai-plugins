@@ -1,6 +1,6 @@
 ---
 name: prd
-description: Use when importing an existing PRD into the pipeline, decomposing it into implementable pieces, or reviewing PRD fulfillment after all pieces are complete. Also handles updating the manifest when PRD changes.
+description: Use when importing an existing PRD into the spec-flow pipeline, decomposing it into implementable pieces, onboarding a new project that already has requirements docs (BMad, speckit, a Notion export, or a plain `prd.md`), or reviewing PRD fulfillment after all pieces are complete. Also handles updating the manifest when the PRD changes or the user wants to add/reprioritize pieces. Use whenever the user mentions "import my PRD", "set up spec-flow", "onboard this project", or "validate we built everything the PRD asked for".
 ---
 
 # PRD — Import, Normalize, Decompose

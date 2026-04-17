@@ -1,6 +1,6 @@
 ---
 name: status
-description: Use when starting a session, checking progress, or asking what to work on next. Shows PRD coverage, current piece state, phase progress, and recommends the next action.
+description: Use when starting a session on a spec-flow project, checking progress on the spec-flow pipeline, or asking what to work on next (e.g. "where are we", "what's next", "pipeline status", "anything in flight"). Shows PRD coverage, current piece state, phase progress, and recommends the next spec-flow action. Use whenever the user wants a snapshot of spec-flow pipeline state, even if they don't say "status" explicitly.
 ---
 
 # Pipeline Status
@@ -15,7 +15,7 @@ Show the current state of the development pipeline and recommend what to work on
 
 2. **Parse manifest:** Read the YAML file. Extract the pieces list with their statuses and the coverage section.
 
-3. **Scan active specs:** For each piece with status `specced`, `planned`, or `implementing`:
+3. **Scan active specs:** For each piece with status `specced`, `planned`, or `implementing` (a piece is `implementing` while `execute` is running against it):
    - Check if `docs/specs/<piece-name>/spec.md` exists
    - Check if `docs/specs/<piece-name>/plan.md` exists
    - If plan.md exists, count `- [x]` vs `- [ ]` checkboxes to determine phase progress
