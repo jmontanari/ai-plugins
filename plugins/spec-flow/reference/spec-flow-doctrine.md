@@ -1,6 +1,6 @@
 # TDD Doctrine
 
-This document governs all implementation work in the TDD Pipeline. It is loaded automatically at session start and referenced by all agent prompts.
+This document governs all implementation work in the spec-flow plugin. It is loaded automatically at session start and referenced by all agent prompts.
 
 ## The Three Laws
 

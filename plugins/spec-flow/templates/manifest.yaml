@@ -1,7 +1,7 @@
 schema_version: 1
 generated: {{date}}
 last_updated: {{date}}
-prd_source: docs/prd.md
+prd_source: "{{docs_root}}/prd.md"
 
 pieces: []
 

@@ -7,6 +7,10 @@ description: Use when authoring a detailed specification for a piece from the ma
 
 Author a detailed specification for one piece from the manifest through Socratic dialogue, adversarial QA review, and human sign-off.
 
+## Step 0: Load Config
+
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+
 ## Prerequisites
 
 - `docs/manifest.yaml` must exist (run `prd` first)

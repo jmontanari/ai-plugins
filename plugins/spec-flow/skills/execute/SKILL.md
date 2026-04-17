@@ -7,6 +7,10 @@ description: Use when a plan is approved and ready for implementation. Orchestra
 
 Execute an approved plan phase by phase using dedicated agents for each TDD step, with QA gates at every boundary and a 5-agent final review before merge.
 
+## Step 0: Load Config
+
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+
 ## Prerequisites
 
 - Piece must have status `planned` in manifest

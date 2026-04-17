@@ -9,6 +9,8 @@ Show the current state of the development pipeline and recommend what to work on
 
 ## Workflow
 
+0. **Load config:** Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+
 1. **Read manifest:** Look for `docs/manifest.yaml` in the project root. If it does not exist, report: "No pipeline initialized. Run the `prd` skill to import a PRD and create the manifest."
 
 2. **Parse manifest:** Read the YAML file. Extract the pieces list with their statuses and the coverage section.

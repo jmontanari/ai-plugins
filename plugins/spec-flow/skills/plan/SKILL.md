@@ -7,6 +7,10 @@ description: Use when a spec is approved and needs a detailed implementation pla
 
 Generate an exhaustive implementation plan from an approved spec. The plan is so detailed that a Sonnet-tier agent can execute each task without design decisions.
 
+## Step 0: Load Config
+
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+
 ## Prerequisites
 
 - Piece must have status `specced` in manifest

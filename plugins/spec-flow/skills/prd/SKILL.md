@@ -7,6 +7,10 @@ description: Use when importing an existing PRD into the pipeline, decomposing i
 
 Import an existing PRD, normalize it into the pipeline format, decompose it into implementable pieces, and create the tracking manifest.
 
+## Step 0: Load Config
+
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`. During import, if the user specifies a non-default docs location or you detect docs live elsewhere (e.g., `repo/docs/`), update `.spec-flow.yaml` accordingly.
+
 ## Modes
 
 Detect which mode based on arguments and current state:

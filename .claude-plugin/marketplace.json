@@ -1,15 +1,19 @@
 {
-  "name": "tdd-pipeline",
-  "description": "PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability",
+  "name": "shared-plugins",
+  "description": "Shared plugin marketplace hosting multiple Claude Code plugins",
   "owner": {
     "name": "Joe"
   },
+  "metadata": {
+    "description": "Shared plugin marketplace hosting multiple Claude Code plugins",
+    "pluginRoot": "./plugins"
+  },
   "plugins": [
     {
-      "name": "tdd-pipeline",
+      "name": "spec-flow",
+      "source": "./plugins/spec-flow",
       "description": "PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability",
       "version": "0.1.0",
-      "source": "./",
       "author": {
         "name": "Joe"
       }
