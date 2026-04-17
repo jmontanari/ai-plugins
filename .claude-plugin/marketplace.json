@@ -1,0 +1,18 @@
+{
+  "name": "tdd-pipeline",
+  "description": "PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability",
+  "owner": {
+    "name": "Joe"
+  },
+  "plugins": [
+    {
+      "name": "tdd-pipeline",
+      "description": "PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "Joe"
+      }
+    }
+  ]
+}
