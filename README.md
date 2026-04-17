@@ -1,0 +1,192 @@
+# spec-flow
+
+A PRD-to-code pipeline for Claude Code. Turns a product requirements document into shipped, reviewed code through a chain of skills and specialized agents, with TDD doctrine, adversarial QA gates, and PRD traceability baked in.
+
+---
+
+## The principle
+
+Good AI-assisted engineering fails at the seams between intent and execution. A user says "build feature X," the model guesses, produces code, and ambiguity lives forever in the diff. Spec-flow refuses to let ambiguity compound: every stage produces an artifact that is reviewed *before* the next stage runs.
+
+Three ideas drive the design:
+
+1. **Progressive narrowing.** A PRD is ambiguous by nature. A spec resolves requirements into acceptance criteria. A plan resolves the spec into file paths and signatures. Implementation then has no design decisions left — just execution. By the time code is written, the model is a Sonnet-tier executor, not a designer.
+2. **Adversarial review at every boundary.** Each artifact (spec, plan, phase diff, final worktree) passes through a dedicated reviewer agent before advancing. Reviewers are fresh — they see only the artifact, not the conversation that produced it. This is the check against model bias and self-justification.
+3. **Context isolation via subagents.** Implementation agents never see brainstorming history, spec rationale, or each other's conversations. They see the plan and their oracle of done. This prevents scope creep and keeps each agent cheap to rerun.
+
+One consequence: the orchestrator (the main conversation) writes **zero** implementation code. It reads plans, dispatches agents, evaluates reports, and decides proceed/retry/escalate. Code comes exclusively from subagents.
+
+---
+
+## How it's structured
+
+The plugin ships five skills, a pool of specialized agents, reusable templates, and a doctrine document loaded on every session.
+
+```
+plugins/spec-flow/
+├── skills/          # Entry points — invoked via /status, /prd, /spec, /plan, /execute
+│   ├── status/      # Pipeline dashboard + next-action recommendation
+│   ├── prd/         # Import/normalize PRD, decompose into pieces, update manifest
+│   ├── spec/        # Author a spec for one piece (Socratic brainstorm + QA)
+│   ├── plan/        # Turn spec into exhaustive implementation plan + QA
+│   └── execute/     # Orchestrate implementation phase-by-phase with subagents
+│
+├── agents/          # Subagent templates dispatched by the skills above
+│   ├── tdd-red.md           # Writes failing tests (TDD mode only)
+│   ├── implementer.md       # Unified code-writer; runs in Mode: TDD or Mode: Implement
+│   ├── verify.md            # Confirms correctness against spec ACs
+│   ├── refactor.md          # Phase-scoped cleanup
+│   ├── qa-phase.md          # Reviews each completed phase
+│   ├── qa-spec.md           # Reviews spec before plan
+│   ├── qa-plan.md           # Reviews plan before execution
+│   ├── qa-prd-review.md     # End-of-pipeline: did we actually fulfill the PRD?
+│   ├── fix-code.md          # Targeted fixes after QA findings
+│   ├── fix-doc.md           # Same, for spec/plan documents
+│   └── review-board/        # Final 5-agent parallel review before merge
+│       ├── blind.md, edge-case.md, spec-compliance.md,
+│       └── prd-alignment.md, architecture.md
+│
+├── templates/       # Starting shapes for PRD, spec, plan, manifest
+├── reference/       # spec-flow-doctrine.md — auto-loaded on session start
+└── hooks/           # SessionStart hook that loads the doctrine
+```
+
+Every skill is a thin orchestrator. Every agent is a narrow executor. Templates are shared shapes. The doctrine is shared philosophy.
+
+---
+
+## The chain of events
+
+A piece of work flows through the pipeline linearly. Each stage has an output, a QA gate, and a status update in the manifest.
+
+```
+                              ┌──────────────────────────────────────────┐
+                              │              docs/prd.md                 │
+                              │         docs/manifest.yaml               │
+                              │   (FR-001…, NFR-001…, NN-001…, SC-001…) │
+                              └──────────────────────────────────────────┘
+                                               │
+                                       per piece ↓
+  status: open ─────────────────────────────────┐
+                                                ▼
+  ┌──────────┐   Socratic   ┌─────────┐   QA    ┌───────────────────────┐
+  │   spec   │─ brainstorm ▶│  spec   │──loop──▶│ docs/specs/<p>/spec.md│
+  └──────────┘              └─────────┘  (Opus) │   + human sign-off    │
+                                                └───────────────────────┘
+  status: specced ──────────────────────────────┐
+                                                ▼
+  ┌──────────┐   read-only  ┌─────────┐   QA    ┌───────────────────────┐
+  │   plan   │─ exploration▶│  plan   │──loop──▶│ docs/specs/<p>/plan.md│
+  └──────────┘              └─────────┘  (Opus) │   + human sign-off    │
+                                                └───────────────────────┘
+  status: planned ──────────────────────────────┐
+                                                ▼
+  ┌──────────┐     per-phase loop:
+  │ execute  │     ┌───────────────────────────────────────────────────┐
+  └──────────┘     │  (TDD mode)   tdd-red → implementer → verify →    │
+                   │                refactor → qa-phase                │
+                   │  (Implement)  implementer → verify → (refactor?)→ │
+                   │                qa-phase                           │
+                   └───────────────────────────────────────────────────┘
+                                                ▼
+                   final review:   5 parallel reviewers (Opus)
+                   ─────────────   blind, edge-case, spec-compliance,
+                                   prd-alignment, architecture
+                                                ▼
+                                   learnings.md, squash-merge to main
+  status: done ─────────────────────────────────┘
+
+  When all pieces are done: /prd --review validates the full PRD.
+```
+
+### What each stage does
+
+| Stage | Input | Output | Reviewer | Main model |
+|---|---|---|---|---|
+| **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prd.md` + `docs/manifest.yaml` with numbered FR/NFR/NN/SC and a piece list | Human (during brainstorm) | — |
+| **spec** | One `open` piece + PRD sections mapped to it | `docs/specs/<piece>/spec.md` with acceptance criteria | `qa-spec` (Opus, up to 3 fix loops) | — |
+| **plan** | Approved spec | `docs/specs/<piece>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, exit gates | `qa-plan` (Opus, up to 3 fix loops) | — |
+| **execute** | Approved plan | Working code on `spec/<piece>` branch, phase-by-phase, with commits | `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
+
+---
+
+## The two tracks (TDD vs Implement)
+
+Not all code benefits from test-first development. A YAML config, a Terraform module, a migration script, or wiring between two existing services doesn't. The plan skill picks one track per phase:
+
+- **TDD track** — phase has a `[TDD-Red]` checkbox. Used for behavior-bearing code. Flow: failing tests → implementer (Mode: TDD) → verify → refactor → QA.
+- **Implement track** — phase has an `[Implement]` checkbox (no `[TDD-Red]`). Used for config, infra, scaffolding, glue code, docs-as-code. Flow: implementer (Mode: Implement) → verify against a plan-specified command (lint, build, smoke run, integration test) → optional refactor → QA.
+
+The same `implementer.md` agent handles both. The orchestrator sets a `Mode: TDD` or `Mode: Implement` flag at the top of the agent's prompt, and the mode determines the oracle of done — failing tests going green (TDD) or a verification command passing (Implement). Every other rule is shared: follow the plan exactly, respect architecture, stay in scope, BLOCKED over guessing.
+
+A phase must pick exactly one track. Both markers, or neither, is treated as a malformed plan and escalates to the human.
+
+---
+
+## Getting started
+
+**Install the plugin** via the marketplace at the repo root:
+
+```bash
+claude plugin install spec-flow
+```
+
+**First session on a project with an existing PRD:**
+
+1. `/status` — reports "No pipeline initialized."
+2. `/prd` — imports your PRD (BMad output, speckit specs, a raw `docs/prd.md`, or anything else), normalizes it, decomposes it into pieces with you, writes `docs/manifest.yaml`.
+3. `/spec` — authors a spec for the first `open` piece. Brainstorms with you, creates a worktree on `spec/<piece>`, runs `qa-spec`, asks for sign-off.
+4. `/plan` — does read-only codebase exploration, writes an exhaustive plan, runs `qa-plan`, asks for sign-off.
+5. `/execute` — runs the per-phase loop until all phases are green and the 5-agent final review is clean. Asks for merge approval.
+6. Repeat `/spec` → `/plan` → `/execute` for each remaining piece.
+7. When the manifest shows all pieces `done`, `/prd --review` validates that the full PRD was actually fulfilled.
+
+**Every session:** start with `/status` to see where you are. The SessionStart hook loads the doctrine so every conversation knows the rules.
+
+---
+
+## Key concepts
+
+- **Manifest** (`docs/manifest.yaml`) — the source of truth for what pieces exist, what PRD sections each covers, and their statuses (`open` → `specced` → `planned` → `implementing` → `done`). PRD traceability is a first-class concept.
+- **Piece** — an independently implementable, testable unit of work that maps to specific PRD sections.
+- **Worktree** — each piece gets its own `spec/<piece>` branch in a separate working directory. No cross-piece contamination. Merged via squash when done.
+- **Non-negotiables (NN-xxx)** — constraints the PRD flags as binding (security, compliance, architecture). Every QA gate checks against them.
+- **Oracle of done** — the single objective check that proves a phase is complete. TDD mode: green tests. Implement mode: the plan's `[Verify]` command passes. The implementer agent refuses to report DONE without passing its oracle.
+- **Circuit breakers** — every retry loop caps at 2–3 attempts, then escalates to the human. The pipeline refuses to burn tokens on stuck problems.
+
+---
+
+## Configuration
+
+On first use, a `.spec-flow.yaml` is created at the project root:
+
+```yaml
+docs_root: docs          # Where prd.md, specs/, manifest.yaml live
+worktrees_root: worktrees # Where feature branches get checked out
+```
+
+Edit if your project uses different layouts (e.g., `docs_root: repo/docs`).
+
+---
+
+## Extending
+
+- **Templates** — edit `templates/prd.md`, `spec.md`, `plan.md`, `manifest.yaml` to match your team's shape.
+- **Doctrine** — `reference/spec-flow-doctrine.md` is loaded on every session. Adjust the TDD laws, safeguards, or testing ratios to your engineering culture.
+- **Agents** — each agent is a short Markdown template under `agents/`. Rules, context shape, and output format are all text you can tune.
+- **Review board** — add or remove reviewers under `agents/review-board/`. The final review dispatches whatever is in that directory in parallel.
+
+---
+
+## Design choices worth knowing
+
+**Why the orchestrator writes no code.** Main-window context grows with brainstorming, review history, and agent reports. Keeping it out of the code path means it never has partial state that biases implementation. Subagents get exactly the context they need; nothing more.
+
+**Why specs and plans exist as separate artifacts.** A spec defines *what* from the user's perspective (acceptance criteria). A plan defines *how* from the codebase's perspective (file paths, signatures, test patterns). Separating them means spec review catches requirements gaps and plan review catches implementation gaps — two different failure modes, two different reviewers.
+
+**Why the implementer is a single agent with a mode flag** (not two agents). The rules of good implementation — follow the plan, respect architecture, stay in scope, don't guess — are identical regardless of whether the oracle is failing tests or a lint command. Splitting them created drift. One file, one flag, shared doctrine.
+
+**Why five parallel reviewers at merge time.** Each reviewer has a lens: blind (no context, just the diff), edge-case, spec-compliance, PRD-alignment, architecture. Running them in parallel with fresh context is cheap (one round-trip) and catches the things a single reviewer would rationalize away.
+
+**Why circuit breakers everywhere.** AI coding agents will cheerfully loop on the same failure forever. 2 build attempts, 3 QA cycles, 3 review cycles — then escalate. If the pipeline can't make progress, the human is the right solver, not another retry.

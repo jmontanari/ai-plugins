@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Use when authoring a detailed specification for a piece from the manifest. Brainstorms with the user, creates a worktree, writes the spec, runs adversarial QA review, and gets human sign-off before advancing.
+description: Use when authoring a detailed specification for a piece from the spec-flow manifest — including when the user says "spec out X", "write a spec for Y", "let's design the next piece", or wants to start work on the next `open` piece. Brainstorms with the user one question at a time, creates a worktree on a feature branch, writes the spec, runs adversarial QA review, and gets human sign-off before advancing. Use whenever the pipeline is in a state where the next move is to spec a piece — even if the user doesn't explicitly say "spec".
 ---
 
 # Spec — Author Spec for One Piece

@@ -27,7 +27,7 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 ### VERIFY — Confirm Correctness
 - Run full test suite, confirm all pass
 - Check AC coverage: does each spec AC have a corresponding passing test?
-- Detect over-engineering: did the builder add code beyond what tests require?
+- Detect over-engineering: did the implementer add code beyond what the mode's oracle requires?
 - Detect test tampering: were test files modified since the Red step?
 
 ### REFACTOR — Clean Up

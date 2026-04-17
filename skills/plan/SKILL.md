@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Use when a spec is approved and needs a detailed implementation plan. Does read-only codebase exploration, generates an exhaustive phase-by-phase plan with TDD structure, runs QA review, and gets human sign-off.
+description: Use when a spec is approved and needs a detailed implementation plan. Does read-only codebase exploration, generates an exhaustive phase-by-phase plan where each phase picks a TDD track (for behavior-bearing code) or an Implement track (for config, infra, glue code, docs-as-code), runs QA review, and gets human sign-off. Use whenever the user wants to turn an approved spec into an executable plan — even for non-TDD work.
 ---
 
 # Plan — Generate Detailed Implementation Plan
@@ -45,12 +45,22 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    - Define a clear exit gate for each phase
    - Order phases by dependency (inside-out execution)
 
-2. For each phase, generate the TDD structure:
+2. For each phase, choose ONE track and generate its structure. A phase must have exactly one track marker — the executor branches on it mechanically.
+
+   **TDD track** (default for behavior-bearing code):
    - **[TDD-Red]**: Exact test file paths, test names, assertions, patterns to follow
    - **[Build]**: Exact source file paths, class/function signatures, implementation approach
    - **[Verify]**: Test command to run, expected output
    - **[Refactor]**: Scope constraints (phase files only)
    - **[QA]**: ACs to review against, diff baseline
+
+   **Implement track** (for config, infra, scaffolding, glue/wiring, docs-as-code, fixtures, migrations — where unit-level TDD is ceremony without payoff):
+   - **[Implement]**: Exact file paths, signatures/structure, pattern pointers, architecture constraints the phase must honor
+   - **[Verify]**: The verification command the plan author chooses (lint, type check, build, smoke run, integration test) and its expected output
+   - **[Refactor]** (optional): Include only if cleanup is plausibly needed
+   - **[QA]**: ACs to review against, diff baseline
+
+   Pick the track that matches reality. Don't force TDD onto a YAML file; don't skip TDD for a business rule.
 
 3. Use semantic anchors (function names, class names) NOT line numbers
 4. Mark parallel-eligible tasks with `[P]` — verify no file overlap
