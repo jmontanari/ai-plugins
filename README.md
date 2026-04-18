@@ -168,6 +168,28 @@ worktrees_root: worktrees # Where feature branches get checked out
 
 Edit if your project uses different layouts (e.g., `docs_root: repo/docs`).
 
+### Recommended project-level setup
+
+Spec-flow delegates a few concerns to the project's own tooling rather than owning them in the skill — this keeps the plugin language-agnostic and avoids reinventing battle-tested tools per ecosystem.
+
+**Diff-scoped test selection at the hook boundary.** Under v1.2's commit cadence, pre-commit runs once per phase at consolidation (Step 6b) against the full phase diff. If your hook config includes a full test-suite run, consolidation can take minutes on larger projects. Narrow the hook to tests actually affected by the changed files. Each ecosystem has a tool for this:
+
+| Ecosystem | Tool / approach |
+|---|---|
+| Python (pytest) | [`pytest-testmon`](https://pytest-testmon.readthedocs.io/) — coverage-based, transitive-import-aware |
+| JavaScript / TypeScript (Jest) | `jest --findRelatedTests <changed files>` |
+| JavaScript / TypeScript (Vitest) | `vitest related <changed files>` or `vitest --changed` |
+| Go | `go test` with a diff-to-package resolver (e.g. shell script piping `git diff --name-only` to `go list`) |
+| Rust | `cargo nextest` with `--changed-since` (via `cargo-nextest` + git) |
+| Ruby | `rspec --only-failures` combined with a diff-aware runner like `test_queue` |
+| Other | any incremental/selective test runner for your language; fall back to the full suite only when the scope resolver is unsafe (e.g. build config or hook config changed) |
+
+The common shape for a pre-commit hook: take `pass_filenames: true`, receive the changed file list, and either run the narrowed command or fall back to the full suite on ambiguity. A 1000-test suite typically drops from 90 s+ to under 10 s once selective runs stabilize.
+
+**Phase-boundary hook selection.** If your hook config has expensive checks that don't need to fire at every phase boundary (whole-repo type check, documentation build, license scanner), split them across hook stages (`pre-commit` vs `pre-push`) and let spec-flow's consolidation only hit the `pre-commit` stage. The `pre-push` stage can still gate the final squash-merge.
+
+**Scaffold-first commits for multi-phase coordination-file edits.** See the [scaffold-first phase guidance in the plan skill](skills/plan/SKILL.md) — when a piece has ≥2 phases each appending to the same shared coordination files, authoring a single scaffold phase upfront unblocks parallel dispatch of the later phases.
+
 ---
 
 ## Extending

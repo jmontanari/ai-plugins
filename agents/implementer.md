@@ -32,7 +32,7 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 5. Do not modify files outside the phase scope listed in the plan.
 6. If the plan is ambiguous or contradicts the spec, STOP and report BLOCKED with the specific ambiguity. Do not guess.
 7. Run your mode's oracle command before reporting DONE and include its verbatim output.
-8. Commit the implementation files when done with a concise message referencing the phase and mode.
+8. Commit the implementation files when done with `git commit --no-verify` and a concise message referencing the phase and mode. Append `(intermediate commit — pre-commit runs at phase consolidation)` to the message body so reviewers see the bypass is deliberate. The orchestrator runs pre-commit once over the full phase diff after QA passes; running it per-step multiplies hook wall time without changing outcomes.
 
 ## Rule: orchestrator pre-decisions are binding
 
@@ -46,17 +46,17 @@ If a pre-decision conflicts with what you discover while implementing
 (e.g. the LOC figure underlying it is stale), STOP and report BLOCKED
 with the mismatch — do not silently override.
 
-## Rule: pre-commit self-check before reporting DONE
+## Rule: no pre-commit self-check
 
-If `.pre-commit-config.yaml` exists at the repo root, run
-`pre-commit run --files <list of files you touched>` before reporting
-DONE. Resolve every hook failure. If a hook failure is outside the
-phase's declared scope (e.g. a pre-existing lint error in an untouched
-file surfaced by a global hook), report BLOCKED rather than bypassing
-the hook with `--no-verify`.
+Do NOT run `pre-commit run --files ...` inside your turn. Under the
+v1.2 commit cadence, intermediate phase commits use `--no-verify` and
+the orchestrator runs pre-commit once at phase consolidation against
+the full phase diff. Running hooks per-step multiplies wall time (a
+100 s hook x 3–4 intermediate commits is 5–7 minutes of pure overhead)
+without catching anything the consolidation pass wouldn't.
 
-If `.pre-commit-config.yaml` does not exist, skip this check — nothing
-to run.
+Formatting/lint failures surfaced at consolidation are handled by a
+targeted fix-code dispatch, not by you.
 
 ## Mode-Specific Rules
 
@@ -84,9 +84,22 @@ TDD | Implement
 ## Verification
 <verbatim output from the mode's oracle command>
 
+## AC Coverage Matrix
+- AC-<id>: <test function or [Verify] assertion that exercises it>
+- AC-<id>: <test function or [Verify] assertion that exercises it>
+...
+(List every AC this phase claims to cover. For TDD mode, each AC maps
+to a concrete test function. For Implement mode, each AC maps to the
+specific assertion/check in the plan's [Verify] command that proves
+it. If an AC cannot be mapped, write "NOT COVERED — <reason>" — this
+forces a full Verify pass rather than the audit shortcut.)
+
 ## Plan Adherence
 - Followed signatures/paths exactly: yes | no (with diff)
 - Deviations from plan: none | <list with reason>
+
+## Oracle Outcome
+- Oracle ran clean on first attempt: yes | no (describe retries)
 
 ## Status
 DONE | BLOCKED (with explanation)

@@ -96,7 +96,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
 *(Mode: TDD only)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/tdd-red.md`
-2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. If the snapshot flags a test-running pre-commit hook, the Red agent is already authorized by its template to use `git commit --no-verify` on the Red commit only — no extra instruction needed in the prompt beyond attaching the snapshot.
+2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. Under the v1.2 commit cadence, the Red agent commits with `--no-verify` unconditionally (its template handles this) — pre-commit runs once at phase consolidation (Step 6b).
 3. Dispatch:
    ```
    Agent({
@@ -109,6 +109,13 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
    - Check failure messages: do they indicate missing features (good) or setup errors (bad)?
    - If setup errors: the agent wrote bad tests. Retry once with error output. If still failing for wrong reason: escalate.
 5. **Capture the Oracle block:** extract the Red agent's `## Oracle block` section verbatim. Hold in orchestrator state as `phase_N_oracle_block` — Step 3 splices it into the implementer prompt without paraphrase.
+6. **Post-commit contamination check.** After the Red commit lands, reconcile the committed file list against the agent's `## Tests Written` paths:
+   ```bash
+   git show --name-only --pretty= HEAD | sort > /tmp/red_committed.txt
+   # Extract paths from the agent's ## Tests Written section into /tmp/red_reported.txt (sorted).
+   diff /tmp/red_committed.txt /tmp/red_reported.txt
+   ```
+   If the two lists diverge, the commit is contaminated — most often because a concurrent agent's uncommitted work in the same worktree was swept in. Pause and ask the human whether to split the commit. Do NOT auto-reset.
 
 ### Step 3: Implement — Write the Code
 
@@ -158,23 +165,35 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
 ### Step 4: Verify — Confirm Correctness
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/verify.md`
-2. Compose prompt with: the verification output for this phase (full test suite output for Mode: TDD, or the plan's `[Verify]` command output for Mode: Implement) and spec ACs for this phase
-3. Dispatch:
+2. **Pick the Verify input mode.** Inspect the Implement agent's report for three conditions:
+   - **`## Oracle Outcome`** — does it say the oracle ran clean on first attempt (no retries)?
+   - **`## Plan Adherence`** — is `Deviations from plan: none`?
+   - **`## AC Coverage Matrix`** — is it present, complete (every in-scope AC listed), and free of `NOT COVERED` entries?
+
+   If **all three** are true, pick **Mode: Audit** — dispatch a narrow agent that sanity-checks the AC matrix without re-running the oracle (~3 min). If any is false, pick **Mode: Full** — dispatch the full verifier (~10 min).
+
+   Record the decision in the dispatch log so session summaries can report the Audit/Full mix.
+3. Compose prompt. Line 1 is the mode flag:
+   - **Mode: Audit** — attach Build's `## AC Coverage Matrix` verbatim, the implementation diff (`git diff $phase_N_start_sha..HEAD -- <non-test files>`), and spec ACs for this phase. Do NOT attach test output — Audit does not re-run tests.
+   - **Mode: Full** — attach the full oracle output (the project's test-runner output for Mode: TDD, or the plan's `[Verify]` command output for Mode: Implement), the full phase diff, and spec ACs.
+4. Dispatch:
    ```
    Agent({
-     description: "Verify: check Phase N correctness",
-     prompt: <composed>,
+     description: "Verify (Mode: Audit|Full): check Phase N correctness",
+     prompt: <composed, with Mode: flag on line 1>,
      model: "sonnet"
    })
    ```
-4. **Validate test integrity (Mode: TDD only):** Diff test files between the phase-start SHA and now:
+5. **Validate test integrity (Mode: TDD only):** Diff test files between the phase-start SHA and now:
    ```bash
    git diff $phase_N_start_sha..HEAD -- tests/
    ```
-   (Substitute the SHA captured in Step 1.) If test files were modified since the Red step (and not by the Red agent): REJECT. Agent cheating detected.
-5. Parse verify report. If gaps found:
-   - Mode: TDD — decide whether to loop back to Red (add tests) or escalate.
-   - Mode: Implement — loop back to Step 3 with the gaps as additional context, or escalate.
+   (Substitute the SHA captured in Step 1.) If test files were modified since the Red step (and not by the Red agent): REJECT. Agent cheating detected. This check applies under both Audit and Full — it's a cheap orchestrator-side diff, unrelated to the Verify agent.
+6. Parse verify report.
+   - **Audit Mode returned PASS** — proceed to Refactor (Step 5).
+   - **Audit Mode returned FAIL** with `Recommend: Full mode re-verify` — re-dispatch as Mode: Full, treat that result as authoritative.
+   - **Full Mode returned PASS** — proceed to Refactor.
+   - **Full Mode returned FAIL** — if gaps: Mode: TDD can loop back to Red (add tests); Mode: Implement can loop back to Step 3 with gaps as context. Otherwise escalate.
 
 ### Step 5: Refactor — Clean Up
 
@@ -216,11 +235,52 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
    - Read fix template: `${CLAUDE_PLUGIN_ROOT}/agents/fix-code.md`
    - Dispatch fix agent (Sonnet) with prior findings + plan context. The fix agent does NOT commit; it ends its report with a `## Diff of changes` section containing its `git diff`.
    - Extract that diff string from the fix agent's report and hold it in orchestrator state as `iter_M_fix_diff`.
+   - **Commit the fix diff with `--no-verify`** so HEAD advances and the next QA iteration reviews a real commit boundary rather than a dirty worktree:
+     ```bash
+     git add -- <files touched in iter_M_fix_diff>
+     git commit --no-verify -m "fix: Phase N QA iter M (intermediate commit — pre-commit runs at phase consolidation)"
+     ```
    - Re-dispatch QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings.
    - **Circuit breaker:** 3 iterations max, then escalate.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate — no point re-running QA.
 
-4. When QA returns must-fix=None, proceed to Step 7.
+4. When QA returns must-fix=None, proceed to **Step 6b — Phase Consolidation**.
+
+### Step 6b: Phase Consolidation (pre-commit over the full phase diff)
+
+Under the v1.2 commit cadence, intermediate phase commits use `--no-verify`. This step is the single hook gate per phase.
+
+1. Compute the phase's changed files:
+   ```bash
+   git diff --name-only $phase_N_start_sha..HEAD > /tmp/phase_N_files.txt
+   ```
+   If the list is empty, skip to Step 7 (nothing to check).
+
+2. Run pre-commit against them:
+   ```bash
+   pre-commit run --files $(cat /tmp/phase_N_files.txt)
+   ```
+   If `.pre-commit-config.yaml` is absent, skip this step (nothing to run).
+
+3. **On PASS:** proceed to Step 7.
+
+4. **On FAIL:** dispatch fix-code with the hook output as the finding set:
+   ```
+   Agent({
+     description: "Fix-code: pre-commit failures at Phase N consolidation",
+     prompt: <fix-code.md + hook output + list of files changed in phase>,
+     model: "sonnet"
+   })
+   ```
+   Extract the fix diff, commit with `--no-verify`:
+   ```bash
+   git add -- <files from fix diff>
+   git commit --no-verify -m "fix: Phase N pre-commit failures (intermediate commit — pre-commit re-runs at consolidation)"
+   ```
+   Re-run pre-commit over the updated file list. Repeat.
+   - **Circuit breaker:** 2 consolidation fix loops max. If hooks still fail, escalate — the hook failure is likely out-of-scope (e.g. pre-existing lint error in an untouched file surfaced by a global hook) and a human needs to decide whether to exclude the file or fix the pre-existing issue.
+
+5. When hooks pass, proceed to Step 7.
 
 ### Step 7: Mark Progress
 
@@ -267,6 +327,11 @@ Record each reviewer's must-fix list separately in orchestrator state — iterat
 If must-fix findings exist:
 - Dispatch fix agent (Sonnet, `agents/fix-code.md`) with all must-fix findings. The fix agent does NOT commit; it ends its report with `## Diff of changes` containing its `git diff`.
 - Extract that diff string and hold it in orchestrator state as `review_iter_M_fix_diff`.
+- **Commit the fix with `--no-verify`** so HEAD advances for the next review cycle:
+  ```bash
+  git add -- <files from review_iter_M_fix_diff>
+  git commit --no-verify -m "fix: final-review iter M must-fix (intermediate commit — pre-commit already ran at each phase's consolidation)"
+  ```
 - Re-dispatch ALL 5 reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** 3 full review cycles maximum.
@@ -327,17 +392,19 @@ Progress tracked via [x] checkboxes in plan.md:
 
 ## Measurement
 
-At session end, emit a summary with per-phase **Build duration** and **Build token count** from task-notification data (the `duration_ms` field and token counts returned by Agent dispatches). Two observable properties on complex phases after these changes ship:
+At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), and **consolidation outcome** (hooks pass/fix-loop count) from task-notification data and orchestrator state. Observable properties after v1.2 changes ship:
 
-1. Build token count drops ≥ 30 % vs. a comparable-scope pre-change phase.
+1. Build token count drops ≥ 30 % vs. a comparable-scope pre-v1.1 phase.
 2. Build tool-use count drops ≥ 25 %.
+3. Verify: majority of clean-Build phases use Audit mode (3–5 min) rather than Full (10–15 min).
+4. Consolidation (Step 6b): hooks pass on first try on majority of phases; ≤1 fix-code loop needed.
 
-If neither holds on two consecutive large phases, something other than the five inefficiencies addressed here is dominating — re-audit before adding more orchestration machinery.
+If (1)/(2) don't hold on two consecutive large phases, something other than the pre-flight inefficiencies is dominating — re-audit before adding more machinery. If (3) doesn't hold, inspect Implement's AC coverage matrix — the matrix is likely incomplete or inconsistent, forcing Full mode unnecessarily. If (4) doesn't hold, the pre-commit config is running checks that agents can't satisfy in isolation (e.g. a hook that requires the full repo context); consider narrowing the consolidation hook stage.
 
 ## Known costs and caveats
 
 - **Pre-flight on monorepos.** `git grep` across a very large repo is slow. Scope probes to the phase's declared scope directories and use path filters. If a probe would take more than a few seconds, skip it and let the agent rediscover — pre-flight is an optimization, not a correctness gate.
-- **`pre-commit run` cost.** On projects whose pre-commit config runs type-check or the full test suite, the agent self-check (implementer/refactor/fix-code rule) can add minutes. Net positive vs. the hook-failure retry loop, but consider `--hook-stage commit` or a project-configured lightweight hook stage for the self-check if a full run is prohibitive.
+- **`pre-commit run` cost.** Under the v1.2 commit cadence, intermediate phase commits use `--no-verify` and pre-commit runs exactly once per phase at Step 6b against the full phase diff. On projects whose hook config includes a full test suite or a type checker, this is still a 1–3 minute pass — but it replaces 3–5 per-step runs that each paid the same cost. If Step 6b is consistently the longest single step in a phase, narrow the hook config to diff-scoped checks. The README lists language-specific tools for this (pytest-testmon, Jest `--findRelatedTests`, `cargo nextest --changed-since`, etc.) — a project-level concern, not a spec-flow knob.
 - **Phase-size outliers are out of scope here.** These changes reduce *avoidable* work inside Implement. A phase with 1700+ LOC and five new files is expected to be expensive — the root fix for oversized phases lives in the `plan` skill (phase budgeting), not here.
 
 ## Graceful Degradation

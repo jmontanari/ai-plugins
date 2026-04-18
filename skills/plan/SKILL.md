@@ -65,6 +65,24 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 3. Use semantic anchors (function names, class names) NOT line numbers
 4. Mark parallel-eligible tasks with `[P]` — verify no file overlap
 5. Include the agent context summary table
+6. **Scaffold-first phase for coordination-file contention.** If ≥2 phases in this plan each append entries to the same shared coordination file(s), author a **Phase 0: Scaffold** as an Implement-track phase that pre-appends stub entries for *every* subsequent phase's additions in a single commit.
+
+   "Coordination files" are any shared files that multiple phases will need to touch. Examples vary by ecosystem:
+   - Test infrastructure: shared test config or fixture files (e.g. pytest `conftest.py`, Jest `setup.ts`, Go `testmain_test.go`, RSpec `spec_helper.rb`)
+   - Module surface / re-exports: package index files (e.g. Python `__init__.py` + `__all__`, TypeScript/JS `index.ts` barrel, Rust `mod.rs`/`lib.rs`, Go `doc.go`)
+   - Build/type/lint manifests: project config that lists modules or applies overrides (e.g. `pyproject.toml` + mypy overrides, `tsconfig.json` paths, `Cargo.toml` features, `go.mod` replaces, ESLint override blocks)
+   - Allow/deny lists: dep or symbol allowlists the lint/static-analysis step reads
+   - Test-discovery tables or registry tuples the test runner references
+
+   Each stub entry must be defensive and valid before the code it references exists. The exact mechanism depends on the file type and language — pick whichever idiom the ecosystem supports:
+   - Conditional skip when the target module is missing (e.g. Python `pytest.skip(...)` in an `except ModuleNotFoundError:` branch; Jest `describe.skip` around a missing-import guard; Go build tags or `t.Skip`; Rust `#[cfg(feature = "x")]`)
+   - Guarded re-exports (e.g. `try: from .X import Y; except ImportError: pass` in Python; conditional `export` behind an env-gated dynamic import in JS; feature-flagged `pub use` in Rust)
+   - Tolerant manifest entries (mypy `[[tool.mypy.overrides]]`, TypeScript `paths`, Cargo features — all permit entries for modules that don't exist yet)
+   - Allowlist entries for the expected names (most linters tolerate unused entries)
+
+   The Scaffold phase runs once before any adapter/subsystem phase. Its existence lets every subsequent phase write ONLY its own files — no edits to shared infrastructure — which unlocks true `[P]` parallel dispatch across those phases and eliminates the race where concurrent agents contend on the same coordination file.
+
+   If only one phase touches the coordination files, skip Scaffold — it's overhead without payoff.
 
 Write the plan to `docs/specs/<piece-name>/plan.md`
 
