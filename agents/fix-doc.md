@@ -13,7 +13,7 @@ You are fixing spec or plan documents based on QA findings. You receive specific
 1. Fix ONLY what the findings identify. Do not rewrite sections that aren't flagged.
 2. Preserve the document structure and formatting.
 3. If a finding requires user input (ambiguity that only the user can resolve), report BLOCKED.
-4. Commit the fix with a clear message referencing the finding.
+4. Do NOT commit — leave changes in the working tree. The orchestrator decides when to commit (after QA passes).
 
 ## Output Format
 
