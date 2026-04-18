@@ -48,11 +48,16 @@ This makes `status` report an accurate picture — a piece is `implementing` whi
 
 For each phase in plan.md (skip phases where all checkboxes are [x]):
 
-### Step 1: Tag Phase Start
+### Step 1: Capture Phase Start SHA
+
+Record the current HEAD into orchestrator state as `phase_N_start_sha`. No tag, no commit — this lives in your (the orchestrator's) working memory.
 
 ```bash
-git tag spec/<piece-name>-phase-N-start
+# orchestrator captures the output of this into phase_N_start_sha
+git rev-parse HEAD
 ```
+
+On resume mid-phase (phase not yet marked complete in plan.md), recover the SHA the same way: `git rev-parse HEAD`. Phase steps do not commit, so HEAD stays anchored at phase start until Step 7 runs.
 
 ### Step 1a: Detect Phase Mode
 
@@ -117,11 +122,11 @@ The orchestrator branches mechanically on the checkbox; it does not decide which
      model: "sonnet"
    })
    ```
-4. **Validate test integrity (Mode: TDD only):** Diff test files between the Red step tag and now:
+4. **Validate test integrity (Mode: TDD only):** Diff test files between the phase-start SHA and now:
    ```bash
-   git diff spec/<piece-name>-phase-N-start..HEAD -- tests/
+   git diff $phase_N_start_sha..HEAD -- tests/
    ```
-   If test files were modified since the Red step (and not by the Red agent): REJECT. Agent cheating detected.
+   (Substitute the SHA captured in Step 1.) If test files were modified since the Red step (and not by the Red agent): REJECT. Agent cheating detected.
 5. Parse verify report. If gaps found:
    - Mode: TDD — decide whether to loop back to Red (add tests) or escalate.
    - Mode: Implement — loop back to Step 3 with the gaps as additional context, or escalate.
@@ -148,24 +153,29 @@ The orchestrator branches mechanically on the checkbox; it does not decide which
 ### Step 6: Phase QA
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-phase.md`
-2. Get phase diff:
+
+2. **Iteration 1 (full review):** Get the full phase diff using the phase-start SHA from Step 1:
    ```bash
-   git diff spec/<piece-name>-phase-N-start..HEAD
+   git diff $phase_N_start_sha..HEAD
    ```
-3. Compose prompt with: diff, spec, plan (current phase section), PRD sections, non-negotiables
-4. Dispatch:
+   Compose prompt with: `Input Mode: Full`, the diff, spec, plan (current phase section), PRD sections, non-negotiables. Dispatch:
    ```
    Agent({
-     description: "QA: review Phase N",
+     description: "QA: review Phase N (iter 1, full)",
      prompt: <composed>,
      model: "opus"
    })
    ```
-5. **QA Loop:** If must-fix findings:
+
+3. **QA Loop (iterations 2+, focused):** If iteration M-1 returned must-fix findings:
    - Read fix template: `${CLAUDE_PLUGIN_ROOT}/agents/fix-code.md`
-   - Dispatch fix agent (Sonnet) with findings + plan context
-   - Re-dispatch QA agent (fresh, Opus)
-   - **Circuit breaker:** 3 iterations max, then escalate
+   - Dispatch fix agent (Sonnet) with prior findings + plan context. The fix agent does NOT commit; it ends its report with a `## Diff of changes` section containing its `git diff`.
+   - Extract that diff string from the fix agent's report and hold it in orchestrator state as `iter_M_fix_diff`.
+   - Re-dispatch QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings.
+   - **Circuit breaker:** 3 iterations max, then escalate.
+   - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate — no point re-running QA.
+
+4. When QA returns must-fix=None, proceed to Step 7.
 
 ### Step 7: Mark Progress
 
@@ -181,21 +191,21 @@ Advance to next phase.
 
 Triggered automatically when the last phase's QA passes.
 
-### Step 1: Dispatch 5 Parallel Review Agents
+### Step 1: Iteration 1 — Full Review (5 Parallel Agents)
 
-Get full worktree diff:
+Get the full worktree diff:
 ```bash
-git diff main..spec/<piece-name>
+git diff main..HEAD
 ```
 
-Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board/` and dispatch ALL FIVE concurrently:
+Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board/` and dispatch ALL FIVE concurrently with `Input Mode: Full`:
 
 ```
-Agent({ description: "Blind review", prompt: <blind.md + diff only>, model: "opus" })
-Agent({ description: "Edge case review", prompt: <edge-case.md + diff + codebase note>, model: "opus" })
-Agent({ description: "Spec compliance review", prompt: <spec-compliance.md + diff + spec + plan>, model: "opus" })
-Agent({ description: "PRD alignment review", prompt: <prd-alignment.md + diff + spec + PRD + manifest>, model: "opus" })
-Agent({ description: "Architecture review", prompt: <architecture.md + diff + arch docs + non-negotiables>, model: "opus" })
+Agent({ description: "Blind review (iter 1, full)", prompt: <blind.md + Input Mode: Full + diff only>, model: "opus" })
+Agent({ description: "Edge case review (iter 1, full)", prompt: <edge-case.md + Input Mode: Full + diff + codebase note>, model: "opus" })
+Agent({ description: "Spec compliance review (iter 1, full)", prompt: <spec-compliance.md + Input Mode: Full + diff + spec + plan>, model: "opus" })
+Agent({ description: "PRD alignment review (iter 1, full)", prompt: <prd-alignment.md + Input Mode: Full + diff + spec + PRD + manifest>, model: "opus" })
+Agent({ description: "Architecture review (iter 1, full)", prompt: <architecture.md + Input Mode: Full + diff + arch docs + non-negotiables>, model: "opus" })
 ```
 
 ### Step 2: Triage
@@ -205,12 +215,17 @@ Collect findings from all 5 agents. Deduplicate (same issue reported by multiple
 - `defer` — pre-existing issue, not introduced by this spec
 - `dismiss` — false positive or noise
 
-### Step 3: Fix Loop
+Record each reviewer's must-fix list separately in orchestrator state — iteration 2+ needs to tell each reviewer which of its own prior findings to verify.
+
+### Step 3: Fix Loop (iterations 2+, focused)
 
 If must-fix findings exist:
-- Dispatch fix agent (Sonnet, `agents/fix-code.md`) with all must-fix findings
-- Re-dispatch ALL 5 reviewers (fresh)
-- **Circuit breaker:** 3 full review cycles maximum
+- Dispatch fix agent (Sonnet, `agents/fix-code.md`) with all must-fix findings. The fix agent does NOT commit; it ends its report with `## Diff of changes` containing its `git diff`.
+- Extract that diff string and hold it in orchestrator state as `review_iter_M_fix_diff`.
+- Re-dispatch ALL 5 reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff.
+- Re-triage the new findings (still deduplicate across reviewers).
+- **Circuit breaker:** 3 full review cycles maximum.
+- If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
 ### Step 4: Human Sign-Off
 
@@ -251,7 +266,7 @@ Update `docs/manifest.yaml` on main: piece status → `done`, update coverage se
 - Implementer can't pass its oracle (green tests in Mode: TDD, plan `[Verify]` command in Mode: Implement) after 2 attempts → escalate
 - Missing or invalid `Mode:` flag in the implementer's prompt → the orchestrator must not dispatch; fix the composition
 - Phase has both `[TDD-Red]` and `[Implement]` markers, or neither → escalate (malformed plan)
-- Test files modified during Implement (Mode: TDD) or Refactor → reject and escalate
+- Test files modified during Implement (Mode: TDD) or Refactor (detected via `git diff $phase_N_start_sha..HEAD -- tests/`) → reject and escalate
 - Parallel agents modify shared file → reject, re-dispatch sequentially
 - Merge conflicts → escalate
 
@@ -261,7 +276,8 @@ Progress tracked via [x] checkboxes in plan.md:
 - Resume reads plan.md, finds first unchecked checkbox
 - Completed phases skip
 - In-progress phase resumes from first unchecked step
-- Phase start tags enable correct diff baselines on resume
+- Phase-start SHA is recovered on resume via `git rev-parse HEAD` — phases do not commit internally, so HEAD stays anchored at phase start until Step 7 runs. For phase 1, the phase-start SHA equals the HEAD when execute began (also the current HEAD on resume). Progress commits from prior phases advance HEAD, so each resumed phase still sees its own phase-start SHA at HEAD.
+- Mid-QA-iteration state (fix diffs from prior iterations) is NOT persisted. On resume inside a QA loop, restart at iteration 1 (full review) rather than reconstructing.
 
 ## Graceful Degradation
 

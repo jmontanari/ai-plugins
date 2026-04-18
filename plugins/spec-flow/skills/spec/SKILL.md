@@ -49,28 +49,25 @@ Socratic dialogue with the user, one question at a time:
 ### Phase 4: QA Loop
 
 1. Read the agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-spec.md`
-2. Compose prompt: interpolate the spec, PRD sections, architecture docs, manifest piece, non-negotiables
-3. Dispatch QA agent:
+
+2. **Iteration 1 (full review):** Compose prompt with `Input Mode: Full`: interpolate the full spec, PRD sections, architecture docs, manifest piece, non-negotiables. Dispatch:
    ```
    Agent({
-     description: "Spec QA review for <piece-name>",
-     prompt: <composed prompt>,
+     description: "Spec QA for <piece-name> (iter 1, full)",
+     prompt: <composed>,
      model: "opus"
    })
    ```
-4. Parse findings. If `must-fix` findings exist:
+
+3. **QA loop (iterations 2+, focused):** If iteration M-1 returned must-fix findings:
    - Read the fix template: `${CLAUDE_PLUGIN_ROOT}/agents/fix-doc.md`
-   - Dispatch fix agent:
-     ```
-     Agent({
-       description: "Fix spec findings for <piece-name>",
-       prompt: <composed with findings + spec + context>,
-       model: "sonnet"
-     })
-     ```
-   - Re-dispatch QA agent (completely fresh — new Agent call)
-   - **Circuit breaker:** After 3 QA iterations, escalate to human
-5. When QA returns clean: present spec to user for sign-off
+   - Dispatch fix agent with prior findings + spec + context. The fix agent does NOT commit; it ends its report with `## Diff of changes` containing its `git diff` of spec.md.
+   - Extract that diff string and hold it in orchestrator state as `spec_iter_M_fix_diff`.
+   - Re-dispatch QA agent (fresh) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `spec_iter_M_fix_diff`. Do NOT re-send the full spec.
+   - **Circuit breaker:** After 3 QA iterations, escalate to human.
+   - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
+
+4. When QA returns clean: present spec to user for sign-off.
 
 **Limitation:** The QA agent cannot assess brainstorming trade-offs not captured in the spec. The human sign-off covers this gap.
 

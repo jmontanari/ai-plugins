@@ -71,11 +71,24 @@ Write the plan to `docs/specs/<piece-name>/plan.md`
 ### Phase 3: QA Loop
 
 1. Read template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-plan.md`
-2. Dispatch QA agent (Opus) with plan + spec + PRD sections
-3. Process findings:
-   - must-fix → dispatch fix agent (using `${CLAUDE_PLUGIN_ROOT}/agents/fix-doc.md`) → QA again
-   - **Circuit breaker:** 3 iterations max, then escalate
-4. Present to user for sign-off
+
+2. **Iteration 1 (full review):** Dispatch QA agent (Opus) with `Input Mode: Full`, the full plan, spec, and PRD sections:
+   ```
+   Agent({
+     description: "Plan QA for <piece-name> (iter 1, full)",
+     prompt: <composed>,
+     model: "opus"
+   })
+   ```
+
+3. **QA loop (iterations 2+, focused):** If iteration M-1 returned must-fix findings:
+   - Dispatch fix agent (using `${CLAUDE_PLUGIN_ROOT}/agents/fix-doc.md`) with prior findings + plan + context. The fix agent does NOT commit; it ends its report with `## Diff of changes` containing its `git diff` of plan.md.
+   - Extract that diff string and hold it in orchestrator state as `plan_iter_M_fix_diff`.
+   - Re-dispatch QA agent (fresh) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `plan_iter_M_fix_diff`. Do NOT re-send the full plan.
+   - **Circuit breaker:** 3 iterations max, then escalate.
+   - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
+
+4. Present to user for sign-off.
 
 ### Phase 4: Finalize
 

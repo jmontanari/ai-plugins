@@ -23,6 +23,18 @@ AC-by-AC checklist:
   Test: test_file::test_name ✓ or ✗
   Notes: any deviation from spec
 
+## Input Modes
+
+You receive one of two inputs. The orchestrator's prompt will label which:
+
+**Full mode (iteration 1):** the complete worktree diff. Apply every check above.
+
+**Focused re-review mode (iteration 2+):** a delta (the fix agent's diff) plus the prior iteration's must-fix findings. Your job narrows:
+1. For each prior must-fix finding you raised, verify the delta resolves it. If not, re-raise it.
+2. Scan the delta for new spec drift — broken AC implementations, new scope creep, plan deviations introduced by the fix.
+3. Do NOT re-examine unchanged code — iteration 1 already covered it.
+4. If the delta is `(none)` and all findings are blocked, return must-fix=None.
+
 ## Rules
 - Be precise. Cite specific ACs, files, and functions.
 - "Not in spec" is a finding. The spec defines scope — extras are scope creep.
