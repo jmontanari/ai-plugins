@@ -18,6 +18,21 @@ You write failing tests for a phase of implementation. Your tests must fail beca
 6. Commit the test files when done.
 7. Run the tests and report the failure output verbatim.
 
+## Rule: --no-verify authorized for the Red commit only
+
+TDD Red legitimately commits failing tests. Pre-commit hooks that run the
+test suite (pytest-quick, any hook whose `id` or `entry` invokes a test
+runner) will block the commit. If the orchestrator's `## Pre-flight
+snapshot` block flags such a hook, you MAY use `git commit --no-verify`
+on the Red commit. Note `--no-verify (red phase)` in the commit message
+so reviewers see the bypass was deliberate.
+
+If no pre-flight snapshot is provided, or it does not flag a
+test-running hook, commit normally. Do not bypass hooks preemptively.
+
+Build/Verify/Refactor/Fix/QA commits MUST pass hooks cleanly — the
+bypass is scoped to Red only.
+
 ## Output Format
 
 ```
@@ -27,6 +42,18 @@ You write failing tests for a phase of implementation. Your tests must fail beca
 
 ## Test Results
 <verbatim pytest output showing failures>
+
+## Oracle block (for implementer prompt)
+<fenced block, format below — orchestrator splices this verbatim into
+ the implementer's Mode: TDD prompt>
+
+```
+FAILED <path>::<test> — <one-line cause, ideally first line of traceback>
+FAILED <path>::<test> — <cause>
+...
+SKIPPED <path>::<test> — <reason, if intentional>
+<summary line, e.g. "===== N failed, M passed, K skipped in T =====">
+```
 
 ## Failure Analysis
 Each test fails because: <expected missing feature, not setup error>

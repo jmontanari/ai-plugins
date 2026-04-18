@@ -22,13 +22,15 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 You (the main window) are a PURE CONDUCTOR. You:
 - Read the plan and construct agent prompts
+- Gather read-only pre-flight facts (LOC, schema samples, symbol presence, hook inventory) to avoid pushing cheap discovery work into agents — see Step 1b
+- Resolve plan conditionals the orchestrator can evaluate (LOC- and filesystem-based) into binding pre-decisions before dispatch
 - Dispatch agents via the Agent tool
 - Run verification commands (test suite, type checker, linter)
 - Evaluate agent reports and QA findings
 - Decide: proceed / retry / escalate
 - Track progress via plan.md checkboxes
 
-You write ZERO implementation code. All code comes from subagents.
+You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git grep`, reading `.pre-commit-config.yaml`) are explicitly part of the conductor role — they are cheap reads that collapse 5–15 agent tool calls per dispatch. Synthesis and code-writing still come from subagents.
 
 ## Pre-Loop: Mark Piece as Implementing
 
@@ -69,12 +71,32 @@ Inspect the phase's checkboxes in plan.md to determine the mode flag passed to t
 
 The orchestrator branches mechanically on the checkbox; it does not decide which mode applies. The mode decision was made by the plan author. The Implement mode exists for phases where TDD doesn't fit (config, infra, scaffolding, glue code, docs-as-code).
 
+### Step 1b: Phase Pre-Flight (read-only)
+
+Before dispatching Red or Implement, the orchestrator collects facts the agents would otherwise rediscover. Scope every probe to the phase's declared scope — files and symbols named in the plan's [TDD-Red], [Build], or [Implement] blocks. Pre-flight should take seconds; if any probe is slow (e.g. `git grep` on a monorepo), use path filters targeting scope directories or skip it.
+
+1. **LOC snapshot** — for each file the phase touches, run `wc -l <file>`. Attach as "LOC headroom" context.
+2. **Schema shape** — if the plan references a config family (`configs/<X>/`, schemas, templates), sample one existing sibling: `head -20 configs/<X>/<any_existing>`. Attach as "Existing schema" context.
+3. **Symbol presence** — for each type/class/function the plan names that isn't already defined inside the phase's own scope, `git grep -l -E '^(class|def|function) <Name>\b'` (or equivalent scoped to likely source directories). Attach the hit paths or "(not found — define in Build)".
+4. **Pre-commit hook inventory** — if `.pre-commit-config.yaml` exists, read it. For each hook, check whether its `id` or `entry` invokes a test runner (substring match on `pytest`, `unittest`, `go test`, `jest`, `vitest`, or the project's declared test command from CLAUDE.md). Flag any matches. **Err on surfacing** — false positives only give the Red agent information it doesn't need; false negatives stall the pipeline when Red hits a hook wall.
+5. **Plan conditional resolution** — scan the phase's [Build]/[Implement] block for ONLY these two phrase patterns:
+   - "extract ... if ... exceeds <N>" — evaluate using the LOC snapshot.
+   - "if <file/symbol> exists, reuse; otherwise create ..." — evaluate using symbol presence.
+   Resolve each into a bullet under `## Orchestrator pre-decisions`. Other conditional phrasings (runtime-state conditions, fuzzy natural-language conditionals) pass through unchanged — the orchestrator is not a general-purpose plan interpreter.
+
+Compose two attachments for later steps:
+
+- `## Pre-flight snapshot` — items 1–4 above, verbatim. Attached to BOTH the Red prompt (Step 2) and the Implement prompt (Step 3) — Red benefits from symbol presence and schema samples too.
+- `## Orchestrator pre-decisions` — item 5, one resolved decision per bullet. Attached only to the Implement prompt. Empty section OK (include the heading with "(none)" if no conditionals matched).
+
+If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red `--no-verify` authorization does not fire — Red commits normally.
+
 ### Step 2: TDD-Red — Write Failing Tests
 
 *(Mode: TDD only)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/tdd-red.md`
-2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns
+2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. If the snapshot flags a test-running pre-commit hook, the Red agent is already authorized by its template to use `git commit --no-verify` on the Red commit only — no extra instruction needed in the prompt beyond attaching the snapshot.
 3. Dispatch:
    ```
    Agent({
@@ -86,15 +108,38 @@ The orchestrator branches mechanically on the checkbox; it does not decide which
 4. **Validate:** Run the test suite. Confirm tests FAIL.
    - Check failure messages: do they indicate missing features (good) or setup errors (bad)?
    - If setup errors: the agent wrote bad tests. Retry once with error output. If still failing for wrong reason: escalate.
+5. **Capture the Oracle block:** extract the Red agent's `## Oracle block` section verbatim. Hold in orchestrator state as `phase_N_oracle_block` — Step 3 splices it into the implementer prompt without paraphrase.
 
 ### Step 3: Implement — Write the Code
 
 *(Both modes. The mode flag determines the agent's oracle of done.)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/implementer.md`
-2. Compose prompt. The FIRST line MUST be the mode flag:
-   - `Mode: TDD` — include verbatim failing-test output as the oracle, plan [Build] tasks, spec ACs, architecture constraints, pattern pointers
-   - `Mode: Implement` — include the plan's `[Verify]` command and expected output as the oracle, plan [Implement] tasks, spec ACs, architecture constraints, pattern pointers
+2. Compose prompt using the canonical template below. **Reference plan.md by file path and line range rather than restating its contents** — the agent reads plan.md directly. The prompt supplies only what plan.md doesn't: pre-flight facts, pre-decisions, and the mode oracle.
+
+   ```markdown
+   Mode: TDD | Implement
+
+   ## Plan reference
+   Execute `docs/specs/<piece>/plan.md` Phase <N> [Build] | [Implement]
+   block verbatim (lines <X>-<Y>). The plan is binding; this prompt
+   only supplies context the plan doesn't.
+
+   ## Pre-flight snapshot
+   <LOC snapshot, schema samples, symbol presence, hook inventory from Step 1b>
+
+   ## Orchestrator pre-decisions
+   <one bullet per resolved plan conditional from Step 1b item 5, or "(none)">
+
+   ## Oracle (Mode: TDD) | Verify command (Mode: Implement)
+   - Mode: TDD — splice `phase_N_oracle_block` from Step 2 verbatim.
+   - Mode: Implement — include the plan's `[Verify]` command and
+     expected output.
+
+   ## Commit
+   <concise message referencing phase N and mode>
+   ```
+
 3. For tasks marked [P] (parallel): dispatch multiple Agent calls concurrently, each with the same mode flag.
    - **Merge check:** After all parallel agents complete, verify no file conflicts. If conflicts: reject, re-dispatch sequentially, flag as plan defect.
 4. Dispatch:
@@ -108,7 +153,7 @@ The orchestrator branches mechanically on the checkbox; it does not decide which
 5. **Validate:** Run the mode's oracle.
    - Mode: TDD — full test suite must be GREEN.
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
-6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict), escalate — do not retry blindly.
+6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
 
 ### Step 4: Verify — Confirm Correctness
 
@@ -278,6 +323,22 @@ Progress tracked via [x] checkboxes in plan.md:
 - In-progress phase resumes from first unchecked step
 - Phase-start SHA is recovered on resume via `git rev-parse HEAD` — phases do not commit internally, so HEAD stays anchored at phase start until Step 7 runs. For phase 1, the phase-start SHA equals the HEAD when execute began (also the current HEAD on resume). Progress commits from prior phases advance HEAD, so each resumed phase still sees its own phase-start SHA at HEAD.
 - Mid-QA-iteration state (fix diffs from prior iterations) is NOT persisted. On resume inside a QA loop, restart at iteration 1 (full review) rather than reconstructing.
+- Pre-flight snapshot and pre-decisions are NOT persisted. On resume before Step 2 or 3, re-run Step 1b — it's cheap and ensures LOC/symbol facts aren't stale from earlier in the session.
+
+## Measurement
+
+At session end, emit a summary with per-phase **Build duration** and **Build token count** from task-notification data (the `duration_ms` field and token counts returned by Agent dispatches). Two observable properties on complex phases after these changes ship:
+
+1. Build token count drops ≥ 30 % vs. a comparable-scope pre-change phase.
+2. Build tool-use count drops ≥ 25 %.
+
+If neither holds on two consecutive large phases, something other than the five inefficiencies addressed here is dominating — re-audit before adding more orchestration machinery.
+
+## Known costs and caveats
+
+- **Pre-flight on monorepos.** `git grep` across a very large repo is slow. Scope probes to the phase's declared scope directories and use path filters. If a probe would take more than a few seconds, skip it and let the agent rediscover — pre-flight is an optimization, not a correctness gate.
+- **`pre-commit run` cost.** On projects whose pre-commit config runs type-check or the full test suite, the agent self-check (implementer/refactor/fix-code rule) can add minutes. Net positive vs. the hook-failure retry loop, but consider `--hook-stage commit` or a project-configured lightweight hook stage for the self-check if a full run is prohibitive.
+- **Phase-size outliers are out of scope here.** These changes reduce *avoidable* work inside Implement. A phase with 1700+ LOC and five new files is expected to be expensive — the root fix for oversized phases lives in the `plan` skill (phase budgeting), not here.
 
 ## Graceful Degradation
 

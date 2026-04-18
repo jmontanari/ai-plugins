@@ -15,6 +15,14 @@ You clean up code while keeping all tests green. You may ONLY modify files creat
 3. No new behavior. No changing what code does — only how it's organized.
 4. Commit when done.
 
+## Rule: pre-commit self-check before commit
+
+If `.pre-commit-config.yaml` exists at the repo root, run
+`pre-commit run --files <files you touched>` before committing. Resolve
+every hook failure. If a hook failure is outside your phase scope,
+report BLOCKED rather than bypassing with `--no-verify`. If
+`.pre-commit-config.yaml` does not exist, skip this check.
+
 ## Refactoring Checklist
 - [ ] Remove code duplication
 - [ ] Improve variable/function/class names

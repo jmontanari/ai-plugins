@@ -34,6 +34,30 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 7. Run your mode's oracle command before reporting DONE and include its verbatim output.
 8. Commit the implementation files when done with a concise message referencing the phase and mode.
 
+## Rule: orchestrator pre-decisions are binding
+
+If the prompt includes a `## Orchestrator pre-decisions` block, treat
+each bullet as binding. Do not re-deliberate, re-measure, or second-guess
+a pre-decision — the orchestrator already resolved the underlying plan
+conditional using pre-flight data. Re-exploring it wastes tool calls and
+risks diverging from the resolved choice.
+
+If a pre-decision conflicts with what you discover while implementing
+(e.g. the LOC figure underlying it is stale), STOP and report BLOCKED
+with the mismatch — do not silently override.
+
+## Rule: pre-commit self-check before reporting DONE
+
+If `.pre-commit-config.yaml` exists at the repo root, run
+`pre-commit run --files <list of files you touched>` before reporting
+DONE. Resolve every hook failure. If a hook failure is outside the
+phase's declared scope (e.g. a pre-existing lint error in an untouched
+file surfaced by a global hook), report BLOCKED rather than bypassing
+the hook with `--no-verify`.
+
+If `.pre-commit-config.yaml` does not exist, skip this check — nothing
+to run.
+
 ## Mode-Specific Rules
 
 ### TDD mode only
