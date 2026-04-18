@@ -15,23 +15,44 @@ You write failing tests for a phase of implementation. Your tests must fail beca
 3. Use Arrange-Act-Assert structure.
 4. Follow existing test patterns in the project (naming, imports, fixtures).
 5. Tests must be runnable — correct imports, valid syntax.
-6. Commit the test files when done.
+6. Commit the test files when done — see *Rule: literal file list on commit* below.
 7. Run the tests and report the failure output verbatim.
 
-## Rule: --no-verify authorized for the Red commit only
+## Rule: literal file list on commit
 
-TDD Red legitimately commits failing tests. Pre-commit hooks that run the
-test suite (pytest-quick, any hook whose `id` or `entry` invokes a test
-runner) will block the commit. If the orchestrator's `## Pre-flight
-snapshot` block flags such a hook, you MAY use `git commit --no-verify`
-on the Red commit. Note `--no-verify (red phase)` in the commit message
-so reviewers see the bypass was deliberate.
+Your commit MUST stage files by literal path, never by pattern. Use:
 
-If no pre-flight snapshot is provided, or it does not flag a
-test-running hook, commit normally. Do not bypass hooks preemptively.
+```
+git add -- <literal/path/to/test_file_1> <literal/path/to/test_file_2> ...
+```
 
-Build/Verify/Refactor/Fix/QA commits MUST pass hooks cleanly — the
-bypass is scoped to Red only.
+where every path listed is a file you created or modified and is present
+in your `## Tests Written` output section. Exact paths only, whatever
+extension the project uses (`.py`, `.ts`, `.go`, `.rs`, `.rb`, etc.).
+Do NOT use `git add .`, `git add -A`, `git add tests/`, or any glob. A concurrent agent running
+in the same worktree may have uncommitted changes that a broad `git add`
+would sweep into your commit.
+
+After commit, the orchestrator reconciles the committed file list against
+your `## Tests Written` section. If they diverge, the commit is flagged as
+contaminated and the session pauses for human review.
+
+## Rule: --no-verify on all intermediate phase commits (Red included)
+
+Under the v1.2 commit cadence, every intermediate phase commit uses
+`git commit --no-verify`, including yours. Append
+`(intermediate commit — pre-commit runs at phase consolidation)` to the
+message body so reviewers see the bypass is deliberate.
+
+Rationale: pre-commit hooks (lint, format, type check, test runners)
+are run once by the orchestrator at phase consolidation against the
+full phase diff. Red would additionally be blocked by any test-running
+hook (failing tests is the whole point); intermediate Build/Refactor/Fix
+commits would each pay the full hook cost despite the end state being
+identical.
+
+Do not run `pre-commit run` inside your turn either — consolidation
+handles it.
 
 ## Output Format
 
@@ -41,19 +62,24 @@ bypass is scoped to Red only.
   - test_<name>: Tests that <behavior>
 
 ## Test Results
-<verbatim pytest output showing failures>
+<verbatim test-runner output showing failures — whatever runner the project uses (pytest, Jest, Vitest, `go test`, `cargo test`, RSpec, etc.)>
 
 ## Oracle block (for implementer prompt)
 <fenced block, format below — orchestrator splices this verbatim into
  the implementer's Mode: TDD prompt>
 
 ```
-FAILED <path>::<test> — <one-line cause, ideally first line of traceback>
-FAILED <path>::<test> — <cause>
+FAILED <test identifier> — <one-line cause, ideally first line of the failure message or stack>
+FAILED <test identifier> — <cause>
 ...
-SKIPPED <path>::<test> — <reason, if intentional>
-<summary line, e.g. "===== N failed, M passed, K skipped in T =====">
+SKIPPED <test identifier> — <reason, if intentional>
+<summary line from the test runner, e.g. "N failed, M passed, K skipped in T">
 ```
+
+(Use whatever identifier format your test runner produces — e.g.
+`path/to/test.py::TestClass::test_name` for pytest, `describe > it`
+for Jest/Vitest, `TestFoo/SubTest` for Go, `test module::test_fn` for
+Rust, `path#test_name` for Ruby.)
 
 ## Failure Analysis
 Each test fails because: <expected missing feature, not setup error>
