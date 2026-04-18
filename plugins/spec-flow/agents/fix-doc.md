@@ -20,3 +20,5 @@ You are fixing spec or plan documents based on QA findings. You receive specific
 For each finding report: Status (FIXED or BLOCKED), what was changed.
 
 Return a summary: "Fixed N of M findings. K blocked (requires human input)."
+
+End your report with a `## Diff of changes` section containing the unified diff of every file you modified. Produce it by running `git diff -- <files you touched>` against the working tree (include uncommitted changes — do not rely on commits). The orchestrator uses this diff as the sole input to the next QA iteration, so it must be complete and accurate. If you made no changes (all findings blocked), write `## Diff of changes` followed by `(none)`.
