@@ -85,6 +85,46 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
    If only one phase touches the coordination files, skip Scaffold — it's overhead without payoff.
 
+8. **Phase Groups for parallelizable work.** When a piece contains ≥2 units of work that touch disjoint file scopes and have no symbol dependencies on each other (classic examples: N independent adapters, N independent endpoints, per-table migrations), decompose them into a **Phase Group** with `[P]`-marked **Sub-Phases** instead of a single combined phase or a serial chain of flat phases.
+
+   **Structure a Phase Group as:**
+   ```markdown
+   ## Phase Group <letter>: <logical name>
+   **Exit gate:** all sub-phases pass oracle + group-level Deep QA clean
+   **ACs covered:** <union of sub-phase ACs>
+
+   ### Sub-Phase <letter>.<n> [P]: <sub-phase name>
+   **Scope:** <file paths, comma-separated — must be disjoint from sibling sub-phases>
+   **ACs:** <subset of group ACs>
+   - [ ] [TDD-Red] ...
+   - [ ] [Build] ...
+   - [ ] [Verify] ...
+   - [ ] [QA-lite] Sonnet narrow review, scope: this sub-phase only
+
+   ### Sub-Phase <letter>.<n+1> [P]: <next sub-phase>
+   ...
+
+   ### Group-level
+   - [ ] [Refactor] scope: union of sub-phase files (auto-skip if all Builds clean)
+   - [ ] [QA] Opus deep review, diff baseline: group_start_sha
+   - [ ] [Progress]
+   ```
+
+   **When to use Phase Groups:**
+   - Adapter-pattern work (N adapters, each a separate file)
+   - Independent endpoints, routes, or handlers
+   - Per-entity migrations or transformations
+   - Any decomposable work where sub-units are genuinely disjoint
+
+   **When NOT to use Phase Groups:**
+   - Single-file work — degenerate case, use a flat phase
+   - Tightly-coupled code where sub-phase N+1 references types or functions defined in sub-phase N — the phases are not truly disjoint; keep them as a flat phase or sequential flat phases
+   - Work that needs per-unit deep Opus review for regulatory/audit reasons — flat phases preserve per-phase Opus QA; Phase Groups defer it to group level
+
+   **Scope discipline:** each Sub-Phase MUST declare its `**Scope:**` as a literal file path list (glob patterns rejected). The orchestrator validates disjointness at dispatch time — if two sibling sub-phases declare overlapping file paths, the whole group falls back to serial execution (parallelism would race on the overlap).
+
+   **Phase 0 Scaffold interacts with Phase Groups.** If sub-phases in a group each need to append entries to a shared coordination file (a common `__init__.py`, a shared fixtures file, a test registry), author a Phase 0 Scaffold BEFORE the Phase Group to pre-create the entries. Otherwise concurrent sub-phases will race on the shared file. The existing Scaffold guidance above (previous rule) covers this pattern.
+
 Write the plan to `docs/specs/<piece-name>/plan.md`
 
 ### Phase 3: QA Loop
