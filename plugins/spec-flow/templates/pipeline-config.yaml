@@ -20,3 +20,8 @@ qa_iter2: auto
 #   always  — same as auto but errors if a plan has no parallelism (catches over-flat plans)
 #   off     — treat Phase Groups as if they were flat serial phases (disable new scheduler; useful for rollback)
 phase_groups: auto
+
+# reflection: controls Step 4.5 end-of-piece reflection (new in v1.5.0)
+#   auto    — dispatch reflection agents (process-retro + future-opportunities); append findings to <docs_root>/improvement-backlog.md (default)
+#   off     — skip Step 4.5; learnings.md authored without reflection-agent input (pre-v1.5 behavior)
+reflection: auto
