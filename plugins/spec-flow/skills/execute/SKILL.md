@@ -542,14 +542,72 @@ Present to user:
 - Final review results (clean or deferred items)
 - Request approval to merge
 
+### Step 4.5: Reflection
+
+Read the `reflection` key from `.spec-flow.yaml` (valid values: `auto`, `off`; default `auto`). If `off`, skip this step entirely and proceed directly to Step 5 with no reflection inputs (Step 5 falls back to free-form authoring).
+
+In `auto` mode, dispatch two reflection agents concurrently (read-only, Sonnet):
+
+```
+Agent({ description: "Process retro for <piece>", prompt: <process-retro composed>, model: "sonnet" })
+Agent({ description: "Future opportunities for <piece>", prompt: <future-opportunities composed>, model: "sonnet" })
+```
+
+**Process-retro prompt context:**
+- Session-end metrics summary (per the Measurement section — Build duration, Build token count, Verify mode chosen, Refactor skipped, QA iter-2 skipped, Step 6b outcome, Phase Group auto-triage outcomes if any group ran)
+- Per-phase escalation log (every circuit-breaker hit, BLOCKED report, contamination event, scope violation observed during the piece)
+- Plan structure (plan.md's phase outline)
+- Cumulative diff (`git diff $piece_start_sha..HEAD`)
+
+**Future-opportunities prompt context:**
+- Final spec for this piece (with acceptance criteria, including any deferred ACs)
+- Final plan (with `NOT COVERED` rows from Build's AC matrix)
+- Cumulative diff (`git diff $piece_start_sha..HEAD`)
+- Current `<docs_root>/improvement-backlog.md` contents, OR the literal string "(file does not exist yet)" if absent
+- `<docs_root>/manifest.yaml`
+
+Wait for both agents to complete. Collect their structured outputs.
+
+**Append findings to `<docs_root>/improvement-backlog.md`** (create the file if it does not exist):
+
+```
+## <piece-name> — <YYYY-MM-DD>
+
+### Process retro
+<process-retro output verbatim>
+
+### Future opportunities
+<future-opportunities output verbatim>
+
+---
+```
+
+Commit the backlog append as a separate commit on the worktree branch (this lands BEFORE Step 5's learnings.md commit so that even if Step 5 fails, the raw findings are preserved):
+
+```bash
+git add <docs_root>/improvement-backlog.md
+git commit -m "reflection: <piece-name> — append findings to improvement backlog"
+```
+
+Hold both reflection outputs in orchestrator state for Step 5 synthesis.
+
 ### Step 5: Capture Learnings
 
-Write `docs/specs/<piece-name>/learnings.md` on the worktree branch:
+Synthesize a human-readable `learnings.md` from the reflection findings (Step 4.5 outputs) + the cumulative diff. The synthesized doc focuses on narrative — what worked, what to repeat, what to change next time — not raw findings (those live in the improvement backlog from Step 4.5).
+
+Write `docs/specs/<piece-name>/learnings.md` on the worktree branch with sections:
 - Patterns that worked well
 - Issues QA caught
 - Recommendations for future specs
 
-Commit on worktree branch before merge.
+If Step 4.5 was skipped (`reflection: off`), fall back to pre-v1.5 behavior: orchestrator (or human) authors `learnings.md` directly without reflection-agent input, using the cumulative diff and any session-end observations as the only inputs.
+
+Commit on worktree branch before merge:
+
+```bash
+git add docs/specs/<piece-name>/learnings.md
+git commit -m "learnings: <piece-name>"
+```
 
 ### Step 6: Merge
 
