@@ -37,22 +37,13 @@ After commit, the orchestrator reconciles the committed file list against
 your `## Tests Written` section. If they diverge, the commit is flagged as
 contaminated and the session pauses for human review.
 
-## Rule: --no-verify on all intermediate phase commits (Red included)
+## Rule: committing failing tests
 
-Under the v1.2 commit cadence, every intermediate phase commit uses
-`git commit --no-verify`, including yours. Append
-`(intermediate commit — pre-commit runs at phase consolidation)` to the
-message body so reviewers see the bypass is deliberate.
+Your tests are expected to FAIL — that's the whole point of TDD-Red. Spec-flow projects keep test runs out of pre-commit hooks (tests run at pre-push or as the orchestrator's oracle gate, not per-commit) so your `git commit` won't be blocked by its own failing tests. The hook only runs lint/format/type-check, which your test files should satisfy.
 
-Rationale: pre-commit hooks (lint, format, type check, test runners)
-are run once by the orchestrator at phase consolidation against the
-full phase diff. Red would additionally be blocked by any test-running
-hook (failing tests is the whole point); intermediate Build/Refactor/Fix
-commits would each pay the full hook cost despite the end state being
-identical.
+If the project's pre-commit config still includes a test hook (uncommon; flagged by the orchestrator's pre-flight as a "test-running hook" in the hook inventory), the commit will fail on your own failing tests and the orchestrator has explicitly authorized `--no-verify` as a scoped escape hatch for your commit only — use it if the pre-flight surfaced a test hook, otherwise commit normally.
 
-Do not run `pre-commit run` inside your turn either — consolidation
-handles it.
+Do not run `pre-commit run` inside your turn — the commit triggers hooks automatically. Running them manually first is redundant.
 
 ## Output Format
 

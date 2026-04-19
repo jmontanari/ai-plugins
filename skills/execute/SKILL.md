@@ -89,14 +89,14 @@ Compose two attachments for later steps:
 - `## Pre-flight snapshot` — items 1–4 above, verbatim. Attached to BOTH the Red prompt (Step 2) and the Implement prompt (Step 3) — Red benefits from symbol presence and schema samples too.
 - `## Orchestrator pre-decisions` — item 5, one resolved decision per bullet. Attached only to the Implement prompt. Empty section OK (include the heading with "(none)" if no conditionals matched).
 
-If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red `--no-verify` authorization does not fire — Red commits normally.
+If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents commit normally without any hooks running.
 
 ### Step 2: TDD-Red — Write Failing Tests
 
 *(Mode: TDD only)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/tdd-red.md`
-2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. Under the v1.2 commit cadence, the Red agent commits with `--no-verify` unconditionally (its template handles this) — pre-commit runs once at phase consolidation (Step 6b).
+2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. Red commits normally — the commit triggers hooks like any other. The one exception: when the pre-flight hook inventory flagged a test-running hook, Red's template is authorized to use `--no-verify` for its own commit (Red's tests are expected to fail; a test-running pre-commit hook would block it).
 3. Dispatch:
    ```
    Agent({
@@ -161,6 +161,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
    - Mode: TDD — full test suite must be GREEN.
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
 6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
+7. **AC Coverage Matrix validation gate.** After the oracle passes, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment.
 
 ### Step 4: Verify — Confirm Correctness
 
@@ -197,7 +198,22 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
 
 ### Step 5: Refactor — Clean Up
 
-*(Mode: TDD always; Mode: Implement only if the phase has a `[Refactor]` checkbox)*
+*(Mode: TDD by default; Mode: Implement only if the phase has a `[Refactor]` checkbox. Conditional skip applies to both modes — see below.)*
+
+**Conditional skip.** Read the `refactor` key from `.spec-flow.yaml` (valid values: `auto`, `always`, `never`; default `auto`). If the key is absent, default to `auto`.
+
+- `never` — skip this step unconditionally. Proceed to Step 6.
+- `always` — run this step unconditionally.
+- `auto` — inspect the Build agent's report. Skip this step if **all** of:
+  - `## Oracle Outcome` reports `Oracle ran clean on first attempt: yes`
+  - `## Plan Adherence` reports `Deviations from plan: none`
+  - `## AC Coverage Matrix` is clean (all rows `covered`, no `NOT COVERED` rows — already validated by Step 3's gate, but re-check here)
+
+  Otherwise run the step.
+
+Log the skip decision (`refactor_skipped: auto|never` with the reason) for the session summary. Observed yield from Phases 5a–11: 8 Refactor passes produced only comment cleanups / −3 to −48 LOC dedup and fixed zero correctness defects. Skipping when Build is clean reclaims 10–15 min per phase with no observed quality loss.
+
+If skipped, proceed directly to Step 6. Otherwise:
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/refactor.md`
 2. Compose prompt with: list of phase files, the mode's verification command (full test suite for Mode: TDD, plan's `[Verify]` command for Mode: Implement), quality principles
@@ -218,15 +234,31 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-phase.md`
 
-2. **Iteration 1 (full review):** Get the full phase diff using the phase-start SHA from Step 1:
-   ```bash
-   git diff $phase_N_start_sha..HEAD
-   ```
-   Compose prompt with: `Input Mode: Full`, the diff, spec, plan (current phase section), PRD sections, non-negotiables. Dispatch:
+2. **Iteration 1 (full review):** Build a structured surface map instead of dumping the raw diff + full spec + PRD. The goal is to hand Opus pre-digested context so it does adversarial review, not re-discovery.
+
+   Compose the iter-1 prompt with the following blocks, in order:
+
+   - **`## Files changed`** — one row per file: `path | +adds/-dels | role (test/impl/config/docs)`. Generated from `git diff --numstat $phase_N_start_sha..HEAD` plus path-based role inference.
+
+   - **`## Public symbols added or modified`** — list of class/function/type names the diff introduces or modifies in non-test files. Use `git diff $phase_N_start_sha..HEAD -- <impl paths>` and grep for added/changed lines matching the project's symbol declarations (e.g. `^[+-]\s*(class|def|function|type)\s+\w+`). One line per symbol: `path:symbol`.
+
+   - **`## Integration callers`** — for each public symbol above, run `git grep -l <symbol>` scoped to source directories. Paths only, no bodies. Opus can `Read` specific callers if it needs to inspect them. If a symbol has zero callers, mark it "(new — no callers yet)".
+
+   - **`## Diff`** — changed-line hunks only (default `git diff` output). If the total diff is > 500 LOC, collapse to per-file summaries with a pointer: "Full hunks available; Read <path> or request via targeted diff if you need specific ranges." Do not attach full file bodies ever.
+
+   - **`## AC Coverage Matrix (from Build)`** — splice Build's `## AC Coverage Matrix` table verbatim. This was already validated clean by Step 3's gate. Opus's job is to adversarially verify the claimed coverage is real and find gaps, NOT to re-derive the matrix from scratch.
+
+   - **`## Phase ACs`** — attach ONLY the acceptance criteria for this phase (mapped via plan.md), not the full spec. Use the plan's "AC map" section or the spec's AC sections that the plan references for this phase.
+
+   - **`## Non-negotiables`** — project constraints (short file).
+
+   **Do NOT attach:** full spec, PRD sections, full plan, or full test-runner output. PRD alignment is the Final Review board's job (`review-board/prd-alignment.md`). Per-phase QA is about correctness against the plan, not PRD compliance.
+
+   Dispatch:
    ```
    Agent({
      description: "QA: review Phase N (iter 1, full)",
-     prompt: <composed>,
+     prompt: <composed blocks above, with "Input Mode: Full" on line 1>,
      model: "opus"
    })
    ```
@@ -235,52 +267,46 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty and the Red 
    - Read fix template: `${CLAUDE_PLUGIN_ROOT}/agents/fix-code.md`
    - Dispatch fix agent (Sonnet) with prior findings + plan context. The fix agent does NOT commit; it ends its report with a `## Diff of changes` section containing its `git diff`.
    - Extract that diff string from the fix agent's report and hold it in orchestrator state as `iter_M_fix_diff`.
-   - **Commit the fix diff with `--no-verify`** so HEAD advances and the next QA iteration reviews a real commit boundary rather than a dirty worktree:
+   - Commit the fix diff so HEAD advances and the next QA iteration reviews a real commit boundary rather than a dirty worktree:
      ```bash
      git add -- <files touched in iter_M_fix_diff>
-     git commit --no-verify -m "fix: Phase N QA iter M (intermediate commit — pre-commit runs at phase consolidation)"
+     git commit -m "fix: Phase N QA iter M"
      ```
-   - Re-dispatch QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings.
+     Hooks run on the commit. If a hook fails, re-dispatch the fix agent with the hook error appended to its context; do not bypass with `--no-verify`.
+
+   - **Conditional skip of re-dispatch.** Read the `qa_iter2` key from `.spec-flow.yaml` (valid values: `auto`, `always`; default `auto`). In `auto` mode, skip the iter-M+1 QA re-dispatch if **all** of:
+     - `iter_M_fix_diff` line count (excluding diff headers) < 50 LOC
+     - The fix agent reported all findings resolved (no `## Blocked findings` section or it's empty)
+     - The mode's oracle is green after the fix commit (re-run it; cheap vs. another Opus dispatch)
+
+     When skipped, treat the fix agent's self-verification as the gate and proceed to Step 7. Log `qa_iter2_skipped: true` with the fix diff line count for the session summary. Rationale: across observed sessions iter-2 found new must-fix in roughly 1 out of 6 runs — low yield for a 15–30 min Opus dispatch, and the class of finding that hits (cross-file semantic issues like stale fixture references) tends to get caught by Final Review's board anyway. The small-diff + self-verified heuristic is conservative enough to not mask genuine regressions.
+
+     In `always` mode, always re-dispatch.
+
+   - **Re-dispatch (when not skipped):** QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings. The agent template's iter-2 rules hard-cap out-of-scope reads (return BLOCKED rather than fetching).
    - **Circuit breaker:** 3 iterations max, then escalate.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate — no point re-running QA.
 
-4. When QA returns must-fix=None, proceed to **Step 6b — Phase Consolidation**.
+4. When QA returns must-fix=None (or iter-2 re-dispatch was skipped by the conditional above), proceed to **Step 7**.
 
-### Step 6b: Phase Consolidation (pre-commit over the full phase diff)
+### Step 6b: Phase Hook Sanity Check
 
-Under the v1.2 commit cadence, intermediate phase commits use `--no-verify`. This step is the single hook gate per phase.
+Every intermediate commit in the phase already ran hooks (Red, Build, Refactor, and fix-code commits all trigger pre-commit normally), so the cumulative phase diff has been lint/format/type-check-clean at each step. This step is a single defensive sweep against any autofix residue or staging-area drift that might have slipped through.
 
-1. Compute the phase's changed files:
+1. Run pre-commit over the phase's changed files:
    ```bash
    git diff --name-only $phase_N_start_sha..HEAD > /tmp/phase_N_files.txt
-   ```
-   If the list is empty, skip to Step 7 (nothing to check).
-
-2. Run pre-commit against them:
-   ```bash
    pre-commit run --files $(cat /tmp/phase_N_files.txt)
    ```
-   If `.pre-commit-config.yaml` is absent, skip this step (nothing to run).
+   If `.pre-commit-config.yaml` is absent or the file list is empty, skip to Step 7.
 
-3. **On PASS:** proceed to Step 7.
+2. **Exit 0:** proceed to Step 7.
 
-4. **On FAIL:** dispatch fix-code with the hook output as the finding set:
-   ```
-   Agent({
-     description: "Fix-code: pre-commit failures at Phase N consolidation",
-     prompt: <fix-code.md + hook output + list of files changed in phase>,
-     model: "sonnet"
-   })
-   ```
-   Extract the fix diff, commit with `--no-verify`:
-   ```bash
-   git add -- <files from fix diff>
-   git commit --no-verify -m "fix: Phase N pre-commit failures (intermediate commit — pre-commit re-runs at consolidation)"
-   ```
-   Re-run pre-commit over the updated file list. Repeat.
-   - **Circuit breaker:** 2 consolidation fix loops max. If hooks still fail, escalate — the hook failure is likely out-of-scope (e.g. pre-existing lint error in an untouched file surfaced by a global hook) and a human needs to decide whether to exclude the file or fix the pre-existing issue.
+3. **Non-zero exit, files modified** (autofix residue): commit the autofix and re-run once. If the second run also modifies files, escalate — hooks are fighting each other; narrow the hook config.
 
-5. When hooks pass, proceed to Step 7.
+4. **Non-zero exit, no files modified** (real error the hooks couldn't autofix): dispatch fix-code once with the hook output as context. If fix-code's diff doesn't resolve the complaint on the next hook run, escalate — the hook is flagging something out-of-scope for the phase (pre-existing debt surfaced by a global hook, or architecture/type issue).
+
+**Why this step is usually a no-op.** Per-commit hooks catch lint/format/type issues at the commit that introduced them, so nothing accumulates. If this step becomes expensive in practice (multiple fix-code dispatches per phase, or autofix cycles that don't converge), the likely cause is that the project's pre-commit config includes checks requiring full-repo context (whole-repo mypy, global lint rules). Move those to `pre-push` or run them as explicit orchestrator gates — per-commit hooks should be diff-scoped and cheap.
 
 ### Step 7: Mark Progress
 
@@ -327,11 +353,12 @@ Record each reviewer's must-fix list separately in orchestrator state — iterat
 If must-fix findings exist:
 - Dispatch fix agent (Sonnet, `agents/fix-code.md`) with all must-fix findings. The fix agent does NOT commit; it ends its report with `## Diff of changes` containing its `git diff`.
 - Extract that diff string and hold it in orchestrator state as `review_iter_M_fix_diff`.
-- **Commit the fix with `--no-verify`** so HEAD advances for the next review cycle:
+- Commit the fix so HEAD advances for the next review cycle:
   ```bash
   git add -- <files from review_iter_M_fix_diff>
-  git commit --no-verify -m "fix: final-review iter M must-fix (intermediate commit — pre-commit already ran at each phase's consolidation)"
+  git commit -m "fix: final-review iter M must-fix"
   ```
+  Hooks run normally. If a hook fails, re-dispatch the fix agent with the hook output appended; don't bypass.
 - Re-dispatch ALL 5 reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** 3 full review cycles maximum.
@@ -392,19 +419,20 @@ Progress tracked via [x] checkboxes in plan.md:
 
 ## Measurement
 
-At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), and **consolidation outcome** (hooks pass/fix-loop count) from task-notification data and orchestrator state. Observable properties after v1.2 changes ship:
+At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), **Refactor skipped** (auto-skip predicate matched), **QA iter-2 skipped** (small-diff predicate matched), and **Step 6b outcome** (pass / autofix / fix-code dispatched). Observable properties:
 
-1. Build token count drops ≥ 30 % vs. a comparable-scope pre-v1.1 phase.
-2. Build tool-use count drops ≥ 25 %.
-3. Verify: majority of clean-Build phases use Audit mode (3–5 min) rather than Full (10–15 min).
-4. Consolidation (Step 6b): hooks pass on first try on majority of phases; ≤1 fix-code loop needed.
+1. Build token count is materially lower than a comparable-scope phase would have been without pre-flight digests and scoped QA prompts — pre-flight facts + pitfall checklist reduce agent rediscovery and self-iteration.
+2. Build tool-use count drops commensurately.
+3. Verify: majority of clean-Build phases use Audit mode (3–5 min) rather than Full (10–15 min). Driven by Step 3's AC matrix gate — a clean matrix unlocks Audit.
+4. Step 6b passes cleanly on the majority of phases (no-op), because per-commit hooks caught issues at each intermediate commit rather than letting them accumulate.
+5. Refactor is skipped on clean-Build phases; QA iter-2 is skipped when the fix-diff is small and self-verified.
 
-If (1)/(2) don't hold on two consecutive large phases, something other than the pre-flight inefficiencies is dominating — re-audit before adding more machinery. If (3) doesn't hold, inspect Implement's AC coverage matrix — the matrix is likely incomplete or inconsistent, forcing Full mode unnecessarily. If (4) doesn't hold, the pre-commit config is running checks that agents can't satisfy in isolation (e.g. a hook that requires the full repo context); consider narrowing the consolidation hook stage.
+If (1)/(2) don't hold on two consecutive large phases, something other than the pre-flight inefficiencies is dominating — re-audit before adding more machinery. If (3) doesn't hold, inspect Implement's AC coverage matrix — the matrix is likely incomplete or inconsistent, forcing Full mode unnecessarily. If Step 6b consistently dispatches fix-code, the project's pre-commit config includes checks that depend on full-repo context (e.g. global mypy or whole-repo type checking); move those to pre-push.
 
 ## Known costs and caveats
 
 - **Pre-flight on monorepos.** `git grep` across a very large repo is slow. Scope probes to the phase's declared scope directories and use path filters. If a probe would take more than a few seconds, skip it and let the agent rediscover — pre-flight is an optimization, not a correctness gate.
-- **`pre-commit run` cost.** Under the v1.2 commit cadence, intermediate phase commits use `--no-verify` and pre-commit runs exactly once per phase at Step 6b against the full phase diff. On projects whose hook config includes a full test suite or a type checker, this is still a 1–3 minute pass — but it replaces 3–5 per-step runs that each paid the same cost. If Step 6b is consistently the longest single step in a phase, narrow the hook config to diff-scoped checks. The README lists language-specific tools for this (pytest-testmon, Jest `--findRelatedTests`, `cargo nextest --changed-since`, etc.) — a project-level concern, not a spec-flow knob.
+- **Per-commit hook cost.** Every intermediate commit runs hooks, so the project's pre-commit config needs to be cheap: lint + format + type-check on small diffs, not whole-repo or test-suite runs. A ~5s/commit hook cost × 5 intermediate commits/phase = negligible. Move expensive checks (full test suites, whole-repo type checks, documentation builds) to `pre-push` or run them as explicit orchestrator gates between phases. The README covers pre-commit config shape.
 - **Phase-size outliers are out of scope here.** These changes reduce *avoidable* work inside Implement. A phase with 1700+ LOC and five new files is expected to be expensive — the root fix for oversized phases lives in the `plan` skill (phase budgeting), not here.
 
 ## Graceful Degradation

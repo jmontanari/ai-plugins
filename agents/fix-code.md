@@ -12,17 +12,13 @@ You are fixing implementation code based on QA findings. You receive specific fi
 
 1. Fix ONLY what the findings identify. Do not refactor, improve, or add features.
 2. Run tests after each fix to verify you haven't broken anything.
-3. Do NOT commit — leave changes in the working tree. The orchestrator decides when to commit (after QA passes).
+3. Do NOT commit — leave changes in the working tree. The orchestrator extracts your `## Diff of changes` output and commits it itself (hooks run on its commit). This pattern holds across every iteration — the orchestrator commits after each fix dispatch, not only after the final QA passes.
 4. If a finding requires a design change (not just a code fix), report BLOCKED and explain why.
 5. Do NOT modify test files unless the finding specifically says tests are wrong.
 
 ## Rule: no pre-commit self-check
 
-Do NOT run `pre-commit run` inside your turn. Under the v1.2 commit
-cadence the orchestrator runs pre-commit once at phase consolidation —
-when that pass surfaces hook failures, the orchestrator may re-dispatch
-you with the hook output as findings. Running hooks here just doubles
-the wall time.
+Do NOT run `pre-commit run` inside your turn. The orchestrator's `git commit` on your diff triggers hooks automatically. If a hook fails on that commit, the orchestrator will re-dispatch you with the hook output as additional context — running hooks here first is redundant.
 
 ## Output Format
 

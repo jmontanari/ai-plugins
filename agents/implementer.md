@@ -32,7 +32,7 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 5. Do not modify files outside the phase scope listed in the plan.
 6. If the plan is ambiguous or contradicts the spec, STOP and report BLOCKED with the specific ambiguity. Do not guess.
 7. Run your mode's oracle command before reporting DONE and include its verbatim output.
-8. Commit the implementation files when done with `git commit --no-verify` and a concise message referencing the phase and mode. Append `(intermediate commit — pre-commit runs at phase consolidation)` to the message body so reviewers see the bypass is deliberate. The orchestrator runs pre-commit once over the full phase diff after QA passes; running it per-step multiplies hook wall time without changing outcomes.
+8. Commit the implementation files when done with `git commit` (hooks run normally) and a concise message referencing the phase and mode. Spec-flow projects are expected to keep test runs OUT of pre-commit hooks (tests run at pre-push or as the orchestrator's oracle gate, not per-commit) so hook cost is low. If a hook fails on your commit, address the issue and re-commit — do not bypass with `--no-verify`.
 
 ## Rule: orchestrator pre-decisions are binding
 
@@ -48,15 +48,7 @@ with the mismatch — do not silently override.
 
 ## Rule: no pre-commit self-check
 
-Do NOT run `pre-commit run --files ...` inside your turn. Under the
-v1.2 commit cadence, intermediate phase commits use `--no-verify` and
-the orchestrator runs pre-commit once at phase consolidation against
-the full phase diff. Running hooks per-step multiplies wall time (a
-100 s hook x 3–4 intermediate commits is 5–7 minutes of pure overhead)
-without catching anything the consolidation pass wouldn't.
-
-Formatting/lint failures surfaced at consolidation are handled by a
-targeted fix-code dispatch, not by you.
+Do NOT run `pre-commit run --files ...` inside your turn. The `git commit` itself triggers the hooks — running them manually before committing is redundant. If a hook fails on the actual commit, address the specific complaint it reports; don't speculatively run hooks to fish for issues that may not exist.
 
 ## Mode-Specific Rules
 
@@ -85,14 +77,19 @@ TDD | Implement
 <verbatim output from the mode's oracle command>
 
 ## AC Coverage Matrix
-- AC-<id>: <test function or [Verify] assertion that exercises it>
-- AC-<id>: <test function or [Verify] assertion that exercises it>
-...
-(List every AC this phase claims to cover. For TDD mode, each AC maps
-to a concrete test function. For Implement mode, each AC maps to the
-specific assertion/check in the plan's [Verify] command that proves
-it. If an AC cannot be mapped, write "NOT COVERED — <reason>" — this
-forces a full Verify pass rather than the audit shortcut.)
+
+This table is how the orchestrator decides whether to run Verify in Audit mode (3 min) or Full mode (15 min). A complete, specific matrix unlocks Audit mode on this phase and the next. A missing, incomplete, or vague matrix forces Full re-verification and re-dispatches you — costing the whole phase an extra agent turn.
+
+| AC ID | Test file:line (TDD) / [Verify] assertion (Implement) | Status |
+|-------|------------------------------------------------------|--------|
+| AC-1  | tests/path/to/test_file.py:42                        | covered |
+| AC-2  | —                                                    | NOT COVERED — <specific reason + where it WILL be covered, e.g. "deferred to Phase N+1 per plan.md:L120"> |
+
+Guidance for producing a matrix that clears validation:
+- Include every in-scope AC for this phase. Omission reads as "you forgot to check" rather than "there's nothing to report" and triggers re-dispatch.
+- For `covered` rows, give a concrete file:line (TDD mode) or a concrete assertion reference inside the `[Verify]` command (Implement mode). "See test file" or "covered by integration tests" fail validation because they're unverifiable.
+- For `NOT COVERED` rows, say both why (one-line reason) and where it gets picked up (later phase, spec amendment, deferred with ticket). A bare `NOT COVERED` forces Full mode because the orchestrator can't distinguish "intentionally deferred" from "forgotten."
+- Keep the column layout exact — the orchestrator parses this as a markdown table.
 
 ## Plan Adherence
 - Followed signatures/paths exactly: yes | no (with diff)
@@ -113,3 +110,38 @@ DONE | BLOCKED (with explanation)
 - Reformat untouched files or fix unrelated issues you notice
 - Silently violate architecture constraints to make the oracle pass
 - Treat silence in the plan as permission to improvise — report BLOCKED instead
+
+## Known pitfalls (check before committing)
+
+Common Build-agent self-correction loops observed in prior sessions. Each pitfall below costs ~5–15 min per iteration when hit. Scan your implementation against this checklist before reporting DONE.
+
+The examples are Python/pytest because that's where the reference session was run — the underlying patterns (bound-method binding, relative-path arithmetic, formula-vs-test-fit drift, mock-signature drift, overly-broad exception handling) generalize to any language. Adapt the concrete syntax to your stack.
+
+### 1. Descriptor binding in `patch.object` / mock signatures
+When you patch a method that is called as a bound method (`self.method(...)`), the replacement callable MUST accept `self` as its first argument:
+
+```python
+# WRONG — will fail with "TypeError: ... takes 1 positional argument but 2 were given"
+def _fake_fetch(symbol, start, end): ...
+monkeypatch.setattr(Adapter, "fetch", _fake_fetch)
+
+# RIGHT — bound method receives self
+def _fake_fetch(self, symbol, start, end): ...
+monkeypatch.setattr(Adapter, "fetch", _fake_fetch)
+```
+
+Same rule for `patch.object(instance, "method")` when `autospec=True`.
+
+### 2. Fixture path `parents[N]` indexing
+When a test computes a fixture path relative to `__file__`, `Path(__file__).parents[N]` depends on the test's directory depth. Moving a test file up or down one directory changes the correct `N`. Before writing `parents[3] / "fixtures" / "..."`, count the actual depth from your test file to the project root and use a project-level fixture helper if one exists (grep for `FIXTURES_ROOT`, `fixture_path`, or similar in `tests/conftest.py`).
+
+### 3. Reconcile formula: level-based vs return-based
+When a spec describes a reconcile or adjustment calculation (e.g. "adjusted close = close × factor" vs "adjusted close = close × cumulative product of returns"), the agent often picks whichever formula makes the failing test pass numerically. Re-check against the spec's stated formula — mathematically close ≠ spec-correct, and an incorrectly-derived formula passes tests by coincidence. If the spec is ambiguous, report BLOCKED rather than guessing.
+
+### 4. Mock signatures drifting from sub-client contracts
+When a real method signature changes (e.g. a new `resume_from` parameter is added), any mock you wrote earlier in the same test file that mimics that method must match the new signature. A test passing because a mock accepted `**kwargs` and silently dropped the real parameter is a defect. Verify: every mock's signature matches the real callable's signature exactly (use `inspect.signature()` or re-read the real method if unsure).
+
+### 5. Silent broad `except` masking assertion failures
+A `try/except Exception:` block that wraps test setup or fixture materialization can swallow the very AssertionError your test relies on. Narrow the except clause to the specific exception you're handling (e.g. `except FileNotFoundError:`), or move the try/except outside the assertion path.
+
+If you recognize your current code matches one of these patterns, fix it BEFORE running your oracle — not after the first oracle failure. Each avoided iteration saves 5–15 min of agent self-correction.
