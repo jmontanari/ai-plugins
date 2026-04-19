@@ -51,18 +51,20 @@ You examine how the spec-flow orchestration ran for this piece — phase sizing,
 
 ## Output Format
 
-```
-## Process retro for <piece-name>
+Emit at H3 level so the orchestrator can nest your output cleanly under the per-piece H2 wrapper in the improvement backlog. Do NOT emit a top-level H2 — the orchestrator wraps your output with one.
 
-### must-improve
+```
+### Process retro for <piece-name>
+
+#### must-improve
 - <specific orchestration issue observed>: <evidence — metric, escalation event, or plan section> — <suggested change for future pieces>
 - ...
 
-### worked-well
+#### worked-well
 - <specific pattern that paid off>: <evidence>
 - ...
 
-### metrics
+#### metrics
 - <key session number worth preserving for cross-piece comparison>: <value> (<context — was it expected? outlier?>)
 - ...
 ```
