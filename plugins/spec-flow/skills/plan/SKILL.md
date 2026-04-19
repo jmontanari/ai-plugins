@@ -90,8 +90,8 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    **Structure a Phase Group as:** (note heading levels — the execute skill's Phase Scheduler detects `## Phase Group` at H2 and `#### Sub-Phase` at H4; deviating breaks detection)
    ```markdown
    ## Phase Group <letter>: <logical name>
-   **Exit gate:** all sub-phases pass oracle + group-level Deep QA clean
-   **ACs covered:** <union of sub-phase ACs>
+   **Exit Gate:** all sub-phases pass oracle + group-level Deep QA clean
+   **ACs Covered:** <union of sub-phase ACs>
 
    #### Sub-Phase <letter>.<n> [P]: <sub-phase name>
    **Scope:** <file paths, comma-separated — must be disjoint from sibling sub-phases>

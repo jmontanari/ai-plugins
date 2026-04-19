@@ -16,6 +16,7 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 - **`skills/plan/SKILL.md` rule 8** introduces Phase Group authoring guidance with structure template, when-to-use / when-not-to-use criteria, scope discipline requirement, and Phase 0 Scaffold interaction.
 - **`templates/plan.md`** gains a Phase Group example alongside the existing flat-phase examples.
 - **`skills/execute/SKILL.md`** opens with an API-encapsulation doctrine callout reinforcing that this skill is the sole entrypoint for internal phase agents.
+- **`agents/refactor.md` Rule 1** clarifies that when dispatched at Phase Group level (Step G7), "phase files" means the union of all sub-phase `**Scope:**` declarations. Orchestrator passes the union as the authoritative file list.
 
 ### Notes for upgraders
 - Plans authored before v1.4.0 using only flat phases are fully backward-compatible.

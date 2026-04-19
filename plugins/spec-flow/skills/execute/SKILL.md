@@ -359,13 +359,13 @@ For each `[P]`-marked sub-phase in the group, launch its full internal pipeline 
 
 Dispatch mechanism: issue all sub-phase Red agent dispatches in the same orchestrator turn. When a sub-phase's Red completes, immediately dispatch its Build agent (do not wait for sibling Reds). Same for Build → Verify → QA-lite. Each sub-phase progresses independently; sibling sub-phases are not sync barriers except at the group-end barrier (Step G5).
 
-Rate limiting: if the `max_concurrent_dispatches` config key is set (default unlimited), throttle so the number of in-flight agent dispatches never exceeds the configured value. When at the cap, new sub-phases queue until a slot opens.
+Rate limiting: dispatch all `[P]` sub-phases in parallel by default. If you hit inference-provider rate limits on large groups (observed when 8+ sub-phases fire concurrently against Opus/Sonnet tiers simultaneously), fall back to serial execution for that group and log the cause. No config knob is exposed today — rate-limit handling is the orchestrator's responsibility, not the plan author's.
 
 Per-sub-phase internal flow — each sub-phase runs the same checks as the Per-Phase Loop:
 - Red step (Step 2)
 - Build step (Step 3) with Step 3 item 7 AC matrix validation gate
 - Verify step (Step 4) with Audit/Full mode selection
-- QA-lite step — dispatch `qa-phase-lite.md`, Sonnet. Same iter-1/iter-2 loop as the current full QA, with the Q3 skip predicate still applying.
+- QA-lite step — dispatch `qa-phase-lite.md`, Sonnet. Same iter-1/iter-2 loop as the current full QA, with Step 6's `qa_iter2` skip predicate still applying (small self-verified fix-diffs skip the iter-2 re-dispatch).
 - Sub-phase Progress is implicit (no separate progress commit per sub-phase — the group progress commit covers all)
 
 ### Step G5: Barrier — wait for all sub-phases
@@ -405,7 +405,7 @@ Dispatch the `qa-phase.md` agent at Opus tier. Compose the prompt using the exis
 - `## Phase ACs` — union of all sub-phase ACs
 - `## Non-negotiables` — unchanged
 
-If Group Deep QA returns must-fix: run the same iter-2 loop as the flat-phase QA does (Q3 skip predicate applies), dispatching fix-code agents for findings. Each fix-code dispatch operates on the specific sub-phase scope the finding points to.
+If Group Deep QA returns must-fix: run the same iter-2 loop as the flat-phase QA does (Step 6's `qa_iter2` skip predicate applies — small self-verified fix-diffs skip the iter-2 re-dispatch), dispatching fix-code agents for findings. Each fix-code dispatch operates on the specific sub-phase scope the finding points to.
 
 ### Step G9: Step 6b hook sweep over the group diff
 
