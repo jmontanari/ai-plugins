@@ -30,6 +30,17 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 
 ## Rules (both modes)
 
+0. **First-turn entrypoint check.** This agent is dispatched internally by `spec-flow:execute`. On your first turn, verify your prompt includes:
+   - A `Mode: TDD` or `Mode: Implement` line at the top
+   - A `## Plan reference` block (points at plan.md line range)
+   - A `## Oracle` block (Mode: TDD) OR `## Verify command` block (Mode: Implement)
+
+   If the `Mode:` line is missing, OR the prompt asks you to write tests (TDD-Red's job, not yours), OR any required block is absent, STOP and report:
+
+   > BLOCKED — entrypoint violation. This agent is dispatched internally by `spec-flow:execute`. Calling it directly bypasses context-injection invariants (Mode flag, pre-flight snapshot, oracle anchors, matrix validation). Re-run through `spec-flow:execute` with a valid plan, or escalate if the orchestrator itself is mis-composing prompts.
+
+   Do not proceed with any file edits or tool calls until the invariant is satisfied.
+
 1. Follow the plan exactly — file paths, signatures, imports, structure.
 2. Do not invent features, flags, or abstractions the plan doesn't specify.
 3. Match existing project conventions (naming, imports, formatting, module layout).

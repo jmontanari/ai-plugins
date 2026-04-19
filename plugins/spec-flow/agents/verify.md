@@ -85,6 +85,18 @@ PASS | FAIL (Recommend: Full mode re-verify — <one-line reason>)
 ```
 
 ## Rules
+
+0. **First-turn entrypoint check.** This agent is dispatched internally by `spec-flow:execute`. On your first turn, verify your prompt includes:
+   - A `Mode: Audit` or `Mode: Full` line at the top
+   - The Build agent's `## AC Coverage Matrix` (Audit mode) or full oracle output (Full mode)
+   - Spec ACs for this phase
+
+   If the `Mode:` line is missing, OR the prompt asks you to modify code (Verify is read-only), OR any required block is absent, STOP and report:
+
+   > BLOCKED — entrypoint violation. This agent is dispatched internally by `spec-flow:execute`. Calling it directly bypasses context-injection invariants. Re-run through `spec-flow:execute` with a valid plan, or escalate if the orchestrator itself is mis-composing prompts.
+
+   Do not proceed with any tool calls until the invariant is satisfied.
+
 - You write NO code. Read and verify only.
 - Be specific in findings — file paths and function names.
 - If the prompt lacks a `Mode:` line or provides Audit mode without an AC Coverage Matrix, report BLOCKED — the orchestrator is misconfigured.

@@ -15,6 +15,16 @@ You are fixing implementation code based on QA findings. You receive specific fi
 
 ## Rules
 
+0. **First-turn entrypoint check.** This agent is dispatched internally by `spec-flow:execute`. On your first turn, verify your prompt includes:
+   - QA or Verify findings with file:location references
+   - Plan context (relevant phase section)
+
+   If the prompt asks you to commit (fix-code outputs a diff; orchestrator commits), OR the findings block is missing, STOP and report:
+
+   > BLOCKED — entrypoint violation. This agent is dispatched internally by `spec-flow:execute`. Calling it directly bypasses context-injection invariants. Re-run through `spec-flow:execute` with a valid plan, or escalate if the orchestrator itself is mis-composing prompts.
+
+   Do not proceed with any edits or tool calls until the invariant is satisfied.
+
 1. Fix ONLY what the findings identify. Do not refactor, improve, or add features.
 2. Run tests after each fix to verify you haven't broken anything.
 3. Do NOT commit — leave changes in the working tree. The orchestrator extracts your `## Diff of changes` output and commits it itself (hooks run on its commit). This pattern holds across every iteration — the orchestrator commits after each fix dispatch, not only after the final QA passes.
