@@ -15,7 +15,7 @@ You write failing tests for a phase of implementation. Your tests must fail beca
 3. Use Arrange-Act-Assert structure.
 4. Follow existing test patterns in the project (naming, imports, fixtures).
 5. Tests must be runnable — correct imports, valid syntax.
-6. Commit the test files when done — see *Rule: literal file list on commit* below.
+6. **Commit at logical checkpoints, then a final commit when done.** A checkpoint is any boundary where the tests you've written so far are lint-clean and syntactically valid — typically one commit per test file or per AC group. Each commit runs hooks (cheap lint/format/type-check). Failing tests are expected; the hook won't reject them unless the project has a test-running hook (see *Rule: committing failing tests*). See *Rule: literal file list on commit* for staging discipline.
 7. Run the tests and report the failure output verbatim.
 
 ## Rule: literal file list on commit

@@ -64,8 +64,9 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
 3. Use semantic anchors (function names, class names) NOT line numbers
 4. Mark parallel-eligible tasks with `[P]` — verify no file overlap
-5. Include the agent context summary table
-6. **Scaffold-first phase for coordination-file contention.** If ≥2 phases in this plan each append entries to the same shared coordination file(s), author a **Phase 0: Scaffold** as an Implement-track phase that pre-appends stub entries for *every* subsequent phase's additions in a single commit.
+5. **Order the bullets inside `[Build]` / `[Implement]` blocks in checkpoint progression.** The implementer agent commits at each logical checkpoint during its dispatch; a well-ordered bullet list gives the agent natural checkpoint boundaries. Good order: data model or types first → public constructors / factories → public methods/functions → internal helpers → error paths and edge cases. Bad order: leaf helpers first, then the public API that calls them. Each bullet (or small group of bullets) should be a point where the code in-flight is lint-clean and internally consistent even if not yet feature-complete. This is guidance for readability and checkpoint quality, not a hard structural requirement — the agent will infer checkpoints regardless.
+6. Include the agent context summary table
+7. **Scaffold-first phase for coordination-file contention.** If ≥2 phases in this plan each append entries to the same shared coordination file(s), author a **Phase 0: Scaffold** as an Implement-track phase that pre-appends stub entries for *every* subsequent phase's additions in a single commit.
 
    "Coordination files" are any shared files that multiple phases will need to touch. Examples vary by ecosystem:
    - Test infrastructure: shared test config or fixture files (e.g. pytest `conftest.py`, Jest `setup.ts`, Go `testmain_test.go`, RSpec `spec_helper.rb`)
