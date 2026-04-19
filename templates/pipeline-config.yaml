@@ -14,3 +14,9 @@ refactor: auto
 #   auto    — skip iter-2 re-dispatch when fix diff < 50 LOC AND fix-code reported all findings resolved AND oracle green (default)
 #   always  — always re-dispatch iter-2
 qa_iter2: auto
+
+# phase_groups: controls Phase Group parallel execution (new in v1.4.0)
+#   auto    — dispatch sub-phases concurrently when plan uses Phase Groups; fall back to serial for flat phases (default)
+#   always  — same as auto but errors if a plan has no parallelism (catches over-flat plans)
+#   off     — treat Phase Groups as if they were flat serial phases (disable new scheduler; useful for rollback)
+phase_groups: auto
