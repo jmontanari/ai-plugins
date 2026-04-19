@@ -61,6 +61,47 @@ A phase must have exactly one of these markers. The executor branches mechanical
   - Review against: {{ac_list}}
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
+### Phase Group A (example): {{group_name}}
+**Exit gate:** all sub-phases pass their oracles + group Deep QA clean
+**ACs covered:** {{group_ac_list}}
+
+#### Sub-Phase A.1 [P]: {{sub_phase_name}}
+**Scope:** {{literal_file_paths_comma_separated}}
+**ACs:** {{sub_phase_ac_subset}}
+
+- [ ] **[TDD-Red]** Write failing tests for this sub-phase
+  - {{test_details}}
+
+- [ ] **[Build]** Implement this sub-phase
+  - Order bullets in checkpoint progression (types → constructors → public API → internals → error paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.
+  - {{implementation_details}}
+
+- [ ] **[Verify]** Confirm tests pass
+  - Run: {{test_command}}
+  - Expected: all tests for this sub-phase pass
+  - Verify: no test files modified since [TDD-Red] step
+
+- [ ] **[QA-lite]** Sonnet narrow review
+  - Scope: this sub-phase only
+  - Review: plan alignment, AC matrix spot-check, structural sanity, scope discipline
+
+#### Sub-Phase A.2 [P]: {{sub_phase_name}}
+**Scope:** {{literal_file_paths_comma_separated}}
+... (same shape as A.1)
+
+#### Group-level tasks
+- [ ] **[Refactor]** (optional — auto-skipped when all Builds clean)
+  - Scope: union of all sub-phase files in this group
+  - Check for: cross-sub-phase dedup opportunities, inconsistent naming
+  - Constraint: only modify files created/changed in this group
+
+- [ ] **[QA]** Opus deep review
+  - Review against: group ACs (union)
+  - Diff baseline: git diff {{group_start_tag}}..HEAD
+  - Surface map composed by orchestrator (Files changed, Public symbols, Integration callers)
+
+- [ ] **[Progress]** Single commit for the group
+
 ## Parallel Execution Notes
 {{parallel_notes}}
 
@@ -71,5 +112,6 @@ A phase must have exactly one of these markers. The executor branches mechanical
 | Implementer (Mode: TDD) | `Mode: TDD` flag, failing tests (verbatim), plan details, arch constraints, pattern pointers | Spec rationale, brainstorming history |
 | Implementer (Mode: Implement) | `Mode: Implement` flag, plan [Implement] tasks, spec ACs, plan's [Verify] command, arch constraints, pattern pointers | Spec rationale, brainstorming history |
 | Verify | Verification output (tests or plan-specified command), spec ACs | Implementation reasoning |
+| QA-lite (sub-phase) | `Mode:` flag, sub-phase diff, sub-phase ACs, AC matrix (from Build), sub-phase scope block | Full piece spec, PRD sections, other sub-phases' diffs |
 | Refactor | Current code (phase files only), mode's verification command, quality principles | Prior agent conversations |
 | QA | Phase diff, spec, plan, PRD sections | Any agent conversation history |
