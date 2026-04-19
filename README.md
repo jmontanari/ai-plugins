@@ -169,11 +169,14 @@ worktrees_root: worktrees  # Where feature branches get checked out
 refactor: auto             # auto | always | never — skip Refactor when Build is clean
 qa_iter2: auto             # auto | always — skip QA iter-2 re-dispatch when fix diff is small + self-verified
 phase_groups: auto         # auto | always | off — use Phase Group scheduler when plan has groups
+reflection: auto           # auto | off — dispatch end-of-piece reflection agents (Step 4.5)
 ```
 
 Edit if your project uses different layouts (e.g., `docs_root: repo/docs`) or wants different orchestrator defaults. The `refactor` and `qa_iter2` keys both default to `auto` — they skip low-yield steps based on the Build agent's own self-reported cleanliness. Set to `always` if you want every phase to get a Refactor pass and every fix-code iteration to get an Opus QA re-review regardless of self-report — costs ~20–30 min/phase of extra wall time but catches anything the skip predicates might miss. Set `refactor: never` for repetitive-pattern tracks (e.g. adapter boilerplate) where Refactor historically produces only comment cleanups.
 
 The `phase_groups` key controls the v1.4.0 Phase Scheduler. In `auto` (default), plans that use Phase Group headings (`## Phase Group <letter>:`) dispatch their Sub-Phases concurrently; plans using only flat phases (`### Phase <N>`) run serially as before. Set to `off` to disable the scheduler entirely (treats groups as flat serial phases) — useful for rollback if you hit scheduler bugs in a new release. Set to `always` to have the orchestrator warn when a plan has only flat phases in a piece that looks parallelizable — catches over-flat plans during doctrine adoption.
+
+The `reflection` key (new in v1.5.0) controls Step 4.5 of Final Review. In `auto` (default), two read-only Sonnet reflection agents fire after Human Sign-Off and before Capture Learnings: a process retro examining session metrics + escalations to identify what worked / what didn't in the orchestration flow, and a future-opportunities agent examining the spec/plan/diff/manifest to surface candidate future pieces. Their findings get appended to `<docs_root>/improvement-backlog.md` (committed) and feed Step 5's `learnings.md` synthesis. Set to `off` to skip Step 4.5 entirely (preserves pre-v1.5 behavior — `learnings.md` authored without reflection-agent input).
 
 ### Recommended project-level setup
 
@@ -221,6 +224,19 @@ This tiering drops net Opus QA cost: instead of N Opus dispatches per group (one
 **Failure handling is autonomous.** If sub-phases fail in pass 1, the orchestrator auto-triages against a decision matrix (fix-code for local defects, Refactor for repeated-pattern failures, reset-and-re-dispatch for contamination/scope-violation, immediate escalation for BLOCKED categories). A focused pass-2 re-check runs on recovered sub-phases only. Hard cap: 2 passes then escalate. Humans are involved only when the matrix says "stop and think."
 
 See the plan skill's rule 8 for Phase Group structure; see `skills/execute/SKILL.md` "Phase Group Loop" for the execution flow.
+
+### Reflection stage (v1.5.0+) — end-of-piece retros + improvement backlog
+
+Each piece ends with a two-agent reflection stage (Step 4.5 in execute) before the synthesized `learnings.md` gets written. The agents run in parallel:
+
+- **Process retro** (Sonnet, read-only) examines session metrics, per-phase escalation log, and the cumulative diff to identify orchestration patterns worth keeping or changing for future pieces. Output: `must-improve` / `worked-well` / `metrics` sections.
+- **Future opportunities** (Sonnet, read-only) examines the spec, plan, cumulative diff, current improvement backlog, and manifest to surface candidate future pieces (deferred ACs, hinted features, tech debt accrued, dependencies unlocked, cross-piece patterns). Every item must reference a concrete artifact — no speculation.
+
+Findings get appended to `<docs_root>/improvement-backlog.md` (project-level, committed, accumulates across pieces). The `spec` skill reads this file at brainstorm start (Phase 1, step 6) and surfaces ~5 most-relevant items as candidate considerations for the new piece. Items the user marks `incorporated` or `obsolete` during brainstorm get pruned from the backlog after spec sign-off (Phase 5, step 4); `deferred` items stay for future surface-up.
+
+The improvement backlog is intentionally pruneable working state, not an immutable log. Manually delete entries when they're addressed or no longer relevant.
+
+Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the pre-v1.5 single-shot `learnings.md` flow.
 
 ---
 
