@@ -25,6 +25,7 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 3. Read `docs/architecture/` — load any architecture decision docs
 4. Scan `docs/specs/*/learnings.md` — load learnings from previously completed pieces
 5. Scan `CLAUDE.md` and `docs/prd.md` for non-negotiables (NN-xxx pattern)
+6. Read `<docs_root>/improvement-backlog.md` if it exists. This file accumulates end-of-piece reflection findings from prior pieces (process retros + future opportunities). For each item recorded, semantic-match against this piece's name (from manifest) and the user's brainstorm prompt; surface the ~5 most-relevant items as candidate considerations during Phase 2 brainstorm. Track user responses in orchestrator state for Phase 5 prune (statuses: `incorporated` — addressed by this piece's spec; `deferred` — still relevant but not in this piece's scope; `obsolete` — no longer applies). If the file does not exist (first piece on a new project, or `reflection: off` configured), skip silently.
 
 ### Phase 2: Brainstorm
 
@@ -87,6 +88,12 @@ Socratic dialogue with the user, one question at a time:
    git add docs/specs/<piece-name>/spec.md
    git commit -m "spec: add <piece-name> specification"
    ```
+4. **Prune addressed backlog items.** If Phase 1 step 6 surfaced backlog items and the user marked any as `incorporated` or `obsolete` during brainstorm, remove those entries from `<docs_root>/improvement-backlog.md`. `deferred` items stay in the file. Commit the prune as a separate commit on the worktree branch:
+   ```bash
+   git add <docs_root>/improvement-backlog.md
+   git commit -m "chore: prune backlog items addressed by <piece-name>"
+   ```
+   If no items were marked or no backlog existed, skip this step.
 
 ## NEEDS CLARIFICATION Lifecycle
 
