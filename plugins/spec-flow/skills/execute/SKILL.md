@@ -414,6 +414,75 @@ git commit -m "progress: Phase Group <letter> complete"
 
 Advance to next top-level unit in plan.md (another group, or a flat phase, or end-of-piece → Final Review).
 
+## Auto-triage decision matrix (used by Step G6)
+
+When Step G5 ends with any failed sub-phases, the orchestrator auto-triages each failure against this matrix. One recovery action per sub-phase per pass; matrix categories marked "escalate immediately" bypass recovery.
+
+### Pass 1 triage table
+
+| Failure signature | Detection signal | Recovery action | Iterations |
+|-------------------|------------------|-----------------|------------|
+| Oracle defect — one file, one function, clear error | Test output names a single file + function; fix-code trial stays < 50 LOC | Dispatch fix-code targeting the implementation | 1 |
+| Oracle defect — multi-file or repeated-pattern failure | Multiple impl files implicated OR fix-code attempted 2× without progress during the original Build | Dispatch Refactor at sub-phase scope to restructure the approach | 1 |
+| Hook failure — lint/format/type-check | Pre-commit output names tool + rule; diff < 20 LOC | Inline autofix if ruff/mypy suggest a concrete patch; otherwise fix-code | 1 |
+| Contamination — implementer modified test files during Build (Mode: TDD) | Orchestrator's test-file diff check flagged modified tests | Reset sub-phase to `sub_phase_start_sha`; re-dispatch Build with explicit "do not modify tests" reminder | 1 |
+| Scope violation — Build touched files outside declared `**Scope:**` | `git diff --name-only` shows paths outside the sub-phase scope block | Reset sub-phase to `sub_phase_start_sha`; re-dispatch Build with explicit scope violation called out in the prompt | 1 |
+| QA-lite must-fix — plan misalignment or local defect | QA-lite `### must-fix` names file:line inside the sub-phase | Dispatch fix-code targeting the finding | 1 |
+| QA-lite must-fix — cross-sub-phase concern | QA-lite finding names files in another sub-phase | Escalate immediately — group decomposition is wrong | — |
+| BLOCKED — plan ambiguity | Agent returned BLOCKED with ambiguity reason | Escalate immediately | — |
+| BLOCKED — architecture conflict | Agent returned BLOCKED citing non-negotiable | Escalate immediately | — |
+| BLOCKED — pre-decision mismatch | LOC estimate or symbol-presence pre-decision contradicted by filesystem | Re-run Step 1b pre-flight for this sub-phase; re-dispatch with fresh pre-decisions | 1 |
+| All sub-phases in group failed | Pass 1 has zero successes | Escalate immediately — likely spec or plan problem | — |
+| Majority share a root cause | ≥50% of failures share a common error signature (same missing type, same fixture path issue) | Escalate immediately — group-level structural issue | — |
+
+Recovery actions for different sub-phases run in parallel when their scopes remain disjoint. Reset-and-re-dispatch (contamination, scope violation) runs serially with the sub-phase's re-dispatched Build.
+
+### Pass 2 — focused re-check on recovered sub-phases only
+
+After pass-1 recovery actions complete:
+
+1. Capture `pass1_end_sha` at the moment pass 2 begins (HEAD after recovery fixes landed).
+2. For each sub-phase that had a recovery action, dispatch QA-lite with `Input Mode: Focused re-review` and the fix delta (`git diff $pass1_end_sha..HEAD -- <sub-phase scope>`).
+3. Successful sub-phases from pass 1 are NOT re-reviewed — they are locked in.
+4. Fix-code within pass 2 still respects the standard 2-attempt orchestrator circuit breaker per sub-phase.
+
+### Hard cap
+
+**2 total passes.** If any sub-phase still fails after pass 2, escalate to human. No pass 3. Either the sub-phase has a genuine blocker (spec ambiguity, architecture conflict) or the group decomposition was wrong — either way, more iteration likely wastes tokens.
+
+### What stays committed during failures
+
+- Successful sub-phases' commits stay live
+- Pass-1 recovery commits stay live (each runs hooks and passes before landing)
+- If the group ultimately escalates to human, the human inspects the worktree's partial state
+- `git reset $group_start_sha` cleanly rolls back the whole group if the human decides to abort
+
+### Escalation report format
+
+When escalating to human, the orchestrator produces a batched report:
+
+```
+## Phase Group <letter> — escalation required
+
+### Sub-phase status
+- A.1 ✓ succeeded (pass 1)
+- A.2 ✓ succeeded after pass-1 recovery (fix-code)
+- A.3 ✗ failed — <category from matrix>
+  - Pass 1 attempt: <recovery action taken>
+  - Pass 2 result: <what still fails>
+  - Recommended human action: retry with revised plan | skip sub-phase | abort group
+
+### Worktree state
+- group_start_sha: <sha>
+- HEAD: <sha>
+- Files modified: <list>
+
+### Next step
+<blocking ask to human>
+```
+
+One review session handles the whole batch — no per-sub-phase interruptions.
+
 ## Final Review
 
 Triggered automatically when the last phase's QA passes.
