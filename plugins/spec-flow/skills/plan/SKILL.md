@@ -87,13 +87,13 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
 8. **Phase Groups for parallelizable work.** When a piece contains ≥2 units of work that touch disjoint file scopes and have no symbol dependencies on each other (classic examples: N independent adapters, N independent endpoints, per-table migrations), decompose them into a **Phase Group** with `[P]`-marked **Sub-Phases** instead of a single combined phase or a serial chain of flat phases.
 
-   **Structure a Phase Group as:**
+   **Structure a Phase Group as:** (note heading levels — the execute skill's Phase Scheduler detects `## Phase Group` at H2 and `#### Sub-Phase` at H4; deviating breaks detection)
    ```markdown
    ## Phase Group <letter>: <logical name>
    **Exit gate:** all sub-phases pass oracle + group-level Deep QA clean
    **ACs covered:** <union of sub-phase ACs>
 
-   ### Sub-Phase <letter>.<n> [P]: <sub-phase name>
+   #### Sub-Phase <letter>.<n> [P]: <sub-phase name>
    **Scope:** <file paths, comma-separated — must be disjoint from sibling sub-phases>
    **ACs:** <subset of group ACs>
    - [ ] [TDD-Red] ...
@@ -101,10 +101,10 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    - [ ] [Verify] ...
    - [ ] [QA-lite] Sonnet narrow review, scope: this sub-phase only
 
-   ### Sub-Phase <letter>.<n+1> [P]: <next sub-phase>
+   #### Sub-Phase <letter>.<n+1> [P]: <next sub-phase>
    ...
 
-   ### Group-level
+   #### Group-level
    - [ ] [Refactor] scope: union of sub-phase files (auto-skip if all Builds clean)
    - [ ] [QA] Opus deep review, diff baseline: group_start_sha
    - [ ] [Progress]

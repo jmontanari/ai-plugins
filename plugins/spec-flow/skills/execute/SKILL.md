@@ -380,10 +380,16 @@ If all sub-phases ultimately succeed (either in pass 1 or after pass 2 recovery)
 
 ### Step G7: Group Refactor (optional, auto-skip predicate)
 
-Read the `refactor` key from `.spec-flow.yaml`. In `auto` mode, skip this step if ALL sub-phases in the group reported `Oracle ran clean on first attempt: yes` + `Deviations from plan: none` + clean AC matrix. Otherwise, dispatch the Refactor agent with:
+Read the `refactor` key from `.spec-flow.yaml` (valid values: `auto`, `always`, `never`; default `auto`). Match flat-phase Step 5's three-way branching, scoped to the group:
+
+- `never` — skip this step unconditionally. Proceed to Step G8.
+- `always` — run the group Refactor unconditionally (preserves pre-v1.4 behavior for operators who want it).
+- `auto` — skip this step if ALL sub-phases in the group reported `Oracle ran clean on first attempt: yes` + `Deviations from plan: none` + clean AC matrix; otherwise dispatch the Refactor agent.
+
+When dispatching the Refactor agent at group level:
 
 - Scope: union of all sub-phase scope declarations
-- Prompt notes that "phase files" for this dispatch means the union
+- Prompt notes that "phase files" for this dispatch means the union (see `agents/refactor.md` Rule 1's group-level clarification)
 
 Validate post-Refactor: tests still green (run oracle once over the union), no files outside the union modified.
 
