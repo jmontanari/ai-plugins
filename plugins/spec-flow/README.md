@@ -162,17 +162,25 @@ claude plugin install spec-flow
 On first use, a `.spec-flow.yaml` is created at the project root:
 
 ```yaml
-docs_root: docs          # Where prd.md, specs/, manifest.yaml live
-worktrees_root: worktrees # Where feature branches get checked out
+docs_root: docs            # Where prd.md, specs/, manifest.yaml live
+worktrees_root: worktrees  # Where feature branches get checked out
+
+# Orchestrator behavior
+refactor: auto             # auto | always | never — skip Refactor when Build is clean
+qa_iter2: auto             # auto | always — skip QA iter-2 re-dispatch when fix diff is small + self-verified
 ```
 
-Edit if your project uses different layouts (e.g., `docs_root: repo/docs`).
+Edit if your project uses different layouts (e.g., `docs_root: repo/docs`) or wants different orchestrator defaults. The `refactor` and `qa_iter2` keys both default to `auto` — they skip low-yield steps based on the Build agent's own self-reported cleanliness. Set to `always` if you want every phase to get a Refactor pass and every fix-code iteration to get an Opus QA re-review regardless of self-report — costs ~20–30 min/phase of extra wall time but catches anything the skip predicates might miss. Set `refactor: never` for repetitive-pattern tracks (e.g. adapter boilerplate) where Refactor historically produces only comment cleanups.
 
 ### Recommended project-level setup
 
 Spec-flow delegates a few concerns to the project's own tooling rather than owning them in the skill — this keeps the plugin language-agnostic and avoids reinventing battle-tested tools per ecosystem.
 
-**Diff-scoped test selection at the hook boundary.** Under v1.2's commit cadence, pre-commit runs once per phase at consolidation (Step 6b) against the full phase diff. If your hook config includes a full test-suite run, consolidation can take minutes on larger projects. Narrow the hook to tests actually affected by the changed files. Each ecosystem has a tool for this:
+**Keep pre-commit hooks cheap.** Every intermediate commit the orchestrator and agents make runs pre-commit hooks. Pre-commit should be lint + format + type-check only — the kind of checks that run in a few seconds against a small diff. The orchestrator already runs the test suite explicitly as the phase's oracle gate (Step 3 item 5) and again as Step 6b's sanity sweep; a test hook in pre-commit is redundant and expensive.
+
+**Move expensive checks to pre-push or orchestrator gates.** Full test suites, whole-repo type checks, documentation builds, license scanners — anything that can't complete in a few seconds against a small diff — should live at the `pre-push` stage or run as explicit orchestrator gates between phases. The `pre-push` stage still gates the final squash-merge to main, so you get the coverage without the per-commit cost.
+
+**Diff-scoped test selection (if tests must stay in a hook).** If your project has a hard requirement to run tests on commit (e.g. a regulated industry requiring local verification before push), narrow to tests actually affected by the changed files rather than running the full suite. Each ecosystem has a tool for this:
 
 | Ecosystem | Tool / approach |
 |---|---|
@@ -184,9 +192,7 @@ Spec-flow delegates a few concerns to the project's own tooling rather than owni
 | Ruby | `rspec --only-failures` combined with a diff-aware runner like `test_queue` |
 | Other | any incremental/selective test runner for your language; fall back to the full suite only when the scope resolver is unsafe (e.g. build config or hook config changed) |
 
-The common shape for a pre-commit hook: take `pass_filenames: true`, receive the changed file list, and either run the narrowed command or fall back to the full suite on ambiguity. A 1000-test suite typically drops from 90 s+ to under 10 s once selective runs stabilize.
-
-**Phase-boundary hook selection.** If your hook config has expensive checks that don't need to fire at every phase boundary (whole-repo type check, documentation build, license scanner), split them across hook stages (`pre-commit` vs `pre-push`) and let spec-flow's consolidation only hit the `pre-commit` stage. The `pre-push` stage can still gate the final squash-merge.
+The common shape for a test hook: take `pass_filenames: true`, receive the changed file list, and either run the narrowed command or fall back to the full suite on ambiguity. A 1000-test suite typically drops from 90 s+ to under 10 s once selective runs stabilize.
 
 **Scaffold-first commits for multi-phase coordination-file edits.** See the [scaffold-first phase guidance in the plan skill](skills/plan/SKILL.md) — when a piece has ≥2 phases each appending to the same shared coordination files, authoring a single scaffold phase upfront unblocks parallel dispatch of the later phases.
 

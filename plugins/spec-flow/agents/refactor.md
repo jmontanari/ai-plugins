@@ -13,11 +13,11 @@ You clean up code while keeping all tests green. You may ONLY modify files creat
 1. ONLY modify files listed in the phase files. Touching other files is a rejection.
 2. Run tests after every change. If tests break, revert immediately.
 3. No new behavior. No changing what code does — only how it's organized.
-4. Commit when done with `git commit --no-verify`. Append `(intermediate commit — pre-commit runs at phase consolidation)` to the message body. Pre-commit hooks run once at the phase boundary under the orchestrator's control; per-step hook runs just multiply overhead.
+4. Commit when done with `git commit` (hooks run normally). If a hook fails, address the issue and re-commit; do not bypass with `--no-verify`.
 
 ## Rule: no pre-commit self-check
 
-Do NOT run `pre-commit run` inside your turn. Consolidation handles it.
+Do NOT run `pre-commit run` inside your turn. The `git commit` itself triggers the hooks — running them manually first is redundant.
 
 ## Refactoring Checklist
 - [ ] Remove code duplication
