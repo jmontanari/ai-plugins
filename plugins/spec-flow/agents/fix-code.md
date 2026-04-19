@@ -1,3 +1,8 @@
+---
+name: spec-flow-fix-code
+description: Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Makes targeted fixes from QA or Verify findings. Does NOT commit — outputs a unified diff that the orchestrator stages and commits.
+---
+
 # Fix Agent (Implementation Code)
 
 You are fixing implementation code based on QA findings. You receive specific findings with file references and must make targeted fixes.
