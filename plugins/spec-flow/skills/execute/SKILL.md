@@ -18,6 +18,10 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 - Must be on the worktree branch `spec/<piece-name>`
 - All manifest dependencies for this piece must have status `done`
 
+## API encapsulation — this skill is the sole entrypoint for internal agents
+
+`spec-flow:execute` is the only supported way to dispatch phase-level agents (`implementer`, `tdd-red`, `verify`, `refactor`, `qa-phase`, `qa-phase-lite`, `fix-code`). Those agents assume orchestrator-injected context (Mode flag, pre-flight snapshot, oracle anchors, AC matrix) and have Rule 0 first-turn reject checks that BLOCK when called directly. Do not dispatch them from outside this skill. If a task appears to need direct agent invocation, route through a spec + plan + execute cycle instead — the extra structure exists to prevent the class of contamination bugs where agents run with broken invariants.
+
 ## The Orchestrator Role
 
 You (the main window) are a PURE CONDUCTOR. You:
@@ -49,6 +53,21 @@ This makes `status` report an accurate picture — a piece is `implementing` whi
 ## Per-Phase Loop
 
 For each phase in plan.md (skip phases where all checkboxes are [x]):
+
+## Phase Scheduler — detection
+
+The orchestrator begins each piece by scanning plan.md for Phase Group headings (`## Phase Group <letter>:`). For each top-level unit in plan.md, determine whether it is a flat phase or a phase group:
+
+- **Flat phase** (current model) — starts with `### Phase <N>` — run through the Per-Phase Loop below (Steps 1–7).
+- **Phase Group** — starts with `## Phase Group <letter>:` and contains ≥2 `#### Sub-Phase <letter>.<n>` subheadings — run through the Phase Group Loop (below the Per-Phase Loop).
+
+Read the `phase_groups` key from `.spec-flow.yaml` (valid values: `auto`, `always`, `off`; default `auto`):
+
+- `auto` — recognize Phase Groups from plan headings; fall back to flat phase handling when the plan uses `### Phase <N>`.
+- `always` — recognize Phase Groups and error if the plan has only flat phases when the piece has multiple obviously-parallelizable files. Used to catch over-flat plans during v1.4.0 rollout.
+- `off` — treat every top-level unit as a flat phase, ignoring Phase Group headings. Escape hatch for rollback or for plans authored before v1.4.0.
+
+Scope validation before dispatching any sub-phases in a group: parse each sub-phase's `**Scope:**` declaration (literal file paths only, no globs) and check for pairwise overlap. If two sibling sub-phases declare overlapping files, fall back to serial execution for that group (each sub-phase runs as a flat phase in declaration order) and log a warning naming the overlap.
 
 ### Step 1: Capture Phase Start SHA
 
@@ -317,6 +336,83 @@ git commit -m "progress: Phase N complete"
 ```
 
 Advance to next phase.
+
+## Phase Group Loop
+
+When Phase Scheduler detects a Phase Group:
+
+### Step G1: Capture group-start SHA
+
+Record the current HEAD as `group_start_sha` in orchestrator state. Used later as the diff baseline for group-level Refactor and Opus QA.
+
+### Step G2: Validate sub-phase disjointness
+
+For each Sub-Phase in the group, parse its `**Scope:**` block. Cross-check for pairwise file-path overlap. If overlap exists, log a warning and fall back to serial execution (each sub-phase runs as a flat phase through the Per-Phase Loop).
+
+### Step G3: Per-sub-phase pre-flight
+
+For each sub-phase (in parallel — pre-flight is read-only and cheap), run the existing Step 1b pre-flight against the sub-phase's scope. Produce per-sub-phase `## Pre-flight snapshot` and `## Orchestrator pre-decisions` attachments. These are scoped to the sub-phase only — a Phase Group's pre-flight is not a union.
+
+### Step G4: Dispatch sub-phase pipelines concurrently
+
+For each `[P]`-marked sub-phase in the group, launch its full internal pipeline concurrently. Each pipeline runs independently through its own Red → Build → Verify → QA-lite cycle, anchored at its own `sub_phase_start_sha`.
+
+Dispatch mechanism: issue all sub-phase Red agent dispatches in the same orchestrator turn. When a sub-phase's Red completes, immediately dispatch its Build agent (do not wait for sibling Reds). Same for Build → Verify → QA-lite. Each sub-phase progresses independently; sibling sub-phases are not sync barriers except at the group-end barrier (Step G5).
+
+Rate limiting: if the `max_concurrent_dispatches` config key is set (default unlimited), throttle so the number of in-flight agent dispatches never exceeds the configured value. When at the cap, new sub-phases queue until a slot opens.
+
+Per-sub-phase internal flow — each sub-phase runs the same checks as the Per-Phase Loop:
+- Red step (Step 2)
+- Build step (Step 3) with Step 3 item 7 AC matrix validation gate
+- Verify step (Step 4) with Audit/Full mode selection
+- QA-lite step — dispatch `qa-phase-lite.md`, Sonnet. Same iter-1/iter-2 loop as the current full QA, with the Q3 skip predicate still applying.
+- Sub-phase Progress is implicit (no separate progress commit per sub-phase — the group progress commit covers all)
+
+### Step G5: Barrier — wait for all sub-phases
+
+Wait for all sub-phase pipelines to complete (success OR circuit-breaker failure). Do NOT abort early on first failure. Collect each sub-phase's terminal status (success / failure + failure signature).
+
+### Step G6: Auto-triage and two-pass recovery
+
+See the **Auto-triage decision matrix** section below. This step runs the matrix against each failed sub-phase, dispatches appropriate recovery, and (if any recovery actions ran) executes a pass-2 focused re-check.
+
+If all sub-phases ultimately succeed (either in pass 1 or after pass 2 recovery), proceed to Step G7. If any sub-phase remains failed after pass 2, escalate to human with a batched failure report.
+
+### Step G7: Group Refactor (optional, auto-skip predicate)
+
+Read the `refactor` key from `.spec-flow.yaml`. In `auto` mode, skip this step if ALL sub-phases in the group reported `Oracle ran clean on first attempt: yes` + `Deviations from plan: none` + clean AC matrix. Otherwise, dispatch the Refactor agent with:
+
+- Scope: union of all sub-phase scope declarations
+- Prompt notes that "phase files" for this dispatch means the union
+
+Validate post-Refactor: tests still green (run oracle once over the union), no files outside the union modified.
+
+### Step G8: Group Deep QA (Opus)
+
+Dispatch the `qa-phase.md` agent at Opus tier. Compose the prompt using the existing Step 6 surface-map composition, but scoped to the group:
+
+- `## Files changed` — from `git diff --numstat $group_start_sha..HEAD`
+- `## Public symbols added or modified` — union across all sub-phase impl files
+- `## Integration callers` — resolved for the union of public symbols
+- `## Diff` — collapsed per-sub-phase if total > 500 LOC
+- `## AC Coverage Matrix (from Build)` — union of all sub-phases' matrices, sectioned by sub-phase
+- `## Phase ACs` — union of all sub-phase ACs
+- `## Non-negotiables` — unchanged
+
+If Group Deep QA returns must-fix: run the same iter-2 loop as the flat-phase QA does (Q3 skip predicate applies), dispatching fix-code agents for findings. Each fix-code dispatch operates on the specific sub-phase scope the finding points to.
+
+### Step G9: Step 6b hook sweep over the group diff
+
+Run `pre-commit run --files $(git diff --name-only $group_start_sha..HEAD)`. Same autofix-or-fix-code recovery as the flat-phase Step 6b, once across the group.
+
+### Step G10: Group Progress commit
+
+```bash
+git add docs/specs/<piece-name>/plan.md
+git commit -m "progress: Phase Group <letter> complete"
+```
+
+Advance to next top-level unit in plan.md (another group, or a flat phase, or end-of-piece → Final Review).
 
 ## Final Review
 
