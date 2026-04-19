@@ -168,9 +168,12 @@ worktrees_root: worktrees  # Where feature branches get checked out
 # Orchestrator behavior
 refactor: auto             # auto | always | never — skip Refactor when Build is clean
 qa_iter2: auto             # auto | always — skip QA iter-2 re-dispatch when fix diff is small + self-verified
+phase_groups: auto         # auto | always | off — use Phase Group scheduler when plan has groups
 ```
 
 Edit if your project uses different layouts (e.g., `docs_root: repo/docs`) or wants different orchestrator defaults. The `refactor` and `qa_iter2` keys both default to `auto` — they skip low-yield steps based on the Build agent's own self-reported cleanliness. Set to `always` if you want every phase to get a Refactor pass and every fix-code iteration to get an Opus QA re-review regardless of self-report — costs ~20–30 min/phase of extra wall time but catches anything the skip predicates might miss. Set `refactor: never` for repetitive-pattern tracks (e.g. adapter boilerplate) where Refactor historically produces only comment cleanups.
+
+The `phase_groups` key controls the v1.4.0 Phase Scheduler. In `auto` (default), plans that use Phase Group headings (`## Phase Group <letter>:`) dispatch their Sub-Phases concurrently; plans using only flat phases (`### Phase <N>`) run serially as before. Set to `off` to disable the scheduler entirely (treats groups as flat serial phases) — useful for rollback if you hit scheduler bugs in a new release. Set to `always` to have the orchestrator warn when a plan has only flat phases in a piece that looks parallelizable — catches over-flat plans during doctrine adoption.
 
 ### Recommended project-level setup
 
@@ -196,6 +199,29 @@ The common shape for a test hook: take `pass_filenames: true`, receive the chang
 
 **Scaffold-first commits for multi-phase coordination-file edits.** See the [scaffold-first phase guidance in the plan skill](skills/plan/SKILL.md) — when a piece has ≥2 phases each appending to the same shared coordination files, authoring a single scaffold phase upfront unblocks parallel dispatch of the later phases.
 
+### Phase Groups (v1.4.0+) — parallel execution of independent work
+
+When a piece contains multiple independent units of work (N adapters, N endpoints, per-table migrations), the plan skill can decompose them into a **Phase Group** with parallel-eligible Sub-Phases. The execute skill's Phase Scheduler dispatches the Sub-Phases concurrently, runs each through its own Red → Build → Verify → QA-lite cycle, then runs one group-level Refactor + Opus QA on the cumulative diff.
+
+**When to use Phase Groups:**
+- Work decomposes into ≥2 units with disjoint file scopes
+- Sub-units have no symbol dependencies on each other
+- You want wall-time parallelism on independent work
+
+**When to stay flat:**
+- Single-file or tightly-coupled work
+- Regulatory requirement for per-unit deep Opus review
+
+**Tiered QA model:**
+- Per Sub-Phase: **Sonnet QA-lite** runs a narrow fast review (plan alignment, AC matrix spot-check, structural sanity)
+- Per Phase Group: **Opus QA** runs a deep adversarial review once on the cumulative group diff
+
+This tiering drops net Opus QA cost: instead of N Opus dispatches per group (one per sub-phase), there's one Opus dispatch per group plus N cheap Sonnet dispatches.
+
+**Failure handling is autonomous.** If sub-phases fail in pass 1, the orchestrator auto-triages against a decision matrix (fix-code for local defects, Refactor for repeated-pattern failures, reset-and-re-dispatch for contamination/scope-violation, immediate escalation for BLOCKED categories). A focused pass-2 re-check runs on recovered sub-phases only. Hard cap: 2 passes then escalate. Humans are involved only when the matrix says "stop and think."
+
+See the plan skill's rule 8 for Phase Group structure; see `skills/execute/SKILL.md` "Phase Group Loop" for the execution flow.
+
 ---
 
 ## Extending
@@ -204,6 +230,7 @@ The common shape for a test hook: take `pass_filenames: true`, receive the chang
 - **Doctrine** — `reference/spec-flow-doctrine.md` is loaded on every session. Adjust the TDD laws, safeguards, or testing ratios to your engineering culture.
 - **Agents** — each agent is a short Markdown template under `agents/`. Rules, context shape, and output format are all text you can tune.
 - **Review board** — add or remove reviewers under `agents/review-board/`. The final review dispatches whatever is in that directory in parallel.
+- **Internal vs. user-facing agents** — user-facing skills (`spec-flow:prd`, `spec-flow:spec`, `spec-flow:plan`, `spec-flow:execute`, `spec-flow:status`) are the documented API. Internal agents (`implementer`, `tdd-red`, `verify`, `refactor`, `qa-phase`, `qa-phase-lite`, `fix-code`) are dispatched by the execute skill with orchestrator-injected context; they are not meant to be called directly and will BLOCK on a first-turn entrypoint check if invoked without the correct context. If you customize an internal agent, preserve the Rule 0 check — it's the safety net against direct-dispatch contamination.
 
 ---
 
