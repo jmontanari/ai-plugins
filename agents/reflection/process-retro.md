@@ -1,5 +1,5 @@
 ---
-name: spec-flow-reflection-process-retro
+name: reflection-process-retro
 description: Internal agent — dispatched by spec-flow:execute at end-of-piece reflection (Step 4.5). Do NOT call directly. Sonnet-tier orchestration retro — examines session metrics, per-phase escalation log, and the cumulative diff to identify what worked / what didn't in the spec-flow flow for this piece. Read-only — never modifies code.
 ---
 

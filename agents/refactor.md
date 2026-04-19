@@ -1,5 +1,5 @@
 ---
-name: spec-flow-refactor
+name: refactor
 description: Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Cleans up phase-scoped files while keeping tests green. Preserves behavior — never adds new functionality.
 ---
 

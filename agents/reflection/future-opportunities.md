@@ -1,5 +1,5 @@
 ---
-name: spec-flow-reflection-future-opportunities
+name: reflection-future-opportunities
 description: Internal agent — dispatched by spec-flow:execute at end-of-piece reflection (Step 4.5). Do NOT call directly. Sonnet-tier forward-looking review — examines the completed spec, plan, cumulative diff, current improvement backlog, and manifest to surface candidate future pieces or spec amendments. Read-only — never modifies code.
 ---
 

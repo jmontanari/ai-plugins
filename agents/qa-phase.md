@@ -1,5 +1,5 @@
 ---
-name: spec-flow-qa-phase
+name: qa-phase
 description: Internal agent — dispatched by spec-flow:execute at phase or phase-group boundaries. Do NOT call directly. Adversarial Opus review checking code against spec ACs and AC Coverage Matrix. Read-only agent — never modifies code.
 ---
 
