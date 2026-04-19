@@ -13,7 +13,7 @@ You clean up code while keeping all tests green. You may ONLY modify files creat
 1. ONLY modify files listed in the phase files. Touching other files is a rejection.
 2. Run tests after every change. If tests break, revert immediately.
 3. No new behavior. No changing what code does — only how it's organized.
-4. Commit when done with `git commit` (hooks run normally). If a hook fails, address the issue and re-commit; do not bypass with `--no-verify`.
+4. **Commit at logical checkpoints, then a final commit when done.** Good checkpoints: after each independent refactor (one dedup, one rename, one extraction). Each commit runs hooks and must leave tests green — don't checkpoint while tests are red. If a hook fails, address the issue and re-commit; do not bypass with `--no-verify`.
 
 ## Rule: no pre-commit self-check
 

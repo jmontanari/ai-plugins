@@ -23,6 +23,7 @@ A phase must have exactly one of these markers. The executor branches mechanical
   - {{test_details}}
 
 - [ ] **[Build]** Write minimal code to pass
+  - Order bullets in checkpoint progression (types → constructors → public API → internals → error paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.
   - {{implementation_details}}
 
 - [ ] **[Verify]** Confirm tests pass
@@ -43,6 +44,7 @@ A phase must have exactly one of these markers. The executor branches mechanical
 **ACs Covered:** {{ac_list}}
 
 - [ ] **[Implement]** Write code per the plan
+  - Order sub-items in checkpoint progression (schema/types → core wiring → wrappers/adapters → edge paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.
   - Files: {{file_paths_with_signatures_or_structure}}
   - Follow existing patterns: {{pattern_pointers}}
   - Architecture constraints this phase must honor: {{arch_constraints}}
