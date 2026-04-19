@@ -61,7 +61,7 @@ A phase must have exactly one of these markers. The executor branches mechanical
   - Review against: {{ac_list}}
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
-### Phase Group A (example): {{group_name}}
+## Phase Group A (example): {{group_name}}
 **Exit gate:** all sub-phases pass their oracles + group Deep QA clean
 **ACs covered:** {{group_ac_list}}
 
