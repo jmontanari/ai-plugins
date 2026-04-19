@@ -25,17 +25,18 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 3. Read `docs/architecture/` — load any architecture decision docs
 4. Scan `docs/specs/*/learnings.md` — load learnings from previously completed pieces
 5. Scan `CLAUDE.md` and `docs/prd.md` for non-negotiables (NN-xxx pattern)
-6. Read `<docs_root>/improvement-backlog.md` if it exists. This file accumulates end-of-piece reflection findings from prior pieces (process retros + future opportunities). For each item recorded, semantic-match against this piece's name (from manifest) and the user's brainstorm prompt; surface the ~5 most-relevant items as candidate considerations during Phase 2 brainstorm. Track user responses in orchestrator state for Phase 5 prune (statuses: `incorporated` — addressed by this piece's spec; `deferred` — still relevant but not in this piece's scope; `obsolete` — no longer applies). If the file does not exist (first piece on a new project, or `reflection: off` configured), skip silently.
+6. Read `<docs_root>/improvement-backlog.md` if it exists. This file accumulates end-of-piece reflection findings from prior pieces (process retros + future opportunities). For each item recorded, semantic-match against this piece's name (from manifest) and the user's brainstorm prompt; surface the ~5 most-relevant items as candidate considerations during Phase 2 brainstorm. Track user responses in orchestrator state for Phase 5 prune (statuses: `incorporated` — addressed by this piece's spec; `deferred` — still relevant but not in this piece's scope; `obsolete` — no longer applies). If the file does not exist (first piece on a new project), skip silently. If `reflection: off` is set but the file exists from a previous run, still read it — stale findings from past reflections may still be useful brainstorm context.
 
 ### Phase 2: Brainstorm
 
 Socratic dialogue with the user, one question at a time:
 
 1. Confirm the piece scope: "This piece covers [PRD sections]. Does that match your intent?"
-2. Explore purpose and boundaries
-3. PRD compliance check: if the manifest maps requirements the user hasn't mentioned, ask about them
-4. Propose 2-3 approaches with trade-offs and your recommendation
-5. Resolve all open questions — no `[NEEDS CLARIFICATION]` markers may survive
+2. **Surface backlog items.** If Phase 1 step 6 loaded items from `<docs_root>/improvement-backlog.md`, present the top ~5 most-relevant to the user with their concrete references and ask "for each, is this `incorporated` in this piece's spec, `deferred` to a later piece, or `obsolete`?" Record each response in orchestrator state keyed by backlog item — Phase 5 step 4 reads this state to prune `incorporated` and `obsolete` entries from the file. If no items were surfaced (file did not exist, or no relevant matches), skip this step.
+3. Explore purpose and boundaries
+4. PRD compliance check: if the manifest maps requirements the user hasn't mentioned, ask about them
+5. Propose 2-3 approaches with trade-offs and your recommendation
+6. Resolve all open questions — no `[NEEDS CLARIFICATION]` markers may survive
 
 ### Phase 3: Create Worktree and Write Spec
 

@@ -573,11 +573,9 @@ Wait for both agents to complete. Collect their structured outputs.
 ```
 ## <piece-name> — <YYYY-MM-DD>
 
-### Process retro
-<process-retro output verbatim>
+<process-retro output verbatim — emits ### Process retro for <piece-name> at H3>
 
-### Future opportunities
-<future-opportunities output verbatim>
+<future-opportunities output verbatim — emits ### Future opportunities for <piece-name> at H3>
 
 ---
 ```

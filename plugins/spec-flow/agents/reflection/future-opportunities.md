@@ -57,8 +57,10 @@ You examine what was just shipped and what surrounds it (the spec it implemented
 
 ## Output Format
 
+Emit at H3 level so the orchestrator can nest your output cleanly under the per-piece H2 wrapper in the improvement backlog. Do NOT emit a top-level H2 — the orchestrator wraps your output with one.
+
 ```
-## Future opportunities for <piece-name>
+### Future opportunities for <piece-name>
 
 - **<short title>** (priority: high | medium | low)
   - Why it matters now: <what surfaced during this piece — be specific>
@@ -71,4 +73,4 @@ You examine what was just shipped and what surrounds it (the spec it implemented
 
 Priority is your read; the user will re-prioritize during brainstorm of the next piece. The "Concrete reference" field is required — any item that can't fill it doesn't belong here.
 
-If you find no items meeting the bar, return `## Future opportunities for <piece-name>\n\n(no concrete items surfaced — the piece's deferred ACs and forward pointers are already captured in spec/plan; no cross-piece patterns evident; no tech-debt accrued worth flagging.)` Don't pad with weak items.
+If you find no items meeting the bar, return `### Future opportunities for <piece-name>` followed by a blank line and the literal text `(no concrete items surfaced — the piece's deferred ACs and forward pointers are already captured in spec/plan; no cross-piece patterns evident; no tech-debt accrued worth flagging.)` Don't pad with weak items.
