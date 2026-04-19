@@ -1,5 +1,5 @@
 ---
-name: spec-flow-verify
+name: verify
 description: Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Confirms phase correctness in Audit mode (AC matrix sanity check) or Full mode (full oracle re-verification). Read-only agent — never modifies code.
 ---
 

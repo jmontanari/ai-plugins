@@ -1,5 +1,5 @@
 ---
-name: spec-flow-tdd-red
+name: tdd-red
 description: Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Writes failing tests for a phase's [TDD-Red] block. Tests must fail because the feature is missing, not because of setup errors.
 ---
 
