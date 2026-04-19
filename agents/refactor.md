@@ -15,7 +15,19 @@ You clean up code while keeping all tests green. You may ONLY modify files creat
 
 ## Rules
 
+0. **First-turn entrypoint check.** This agent is dispatched internally by `spec-flow:execute`. On your first turn, verify your prompt includes:
+   - The list of phase files (scope)
+   - The mode's verification command (full test suite for Mode: TDD, plan's [Verify] command for Mode: Implement)
+   - Quality principles from the plan
+
+   If the prompt asks you to add new behavior (Refactor preserves behavior), OR the scope block is missing/ambiguous, STOP and report:
+
+   > BLOCKED — entrypoint violation. This agent is dispatched internally by `spec-flow:execute`. Calling it directly bypasses context-injection invariants. Re-run through `spec-flow:execute` with a valid plan, or escalate if the orchestrator itself is mis-composing prompts.
+
+   Do not proceed with any edits or tool calls until the invariant is satisfied.
+
 1. ONLY modify files listed in the phase files. Touching other files is a rejection.
+   When dispatched at Phase Group level (Step G7 of the execute skill's Phase Group Loop), "phase files" means the union of all sub-phase `**Scope:**` declarations in the group. The orchestrator's prompt will pass you the union as your scope list — treat it as the authoritative file list for this dispatch.
 2. Run tests after every change. If tests break, revert immediately.
 3. No new behavior. No changing what code does — only how it's organized.
 4. **Commit at logical checkpoints, then a final commit when done.** Good checkpoints: after each independent refactor (one dedup, one rename, one extraction). Each commit runs hooks and must leave tests green — don't checkpoint while tests are red. If a hook fails, address the issue and re-commit; do not bypass with `--no-verify`.
