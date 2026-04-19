@@ -50,10 +50,6 @@ git checkout spec/<piece-name>
 
 This makes `status` report an accurate picture — a piece is `implementing` while execute is in progress, and flips to `done` after the final merge.
 
-## Per-Phase Loop
-
-For each phase in plan.md (skip phases where all checkboxes are [x]):
-
 ## Phase Scheduler — detection
 
 The orchestrator begins each piece by scanning plan.md for Phase Group headings (`## Phase Group <letter>:`). For each top-level unit in plan.md, determine whether it is a flat phase or a phase group:
@@ -68,6 +64,10 @@ Read the `phase_groups` key from `.spec-flow.yaml` (valid values: `auto`, `alway
 - `off` — treat every top-level unit as a flat phase, ignoring Phase Group headings. Escape hatch for rollback or for plans authored before v1.4.0.
 
 Scope validation before dispatching any sub-phases in a group: parse each sub-phase's `**Scope:**` declaration (literal file paths only, no globs) and check for pairwise overlap. If two sibling sub-phases declare overlapping files, fall back to serial execution for that group (each sub-phase runs as a flat phase in declaration order) and log a warning naming the overlap.
+
+## Per-Phase Loop
+
+For each phase in plan.md (skip phases where all checkboxes are [x]):
 
 ### Step 1: Capture Phase Start SHA
 
