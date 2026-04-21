@@ -11,6 +11,33 @@ fi
 
 doctrine_content=$(cat "${PLUGIN_ROOT}/reference/spec-flow-doctrine.md" 2>/dev/null || echo "spec-flow doctrine not found")
 
+# Charter doctrine (v2.0.0) — conditionally load specific charter files into session context.
+# Controlled by `charter.doctrine_load` in .spec-flow.yaml. Silent no-op if:
+#   - docs/charter/ doesn't exist (pre-charter project, or opted-out)
+#   - charter.doctrine_load is absent, empty, or [] in config
+#   - individual charter file doesn't exist (user hasn't authored it yet)
+docs_root=$(grep -E '^docs_root:' "$CONFIG_FILE" 2>/dev/null | sed -E 's/^docs_root:[[:space:]]*//' | tr -d '"' | head -n1 || true)
+docs_root="${docs_root:-docs}"
+
+charter_content=""
+charter_dir="${docs_root}/charter"
+if [ -d "$charter_dir" ]; then
+  doctrine_line=$(grep -E '^[[:space:]]+doctrine_load:' "$CONFIG_FILE" 2>/dev/null | head -n1 || true)
+  doctrine_list=""
+  if [ -n "$doctrine_line" ]; then
+    doctrine_list=$(printf '%s' "$doctrine_line" | sed -E 's/.*\[([^]]*)\].*/\1/' | tr ',' '\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+  fi
+  if [ -n "$doctrine_list" ]; then
+    while IFS= read -r name; do
+      [ -z "$name" ] && continue
+      file="${charter_dir}/${name}.md"
+      if [ -f "$file" ]; then
+        charter_content+=$'\n\n--- charter/'"${name}.md"$' ---\n'"$(cat "$file")"
+      fi
+    done <<< "$doctrine_list"
+  fi
+fi
+
 escape_for_json() {
     local s="$1"
     s="${s//\\/\\\\}"
@@ -22,7 +49,14 @@ escape_for_json() {
 }
 
 doctrine_escaped=$(escape_for_json "$doctrine_content")
-session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'status' skill to see current pipeline state and recommended next action.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}\n</IMPORTANT>"
+
+charter_section=""
+if [ -n "$charter_content" ]; then
+  charter_escaped=$(escape_for_json "$charter_content")
+  charter_section="\n\nProject Charter (binding — every spec, plan, and implementation must honor these):\n${charter_escaped}"
+fi
+
+session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'status' skill to see current pipeline state and recommended next action.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}\n</IMPORTANT>"
 
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   printf '{\n  "additional_context": "%s"\n}\n' "$session_context"

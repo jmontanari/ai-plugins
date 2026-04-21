@@ -1,6 +1,17 @@
+---
+charter_snapshot:
+  architecture: {{date}}
+  non-negotiables: {{date}}
+  tools: {{date}}
+  processes: {{date}}
+  flows: {{date}}
+  coding-rules: {{date}}
+---
+
 # Plan: {{piece_name}}
 
 **Spec:** docs/specs/{{piece_name}}/spec.md
+**Charter:** docs/charter/ (binding — each phase enumerates its honored NN-C/NN-P/CR entries)
 **Status:** draft
 
 ## Overview
@@ -18,6 +29,8 @@ A phase must have exactly one of these markers. The executor branches mechanical
 ### Phase 1 (TDD track example): {{phase_name}}
 **Exit Gate:** {{exit_criteria}}
 **ACs Covered:** {{ac_list}}
+**Charter constraints honored in this phase:**
+- {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 
 - [ ] **[TDD-Red]** Write failing tests
   - {{test_details}}
@@ -42,6 +55,8 @@ A phase must have exactly one of these markers. The executor branches mechanical
 ### Phase 2 (Implement track example): {{phase_name}}
 **Exit Gate:** {{exit_criteria}}
 **ACs Covered:** {{ac_list}}
+**Charter constraints honored in this phase:**
+- {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 
 - [ ] **[Implement]** Write code per the plan
   - Order sub-items in checkpoint progression (schema/types → core wiring → wrappers/adapters → edge paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.

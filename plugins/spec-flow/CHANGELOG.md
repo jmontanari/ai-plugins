@@ -2,6 +2,33 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-piece.2] — 2026-04-20
+
+### Added (piece 2 of 7 — templates, config, doctrine load)
+- **`charter:` config block** in `templates/pipeline-config.yaml` with two keys:
+  - `required` (default `false`) — piece 3 will wire this so `prd`/`spec`/`plan` fail fast when set to `true` and `docs/charter/` is missing
+  - `doctrine_load` (default `[non-negotiables, architecture]`) — list of charter file base names to auto-load into session context
+- **Session-start hook charter doctrine load** — `hooks/session-start` now conditionally reads the charter files listed in `doctrine_load` when `docs/charter/` exists, and injects them into `additionalContext` alongside the existing TDD doctrine. Silent no-op when charter is absent.
+- **`charter_snapshot:` front-matter** in `templates/spec.md` and `templates/plan.md` capturing per-file `last_updated` dates at spec/plan write time. Used by piece 5 divergence detection.
+- **Per-phase `Charter constraints honored in this phase` slot** in both TDD-track and Implement-track phase examples of `templates/plan.md`.
+
+### Changed
+- **`templates/prd.md`** — `## Non-Negotiables` section renamed to `## Non-Negotiables (Product)` with structured `NN-P-xxx` schema (Type / Statement / Scope / Rationale / How QA verifies). Header gains a `**Charter:** docs/charter/` reference line pointing to the project-wide `NN-C-xxx` namespace.
+- **`templates/spec.md`** — `### Non-Negotiables (from PRD)` renamed to `### Non-Negotiables Honored` and split into **Project (NN-C)** and **Product (NN-P)** subsections. New `### Coding Rules Honored` section for `CR-xxx` citations. Header gains `**Charter:** docs/charter/` reference line.
+- **`templates/plan.md`** — header gains `**Charter:** docs/charter/` reference line.
+
+### Deferred to pieces 3–7
+- Piece 3: downstream skills (`prd`, `spec`, `plan`, `execute`, `status`) read charter, enumerate NN-C/NN-P/CR, enforce `charter.required`
+- Piece 4: agent updates
+- Piece 5: update mode + divergence detection
+- Piece 6: retrofit mode + migration pipeline
+- Piece 7: README + diagrams
+
+### Migration (piece 2)
+- Backward compat preserved — `charter.required: false` is the default so pre-charter projects keep working. Session-start hook silently ignores charter when `docs/charter/` is missing.
+- Existing specs/plans authored against v1.5.x templates continue to validate (the new template sections are additive, not replacing anything structurally).
+- Run `/reload-plugins` after upgrading to pick up the hook change.
+
 ## [2.0.0-piece.1] — 2026-04-20
 
 ### Added (piece 1 of 7 — charter stage bootstrap)
