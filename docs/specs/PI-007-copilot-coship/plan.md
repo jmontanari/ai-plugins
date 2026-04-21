@@ -3,6 +3,8 @@
 **Spec:** docs/specs/PI-007-copilot-coship/spec.md
 **Status:** draft
 
+> **Amendment 2026-04-21 (post-execute):** Phases 1–6 were implemented against this plan's original mirror-branch design. Phase 7's smoketest invalidated the design (no branch-pinning in Copilot CLI v1.0.34). The mirror infrastructure authored by Phases 2–4 was removed; a dual-path co-ship replaced it (plain `.md` files under `plugins/spec-flow/agents/`, plus a `plugin.json` at the plugin subdirectory enabling `/plugin install owner/repo:plugins/spec-flow`). An intermediate design iteration added `.agent.md` symlinks, which a follow-on finding (via the Custom agents configuration reference and prior-art superpowers-copilot packaging) revealed to be redundant; the symlinks were removed. The Verify commands below that grep for the hook/library/setup scripts are therefore no longer satisfiable — those files were deleted — but the phases are retained for historical continuity. **Final delivered ACs:** install via subdirectory syntax (PASS), skill invocation via bare skill name (PASS), agent discovery via `/agents` listing (PASS after frontmatter hygiene fixes). See `learnings.md` for the three smoketest records.
+
 ## Overview
 
 The deliverable mixes content (one new markdown file, one README update, one CHANGELOG entry), scripts (three bash files plus a shared library), and config (version bumps in two JSON files). There is no behavior-bearing code, no test suite, no runtime language. Every phase is **Implement-track**; `[Verify]` on each phase runs either a shell pipeline from the spec's AC or a purpose-built validation command.

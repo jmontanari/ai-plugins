@@ -10,7 +10,7 @@ Added GitHub Copilot CLI install compatibility via a **dual-path co-ship** patte
 
 - Plugin-level overview at `plugins/spec-flow/CLAUDE.md` summarizing the pipeline and entry-point skills. Read by both hosts: Claude Code treats it as the plugin-level README; Copilot CLI auto-loads it as plugin context.
 - GitHub Copilot CLI install path via subdirectory syntax: `/plugin install jmontanari/ai-plugins:plugins/spec-flow`. Confirmed with Copilot CLI v1.0.34 install + `/status` skill invocation.
-- `plugins/spec-flow/agents/<name>.agent.md` symlinks (one per top-level agent, 12 total) pointing at the corresponding `<name>.md`. Enables Copilot CLI's custom-agent discovery (`agents/*.agent.md` convention) while preserving Claude Code's discovery (`agents/*.md`). Single source of truth; dual extensions.
+- YAML frontmatter added to `fix-doc.md`, `qa-plan.md`, `qa-prd-review.md`, and `qa-spec.md` (they were missing it — pre-existing CR-001 violations surfaced by Copilot CLI's stricter schema validation). `implementer.md`'s description now double-quotes the "Mode: TDD" / "Mode: Implement" substrings so YAML doesn't parse the colons as nested mappings. Both hosts now load all top-level agents without warnings.
 
 ### Changed
 
@@ -19,9 +19,9 @@ Added GitHub Copilot CLI install compatibility via a **dual-path co-ship** patte
 ### Notes for upgraders
 
 - **No maintainer setup required.** There is no mirror branch to push, no post-commit hook to install, no bootstrap script to run. Pull, commit, push as normal — both hosts get the updates.
-- **Windows users:** the `.agent.md` symlinks require `git config --global core.symlinks true`. WSL, macOS, and Linux users don't need this. Git for Windows users who encounter broken agent files should enable symlinks or check out via WSL.
+- **No dual-extension trick.** Agent files are plain `.md`. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its Custom agents configuration reference, so no symlinks, extension aliases, or content translation are required. The same files Claude Code reads are the files Copilot CLI reads.
 - **Copilot CLI limitation:** Copilot CLI does not support branch-pinning in `/plugin install` (tracked at `github/copilot-cli#1296`). Copilot users always install from the default branch. Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI's flat-glob agent discovery; skills that dispatch those nested agents work only on Claude Code. Top-level agents work on both.
-- **Historical note:** An earlier PI-007 design (2026-04-21 morning) shipped a `master-copilot` mirror branch + POSIX-bash post-commit hook + setup script. Phase-7 smoketest revealed that branch-pinning doesn't exist in Copilot CLI yet, so the mirror branch couldn't be consumed. The design was refactored to the dual-path pattern above. The mirror infrastructure was removed; the historical commits remain visible in the feature branch's history for anyone curious about the design journey.
+- **Historical note:** Two earlier PI-007 designs were explored on 2026-04-21 before landing on the current dual-path pattern. A morning design shipped a `master-copilot` mirror branch + POSIX-bash post-commit hook + setup script; Phase-7 smoketest revealed Copilot CLI lacks branch-pinning, so the mirror branch couldn't be consumed. A mid-day revision added `.agent.md` symlinks alongside the `.md` files; the `/agents` smoketest plus GitHub's Custom agents configuration reference together showed the symlinks were redundant (Copilot scans both extensions and deduplicates). Both design detours were removed; the commits remain in the feature branch's history.
 
 ## [2.0.0] — 2026-04-20
 

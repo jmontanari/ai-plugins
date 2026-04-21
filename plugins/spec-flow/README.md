@@ -346,11 +346,9 @@ Copilot CLI's subdirectory-install syntax (`owner/repo:path/to/plugin`) discover
 
 - `plugins/spec-flow/CLAUDE.md` is read by both hosts. Copilot CLI reads CLAUDE.md directly as plugin context; Claude Code treats it as the plugin-level overview. No `AGENTS.md` symlink needed.
 - `plugins/spec-flow/skills/<name>/SKILL.md` is the cross-tool Agent Skills open standard — identical file, both hosts.
-- `plugins/spec-flow/agents/<name>.agent.md` are git symlinks pointing at `<name>.md`. Copilot CLI's custom-agent discovery looks for `*.agent.md`; Claude Code looks for `*.md`. Same file on disk, two extensions visible — both hosts find their agents. Nested subdirs (`agents/reflection/`, `agents/review-board/`) are NOT symlinked; Copilot CLI's agent discovery is flat-glob per its plugin docs, so those nested agents work only on Claude Code.
+- `plugins/spec-flow/agents/<name>.md` are plain Markdown files with YAML frontmatter. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its [Custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) reference, so the same files Claude Code discovers are picked up by Copilot CLI — no symlinks or dual extensions needed. Nested subdirs (`agents/reflection/`, `agents/review-board/`) are not part of Copilot CLI's flat-glob agent discovery per its plugin docs, so those nested agents work only on Claude Code.
 
 **Known limitations on Copilot CLI:**
 
 - Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI (flat-glob only). Skills that dispatch those agents may fail when run on Copilot CLI. This is a Copilot CLI design constraint, not a spec-flow defect.
 - Copilot CLI does not support branch-pinning (`#branch` or `@branch`) in `/plugin install` as of v1.0.34 (tracked in `github/copilot-cli#1296`). Users always install from the repo's default branch.
-
-Windows users on Git for Windows need `core.symlinks=true` for the `.agent.md` symlinks to resolve correctly. WSL and macOS/Linux installs work out of the box.

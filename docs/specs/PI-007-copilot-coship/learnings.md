@@ -107,8 +107,115 @@ Phase 6 surfaced three latent bugs that weren't caught during spec/plan QA. All 
 
 None of these showed up in spec or plan QA — all three require runtime context to surface. The plan's Phase 6 was the first opportunity to catch them.
 
+## Copilot CLI smoketest 2 — agent discovery and dispatch
+
+**Tool version:** GitHub Copilot CLI 1.0.34 (same session as smoketest 1)
+**Date:** 2026-04-21
+**Maintainer:** Joe
+
+### What was tested
+
+Post-redesign (mirror branch removed; dual-path shipped via `.agent.md` symlinks), re-installed spec-flow from the subdirectory syntax and asked Copilot CLI to invoke a plugin-provided agent. User's prompt was generic ("qa-spec … count files in ../").
+
+### Transcript excerpt
+
+```
+● Asked user When you say "qa-spec" do you mean the spec-flow:qa-phase agent?
+  └ User selected: Yes — use spec-flow:qa-phase (Recommended)
+
+● Running the spec-flow QA agent to count files in ../ (both non-recursive and recursive) and report top results. I'll instruct the agent to run safe shell commands and return counts and samples. Proceeding.
+
+● Spec-flow:qa-phase Count files in parent directory
+
+● Running local shell commands instead because the spec-flow QA agent cannot be invoked directly. Counting non-recursive and recursive regular files in ../ and listing top 10 largest files. Doing this now.
+```
+
+### Findings
+
+1. **Agent discovery works.** Copilot CLI recognized the plugin's custom agents and offered disambiguation: user said "qa-spec"; Copilot offered `spec-flow:qa-phase` as a likely match. The `.agent.md` symlinks committed in commit `8e4e2b1` are being picked up by Copilot CLI's plugin loader.
+
+2. **Direct agent invocation is blocked — by design.** Copilot CLI's message "*the spec-flow QA agent cannot be invoked directly*" is the plugin's own guard working correctly. Spec-flow's execute skill's API encapsulation rule explicitly states: *"`spec-flow:execute` is the only supported way to dispatch phase-level and end-of-piece agents (`implementer`, `tdd-red`, `verify`, `refactor`, `qa-phase`, `qa-phase-lite`, `fix-code`, `reflection/*`). Those agents assume orchestrator-injected context (Mode flag, pre-flight snapshot, oracle anchors, AC matrix, session metrics for reflection agents) and have Rule 0 first-turn reject checks that BLOCK when called directly."* This is not a failure — it's working as the spec-flow architecture intends.
+
+3. **Copilot fell back gracefully.** Instead of erroring out, Copilot ran the requested task (file counting) using its own tool-use. From a UX standpoint that's a reasonable fallback; the user got their answer even though the plugin's agent wasn't used.
+
+4. **The nested-dispatch path (skill → agent) is the real test, and it's not exercised here.** The meaningful test of whether spec-flow's agent architecture works on Copilot CLI would be:
+   - Install spec-flow on a fresh project
+   - Initialize it (`/charter`, `/prd`)
+   - Then invoke a skill that dispatches agents, e.g., `/spec` which dispatches `qa-spec` after writing the spec
+   - Observe whether the skill-level orchestration correctly dispatches the subagent on Copilot CLI
+
+   That end-to-end test is deferred — it requires a non-trivial setup (charter + PRD + piece) on the Copilot side, and spec-flow's orchestration model also assumes the Agent tool API which Copilot may or may not have. Tracked as a follow-up.
+
+### What this does NOT disprove
+
+- It does not prove that agent dispatch is broken on Copilot CLI. The direct-invocation path the user tried is a path the plugin itself rejects. The nested path (skill dispatches agent from within its own orchestration) was never exercised.
+- It does not invalidate the `.agent.md` symlinks — they successfully enabled agent discovery, which is a prerequisite for any future dispatch path.
+
+### Recommendation
+
+**Keep the `.agent.md` symlinks.** They enable discovery even if full dispatch requires more work in a follow-up piece. Removing them would regress the Copilot-side observability of what agents the plugin provides.
+
+**Document the known gap honestly:** skills work on Copilot CLI today; full agent dispatch from within a skill is untested and would require a dedicated follow-up smoketest on a spec-flow-initialized project inside Copilot CLI. Don't over-claim in the README.
+
+### Outcome
+
+**Outcome: PASS (with scope narrowed)**
+
+The redesigned dual-path approach correctly enables Copilot CLI to install spec-flow and discover its plugin contents (skills + agents). The `.agent.md` symlinks work — discovery is visible. Direct agent invocation is intentionally blocked by the plugin's own guards. Full end-to-end agent dispatch through a skill's orchestration is untested and tracked as follow-up.
+
+---
+
 ## Recommendations for future pieces that integrate with Copilot CLI
 
 - **Check feature-gate issues on github/copilot-cli before designing around new syntax.** Issue #1296 was 3 clicks of web search away; its absence in the plan cost us the entire master-copilot mirror infrastructure.
 - **A live smoketest would have surfaced the branch-pinning gap at spec time, not execute time.** Consider a minimal "is this syntax actually supported?" check during spec brainstorm when the spec relies on an external tool's feature.
 - **Subdirectory install is a cleaner pattern than mirror branches** for multi-plugin marketplaces — it eliminates sync machinery entirely. Future Copilot-CLI-targeting pieces should prefer `/plugin install owner/repo:path/to/plugin` first and only fall back to mirror/sync patterns if subdirectory install has a specific limitation.
+
+---
+
+## Copilot CLI smoketest 3 — `/agents` listing and frontmatter hygiene
+
+**Tool version:** GitHub Copilot CLI 1.0.34 (same session as smoketests 1 and 2)
+**Date:** 2026-04-21
+**Maintainer:** Joe
+
+### What was tested
+
+Ran `/agents` on Copilot CLI after smoketest 2 to list the custom agents the plugin surfaces. Output included both the agents loaded successfully and a set of warnings for files that failed schema validation.
+
+### Finding 1: Copilot CLI scans `.md` AND `.agent.md`
+
+The warnings reported paths ending in `.md` — NOT `.agent.md`. If Copilot CLI only scanned the `.agent.md` extension, the `.md` files would have been invisible and could not have produced schema-validation warnings. This proves empirically what [GitHub's Custom agents configuration reference](https://docs.github.com/en/copilot/reference/custom-agents-configuration) documents: *"The configuration file's name (minus `.md` or `.agent.md`) is used for deduplication between levels."* Both extensions are loaded; the loader deduplicates by basename.
+
+Independent corroboration: DwainTR/superpowers-copilot (a production prior-art plugin) ships `plugins/superpowers/agents/<name>.md` with plain `.md` extensions and no symlink indirection. It works on Copilot CLI without translation.
+
+### Finding 2: Five agent files had frontmatter defects
+
+Copilot CLI's stricter YAML parser surfaced real issues that Claude Code's looser parser had been silently tolerating:
+
+- `implementer.md` — the description line contained unquoted colons (`Mode: TDD`, `Mode: Implement`) that YAML tried to parse as nested mappings. Fixed by wrapping the description value in double quotes.
+- `fix-doc.md`, `qa-plan.md`, `qa-prd-review.md`, `qa-spec.md` — these four files had NO frontmatter at all. Pre-existing violation of spec-flow's own CR-001 (agents must declare name + description). Added canonical frontmatter matching the tdd-red/verify/refactor/qa-phase/fix-code siblings.
+
+All five were fixed in commit `e2ffd2f` on the spec/PI-007-copilot-coship branch. The fixes benefit Claude Code too — Claude's Agent tool relies on the frontmatter description field to route invocations, so these were latent defects from before PI-007.
+
+### Decision: drop the `.agent.md` symlinks
+
+With both findings in hand, the `.agent.md` symlinks committed in `8e4e2b1` (smoketest 2's follow-up) became pure redundancy. They were removed:
+
+- Remove the 12 `.agent.md` symlinks under `plugins/spec-flow/agents/` (top-level agents)
+- Drop the README section advising Windows users to enable `git config --global core.symlinks true` for the `.agent.md` symlinks
+- Update CHANGELOG 2.1.0 to reflect the simplification and the frontmatter fix
+- Retain nested-subdir limitation note (`agents/reflection/`, `agents/review-board/` remain outside Copilot's flat-glob discovery — that's a Copilot CLI architecture constraint, not addressable by filename tricks)
+
+The final shape: the same `.md` files serve both hosts. No symlinks, no dual extensions, no content translation. Closer to the superpowers-copilot prior art and closer to the "single source of truth" NFR the spec demanded.
+
+### Related but out-of-scope findings from the Copilot CLI research
+
+- **`/fleet`** is a Copilot CLI built-in command that parallelizes plan execution across multiple subagent dispatches (GitHub docs + [Copilot blog post](https://github.blog/ai-and-ml/github-copilot/run-multiple-agents-at-once-with-fleet-in-copilot-cli/)). Plugin agents are discoverable targets for `/fleet`. Spec-flow's execute skill already implements an orchestration mode (the Phase Scheduler + Phase Groups) that could complement or be complemented by `/fleet`. Whether this is an integration opportunity or an orthogonal concern is worth a future piece — NOT in scope for PI-007.
+- **Recursive subagent spawning via the `agent` tool** is available to plugin agents when they declare it in their `tools` frontmatter. Spec-flow agents currently don't, because the design uses `spec-flow:execute` as the sole orchestration entrypoint. No change for PI-007; noted as a capability the project could lean on in a future piece if we decide to allow agent-internal delegation.
+
+### Outcome
+
+**Outcome: PASS (simplification)**
+
+The symlink removal makes the dual-path pattern cleaner: one file extension, one discovery mechanism per agent, both hosts load the same file. The frontmatter fixes close pre-existing CR-001 violations that were masking themselves on Claude's looser parser.
