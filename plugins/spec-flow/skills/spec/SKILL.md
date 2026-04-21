@@ -22,9 +22,9 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 1. Read `docs/manifest.yaml` — find the target piece (from user argument or next `open` piece)
 2. Read `docs/prd.md` — extract the PRD sections mapped to this piece
-3. Read `docs/architecture/` — load any architecture decision docs
-4. Scan `docs/specs/*/learnings.md` — load learnings from previously completed pieces
-5. Scan `CLAUDE.md` and `docs/prd.md` for non-negotiables (NN-xxx pattern)
+3. Read `<docs_root>/charter/` — load any charter files present (architecture.md, non-negotiables.md, tools.md, processes.md, flows.md, coding-rules.md). If the charter directory is absent, fall back to reading the legacy `<docs_root>/architecture/` folder. Capture each charter file's `last_updated:` front-matter value for the `charter_snapshot` front-matter written in Phase 3.
+4. Scan `<docs_root>/specs/*/learnings.md` — load learnings from previously completed pieces
+5. Scan for binding rules across namespaces: `<docs_root>/charter/non-negotiables.md` (NN-C), `<docs_root>/prd/prd.md` (or legacy `<docs_root>/prd.md`) for `NN-P-xxx` entries in the Non-Negotiables (Product) section, `<docs_root>/charter/coding-rules.md` (CR), and any `NN-xxx` entries in `CLAUDE.md`. Pre-charter projects with unprefixed `NN-xxx` in the PRD still work — treat them as legacy and mention in Phase 2 that retrofitting would reclassify them.
 6. Read `<docs_root>/improvement-backlog.md` if it exists. This file accumulates end-of-piece reflection findings from prior pieces (process retros + future opportunities). For each item recorded, semantic-match against this piece's name (from manifest) and the user's brainstorm prompt; surface the ~5 most-relevant items as candidate considerations during Phase 2 brainstorm. Track user responses in orchestrator state for Phase 5 prune (statuses: `incorporated` — addressed by this piece's spec; `deferred` — still relevant but not in this piece's scope; `obsolete` — no longer applies). If the file does not exist (first piece on a new project), skip silently. If `reflection: off` is set but the file exists from a previous run, still read it — stale findings from past reflections may still be useful brainstorm context.
 
 ### Phase 2: Brainstorm
@@ -32,6 +32,7 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 Socratic dialogue with the user, one question at a time:
 
 1. Confirm the piece scope: "This piece covers [PRD sections]. Does that match your intent?"
+1a. **Identify charter constraints this piece touches.** From the charter files loaded in Phase 1 step 3, enumerate which `NN-C-xxx` entries, `NN-P-xxx` entries, and `CR-xxx` entries are in scope for this piece. Ask the user to confirm the list (e.g., "This piece touches NN-C-003, NN-P-001, CR-007 and CR-012. Miss anything?"). Record the confirmed list — it becomes the `### Non-Negotiables Honored` and `### Coding Rules Honored` sections of spec.md in Phase 3.
 2. **Surface backlog items.** If Phase 1 step 6 loaded items from `<docs_root>/improvement-backlog.md`, present the top ~5 most-relevant to the user with their concrete references and ask "for each, is this `incorporated` in this piece's spec, `deferred` to a later piece, or `obsolete`?" Record each response in orchestrator state keyed by backlog item — Phase 5 step 4 reads this state to prune `incorporated` and `obsolete` entries from the file. If no items were surfaced (file did not exist, or no relevant matches), skip this step.
 3. Explore purpose and boundaries
 4. PRD compliance check: if the manifest maps requirements the user hasn't mentioned, ask about them
@@ -45,14 +46,14 @@ Socratic dialogue with the user, one question at a time:
    ```bash
    git worktree add worktrees/<piece-name> -b spec/<piece-name>
    ```
-3. Write `docs/specs/<piece-name>/spec.md` in the worktree directory
-4. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/spec.md` as the structural guide
+3. Write `<docs_root>/specs/<piece-name>/spec.md` in the worktree directory
+4. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/spec.md` as the structural guide. Populate the `charter_snapshot:` front-matter with each charter file's `last_updated` date captured in Phase 1 step 3. If a charter file is absent, omit its key from the snapshot block (do not write a blank/null value).
 
 ### Phase 4: QA Loop
 
 1. Read the agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-spec.md`
 
-2. **Iteration 1 (full review):** Compose prompt with `Input Mode: Full`: interpolate the full spec, PRD sections, architecture docs, manifest piece, non-negotiables. Dispatch:
+2. **Iteration 1 (full review):** Compose prompt with `Input Mode: Full`: interpolate the full spec, PRD sections, charter files (all six if present — architecture, non-negotiables (NN-C), tools, processes, flows, coding-rules (CR); else legacy `docs/architecture/`), manifest piece, and NN-P from the PRD's Non-Negotiables (Product) section. Dispatch:
    ```
    Agent({
      description: "Spec QA for <piece-name> (iter 1, full)",

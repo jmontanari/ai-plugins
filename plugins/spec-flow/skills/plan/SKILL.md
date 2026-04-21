@@ -35,6 +35,8 @@ Gather:
 - Test framework patterns used in the project
 - Import conventions and module structure
 - Architecture constraints visible in the code
+- **Charter files** at `<docs_root>/charter/` if present (architecture, non-negotiables, tools, processes, flows, coding-rules). Record each file's `last_updated` date for the plan's `charter_snapshot:` front-matter. Charter content is exploration priors, same as code — it influences phase decomposition and the per-phase "Charter constraints honored" slots.
+- **Spec's `### Non-Negotiables Honored` and `### Coding Rules Honored` sections** — these enumerate the NN-C/NN-P/CR entries the piece claims it honors. The plan allocates each entry to the specific phase(s) that implement it via the per-phase "Charter constraints honored in this phase" slot.
 
 ### Phase 2: Generate Plan
 
@@ -125,13 +127,13 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
    **Phase 0 Scaffold interacts with Phase Groups.** If sub-phases in a group each need to append entries to a shared coordination file (a common `__init__.py`, a shared fixtures file, a test registry), author a Phase 0 Scaffold BEFORE the Phase Group to pre-create the entries. Otherwise concurrent sub-phases will race on the shared file. The existing Scaffold guidance above (previous rule) covers this pattern.
 
-Write the plan to `docs/specs/<piece-name>/plan.md`
+Write the plan to `<docs_root>/specs/<piece-name>/plan.md`. Populate the `charter_snapshot:` front-matter with each charter file's `last_updated` date captured during Phase 1 exploration. Populate each phase's "Charter constraints honored in this phase" slot with the subset of NN-C/NN-P/CR entries from the spec that the phase implements (every entry must appear in exactly one phase — no drops, no duplicates).
 
 ### Phase 3: QA Loop
 
 1. Read template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-plan.md`
 
-2. **Iteration 1 (full review):** Dispatch QA agent (Opus) with `Input Mode: Full`, the full plan, spec, and PRD sections:
+2. **Iteration 1 (full review):** Dispatch QA agent (Opus) with `Input Mode: Full`, the full plan, spec, PRD sections, and charter files (if present — all six; otherwise legacy `docs/architecture/`). The QA agent cross-checks that every NN-C/NN-P/CR cited in the spec appears in exactly one phase's "Charter constraints honored" slot, with no drops and no duplicates.
    ```
    Agent({
      description: "Plan QA for <piece-name> (iter 1, full)",
@@ -155,8 +157,8 @@ Write the plan to `docs/specs/<piece-name>/plan.md`
 2. Update manifest on main: piece status → `planned`
    ```bash
    git checkout main
-   # update manifest.yaml status for this piece
-   git add docs/manifest.yaml
+   # update manifest.yaml status for this piece (new layout: <docs_root>/prd/manifest.yaml; legacy: <docs_root>/manifest.yaml — whichever exists)
+   git add <docs_root>/prd/manifest.yaml   # or <docs_root>/manifest.yaml if still on legacy layout
    git commit -m "manifest: mark <piece-name> as planned"
    git checkout spec/<piece-name>
    ```

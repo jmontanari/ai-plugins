@@ -11,6 +11,16 @@ Import an existing PRD, normalize it into the pipeline format, decompose it into
 
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`. During import, if the user specifies a non-default docs location or you detect docs live elsewhere (e.g., `repo/docs/`), update `.spec-flow.yaml` accordingly.
 
+## Step 0.5: Charter Prerequisite Check
+
+Read the `charter:` block from `.spec-flow.yaml` (added in v2.0.0). Two keys: `required` (default `false`) and `doctrine_load`.
+
+- If `charter.required: true` and `<docs_root>/charter/` does not exist → respond with: *"Charter is required for this project but `<docs_root>/charter/` is missing. Run `/spec-flow:charter` first to bootstrap the charter, then re-run `prd`."* Halt.
+- If `<docs_root>/charter/` exists → continue; charter content is available for PRD import (you can cite `NN-C-xxx` from `<docs_root>/charter/non-negotiables.md` when classifying PRD constraints).
+- If `<docs_root>/charter/` does not exist and `charter.required: false` → continue. Treat this as a pre-charter project; the PRD holds all non-negotiables as unprefixed `NN-xxx` (legacy) until the project chooses to retrofit.
+
+Legacy layout detection (informational): if `<docs_root>/prd.md` exists at the legacy flat path (v1.5.x and prior) rather than `<docs_root>/prd/prd.md`, note this and offer: *"Detected legacy docs layout. Piece 6 (charter retrofit) migrates to the new layout. For now, this skill reads and writes the legacy path."*
+
 ## Modes
 
 Detect which mode based on arguments and current state:
@@ -27,14 +37,18 @@ Detect which mode based on arguments and current state:
    - Check for raw docs: `docs/`, `README.md`, any `*.md` with "requirements" content
    - Report what was found and ask user to confirm the source PRD
 
-2. **Read and normalize PRD** into `docs/prd.md`:
+2. **Read and normalize PRD** into the PRD path — `<docs_root>/prd/prd.md` (v2.0.0 layout; default for new projects) or `<docs_root>/prd.md` (legacy; only if you detected legacy layout in Step 0.5 and chose to preserve it):
    - Extract functional requirements → number as FR-001, FR-002, ...
    - Extract non-functional requirements → number as NFR-001, NFR-002, ...
    - Extract goals and non-goals
    - Extract success metrics → number as SC-001, SC-002, ...
-   - Extract constraints / non-negotiables → number as NN-001, NN-002, ...
+   - Extract constraints / non-negotiables:
+     - If charter exists (`<docs_root>/charter/non-negotiables.md`), classify each constraint:
+       - Project-wide (security, compliance, architecture, tooling) → propose adding to charter as `NN-C-xxx`. Ask the user to confirm; if accepted, append to `<docs_root>/charter/non-negotiables.md` with the next sequential NN-C ID.
+       - Product-specific (tied to this PRD) → number as `NN-P-001, NN-P-002, ...` in the `## Non-Negotiables (Product)` section of `prd.md`.
+     - If charter does not exist (legacy pre-charter project) → number as unprefixed `NN-001, NN-002, ...` in the PRD's legacy `## Non-Negotiables` section. Retrofit (piece 6) will reclassify later.
    - Strip process metadata, persona theater, ceremony artifacts
-   - Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/prd.md` as the structural guide
+   - Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/prd.md` as the structural guide. In v2.0.0, the template uses `## Non-Negotiables (Product)` with structured entries. For pre-charter projects, fall back to the legacy `## Non-Negotiables` section shape.
 
 3. **Brainstorm breakdown** with user (interactive, one question at a time):
    - Identify independently implementable and testable pieces
@@ -42,7 +56,7 @@ Detect which mode based on arguments and current state:
    - Identify dependency ordering between pieces
    - Ask: "Does this breakdown cover all requirements? Any pieces missing?"
 
-4. **Create `docs/manifest.yaml`:**
+4. **Create manifest** at `<docs_root>/prd/manifest.yaml` (v2.0.0 layout) or `<docs_root>/manifest.yaml` (legacy — if preserving legacy layout):
    - Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/manifest.yaml`
    - Populate pieces list with names, descriptions, prd_sections, dependencies
    - All pieces start with status: `open`
@@ -54,7 +68,8 @@ Detect which mode based on arguments and current state:
    - Do NOT delete — move only
 
 6. **Commit:**
-   - `git add docs/prd.md docs/manifest.yaml docs/archive/`
+   - New-layout projects: `git add <docs_root>/prd/prd.md <docs_root>/prd/manifest.yaml <docs_root>/archive/` (also stage any `<docs_root>/charter/non-negotiables.md` updates if you appended NN-C entries in step 2).
+   - Legacy-layout projects: `git add <docs_root>/prd.md <docs_root>/manifest.yaml <docs_root>/archive/`
    - `git commit -m "feat: import and normalize PRD, create manifest"`
 
 ## Update Mode Workflow
