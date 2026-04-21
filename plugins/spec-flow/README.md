@@ -342,7 +342,15 @@ Installs spec-flow only, without registering the marketplace. Copilot CLI's `own
 
 Registers the `shared-plugins` marketplace, then installs spec-flow from it. Future plugins added to this marketplace become discoverable by name afterward. Recommended if you expect to install multiple plugins from this repo over time.
 
-Both paths confirmed with Copilot CLI v1.0.34.
+Both paths confirmed with Copilot CLI v1.0.34. **Minimum version: v1.0.34** — earlier Copilot CLI builds may not support the `/plugin` command family. Check with `copilot --version`.
+
+**Recovery for the "plugins/plugins/spec-flow" error.** spec-flow v2.1.0 ships a fix for a path-duplication bug in the marketplace manifest that affected early adopters who registered the marketplace before this release. If you hit `Plugin source directory not found: .../plugins/plugins/spec-flow` during `/plugin install spec-flow@shared-plugins`, refresh the stale marketplace cache before retrying:
+
+```text
+/plugin marketplace remove jmontanari/ai-plugins
+/plugin marketplace install jmontanari/ai-plugins
+/plugin install spec-flow@shared-plugins
+```
 
 **Invocation form differs from Claude Code.** Copilot CLI does not use the `/<plugin>:<skill>` colon-delimited sigil — use the bare skill name:
 
