@@ -52,13 +52,22 @@ pieces:
     description: Produce docs/architecture/copilot-cli-parity.md — a reference document mapping every marketplace-level and plugin-internal Claude Code capability to its GitHub Copilot CLI equivalent, with conversion recipes and a DIRECT/APPROXIMATE/GAP tier classification per row. Every GAP row specifies a degradation strategy (INLINE-INTO-INSTRUCTIONS, DROP-WITH-WARNING, EMIT-SHIM, or HARD-ERROR). Desk research only; empirical dogfood deferred to a separate maintainer-controlled project during/after PI-006. Source-of-truth input for PI-006.
     prd_sections: [G-3]
     dependencies: []
-    status: implementing
+    status: superseded
+    notes: |
+      Aborted during execute (2026-04-21) after the mapping document reached the 5-agent Final Review stage. Root cause: the piece's core premise — "convert Claude Code plugin artifacts to Copilot CLI equivalents on a mirror branch" — turned out to be the wrong architecture.
+
+      Discovery: the superpowers plugin (github.com/obra/superpowers, v5.0.7) demonstrates an alternative "co-ship dual-configuration" pattern where a single source tree ships per-host manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `gemini-extension.json`, `package.json`) side-by-side with per-host hook-registration files (`hooks/hooks.json`, `hooks/hooks-cursor.json`) and shared content directories (`skills/`, `agents/`, `commands/`). `AGENTS.md` is a symlink to `CLAUDE.md` — Copilot CLI reads the same instruction file Claude does with zero transformation. For distribution to a different canonical marketplace (e.g., OpenAI Codex), a single rsync-plus-exclude-plus-regenerate-overlay script handles publishing (see `scripts/sync-to-codex-plugin.sh` in superpowers). No mirror branch, no conversion pipeline.
+
+      PI-005's feature branch `spec/PI-005-copilot-cli-parity-map` is preserved with full execute history (spec + plan + 217-line deliverable + all phase commits + fix-code commits from 3 QA iterations). Not merged. Reference for the next spec cycle.
+      Follow-up work will be re-specced around the co-ship pattern — to be tracked as a new piece (e.g., PI-007 or later) authored by /spec-flow:spec.
 
   - name: PI-006-copilot-mirror-ci
     description: CI/CD pipeline plus bash conversion script that encodes PI-005's mapping doc and produces a `master-copilot` branch mirroring `master` on every commit with Claude→Copilot conversions applied. Dogfooded in a separate maintainer-controlled project, not in this repo.
     prd_sections: [G-3]
     dependencies: [PI-005-copilot-cli-parity-map]
-    status: open
+    status: superseded
+    notes: |
+      Aborted 2026-04-21 as part of the PI-005 abort. The mirror-branch conversion pipeline this piece proposed is the wrong pattern — the superpowers multi-host plugin demonstrates that co-shipping all hosts' manifests and hook-registrations in one tree eliminates the need for conversion entirely. See PI-005's notes for the discovery detail. Successor piece to be specced with a co-ship focus.
 
 coverage:
   total_prd_sections: 15
@@ -80,4 +89,4 @@ coverage:
     Uncovered-but-intentional: many of G-1/G-3/FR-002/FR-003/NFR-001/NFR-002/NFR-004 are already satisfied by the repo's existing structure (marketplace.json exists, plugin.json exists, install mechanism works, no runtime deps). These don't need dedicated pieces — they're verified by the existence and correctness of the current files. Charter-enforcement keeps them satisfied going forward.
     SC-001/SC-002/SC-003/SC-004 are measurement goals, not implementable pieces. They come true (or don't) over time as users adopt.
     NN-P-003 ("dog-food before recommend") is a process rule enforced at release time, not a piece.
-    PI-005 (design) and PI-006 (implementation) are the prerequisite pieces for SC-002 — they make Copilot-CLI installs of spec-flow possible, but SC-002 itself is satisfied only when such installs actually occur in the wild, so SC-002 remains in uncovered_sections until that measurement is met.
+    PI-005 (design) and PI-006 (implementation) were intended as the prerequisite pieces for SC-002, but both were superseded on 2026-04-21 when the mirror-branch conversion pattern they assumed was discovered to be inferior to the co-ship dual-configuration pattern demonstrated by the superpowers plugin (github.com/obra/superpowers). A successor piece will be specced around the co-ship pattern and will serve as the actual design+implementation prerequisite for SC-002. SC-002 remains in uncovered_sections until that successor ships and real-world Copilot CLI installs of spec-flow occur.
