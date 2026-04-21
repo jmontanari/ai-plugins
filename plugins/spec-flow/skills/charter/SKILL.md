@@ -209,9 +209,179 @@ After commit, check the manifest for pieces at `specced`, `planned`, or `impleme
 
 Do NOT automatically re-spec or re-plan — human decides per piece.
 
-## Retrofit Mode Workflow
+## Retrofit Mode Workflow (v2.0.0 piece 6)
 
-Deferred to v2.0.0 piece 6. See piece 6 plan.
+Triggered when retrofit signals are detected: legacy `<docs_root>/prd.md` at the flat path, unprefixed `NN-xxx` entries in PRD, or `<docs_root>/manifest.yaml` at the legacy path. Also invocable explicitly as `/spec-flow:charter --retrofit`.
+
+### Entry confirmation
+
+Before any file change, announce:
+
+> "Detected a pre-charter spec-flow project (v1.5.x or earlier). Retrofit mode migrates to v2.0.0:
+> - Reclassifies existing NN-xxx entries into NN-C (project-wide) and NN-P (product-specific)
+> - Migrates docs/ layout to the new structure (prd/, backlog/, specs/ stays)
+> - Rewrites existing specs and plans to cite the new namespaces
+>
+> This produces a series of review-gated commits — no destructive operations, every step is revertable.
+>
+> Proceed? (yes / dry-run / cancel)"
+
+- **yes** → run the full pipeline (steps 1–9 below)
+- **dry-run** → run pipeline in dry-run mode: walk each step, produce a combined diff preview, no commits. User reviews; can then re-invoke without dry-run to apply.
+- **cancel** → abort, no changes made
+
+### Step 1 — Snapshot pre-state
+
+Create `<docs_root>/archive/pre-charter-migration-<YYYY-MM-DD>/` and copy current:
+- `<docs_root>/prd.md` (or `<docs_root>/prd/prd.md` if already partially migrated)
+- `<docs_root>/manifest.yaml` (or new location)
+- `<docs_root>/specs/<piece>/spec.md` and `plan.md` for every piece
+
+Commit: `chore: snapshot pre-charter state to archive/ before retrofit`
+
+Pure safety net — if any later step is wrong, user has the pre-migration state verbatim. Print the commit SHA to the user so they know the rollback target.
+
+### Step 2 — Reclassify NN-xxx
+
+Socratic, one entry at a time. For each existing `NN-xxx` in the PRD:
+
+> "NN-003: **[entry statement]**
+>
+> - **C** — project-wide rule (charter; applies across all pieces and products in this repo)
+> - **P** — product-specific rule (stays in PRD; tied to this PRD only)
+> - **R** — retire (no longer binding; will be tombstoned)"
+
+Record all user choices in an in-memory mapping table. No file changes yet.
+
+### Step 3 — Bootstrap Socratic for other five charter files
+
+Run Phase 2 Socratic (from bootstrap mode above) for the five non-NN files: `architecture.md`, `tools.md`, `processes.md`, `flows.md`, `coding-rules.md`. Use detection signals (Phase 1.1) + any user-supplied sources (Phase 1.2) as priors.
+
+Additionally, promote the **C** classified NN entries into `<docs_root>/charter/non-negotiables.md` with new sequential `NN-C-001`... IDs. Keep the mapping in state:
+
+```
+old NN-003 → NN-C-001
+old NN-007 → NN-C-002
+old NN-001 → NN-P-001 (stays in PRD, renumber on next step)
+old NN-012 → RETIRED (tombstone)
+```
+
+Persist the mapping table to `<docs_root>/archive/pre-charter-migration-<date>/nn-mapping.md` for post-migration traceability.
+
+Commit per charter file:
+```bash
+git add <docs_root>/charter/architecture.md && git commit -m "charter: add architecture (retrofit)"
+git add <docs_root>/charter/tools.md && git commit -m "charter: add tools (retrofit)"
+# ... and so on
+git add <docs_root>/charter/non-negotiables.md && git commit -m "charter: add non-negotiables (from migrated NN-xxx)"
+```
+
+### Step 4 — Layout migration via `git mv`
+
+Use `git mv` to preserve history:
+
+```bash
+git mv <docs_root>/prd.md <docs_root>/prd/prd.md
+git mv <docs_root>/manifest.yaml <docs_root>/prd/manifest.yaml
+git mv <docs_root>/improvement-backlog.md <docs_root>/backlog/backlog.md   # if exists
+```
+
+(Per-piece artifacts at `<docs_root>/specs/<piece>/` already match the new layout — no moves needed.)
+
+Commit: `chore: migrate docs/ layout to charter structure (retrofit)`
+
+### Step 5 — Rewrite PRD
+
+Update `<docs_root>/prd/prd.md`:
+
+1. Drop the unprefixed `## Non-Negotiables` section.
+2. Add `## Non-Negotiables (Product)` section. Each NN-P classified entry gets renumbered per the mapping (NN-P-001, NN-P-002, ...) and converted to structured schema (Type / Statement / Scope / Rationale / How QA verifies).
+3. Add `**Charter:** docs/charter/ (NN-C namespace — project-wide binding rules; applies to every piece)` reference line near the top (matches `templates/prd.md`).
+4. Update any inline references in the PRD body text (e.g., "see NN-003" → "see NN-C-001").
+
+Commit: `prd: promote NN to namespaces, reference charter (retrofit)`
+
+### Step 6 — Per-piece spec rewrite (dispatch fix-doc)
+
+For every `<docs_root>/specs/<piece>/spec.md` that cites unprefixed `NN-xxx`:
+
+1. Read the spec.
+2. Dispatch `fix-doc` with the mapping table + spec content:
+
+   ```
+   Agent({
+     description: "Retrofit: rewrite NN citations in spec/<piece>",
+     prompt: <fix-doc.md + mapping table + spec content + "Rewrite every NN-xxx citation to use the new NN-C-xxx or NN-P-xxx ID per this mapping. Retired entries → return BLOCKED citing the piece cannot drop the reference without human judgment.">,
+     model: "sonnet"
+   })
+   ```
+
+3. `fix-doc` returns a diff. Orchestrator applies and stages.
+4. Update `charter_snapshot` front-matter with today's date for every charter file.
+5. If any citation maps to RETIRED, escalate: *"Piece `<piece>`'s spec cites NN-012 which you retired during reclassification. How should I handle this — drop the citation, upgrade to a specific superseding entry, or re-open the piece for re-spec?"*
+
+Commit per piece: `spec(<piece>): update NN citations to charter namespaces (retrofit)`
+
+### Step 7 — Per-piece plan rewrite
+
+Same loop as step 6 for every `<docs_root>/specs/<piece>/plan.md` where plans exist. Updates per-phase "Charter constraints honored in this phase" slots (if they exist; older plans without the slot just get citation rewrites in the body).
+
+Retrofit also auto-populates per-phase slots by allocating each cited entry to the phase whose scope overlaps — if ambiguous, escalate to the user.
+
+Commit per piece: `plan(<piece>): update NN citations to charter namespaces (retrofit)`
+
+### Step 8 — Update `.spec-flow.yaml`
+
+Ensure `.spec-flow.yaml` has the charter block with retrofit-appropriate defaults:
+
+```yaml
+charter:
+  required: true                                    # retrofitted project has charter; enforce on future PRDs
+  doctrine_load: [non-negotiables, architecture]
+```
+
+If the file already has these keys, leave them as-is. If `required: false`, flip to `true` only with user confirmation.
+
+Commit: `config: enable charter stage (retrofit)`
+
+### Step 9 — Full QA sweep
+
+Dispatch reviewers sequentially (not parallel — the orchestrator's single-window context budget and each review's must-fix resolution may depend on the prior):
+
+1. `qa-charter` on the new charter (iter-1 full + loop — see bootstrap Phase 4). Retrofit-mode additions (checks 14 + 15 in qa-charter.md) are active: re-keying completeness + spec back-reference integrity.
+2. For every rewritten spec: `qa-spec` iter-1 full.
+3. For every rewritten plan: `qa-plan` iter-1 full.
+
+Any must-fix finding loops back to the appropriate fix-doc + re-review. Human sign-off before calling retrofit complete.
+
+### Dry-run mode (`--retrofit --dry-run`)
+
+Walks all nine steps using an internal staging area (e.g., orchestrator's in-memory buffer or a scratch `git stash`). Produces a combined unified diff preview of every planned change. No commits. No file writes outside the staging area. Output: human-readable summary of each step's planned changes, plus the full diff.
+
+Users can then re-invoke without `--dry-run` to apply for real.
+
+### Opt-out (`/spec-flow:charter --decline`)
+
+Writes `.spec-flow.yaml` with `charter.required: false` and creates a marker file `<docs_root>/.charter-declined` with a short note:
+
+```
+Charter declined on 2026-04-20.
+Reason: <user-supplied>
+Reversible: run /spec-flow:charter at any time to enter retrofit mode.
+```
+
+Downstream skills (prd, spec, plan, execute, status) skip all charter checks when `charter.required: false`. Existing v1.5.x behavior is fully preserved. Retrofit can be run at any time later — the decline is reversible.
+
+Commit: `config: decline charter stage (reversible)`
+
+### Rollback
+
+No destructive commands anywhere in the pipeline. Options to revert:
+
+- `git revert <step-N-sha>` — reverts a specific step while preserving later commits (may introduce conflicts if later steps build on the reverted step; resolve per normal git workflow).
+- `git reset --hard <pre-state-snapshot-sha>` — nuclear option. Moves back to the snapshot commit from step 1. Requires user confirmation since it rewrites history locally.
+
+The pre-state snapshot in step 1 is always available via `git log --follow <docs_root>/archive/pre-charter-migration-<date>/` — even if the user discards the migration commits, the snapshot copies remain.
 
 ## No QA Gate Between Charter Skill and User
 

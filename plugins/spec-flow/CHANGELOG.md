@@ -2,6 +2,36 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-piece.6] — 2026-04-20
+
+### Added (piece 6 of 7 — retrofit mode + migration pipeline)
+- **Charter skill retrofit mode.** Auto-detected on pre-charter projects (legacy `docs/prd.md` at flat path, unprefixed `NN-xxx` entries in PRD, or legacy manifest location) and invocable as `/spec-flow:charter --retrofit`. Nine-step commit-per-step pipeline migrates pre-v2.0 projects to the new layout:
+  1. Snapshot pre-state to `docs/archive/pre-charter-migration-<date>/`
+  2. Socratic NN-xxx reclassification (per-entry: C / P / R)
+  3. Bootstrap Socratic for five other charter files; promote NN-C entries; persist mapping table
+  4. Layout migration via `git mv` (preserves history)
+  5. Rewrite PRD with NN-P namespace + Charter reference line
+  6. Per-piece spec rewrite via fix-doc (auto-applies mapping; escalates retired citations)
+  7. Per-piece plan rewrite (same pattern; auto-allocates per-phase slots where scope is unambiguous)
+  8. Update `.spec-flow.yaml` with `charter.required: true`
+  9. Full QA sweep (qa-charter + per-piece qa-spec + qa-plan)
+- **`--retrofit --dry-run` flag.** Walks all nine steps using an in-memory staging area and produces a combined unified diff preview. No commits; no file writes. Gives users a preview before committing to the real migration.
+- **`--decline` flag.** Writes `charter.required: false` and creates `docs/.charter-declined` marker. Downstream skills skip charter checks entirely. Fully reversible — run `/spec-flow:charter` later to enter retrofit.
+- **Mapping table persistence.** Retrofit writes `docs/archive/pre-charter-migration-<date>/nn-mapping.md` showing every old NN-xxx → new namespace assignment for post-migration traceability.
+- **Retired-citation escalation.** During step 6/7, any spec or plan citing an NN-xxx the user retired escalates to human with three options: drop, upgrade to superseding entry, or re-open the piece.
+
+### Changed
+- **`prd` skill legacy-detect hint** now points users at `/spec-flow:charter --retrofit` (previously said "piece 6 deferred"). `prd` continues to read/write legacy paths for backward compat until retrofit is run.
+
+### Deferred to piece 7
+- README + diagram updates + consolidated v2.0.0 CHANGELOG (the per-piece CHANGELOG entries added across pieces 1–6 will be consolidated into a single `## [2.0.0]` entry).
+
+### Migration (piece 6)
+- **Fully backward compatible until the user opts in.** Existing v1.5.x projects continue to work unchanged. Retrofit is only invoked when the user explicitly asks (via `/spec-flow:charter --retrofit` or by running the skill on a detected legacy project and confirming).
+- **Pre-state snapshot is the backstop.** No destructive commands anywhere; every step is `git revert`-able; the nuclear rollback is `git reset --hard <snapshot-sha>`.
+- **Opt-out is supported.** Teams that prefer the v1.5.x flow can run `--decline` to permanently (but reversibly) disable charter enforcement.
+- Run `/reload-plugins` after retrofit to pick up doctrine load.
+
 ## [2.0.0-piece.5] — 2026-04-20
 
 ### Added (piece 5 of 7 — update mode + divergence resolution)
