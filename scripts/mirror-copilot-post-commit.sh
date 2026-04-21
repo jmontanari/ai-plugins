@@ -12,6 +12,15 @@ set -euo pipefail
 #   1. Worktree absent — advisory to stderr, exit 0.
 #   2. No plugins/spec-flow files touched in HEAD — silent exit 0.
 
+# CRITICAL: git sets GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE when invoking this
+# post-commit hook. Those env vars make subsequent `git` calls resolve to the
+# committing repo's gitdir — which breaks `git rev-parse --show-toplevel` when
+# the hook is shared across worktrees. Unset these at the top so every git call
+# below re-discovers the repo from CWD's on-disk context. We want REPO_ROOT to
+# be the current working tree of the commit being made (which git's post-commit
+# sets CWD to), not some other worktree's.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 WORKTREE="$REPO_ROOT/worktrees/master-copilot"
 
