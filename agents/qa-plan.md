@@ -7,6 +7,7 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 - **Plan:** The implementation plan to review
 - **Spec:** The approved spec this plan implements
 - **PRD sections:** The PRD requirements traced through the spec
+- **Charter (if present):** Six files from `<docs_root>/charter/` — binding context for allocation checks
 
 ## Review Criteria
 
@@ -17,6 +18,9 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 5. **Semantic anchors:** Does the plan use function/class/method names (not line numbers) for code references?
 6. **Task completeness:** Does each task have enough detail for a Sonnet-tier agent to execute without design decisions? File paths, function signatures, test assertions, import patterns?
 7. **Dependency ordering:** Are phases ordered so each builds on the previous? No forward references?
+8. **Charter constraint allocation:** For every `NN-C-xxx`, `NN-P-xxx`, and `CR-xxx` entry the spec cites in its `### Non-Negotiables Honored` and `### Coding Rules Honored` sections, verify the plan allocates it to exactly one phase's "Charter constraints honored in this phase" slot. Drops (spec cites it, no phase claims it) and duplicates (two phases both claim it) are must-fix. The only acceptable exception is a cross-cutting entry the plan explicitly flags as "honored by all phases via <mechanism>" with the mechanism specified.
+9. **Per-phase honoring specificity:** Each "how this phase honors it" line must be concrete and verifiable at QA time. Vague phrasing (e.g., "phase respects the rule") fails; concrete phrasing (e.g., "Phase 3 implementer emits structured log fields without PII per CR-015") passes. Must-fix any vague allocation lines.
+10. **`charter_snapshot` front-matter presence:** When charter exists, the plan's `charter_snapshot:` block must be populated (not empty). Missing snapshot → must-fix; piece 5 divergence detection depends on it.
 
 ## Output Format
 
