@@ -24,8 +24,9 @@ The plugin ships five skills, a pool of specialized agents, reusable templates, 
 
 ```
 plugins/spec-flow/
-├── skills/          # Entry points — invoked via /status, /prd, /spec, /plan, /execute
-│   ├── status/      # Pipeline dashboard + next-action recommendation
+├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute
+│   ├── status/      # Pipeline dashboard + next-action recommendation + charter divergence resolver
+│   ├── charter/     # Bootstrap/update/retrofit charter — project-wide binding constraints (v2.0.0)
 │   ├── prd/         # Import/normalize PRD, decompose into pieces, update manifest
 │   ├── spec/        # Author a spec for one piece (Socratic brainstorm + QA)
 │   ├── plan/        # Turn spec into exhaustive implementation plan + QA
@@ -39,16 +40,18 @@ plugins/spec-flow/
 │   ├── qa-phase.md          # Reviews each completed phase
 │   ├── qa-spec.md           # Reviews spec before plan
 │   ├── qa-plan.md           # Reviews plan before execution
+│   ├── qa-charter.md        # Reviews charter files before sign-off (v2.0.0)
 │   ├── qa-prd-review.md     # End-of-pipeline: did we actually fulfill the PRD?
 │   ├── fix-code.md          # Targeted fixes after QA findings
-│   ├── fix-doc.md           # Same, for spec/plan documents
+│   ├── fix-doc.md           # Same, for spec/plan/charter documents
 │   └── review-board/        # Final 5-agent parallel review before merge
 │       ├── blind.md, edge-case.md, spec-compliance.md,
 │       └── prd-alignment.md, architecture.md
 │
-├── templates/       # Starting shapes for PRD, spec, plan, manifest
+├── templates/       # Starting shapes for PRD, spec, plan, manifest, charter
+│   └── charter/     # Six charter templates (architecture, non-negotiables, tools, processes, flows, coding-rules)
 ├── reference/       # spec-flow-doctrine.md — auto-loaded on session start
-└── hooks/           # SessionStart hook that loads the doctrine
+└── hooks/           # SessionStart hook that loads the doctrine + charter files
 ```
 
 Every skill is a thin orchestrator. Every agent is a narrow executor. Templates are shared shapes. The doctrine is shared philosophy.
@@ -60,11 +63,19 @@ Every skill is a thin orchestrator. Every agent is a narrow executor. Templates 
 A piece of work flows through the pipeline linearly. Each stage has an output, a QA gate, and a status update in the manifest.
 
 ```
-                              ┌──────────────────────────────────────────┐
-                              │              docs/prd.md                 │
-                              │         docs/manifest.yaml               │
-                              │   (FR-001…, NFR-001…, NN-001…, SC-001…) │
-                              └──────────────────────────────────────────┘
+  ┌──────────┐   Socratic   ┌─────────┐   QA    ┌──────────────────────────────┐
+  │ charter  │─ brainstorm ▶│ charter │──loop──▶│  docs/charter/ (six files)   │
+  │ (v2.0.0) │              │         │  (Opus) │  architecture, tools, flows, │
+  │          │              │         │         │  processes, coding-rules,    │
+  │          │              │         │         │  non-negotiables (NN-C-xxx)  │
+  └──────────┘              └─────────┘         └──────────────────────────────┘
+                                               │
+                                   binds everything below ↓
+                              ┌──────────────────────────────────────────────┐
+                              │          docs/prd/prd.md                     │
+                              │          docs/prd/manifest.yaml              │
+                              │   (FR-001…, NFR-001…, NN-P-001…, SC-001…)   │
+                              └──────────────────────────────────────────────┘
                                                │
                                        per piece ↓
   status: open ─────────────────────────────────┐
@@ -103,9 +114,10 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 
 | Stage | Input | Output | Reviewer | Main model |
 |---|---|---|---|---|
-| **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prd.md` + `docs/manifest.yaml` with numbered FR/NFR/NN/SC and a piece list | Human (during brainstorm) | — |
-| **spec** | One `open` piece + PRD sections mapped to it | `docs/specs/<piece>/spec.md` with acceptance criteria | `qa-spec` (Opus, up to 3 fix loops) | — |
-| **plan** | Approved spec | `docs/specs/<piece>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, exit gates | `qa-plan` (Opus, up to 3 fix loops) | — |
+| **charter** (v2.0.0) | Detection signals + user-supplied sources (team wikis, handbooks) | `docs/charter/` — six files with architecture, NN-C, tools, processes, flows, CR | `qa-charter` (Opus, up to 3 fix loops) | — |
+| **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prd/prd.md` + `docs/prd/manifest.yaml` with numbered FR/NFR/NN-P/SC and a piece list | Human (during brainstorm) | — |
+| **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/specs/<piece>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
+| **plan** | Approved spec + charter | `docs/specs/<piece>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
 | **execute** | Approved plan | Working code on `spec/<piece>` branch, phase-by-phase, with commits | `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
 
@@ -124,6 +136,50 @@ A phase must pick exactly one track. Both markers, or neither, is treated as a m
 
 ---
 
+## Charter (v2.0.0)
+
+Charter is the pre-PRD stage that captures project-wide binding constraints — the stuff that doesn't change when the product changes. Six focused files live in `docs/charter/`:
+
+| File | Content |
+|---|---|
+| `architecture.md` | Layers, dependency direction, component ownership, module boundaries |
+| `non-negotiables.md` | `NN-C-xxx` — project-wide binding rules (security, compliance, architecture, tooling) |
+| `tools.md` | Language, framework, test runner, linter, CI, approved/banned libraries |
+| `processes.md` | Branching, review policy, release cadence, CI gates, incident response |
+| `flows.md` | Request flow, auth flow, data-write path, other critical end-to-end flows |
+| `coding-rules.md` | `CR-xxx` — numbered coding conventions, citable from specs and plans |
+
+### Three modes
+
+- **Bootstrap** — `docs/charter/` doesn't exist. Full Socratic flow → write six files → QA → per-file commits. Runs on new projects or projects adopting charter for the first time.
+- **Update** — scoped re-run of Socratic on specific files. Retirement UX (retire-vs-delete) preserves historical traceability via tombstones. Post-commit, in-flight pieces get a divergence notice.
+- **Retrofit** — automated migration for pre-v2.0 projects. Nine-step commit-per-step pipeline with `--dry-run` preview. Reclassifies existing NN-xxx into NN-C / NN-P / retired. `git mv`-based layout migration. Per-piece spec and plan rewrites via `fix-doc`. Full QA sweep at the end.
+
+### Entry schema — `Rule` vs `Reference`
+
+Numbered entries (NN-C and CR) declare a `Type`:
+
+- **`Type: Rule`** — inline, self-contained. The `Statement:` field IS the rule.
+- **`Type: Reference`** — defers to external content. The `Source:` field (URL or local path) is what agents must consult.
+
+Reference entries let you point at Maven conventions, Google Java Style, your own `.pre-commit-config.yaml`, Uncle Bob's Clean Architecture, etc. without transcribing them inline. QA agents do surface-level validity checks (URL format, local path existence) but don't fetch content in v2.0 — the summary under `Statement:` is what agents rely on.
+
+---
+
+## Non-negotiables: two namespaces (v2.0.0)
+
+- **`NN-C-xxx`** (Charter) — project-wide. Applies across every product and every piece in the repo. Lives in `docs/charter/non-negotiables.md`. Changes rarely.
+- **`NN-P-xxx`** (Product) — product-specific. Tied to the current PRD. Lives in `docs/prd/prd.md` under `## Non-Negotiables (Product)`. Grows with each PRD import.
+- **`CR-xxx`** (Coding Rules) — a third citable namespace for coding conventions, separate from binding rules. Lives in `docs/charter/coding-rules.md`.
+
+Specs and plans cite specific IDs. Every piece's spec enumerates the NN-C, NN-P, and CR entries its scope touches under `### Non-Negotiables Honored` and `### Coding Rules Honored`, with a per-entry "how this piece honors it" line. Plans allocate each cited entry to exactly one phase's "Charter constraints honored in this phase" slot. QA checks that every claim is demonstrably honored in the final diff.
+
+**IDs are write-once.** A number once assigned is never reused. Retired entries stay as tombstones (strikethrough title + `RETIRED YYYY-MM-DD` + reason + pieces that cited them). Specs citing retired IDs are must-fix by QA — you either drop the citation or upgrade to the superseding entry.
+
+**Divergence.** When a piece's spec or plan was written against an older charter and the charter has since changed, the piece is **diverged**. `/status` surfaces this passively; `/status --resolve <piece>` walks you through three options (re-spec the citations, re-plan the allocations, or accept with a documented rationale). Divergence is informational — never blocks execution. Human judgment resolves it.
+
+---
+
 ## Getting started
 
 **Install the plugin** via the marketplace at the repo root:
@@ -132,17 +188,20 @@ A phase must pick exactly one track. Both markers, or neither, is treated as a m
 claude plugin install spec-flow
 ```
 
-**First session on a project with an existing PRD:**
+**First session on a new project (v2.0.0 flow):**
 
 1. `/status` — reports "No pipeline initialized."
-2. `/prd` — imports your PRD (BMad output, speckit specs, a raw `docs/prd.md`, or anything else), normalizes it, decomposes it into pieces with you, writes `docs/manifest.yaml`.
-3. `/spec` — authors a spec for the first `open` piece. Brainstorms with you, creates a worktree on `spec/<piece>`, runs `qa-spec`, asks for sign-off.
-4. `/plan` — does read-only codebase exploration, writes an exhaustive plan, runs `qa-plan`, asks for sign-off.
-5. `/execute` — runs the per-phase loop until all phases are green and the 5-agent final review is clean. Asks for merge approval.
-6. Repeat `/spec` → `/plan` → `/execute` for each remaining piece.
-7. When the manifest shows all pieces `done`, `/prd --review` validates that the full PRD was actually fulfilled.
+2. `/spec-flow:charter` — Socratic bootstrap of `docs/charter/`. Detects existing signals (`README`, `package.json`, `.github/workflows/`, etc.), asks for any additional sources (team wikis, handbooks), then walks you through six files one question at a time. `qa-charter` reviews. Per-file commits.
+3. `/prd` — imports your PRD. Classifies each extracted non-negotiable as `NN-C` (adds to charter) or `NN-P` (stays in PRD). Decomposes into pieces with you, writes `docs/prd/manifest.yaml`.
+4. `/spec` — authors a spec for the first `open` piece. Loads charter, identifies the NN-C/NN-P/CR entries this piece touches, brainstorms with you, creates a worktree on `spec/<piece>`, runs `qa-spec`, asks for sign-off.
+5. `/plan` — reads charter + spec, allocates every cited NN/CR to a specific phase, writes an exhaustive plan, runs `qa-plan`, asks for sign-off.
+6. `/execute` — runs the per-phase loop until all phases are green and the 5-agent final review is clean. Asks for merge approval.
+7. Repeat `/spec` → `/plan` → `/execute` for each remaining piece.
+8. When the manifest shows all pieces `done`, `/prd --review` validates full PRD fulfillment.
 
-**Every session:** start with `/status` to see where you are. The SessionStart hook loads the doctrine so every conversation knows the rules.
+**Upgrading from v1.5.x:** run `/spec-flow:charter --retrofit --dry-run` first to preview the nine-step migration. When you're comfortable, re-invoke without `--dry-run`. Or opt out with `/spec-flow:charter --decline` to keep v1.5.x behavior.
+
+**Every session:** start with `/status` to see where you are. The SessionStart hook loads the TDD doctrine and (if present) the charter files listed under `charter.doctrine_load` in `.spec-flow.yaml`.
 
 ---
 

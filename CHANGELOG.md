@@ -2,167 +2,114 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
-## [2.0.0-piece.6] — 2026-04-20
+## [2.0.0] — 2026-04-20
 
-### Added (piece 6 of 7 — retrofit mode + migration pipeline)
-- **Charter skill retrofit mode.** Auto-detected on pre-charter projects (legacy `docs/prd.md` at flat path, unprefixed `NN-xxx` entries in PRD, or legacy manifest location) and invocable as `/spec-flow:charter --retrofit`. Nine-step commit-per-step pipeline migrates pre-v2.0 projects to the new layout:
-  1. Snapshot pre-state to `docs/archive/pre-charter-migration-<date>/`
-  2. Socratic NN-xxx reclassification (per-entry: C / P / R)
-  3. Bootstrap Socratic for five other charter files; promote NN-C entries; persist mapping table
-  4. Layout migration via `git mv` (preserves history)
-  5. Rewrite PRD with NN-P namespace + Charter reference line
-  6. Per-piece spec rewrite via fix-doc (auto-applies mapping; escalates retired citations)
-  7. Per-piece plan rewrite (same pattern; auto-allocates per-phase slots where scope is unambiguous)
-  8. Update `.spec-flow.yaml` with `charter.required: true`
-  9. Full QA sweep (qa-charter + per-piece qa-spec + qa-plan)
-- **`--retrofit --dry-run` flag.** Walks all nine steps using an in-memory staging area and produces a combined unified diff preview. No commits; no file writes. Gives users a preview before committing to the real migration.
-- **`--decline` flag.** Writes `charter.required: false` and creates `docs/.charter-declined` marker. Downstream skills skip charter checks entirely. Fully reversible — run `/spec-flow:charter` later to enter retrofit.
-- **Mapping table persistence.** Retrofit writes `docs/archive/pre-charter-migration-<date>/nn-mapping.md` showing every old NN-xxx → new namespace assignment for post-migration traceability.
-- **Retired-citation escalation.** During step 6/7, any spec or plan citing an NN-xxx the user retired escalates to human with three options: drop, upgrade to superseding entry, or re-open the piece.
+First major release. Introduces the **charter stage** — a pre-PRD Socratic
+flow producing binding project-wide constraints (architecture, non-negotiables,
+tools, processes, flows, coding rules) that every downstream artifact and
+agent inherits. Also codifies the `docs/` folder layout, splits non-negotiables
+into two citable namespaces, and introduces `CR-xxx` coding-rule IDs for
+per-rule traceability.
 
-### Changed
-- **`prd` skill legacy-detect hint** now points users at `/spec-flow:charter --retrofit` (previously said "piece 6 deferred"). `prd` continues to read/write legacy paths for backward compat until retrofit is run.
+### Added
 
-### Deferred to piece 7
-- README + diagram updates + consolidated v2.0.0 CHANGELOG (the per-piece CHANGELOG entries added across pieces 1–6 will be consolidated into a single `## [2.0.0]` entry).
-
-### Migration (piece 6)
-- **Fully backward compatible until the user opts in.** Existing v1.5.x projects continue to work unchanged. Retrofit is only invoked when the user explicitly asks (via `/spec-flow:charter --retrofit` or by running the skill on a detected legacy project and confirming).
-- **Pre-state snapshot is the backstop.** No destructive commands anywhere; every step is `git revert`-able; the nuclear rollback is `git reset --hard <snapshot-sha>`.
-- **Opt-out is supported.** Teams that prefer the v1.5.x flow can run `--decline` to permanently (but reversibly) disable charter enforcement.
-- Run `/reload-plugins` after retrofit to pick up doctrine load.
-
-## [2.0.0-piece.5] — 2026-04-20
-
-### Added (piece 5 of 7 — update mode + divergence resolution)
-- **Charter skill update mode.** `/spec-flow:charter` now supports editing existing charter files. Detected automatically when `docs/charter/` exists and no legacy signals present; also invocable as `/spec-flow:charter --update`. Six-phase flow (U1–U6): list files → scoped Socratic per selected file → write with bumped `last_updated` → QA on touched files → human sign-off → per-file commit → divergence awareness notice for in-flight pieces.
-- **Retirement UX.** When a user removes an NN-C or CR entry, the skill asks whether to retire (tombstone — recommended) or delete (removes all trace). Retired entries keep the ID reserved; specs citing retired IDs are flagged must-fix by QA so teams can upgrade to superseding entries.
-- **`/spec-flow:status --resolve <piece>` divergence resolution flow.** Walks the user through each diverged charter file with three options per file:
-  - **Re-spec** — dispatch `spec` skill in citation-only mode to update Non-Negotiables Honored / Coding Rules Honored sections.
-  - **Re-plan** — dispatch `plan` skill in allocation-only mode to regenerate per-phase charter slots.
-  - **Accept** — append an `### Accepted Charter Divergence` section to the spec with a user-authored rationale.
-  After resolution, `charter_snapshot` is updated to today's date for the touched file.
-- **Charter skill Phase 7 doctrine reminder** now tells the user to run `/reload-plugins` so the SessionStart hook picks up the new charter (wired in v2.0.0 piece 2).
-
-### Changed
-- Charter skill mode detection: explicit `--update` and `--retrofit` flags supported alongside auto-detection. Retrofit still reports "deferred to piece 6" until piece 6 lands.
-- Divergence is now resolvable via a skill, not just surfaced. Status's passive `⚠ Charter diverged` flag remains; the `--resolve` flag promotes it to an actionable flow.
-
-### Deferred to pieces 6–7
-- Piece 6: retrofit mode + migration pipeline
-- Piece 7: README + diagrams
-
-### Migration (piece 5)
-- No breaking changes. Teams with existing charter can now iterate on it via update mode; teams without charter are unaffected.
-- Divergence resolution is opt-in (`--resolve` flag). Pieces that pre-date `charter_snapshot` front-matter continue to skip divergence check silently.
-- Run `/reload-plugins` to pick up skill updates.
-
-## [2.0.0-piece.4] — 2026-04-20
-
-### Added (piece 4 of 7 — agent updates)
-- **`implementer.md` Rule 4** now explicitly lists `<docs_root>/charter/` (six files), legacy `<docs_root>/architecture/` + `<docs_root>/adr/`, PRD non-negotiables, and plan-cited `NN-C-xxx`/`NN-P-xxx`/`CR-xxx` IDs as binding sources. Architecture-conflict BLOCKED vocabulary expanded to cover charter breach.
-- **`qa-spec` checks** now verify citation integrity (no hallucinated IDs, retired-entry citations must-fix), honoring specificity (vague "handles the rule" fails), and scope coverage (NN-C/NN-P/CR whose scope overlaps piece must be cited).
-- **`qa-plan` checks** now verify per-phase charter allocation (every spec-cited entry appears in exactly one phase, no drops/dupes), per-phase honoring specificity, and charter_snapshot front-matter presence.
-- **`qa-phase` checks** gain charter citation honoring — every NN-C/NN-P/CR cited by the phase's slot must be demonstrably honored in the phase diff.
-- **`qa-prd-review`** audits NN-C/NN-P coverage across done pieces, CR drift spot-check, retired-entry citation detection.
-- **`review-board/architecture`** expanded to cover CR-xxx compliance and flow honoring. Full charter (six files) is now primary context.
-- **`review-board/spec-compliance`** verifies every NN/CR claim in the spec is backed up by the diff.
-- **`review-board/prd-alignment`** verifies NN-P preservation across piece implementation.
-
-### Changed
-- Agents now read both new (`<docs_root>/charter/`) and legacy (`<docs_root>/architecture/`) layouts. Charter takes precedence when present.
-- Retired charter entries (tombstoned with `RETIRED` marker) are must-fix when cited by any spec, plan, or code comment — preventing silent reliance on removed rules.
-
-### Deferred to pieces 5–7
-- Piece 5: update mode + divergence resolution flow (status already surfaces divergence in piece 3)
-- Piece 6: retrofit mode + migration pipeline
-- Piece 7: README + diagrams
-
-### Migration (piece 4)
-- **Backward compat preserved.** Agents check for charter first and fall back to legacy arch docs + unprefixed NN-xxx when charter is absent. Pre-charter projects' review loops continue to work.
-- Run `/reload-plugins` to pick up agent updates.
-
-## [2.0.0-piece.3] — 2026-04-20
-
-### Added (piece 3 of 7 — downstream skill charter wiring)
-- **Charter prerequisite check** in `skills/prd/SKILL.md` (Step 0.5). If `charter.required: true` and `<docs_root>/charter/` is missing, prd halts and directs the user to run `/spec-flow:charter` first. Legacy flat-layout detection surfaces a migration hint pointing to piece 6.
-- **NN classification during PRD import.** `prd` skill now asks the user whether each extracted non-negotiable is project-wide (promoted to `NN-C-xxx` in `<docs_root>/charter/non-negotiables.md`) or product-specific (written as `NN-P-xxx` to PRD). Pre-charter projects fall back to unprefixed `NN-xxx`.
-- **Charter loading in `skills/spec/SKILL.md`.** Phase 1 step 3 now reads `<docs_root>/charter/` (all six files) with fallback to legacy `<docs_root>/architecture/`. Phase 1 step 5 scans for binding rules across NN-C / NN-P / CR namespaces.
-- **Phase 2 step 1a** in `skills/spec/SKILL.md` — identify charter constraints touched by the piece, confirm with user, record list for spec sections.
-- **`charter_snapshot` front-matter** populated at spec write time (Phase 3) and plan write time (`skills/plan/SKILL.md` Phase 2). Used by piece 5 divergence detection.
-- **Charter in exploration priors** in `skills/plan/SKILL.md` Phase 1.
-- **Per-phase charter-constraints allocation** — plan skill distributes every NN-C/NN-P/CR cited by the spec into exactly one phase's "Charter constraints honored" slot (no drops, no duplicates).
-- **Charter in QA prompts** — `qa-spec` and `qa-plan` iter-1 full prompts now interpolate charter files alongside spec/plan/PRD.
-- **Charter in review-board dispatches** (`skills/execute/SKILL.md`): architecture reviewer receives all six charter files (or legacy arch docs); spec-compliance reviewer receives NN-C, NN-P, CR for claim verification.
-- **Phase-QA prompt updates** — `## Non-negotiables` block sources from NN-C + NN-P; new `## Coding rules cited by this phase` block attaches specific CR entries cited by the phase.
-- **Charter presence indicator + divergence flag** in `skills/status/SKILL.md`. Top-line `Charter: present (last_updated YYYY-MM-DD)` when charter exists; per-piece `⚠ Charter diverged` line when any current `last_updated` > snapshot.
-
-### Changed
-- **New layout is preferred for writes.** `prd` writes to `<docs_root>/prd/prd.md` + `<docs_root>/prd/manifest.yaml` on new projects. Legacy-layout projects continue to read/write the flat paths until they retrofit.
-- **Status skill reads manifest from either layout** — checks `<docs_root>/prd/manifest.yaml` first, falls back to `<docs_root>/manifest.yaml`.
-
-### Deferred to pieces 4–7
-- Piece 4: agent updates (implementer, qa-spec, qa-plan, qa-phase, qa-prd-review, review-board/*)
-- Piece 5: update mode + divergence detection (divergence is *surfaced* by status in piece 3 but the update-mode flow is piece 5)
-- Piece 6: retrofit mode + migration pipeline
-- Piece 7: README + diagrams
-
-### Migration (piece 3)
-- **Backward compat preserved.** All five skills read both new and legacy layouts. `charter.required` defaults to `false`, so pre-charter projects continue to work unchanged.
-- **New projects are nudged toward new layout.** The `prd` skill writes to `<docs_root>/prd/` on new bootstraps. Run `/spec-flow:charter` first if `charter.required: true`.
-- **Existing specs without `charter_snapshot` front-matter** are handled silently — divergence check skips those pieces (no false warnings).
-- Run `/reload-plugins` to pick up skill changes.
-
-## [2.0.0-piece.2] — 2026-04-20
-
-### Added (piece 2 of 7 — templates, config, doctrine load)
-- **`charter:` config block** in `templates/pipeline-config.yaml` with two keys:
-  - `required` (default `false`) — piece 3 will wire this so `prd`/`spec`/`plan` fail fast when set to `true` and `docs/charter/` is missing
-  - `doctrine_load` (default `[non-negotiables, architecture]`) — list of charter file base names to auto-load into session context
-- **Session-start hook charter doctrine load** — `hooks/session-start` now conditionally reads the charter files listed in `doctrine_load` when `docs/charter/` exists, and injects them into `additionalContext` alongside the existing TDD doctrine. Silent no-op when charter is absent.
-- **`charter_snapshot:` front-matter** in `templates/spec.md` and `templates/plan.md` capturing per-file `last_updated` dates at spec/plan write time. Used by piece 5 divergence detection.
-- **Per-phase `Charter constraints honored in this phase` slot** in both TDD-track and Implement-track phase examples of `templates/plan.md`.
-
-### Changed
-- **`templates/prd.md`** — `## Non-Negotiables` section renamed to `## Non-Negotiables (Product)` with structured `NN-P-xxx` schema (Type / Statement / Scope / Rationale / How QA verifies). Header gains a `**Charter:** docs/charter/` reference line pointing to the project-wide `NN-C-xxx` namespace.
-- **`templates/spec.md`** — `### Non-Negotiables (from PRD)` renamed to `### Non-Negotiables Honored` and split into **Project (NN-C)** and **Product (NN-P)** subsections. New `### Coding Rules Honored` section for `CR-xxx` citations. Header gains `**Charter:** docs/charter/` reference line.
-- **`templates/plan.md`** — header gains `**Charter:** docs/charter/` reference line.
-
-### Deferred to pieces 3–7
-- Piece 3: downstream skills (`prd`, `spec`, `plan`, `execute`, `status`) read charter, enumerate NN-C/NN-P/CR, enforce `charter.required`
-- Piece 4: agent updates
-- Piece 5: update mode + divergence detection
-- Piece 6: retrofit mode + migration pipeline
-- Piece 7: README + diagrams
-
-### Migration (piece 2)
-- Backward compat preserved — `charter.required: false` is the default so pre-charter projects keep working. Session-start hook silently ignores charter when `docs/charter/` is missing.
-- Existing specs/plans authored against v1.5.x templates continue to validate (the new template sections are additive, not replacing anything structurally).
-- Run `/reload-plugins` after upgrading to pick up the hook change.
-
-## [2.0.0-piece.1] — 2026-04-20
-
-### Added (piece 1 of 7 — charter stage bootstrap)
-- `/spec-flow:charter` skill (bootstrap mode only) at `skills/charter/SKILL.md`
-- `qa-charter` adversarial review agent at `agents/qa-charter.md`
-- Six charter templates in `templates/charter/`:
+#### Charter stage (new pipeline stage before `prd`)
+- **`/spec-flow:charter` skill** at `skills/charter/SKILL.md`. Three modes:
+  - **Bootstrap** — first-run Socratic for fresh projects (seven phases: auto-detect signals → user-supplied sources → confirm summary → Socratic by file → write → QA → commit per file → doctrine-wiring reminder)
+  - **Update** — scoped re-run of Socratic for specific file(s); retirement UX prompts retire-vs-delete; per-file commits; post-commit divergence awareness
+  - **Retrofit** — nine-step commit-per-step migration pipeline for pre-charter projects (v1.5.x and earlier) with `--dry-run` preview and `--decline` opt-out
+- **`qa-charter` adversarial review agent** at `agents/qa-charter.md`. Opus. Read-only. Per-file + cross-file + scope/meta checks; retrofit-mode additions for re-keying completeness and spec back-reference integrity. Reuses `fix-doc.md` via the standard iter-1-full / iter-2+-focused / 3-iter-circuit-breaker loop.
+- **Six focused charter templates** in `templates/charter/`:
   - `architecture.md` — layers, dependency direction, component ownership
   - `non-negotiables.md` — `NN-C-xxx` structured schema (Type: Rule / Reference)
   - `tools.md` — language, framework, test runner, linter, CI, approved/banned libraries
   - `processes.md` — branching, review, release, CI gates, incident response
-  - `flows.md` — request/auth/data-write and other critical flows
-  - `coding-rules.md` — `CR-xxx` structured schema
+  - `flows.md` — request / auth / data-write and other critical flows
+  - `coding-rules.md` — `CR-xxx` structured schema (same Rule/Reference types as NN-C)
+- **`Type: Rule` vs `Type: Reference` entry schema** for numbered-entry files. `Reference` entries defer to external content (URL or local file path); `Rule` entries are inline and self-contained. Both are citable.
 
-### Deferred to pieces 2–7
-- Piece 2: template updates + pipeline-config.yaml + session-start doctrine load
-- Piece 3: downstream skill charter wiring (prd/spec/plan/execute/status)
-- Piece 4: agent updates (implementer, qa-spec, qa-plan, qa-phase, review-board)
-- Piece 5: update mode + divergence detection
-- Piece 6: retrofit mode + migration pipeline
-- Piece 7: README + full CHANGELOG for v2.0.0 + diagrams
+#### Two non-negotiables namespaces
+- **`NN-C-xxx`** (Charter) — project-wide binding rules. Live in `<docs_root>/charter/non-negotiables.md`. Rarely change.
+- **`NN-P-xxx`** (Product) — product-specific binding rules. Live in the PRD's `## Non-Negotiables (Product)` section. Grow with each PRD import.
+- **`CR-xxx`** (Coding Rules) — numbered, citable coding conventions. Live in `<docs_root>/charter/coding-rules.md`.
+- **Write-once IDs** — NN-C, NN-P, CR IDs never renumber. Retired entries stay as tombstones (`RETIRED YYYY-MM-DD` markers). Specs citing retired IDs are must-fix by QA.
 
-### Migration (piece 1 only)
-- No breaking changes in piece 1. Charter files are standalone; downstream skills are unchanged. Projects upgrading from v1.5.x pick up the new charter skill but continue to work without calling it.
+#### Folder layout codified
+- New top-level structure in `<docs_root>/`:
+  - `charter/` — six project-wide binding files
+  - `prd/` — `prd.md` + `manifest.yaml` (moved from flat)
+  - `specs/<piece>/` — per-piece `spec.md`, `plan.md`, `learnings.md`, and local `research/` subfolder
+  - `research/<topic>/` — scaffolded (standalone cross-piece research; not wired in v1, roadmap item)
+  - `backlog/backlog.md` — reflection output (was `improvement-backlog.md`)
+  - `archive/` — legacy artifacts preserved
+
+#### Template updates
+- **`templates/prd.md`** — NN section renamed to `## Non-Negotiables (Product)` with NN-P structured schema. Charter reference line added.
+- **`templates/spec.md`** — `charter_snapshot:` front-matter captures per-file `last_updated` dates at spec write time. NN section split into Project (NN-C) + Product (NN-P). New `### Coding Rules Honored` section for CR-xxx citations. Charter reference line.
+- **`templates/plan.md`** — `charter_snapshot:` front-matter. Charter reference line. Each phase gains a "Charter constraints honored in this phase" slot citing NN-C/NN-P/CR entries.
+
+#### Pipeline config + doctrine
+- **`charter:` config block** in `templates/pipeline-config.yaml`:
+  - `required` (default `false`; piece 6 retrofit flips to `true` after migration) — downstream skills fail fast when missing
+  - `doctrine_load` (default `[non-negotiables, architecture]`) — list of charter files auto-injected into every agent's session via the SessionStart hook
+- **SessionStart hook charter doctrine load** — `hooks/session-start` now conditionally reads charter files listed in `doctrine_load` and injects them into `additionalContext` alongside the TDD doctrine. Silent no-op when charter absent or list empty.
+
+#### Downstream skill charter wiring
+- **`prd` skill** — Step 0.5 charter prerequisite check (halts when `charter.required: true` and charter missing). NN classification during import: user decides project-wide (NN-C) vs product-specific (NN-P). New-layout writes to `<docs_root>/prd/`. Legacy-layout detection points users at `/spec-flow:charter --retrofit`.
+- **`spec` skill** — Phase 1 reads `<docs_root>/charter/` (all six) with fallback to legacy `<docs_root>/architecture/`. Phase 1 scans NN-C, NN-P, CR namespaces. Phase 2 new step 1a identifies charter constraints touched. Phase 3 writes spec with `charter_snapshot` front-matter. Phase 4 QA prompt interpolates charter.
+- **`plan` skill** — Phase 1 exploration reads charter as priors. Phase 2 allocates every spec-cited NN-C/NN-P/CR into exactly one phase's "Charter constraints honored" slot. Plan written with `charter_snapshot`. QA prompt includes charter; allocation completeness checked.
+- **`execute` skill** — `qa-phase` prompt sources `## Non-negotiables` from NN-C + NN-P; new `## Coding rules cited by this phase` block attaches CR entries. Review-board architecture reviewer gets full charter. Spec-compliance reviewer gets NN-C/NN-P/CR for claim verification.
+- **`status` skill** — top-line `Charter: present (last_updated YYYY-MM-DD)` indicator. Per-piece `⚠ Charter diverged` flag when any current `last_updated` > piece's snapshot. New `--resolve <piece>` flag walks divergence resolution (re-spec / re-plan / accept).
+
+#### Agent updates
+- **`implementer`** Rule 4 binds to `<docs_root>/charter/` (six files) with legacy fallback; explicitly names NN-C / NN-P / CR as plan-citable binding references.
+- **`qa-spec`** checks citation integrity (no hallucinated IDs; retired citations must-fix), honoring specificity (vague phrasing fails), scope coverage (overlapping-scope entries must be cited).
+- **`qa-plan`** checks per-phase allocation (no drops, no duplicates), per-phase honoring specificity, `charter_snapshot` front-matter presence.
+- **`qa-phase`** checks charter citation honoring (cited entries must be demonstrably honored in phase diff).
+- **`qa-prd-review`** audits NN-C and NN-P coverage across done pieces, retired-entry citation scan, CR drift spot-check.
+- **`review-board/architecture`** expanded to cover CR-xxx compliance and `flows.md` honoring. Full charter is primary context.
+- **`review-board/spec-compliance`** verifies every NN/CR claim is backed by the diff.
+- **`review-board/prd-alignment`** verifies NN-P preservation across piece implementation.
+
+### Changed
+
+- **Folder layout** — `docs/prd.md` → `docs/prd/prd.md`, `docs/manifest.yaml` → `docs/prd/manifest.yaml`, `docs/improvement-backlog.md` → `docs/backlog/backlog.md`. Per-piece artifacts stay co-located under `docs/specs/<piece>/`. Retrofit mode migrates via `git mv` to preserve history.
+- **PRD NN section** renamed from `## Non-Negotiables` to `## Non-Negotiables (Product)` using structured schema. Pre-charter projects retain the legacy flat section until they retrofit.
+- **Spec NN section** — `### Non-Negotiables (from PRD)` renamed to `### Non-Negotiables Honored` and split into Project (NN-C) + Product (NN-P) subsections.
+- **All downstream skills read both new and legacy layouts.** Charter takes precedence when present; fallback to legacy is automatic and silent.
+
+### Migration from v1.5.x
+
+Three paths for existing projects:
+
+1. **Run `/spec-flow:charter --retrofit`.** Nine-step commit-per-step pipeline:
+   - Snapshots pre-state to `docs/archive/pre-charter-migration-<date>/`
+   - Socratic per existing NN: classify as C (charter) / P (product) / R (retire)
+   - Runs bootstrap Socratic for the other five charter files
+   - `git mv` layout migration (preserves history)
+   - Rewrites PRD with NN-P namespace + Charter reference
+   - Dispatches `fix-doc` per piece to rewrite NN citations
+   - Full QA sweep (qa-charter + qa-spec + qa-plan on every rewritten artifact)
+   - `--dry-run` available for preview before committing
+2. **Opt out via `/spec-flow:charter --decline`.** Writes `charter.required: false` and creates `docs/.charter-declined` marker. Downstream skills skip all charter checks. Existing v1.5.x behavior preserved verbatim. Reversible.
+3. **Do nothing.** `charter.required` defaults to `false`. Skills read and write legacy paths unchanged. Charter adoption happens only when the user invokes `/spec-flow:charter`.
+
+Rollback from retrofit: every step is `git revert`-able; pre-state snapshot is the nuclear-option backstop (`git reset --hard <snapshot-sha>`). No destructive commands anywhere in the pipeline.
+
+**Run `/reload-plugins` after upgrading** to pick up all skill, agent, template, hook, and config changes.
+
+### Deferred (backlog)
+
+- Validate charter structure against a mature existing product
+- Fetch-and-summarize external URLs for `Type: Reference` entries
+- Auto-generated architecture/flow diagrams from code
+- `docs/research/<topic>/` wiring beyond scaffolding
+- Automated divergence-resolution runners (currently human-gated via `/spec-flow:status --resolve`)
+- Cross-piece retirement impact analysis
+- Charter version tags and git-tag integration
+- Automated retry on QA failures during retrofit
+- Step-specific rollback tooling (currently `git revert` + manual reapply)
+- Stale-reference detector (external URL changed outside our control)
 
 ## [1.5.0] — 2026-04-19
 
