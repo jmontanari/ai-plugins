@@ -2,6 +2,31 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-piece.4] — 2026-04-20
+
+### Added (piece 4 of 7 — agent updates)
+- **`implementer.md` Rule 4** now explicitly lists `<docs_root>/charter/` (six files), legacy `<docs_root>/architecture/` + `<docs_root>/adr/`, PRD non-negotiables, and plan-cited `NN-C-xxx`/`NN-P-xxx`/`CR-xxx` IDs as binding sources. Architecture-conflict BLOCKED vocabulary expanded to cover charter breach.
+- **`qa-spec` checks** now verify citation integrity (no hallucinated IDs, retired-entry citations must-fix), honoring specificity (vague "handles the rule" fails), and scope coverage (NN-C/NN-P/CR whose scope overlaps piece must be cited).
+- **`qa-plan` checks** now verify per-phase charter allocation (every spec-cited entry appears in exactly one phase, no drops/dupes), per-phase honoring specificity, and charter_snapshot front-matter presence.
+- **`qa-phase` checks** gain charter citation honoring — every NN-C/NN-P/CR cited by the phase's slot must be demonstrably honored in the phase diff.
+- **`qa-prd-review`** audits NN-C/NN-P coverage across done pieces, CR drift spot-check, retired-entry citation detection.
+- **`review-board/architecture`** expanded to cover CR-xxx compliance and flow honoring. Full charter (six files) is now primary context.
+- **`review-board/spec-compliance`** verifies every NN/CR claim in the spec is backed up by the diff.
+- **`review-board/prd-alignment`** verifies NN-P preservation across piece implementation.
+
+### Changed
+- Agents now read both new (`<docs_root>/charter/`) and legacy (`<docs_root>/architecture/`) layouts. Charter takes precedence when present.
+- Retired charter entries (tombstoned with `RETIRED` marker) are must-fix when cited by any spec, plan, or code comment — preventing silent reliance on removed rules.
+
+### Deferred to pieces 5–7
+- Piece 5: update mode + divergence resolution flow (status already surfaces divergence in piece 3)
+- Piece 6: retrofit mode + migration pipeline
+- Piece 7: README + diagrams
+
+### Migration (piece 4)
+- **Backward compat preserved.** Agents check for charter first and fall back to legacy arch docs + unprefixed NN-xxx when charter is absent. Pre-charter projects' review loops continue to work.
+- Run `/reload-plugins` to pick up agent updates.
+
 ## [2.0.0-piece.3] — 2026-04-20
 
 ### Added (piece 3 of 7 — downstream skill charter wiring)

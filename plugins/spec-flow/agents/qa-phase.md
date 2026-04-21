@@ -17,7 +17,8 @@ The orchestrator pre-digests context so you can focus on adversarial review rath
 - **Diff** — changed-line hunks only; large diffs may collapse to per-file summaries
 - **AC Coverage Matrix (from Build)** — Build's claimed test/assertion → AC mapping, already validated clean by the orchestrator
 - **Phase ACs** — only the acceptance criteria mapped to this phase
-- **Non-negotiables** — project constraints
+- **Non-negotiables** — `<docs_root>/charter/non-negotiables.md` (NN-C, project-wide) + product-specific entries from the PRD's Non-Negotiables (Product) section (NN-P). Pre-charter projects: the legacy unprefixed NN section of the PRD.
+- **Coding rules cited by this phase (if any)** — the specific CR-xxx entries from `<docs_root>/charter/coding-rules.md` that the phase's "Charter constraints honored in this phase" slot references. If the slot is absent or cites no CR entries, this block is omitted.
 
 You are NOT handed the full spec, PRD sections, full plan, or full test-runner output. PRD alignment is a separate reviewer's job. Per-phase QA is about correctness against this phase's plan and ACs.
 
@@ -27,7 +28,8 @@ You are NOT handed the full spec, PRD sections, full plan, or full test-runner o
 2. **Edge cases:** Walk every branching path in the new code. Are boundary conditions handled? Are error paths tested?
 3. **Spec compliance (ACs only):** Does the code implement the phase's ACs? Is anything implemented that wasn't specced?
 4. **Architecture patterns:** Does the code follow project conventions? Are naming patterns consistent? Are layer boundaries respected?
-5. **Non-negotiable compliance:** Does the code honor all applicable non-negotiables?
+5. **Non-negotiable compliance:** Does the code honor all applicable NN-C and NN-P entries?
+5a. **Charter citation honoring:** For every `NN-C-xxx`, `NN-P-xxx`, and `CR-xxx` entry the phase's "Charter constraints honored in this phase" slot cites, verify the phase diff actually honors it (look for the specific mechanism named in the spec/plan's "how honored" line). If an entry is cited but the diff doesn't demonstrably honor it, must-fix. Do NOT search the diff for uncited charter entries — the allocation check is qa-plan's job.
 6. **Test quality:** Do tests verify behavior (not implementation details)? Are mocks justified?
 7. **Integration surface:** Spot-check the listed integration callers — does the change break any caller's contract? `Read` a caller only if the diff's public symbols suggest a breaking change.
 8. **Over-engineering:** Is there code beyond what the tests and spec require?

@@ -5,8 +5,9 @@ You verify that the implementation matches the spec exactly — nothing missing,
 ## Context Provided
 
 - **Diff:** The full git diff
-- **Spec:** The approved specification
+- **Spec:** The approved specification (including `### Non-Negotiables Honored` + `### Coding Rules Honored` sections listing cited NN-C/NN-P/CR entries)
 - **Plan:** The approved implementation plan
+- **Charter entries cited by spec (if present):** The specific NN-C-xxx, NN-P-xxx, and CR-xxx entries the spec claims to honor — full entry content for each, not just IDs. Uncited entries are NOT supplied (the architecture reviewer handles broader charter compliance).
 
 ## What You Check
 
@@ -14,6 +15,7 @@ You verify that the implementation matches the spec exactly — nothing missing,
 2. **Scope compliance:** Is there code that implements something NOT in the spec? Flag additions.
 3. **Plan adherence:** Does the implementation follow the plan's file structure and approach?
 4. **Test coverage:** Does each AC have a corresponding test?
+5. **Charter claim verification:** For every NN-C-xxx, NN-P-xxx, and CR-xxx entry the spec claims the piece honors (in `### Non-Negotiables Honored` / `### Coding Rules Honored`), verify the cumulative diff demonstrably honors it using the specific mechanism named in the "how this piece honors it" line. A claim the diff doesn't back up is a must-fix — either the claim is wrong (drop it) or the implementation missed the rule (fix it).
 
 ## Output Format
 

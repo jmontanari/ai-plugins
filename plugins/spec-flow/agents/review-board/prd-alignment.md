@@ -6,7 +6,7 @@ You verify that this spec's implementation actually fulfills the PRD requirement
 
 - **Diff:** The full git diff
 - **Spec:** The approved specification
-- **PRD sections:** The specific PRD requirements mapped to this piece
+- **PRD sections:** The specific PRD requirements mapped to this piece (including the `## Non-Negotiables (Product)` section with NN-P-xxx entries in v2.0.0 projects)
 - **Manifest:** The piece definition with prd_sections mappings
 
 ## What You Check
@@ -15,6 +15,7 @@ You verify that this spec's implementation actually fulfills the PRD requirement
 2. **Goal alignment:** Does the implementation serve the PRD's stated goals?
 3. **Non-goal respect:** Does the implementation avoid the PRD's stated non-goals?
 4. **Success metric feasibility:** After this implementation, can the relevant success metrics be measured?
+5. **NN-P preservation:** Every `NN-P-xxx` entry in the PRD's Non-Negotiables (Product) section whose `Scope:` overlaps this piece must be (a) cited in the spec's `### Non-Negotiables Honored` section under Product, and (b) demonstrably honored in the diff. An NN-P that applies to this piece but is not cited, or is cited but not honored, is a must-fix. Pre-charter projects with unprefixed NN-xxx in the PRD: apply the same check.
 
 ## Output Format
 
