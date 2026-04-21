@@ -19,11 +19,13 @@ Charter-specific config keys (added in piece 2 — safe defaults if absent):
 
 Detected from current state:
 
-- **Bootstrap mode** (this piece) — `docs/charter/` does not exist. Full Socratic flow → write six files → QA → sign-off.
-- **Update mode** (piece 5) — `docs/charter/` exists. Scoped edit of selected file(s). Not implemented in piece 1.
-- **Retrofit mode** (piece 6) — legacy `docs/prd.md` or unprefixed `NN-xxx` detected. Reclassify + migrate. Not implemented in piece 1.
+- **Bootstrap mode** — `docs/charter/` does not exist. Full Socratic flow → write six files → QA → sign-off.
+- **Update mode** (v2.0.0 piece 5) — `docs/charter/` exists and no legacy signals. User wants to change a charter file.
+- **Retrofit mode** (piece 6) — legacy `docs/prd.md` or unprefixed `NN-xxx` detected in existing PRD. Reclassify + migrate. Not implemented until piece 6.
 
-If not in bootstrap mode (i.e., `docs/charter/` exists, or legacy signals detected), respond: `"Charter update and retrofit modes land in v2.0.0 pieces 5 and 6. This piece 1 release supports bootstrap only. To make charter changes manually, edit files in docs/charter/ directly."`
+Explicit mode flags (optional): `/spec-flow:charter --update`, `/spec-flow:charter --retrofit`. Without flags, mode is auto-detected.
+
+If retrofit signals detected (legacy layout or unprefixed NN-xxx) and piece 6 isn't shipped yet, respond: `"Retrofit mode lands in v2.0.0 piece 6. To update existing charter files in the meantime, run /spec-flow:charter --update."`
 
 ## Bootstrap Mode Workflow
 
@@ -140,21 +142,77 @@ git add <docs_root>/charter/processes.md && git commit -m "charter: add processe
 git add <docs_root>/charter/non-negotiables.md && git commit -m "charter: add non-negotiables"
 ```
 
-### Phase 7: Doctrine wiring
+### Phase 7: Doctrine wiring reminder
 
-Deferred to piece 2. In piece 1, charter files exist on disk but SessionStart hook does NOT auto-load them. Downstream skills (`prd`, `spec`, `plan`) in piece 1 also do NOT read charter yet (wiring is piece 3).
+Since v2.0.0 piece 2, the SessionStart hook auto-loads charter files listed in `.spec-flow.yaml`'s `charter.doctrine_load` (default `[non-negotiables, architecture]`). Users need to run `/reload-plugins` (or start a new session) to pick up newly-authored charter into agent doctrine context.
 
-User is informed after Phase 6:
-> "Charter files committed. Note: downstream wiring (prd/spec/plan reading charter, doctrine auto-load) lands in subsequent v2.0.0 pieces. For now, charter is a standalone artifact."
+Inform the user after Phase 6:
+> "Charter files committed. Run `/reload-plugins` (or start a new session) so downstream skills and agents pick up the charter via SessionStart doctrine load. Future runs of `prd`, `spec`, `plan`, `execute`, and `status` will read from these files automatically."
+
+## Update Mode Workflow (v2.0.0 piece 5)
+
+Triggered when `docs/charter/` exists and no legacy signals are detected. Purpose: edit one or more charter files with the same Socratic+QA rigor as bootstrap, but scoped to only the touched files.
+
+### Phase U1 — Ask which file(s) to edit
+
+Present the six files with their current `last_updated` dates:
+
+```
+docs/charter/
+  architecture.md        last_updated: 2026-02-15
+  non-negotiables.md     last_updated: 2026-03-20
+  tools.md               last_updated: 2026-02-15
+  processes.md           last_updated: 2026-02-15
+  flows.md               last_updated: 2026-02-15
+  coding-rules.md        last_updated: 2026-04-01
+```
+
+Ask: "Which file(s) do you want to change? (comma-separated, or 'all')."
+
+### Phase U2 — Scoped Socratic per selected file
+
+For each selected file, run a Socratic flow scoped to that file's subject area (reuse the bootstrap Phase 2 question set for just that file). The skill proposes edits based on user answers — adds, modifications, or retirements.
+
+**Retirement handling:** If the user wants to remove an `NN-C-xxx` or `CR-xxx` entry, ask:
+
+> "Retire this entry (keep as tombstone in file for historical traceability — recommended) or delete entirely (removes all trace)? Retire is safer — pieces that previously cited this ID will have their citations flagged by QA, giving you a chance to upgrade them. Delete breaks that trail."
+
+Default is **retire**. Retired entries get the tombstone format (strikethrough title + `RETIRED YYYY-MM-DD` marker + reason + list of pieces that cited them).
+
+**Add handling:** New NN-C or CR entries get the next sequential unused ID (continuing past retired IDs — never reuse).
+
+**Modify handling:** Keep the same ID, replace the body, bump `last_updated`.
+
+### Phase U3 — Write and front-matter bump
+
+Write each touched file to `<docs_root>/charter/<name>.md`. Update `last_updated: YYYY-MM-DD` in front-matter to today's date.
+
+### Phase U4 — QA on touched files only
+
+Dispatch `qa-charter` with `Input Mode: Full`, but pass only the touched files in the prompt (not all six). The agent's cross-file consistency checks still run — it will refer to non-touched files if the orchestrator attaches them as read-only context, but only findings on touched files are must-fix (non-touched-file drift is a different update run).
+
+Iteration loop is the same as bootstrap mode's Phase 4 (fix-doc diff, focused re-review, 3-iter circuit breaker).
+
+### Phase U5 — Sign-off and per-file commit
+
+Human reviews diffs. On approval, commit each touched file separately:
+
+```bash
+git add <docs_root>/charter/<file>.md && git commit -m "charter: update <file> — <brief summary>"
+```
+
+### Phase U6 — Divergence awareness
+
+After commit, check the manifest for pieces at `specced`, `planned`, or `implementing` status. For any piece whose `charter_snapshot` on any touched file is older than the new `last_updated`, inform the user:
+
+> "The following pieces are now diverged: [list]. Run `/spec-flow:status --resolve <piece-name>` to walk through divergence resolution options."
+
+Do NOT automatically re-spec or re-plan — human decides per piece.
+
+## Retrofit Mode Workflow
+
+Deferred to v2.0.0 piece 6. See piece 6 plan.
 
 ## No QA Gate Between Charter Skill and User
 
 User is directly involved throughout Socratic. The `qa-charter` agent is the only automated review.
-
-## Out of Scope for Piece 1
-
-- Update mode (piece 5)
-- Retrofit mode (piece 6)
-- Downstream skill charter integration (piece 3)
-- Doctrine auto-load via SessionStart hook (piece 2)
-- `charter.required` enforcement in prd/spec/plan skills (piece 3)
