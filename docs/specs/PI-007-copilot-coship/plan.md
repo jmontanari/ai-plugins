@@ -254,7 +254,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
 **Exit Gate:** spec-flow version bumped to `2.1.0` in all three required places (plugin.json, marketplace.json, CHANGELOG); the new CHANGELOG entry contains `### Added` bullets naming Copilot CLI install and CLAUDE.md, plus a `### Notes for upgraders` subsection pointing at `scripts/setup-mirror-hook.sh`; `plugins/spec-flow/README.md` gains an `## Install on GitHub Copilot CLI` placeholder section with a `#master-copilot` install command. AC-6 passes; AC-7 passes **with the placeholder** `#` syntax (Phase 8 may update to `@` if the smoketest verifies that form).
 **ACs Covered:** AC-6 (complete), AC-7 (placeholder — finalized in Phase 8).
 
-- [ ] **[Implement]** Version-bump + README placeholder.
+- [x] **[Implement]** Version-bump + README placeholder.
   - Order sub-items in checkpoint progression:
     1. Bump `plugins/spec-flow/.claude-plugin/plugin.json` `version` field from `2.0.0` to `2.1.0`. Preserve all other fields (name, description, author, license, keywords) verbatim.
     2. Bump `.claude-plugin/marketplace.json` spec-flow entry's `version` field from `2.0.0` to `2.1.0`. Preserve all other fields. Verify the entry selected is the one with `"name": "spec-flow"`.
@@ -304,7 +304,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     - CR-009 (heading hierarchy in README addition).
   - Follow existing patterns: CHANGELOG entries at `plugins/spec-flow/CHANGELOG.md` for format; existing README H2 headings for style.
 
-- [ ] **[Verify]** AC-6 + AC-7-placeholder pipeline (run from worktree root):
+- [x] **[Verify]** AC-6 + AC-7-placeholder pipeline (run from worktree root):
   - Run:
     ```bash
     command -v jq >/dev/null 2>&1 || { echo "FAIL: jq not available — required for marketplace.json extraction"; exit 1; }
@@ -326,7 +326,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     ```
   - Expected: prints `AC-6 PASS` followed by `AC-7 PASS (placeholder — may finalize in Phase 8)` and exits 0.
 
-- [ ] **[QA]** Phase review.
+- [x] **[QA]** Phase review.
   - Review against: AC-6 (complete), AC-7 (placeholder acceptable), NN-C-009 (three-place version bump), CR-006, CR-005, CR-009. Note that Phase 8 will revisit AC-7 if smoketest surfaces different syntax.
   - Diff baseline: `git diff phase-4-end..HEAD` (expect: plugin.json version change, marketplace.json version change, CHANGELOG top entry, README new section).
 
