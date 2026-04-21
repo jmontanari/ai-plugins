@@ -2,6 +2,22 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] — 2026-04-21
+
+Added GitHub Copilot CLI install compatibility via a derived-mirror-branch pattern (PI-007-copilot-coship). Master stays a pure Claude plugin directory; a POSIX-bash post-commit hook produces the Copilot-ready branch on every commit that touches `plugins/spec-flow/**`.
+
+### Added
+
+- Plugin-level overview at `plugins/spec-flow/CLAUDE.md` summarizing the pipeline and entry-point skills.
+- GitHub Copilot CLI install path via the `master-copilot` mirror branch. Copilot users install with `/plugin install <git-url>#master-copilot` (exact branch-pin syntax verified during execute-time smoketest). See the plugin README section "Install on GitHub Copilot CLI".
+- Marketplace-level scripts supporting the mirror branch: `scripts/lib/sync-plugin-to-mirror.sh`, `scripts/mirror-copilot-post-commit.sh`, `scripts/setup-mirror-hook.sh`.
+
+### Notes for upgraders
+
+- The `scripts/setup-mirror-hook.sh` bootstrap is **for the repo maintainer who pushes `master-copilot`**. Contributors working only on `master` or on feature branches do NOT need to run it — a missing hook on a contributor's clone is not a defect.
+- The `master-copilot` branch is a derived mirror — it receives no author commits directly. Any push should come from the post-commit hook's output only.
+- The `master-copilot` branch visible in `git branch -a` is a derived mirror branch, not a second trunk. Contributors do not need to check it out or push to it. It is maintained by the marketplace repo's post-commit hook on the maintainer's machine and by explicit maintainer pushes. See `plugins/spec-flow/CLAUDE.md` for the plugin overview and `scripts/setup-mirror-hook.sh` for maintainer setup.
+
 ## [2.0.0] — 2026-04-20
 
 First major release. Introduces the **charter stage** — a pre-PRD Socratic

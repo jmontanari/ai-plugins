@@ -320,3 +320,21 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 **Why five parallel reviewers at merge time.** Each reviewer has a lens: blind (no context, just the diff), edge-case, spec-compliance, PRD-alignment, architecture. Running them in parallel with fresh context is cheap (one round-trip) and catches the things a single reviewer would rationalize away.
 
 **Why circuit breakers everywhere.** AI coding agents will cheerfully loop on the same failure forever. 2 build attempts, 3 QA cycles, 3 review cycles — then escalate. If the pipeline can't make progress, the human is the right solver, not another retry.
+
+## Install on GitHub Copilot CLI
+
+spec-flow is available on GitHub Copilot CLI via a derived mirror branch that projects this plugin to a standalone-plugin layout.
+
+```text
+/plugin install https://github.com/<maintainer>/ai-plugins.git#master-copilot
+```
+
+The `master-copilot` branch is maintained automatically by a post-commit hook in the marketplace repo. **Do not push directly to it** — it is a derived branch regenerated from `master` on every commit that touches `plugins/spec-flow/**`.
+
+The `scripts/setup-mirror-hook.sh` bootstrap script is a **maintainer-only** tool; contributors working on the marketplace repo do not need to run it.
+
+Example invocation after install (syntax per Copilot CLI):
+
+```text
+/spec-flow:status
+```
