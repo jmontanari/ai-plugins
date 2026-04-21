@@ -169,7 +169,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
 **Exit Gate:** `scripts/setup-mirror-hook.sh` exists, executable (mode 0755), is structured for idempotence with existence-check gates on all four setup steps, contains the pinned `git subtree split` invocation, sources the shared library for the seed step, and contains a post-seed sanity check for AGENTS.md on master-copilot. Structural AC-3 passes (the script's shape is correct; behavioral validation is Phase 6).
 **ACs Covered:** AC-3 (structural — idempotence-check pattern present and audit-able). AC-4, AC-5, AC-9 require running the script and are validated in Phase 6.
 
-- [ ] **[Implement]** Author the setup bootstrap.
+- [x] **[Implement]** Author the setup bootstrap.
   - Order sub-items in checkpoint progression:
     1. Create `scripts/setup-mirror-hook.sh` with mode 0755.
     2. File header: `#!/usr/bin/env bash` + `set -euo pipefail` + comment block citing spec's FR-PI-007-003 and the **Audience** note (maintainer-only; contributor clones need not run this).
@@ -227,7 +227,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     - FR-PI-007-003 Audience clause: header comment reiterates maintainer-only intent.
   - Follow existing patterns: session-start hook for bash style. No existing setup-type script in the repo to copy from.
 
-- [ ] **[Verify]** Structural AC-3 check (run from worktree root):
+- [x] **[Verify]** Structural AC-3 check (run from worktree root):
   - Run:
     ```bash
     test -x scripts/setup-mirror-hook.sh || { echo "FAIL: setup not executable"; exit 1; }
@@ -245,7 +245,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     ```
   - Expected: prints `AC-3 PASS (structural)` and exits 0.
 
-- [ ] **[QA]** Phase review.
+- [x] **[QA]** Phase review.
   - Review against: AC-3 (structural), FR-PI-007-003 (all four steps + Audience), NN-C-002, NN-C-006 (refuse-to-overwrite path), the pinned `git subtree split` choice (FR-PI-007-003 step 2; verified again in Phase 6's AC-9).
   - Diff baseline: `git diff phase-3-end..HEAD` (expect only the setup script file).
 
