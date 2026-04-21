@@ -1,0 +1,65 @@
+schema_version: 1
+generated: 2026-04-21
+last_updated: 2026-04-21
+prd_source: "docs/prd/prd.md"
+
+pieces:
+  - name: spec-flow-v2.0.0
+    description: Charter stage + codified docs structure + two NN namespaces (NN-C / NN-P) + CR coding rules. Seven internal pieces, shipped across commits 78991dc..cd1eb7a.
+    prd_sections: [G-2, FR-004, FR-005, FR-006, FR-007, NFR-003, NN-P-001, NN-P-002]
+    dependencies: []
+    status: done
+    notes: |
+      Released 2026-04-20 as a single major version. Shipped commits:
+      78991dc piece 1 - charter skill + templates + qa-charter agent
+      598e015 piece 2 - templates + config + session-start doctrine load
+      572d6d8 piece 3 - downstream skill charter wiring
+      b177748 piece 4 - agent updates
+      3db6de1 piece 5 - update mode + divergence resolution
+      fe7355b piece 6 - retrofit mode + migration pipeline
+      cd1eb7a piece 7 - README + consolidated CHANGELOG + version bump
+
+  - name: PI-001-marketplace-version-sync
+    description: Update `.claude-plugin/marketplace.json` to reflect spec-flow's actual version (2.0.0). Currently stale at 1.1.1 — caught during charter bootstrap. First NN-C-001 violation in the history of the repo; fixing it is straightforward.
+    prd_sections: [FR-001, NN-C-001]
+    dependencies: []
+    status: open
+
+  - name: PI-002-version-sync-ci
+    description: Minimal CI job (or pre-commit hook) that enforces NN-C-001 across all plugins in the marketplace. Compares `plugin.json` version to the matching `marketplace.json` entry. Fails if any plugin drifts. Shell + `jq` only.
+    prd_sections: [FR-001, NFR-003, NN-C-001]
+    dependencies: [PI-001-marketplace-version-sync]
+    status: open
+
+  - name: PI-003-charter-dogfood-lessons
+    description: After using charter on a few real pieces of work (PI-001 and PI-002 themselves are good candidates), capture what worked and what didn't. Feed findings into spec-flow's improvement backlog — likely some are backlog items that land in a future spec-flow release.
+    prd_sections: [G-4, NN-P-003, SC-003]
+    dependencies: [PI-001-marketplace-version-sync, PI-002-version-sync-ci]
+    status: open
+
+  - name: PI-004-second-plugin-pilot
+    description: Pilot a second, intentionally-small plugin in this marketplace to validate that the extension mechanism generalizes and that plugin isolation (the no-cross-plugin-references rule from charter/architecture.md) holds up in practice. Candidate plugins are intentionally undecided — the point is to pick something small enough to ship without a full spec-flow cycle.
+    prd_sections: [G-1, G-3, SC-004]
+    dependencies: []
+    status: open
+
+coverage:
+  total_prd_sections: 15
+  covered_sections: 8
+  uncovered_sections:
+    - G-1
+    - G-3
+    - FR-002
+    - FR-003
+    - NFR-001
+    - NFR-002
+    - NFR-004
+    - SC-001
+    - SC-002
+    - SC-004
+    - NN-P-003
+  percentage: 53
+  notes: |
+    Uncovered-but-intentional: many of G-1/G-3/FR-002/FR-003/NFR-001/NFR-002/NFR-004 are already satisfied by the repo's existing structure (marketplace.json exists, plugin.json exists, install mechanism works, no runtime deps). These don't need dedicated pieces — they're verified by the existence and correctness of the current files. Charter-enforcement keeps them satisfied going forward.
+    SC-001/SC-002/SC-003/SC-004 are measurement goals, not implementable pieces. They come true (or don't) over time as users adopt.
+    NN-P-003 ("dog-food before recommend") is a process rule enforced at release time, not a piece.
