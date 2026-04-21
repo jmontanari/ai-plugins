@@ -73,7 +73,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
 **Exit Gate:** `scripts/lib/sync-plugin-to-mirror.sh` exists as a POSIX-bash library with a defined `sync_plugin_to_mirror()` function; library-specific AC-2 greps pass; no rsync invocation anywhere.
 **ACs Covered:** partial AC-2 (library-side checks). AC-2 fully closes in Phase 3 after the hook script exists.
 
-- [ ] **[Implement]** Author the shared sync library.
+- [x] **[Implement]** Author the shared sync library.
   - Order sub-items in checkpoint progression:
     1. Create directory `scripts/lib/` (the editor's file-write creates `scripts/` and `scripts/lib/` implicitly).
     2. Create `scripts/lib/sync-plugin-to-mirror.sh` with mode 0644 (library file, sourced not executed directly).
@@ -98,7 +98,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     - NN-C-006 (destructive ops scope-bounded). `find -exec rm -rf {} +` operates on `$worktree/*` paths (first argument of find must be `$worktree`); inline-commented that the function never invokes rm against files outside `$worktree`.
   - Follow existing patterns: the existing `plugins/spec-flow/hooks/session-start` shell script for bash idiom and shebang style (though this file omits the shebang since it's sourced). The file's header comment references the spec's FR-PI-007-002.
 
-- [ ] **[Verify]** Library-specific AC-2 greps (run from worktree root):
+- [x] **[Verify]** Library-specific AC-2 greps (run from worktree root):
   - Run:
     ```bash
     test -f scripts/lib/sync-plugin-to-mirror.sh || { echo "FAIL: library missing"; exit 1; }
@@ -115,7 +115,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
   - Expected: prints `Phase 2 library PASS` and exits 0.
   - Note: `bash -n` syntax-checks without executing. This is a cheap safety net for the sourced library.
 
-- [ ] **[QA]** Phase review.
+- [x] **[QA]** Phase review.
   - Review against: library-specific AC-2 checks, FR-PI-005's library-related sub-requirements, NN-C-002 POSIX-only constraint, NN-C-005 silent-no-op contract, NN-C-006 destructive-scope bound.
   - Diff baseline: `git diff phase-1-end..HEAD` (expect `scripts/` and `scripts/lib/` directories appear new; `scripts/lib/sync-plugin-to-mirror.sh` new file).
 
