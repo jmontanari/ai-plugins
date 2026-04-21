@@ -335,7 +335,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
 **Exit Gate:** `scripts/setup-mirror-hook.sh` runs successfully (exit 0). Running it a second time succeeds silently (idempotence confirmed). AC-4 (branch/worktree/hook/mirror-tree shape), AC-5 (sentinel round-trip to master-copilot with cleanup), and AC-9 (non-orphan subtree-split history) all pass. Additionally, `docs/specs/PI-007-copilot-coship/ac5-test.sh` exists as a helper script containing the AC-5 sentinel test sequence (identical to the Implement block's step 5). **State persistence:** this phase creates state that persists across the phase completion AND across merge to master: the `master-copilot` branch (remote-tracked after maintainer pushes), the `worktrees/master-copilot/` worktree (local-only, gitignored path), and the `.git/hooks/post-commit` symlink (local-only, not in git). Post-merge, the hook self-heals on the next master commit touching `plugins/spec-flow/**`; no cleanup is performed by this plan. Contributors cloning the marketplace repo who see `master-copilot` in `git branch -a` should consult the CHANGELOG's Notes for upgraders for context.
 **ACs Covered:** AC-4 (complete), AC-5 (complete), AC-9 (complete), AC-3 (behavioral confirmation of idempotence).
 
-- [ ] **[Implement]** Execute the setup script and run end-to-end validation.
+- [x] **[Implement]** Execute the setup script and run end-to-end validation.
   - Order sub-items in checkpoint progression:
     1. Run the setup script: `bash scripts/setup-mirror-hook.sh`. Capture stdout+stderr. Expected: exit 0; progress messages to stderr; no errors.
     2. Run it a second time immediately: `bash scripts/setup-mirror-hook.sh`. Expected: exit 0; no branch/worktree/hook creation messages (idempotence).
@@ -386,7 +386,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     - NN-C-006: the AC-5 cleanup's `git reset --hard` targets only the hook-owned master-copilot worktree. The cleanup also deletes the throwaway branch — safe since it was created for this test.
     - NN-P-003 dogfood groundwork: this phase proves the mechanism works end-to-end before Phase 7's Copilot-CLI smoketest.
 
-- [ ] **[Verify]** Run every AC pipeline in sequence:
+- [x] **[Verify]** Run every AC pipeline in sequence:
   - Run (from worktree root). **Note:** this block does NOT use `set -e`. Each check terminates with an explicit `|| { echo "FAIL: ..."; exit 1; }`, matching the pattern in all other Phase Verify blocks and avoiding fragile interactions between `set -e`, `grep -c` (which exits non-zero on zero matches), and `|| echo 0` fallbacks inside command substitutions.
     ```bash
     # Re-run setup (idempotence)
@@ -430,7 +430,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     ```
   - Expected: prints `Phase 6 PASS — AC-3 behavioral, AC-4, AC-5, AC-9 all green` and exits 0.
 
-- [ ] **[QA]** Phase review.
+- [x] **[QA]** Phase review.
   - Review against: AC-3 (behavioral idempotence confirmed), AC-4 (complete), AC-5 (complete, cleanup performed), AC-9 (complete), NN-C-006 (reset scope bound to hook-owned branch), NN-C-005 (hook's no-op paths exercised implicitly during the idempotent second run — second setup with no plugin-touching commits on HEAD should not re-commit master-copilot).
   - Diff baseline: `git diff phase-5-end..HEAD` (expect new file `docs/specs/PI-007-copilot-coship/ac5-test.sh` + possibly one new commit on master-copilot branch from the initial seed + sentinel-test commit trail has been cleaned).
   - **Important note on execute state:** this phase creates long-lived state (master-copilot branch, worktree, hook symlink). That state persists across the phase's completion. The plan does not clean it up; post-merge the maintainer may re-run setup from master if they want fresh history.
