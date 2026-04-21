@@ -2,6 +2,31 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-piece.5] — 2026-04-20
+
+### Added (piece 5 of 7 — update mode + divergence resolution)
+- **Charter skill update mode.** `/spec-flow:charter` now supports editing existing charter files. Detected automatically when `docs/charter/` exists and no legacy signals present; also invocable as `/spec-flow:charter --update`. Six-phase flow (U1–U6): list files → scoped Socratic per selected file → write with bumped `last_updated` → QA on touched files → human sign-off → per-file commit → divergence awareness notice for in-flight pieces.
+- **Retirement UX.** When a user removes an NN-C or CR entry, the skill asks whether to retire (tombstone — recommended) or delete (removes all trace). Retired entries keep the ID reserved; specs citing retired IDs are flagged must-fix by QA so teams can upgrade to superseding entries.
+- **`/spec-flow:status --resolve <piece>` divergence resolution flow.** Walks the user through each diverged charter file with three options per file:
+  - **Re-spec** — dispatch `spec` skill in citation-only mode to update Non-Negotiables Honored / Coding Rules Honored sections.
+  - **Re-plan** — dispatch `plan` skill in allocation-only mode to regenerate per-phase charter slots.
+  - **Accept** — append an `### Accepted Charter Divergence` section to the spec with a user-authored rationale.
+  After resolution, `charter_snapshot` is updated to today's date for the touched file.
+- **Charter skill Phase 7 doctrine reminder** now tells the user to run `/reload-plugins` so the SessionStart hook picks up the new charter (wired in v2.0.0 piece 2).
+
+### Changed
+- Charter skill mode detection: explicit `--update` and `--retrofit` flags supported alongside auto-detection. Retrofit still reports "deferred to piece 6" until piece 6 lands.
+- Divergence is now resolvable via a skill, not just surfaced. Status's passive `⚠ Charter diverged` flag remains; the `--resolve` flag promotes it to an actionable flow.
+
+### Deferred to pieces 6–7
+- Piece 6: retrofit mode + migration pipeline
+- Piece 7: README + diagrams
+
+### Migration (piece 5)
+- No breaking changes. Teams with existing charter can now iterate on it via update mode; teams without charter are unaffected.
+- Divergence resolution is opt-in (`--resolve` flag). Pieces that pre-date `charter_snapshot` front-matter continue to skip divergence check silently.
+- Run `/reload-plugins` to pick up skill updates.
+
 ## [2.0.0-piece.4] — 2026-04-20
 
 ### Added (piece 4 of 7 — agent updates)

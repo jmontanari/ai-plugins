@@ -62,3 +62,72 @@ Charter divergence is informational — the status skill does NOT block or requi
 
 When all pieces in the manifest have status `done`, prompt:
 > "All pieces are marked done. Run `prd --review` to validate full PRD fulfillment?"
+
+## Divergence Resolution (`--resolve <piece>`)
+
+Invoked as `/spec-flow:status --resolve <piece-name>`. Walks the user through each diverged charter file for the piece and offers three options per file.
+
+### Preconditions
+- Piece exists in manifest
+- Piece status is `specced`, `planned`, or `implementing`
+- At least one charter file's current `last_updated` > piece's `charter_snapshot` for that file
+
+If no divergence exists, respond: *"No divergence detected for `<piece-name>`. `charter_snapshot` matches current charter."*
+
+### Per-file flow
+
+For each diverged file (in order of the `charter_snapshot` block in spec.md), present:
+
+```
+<piece-name> diverges on charter/non-negotiables.md
+  Snapshot: 2026-03-01
+  Current:  2026-04-20
+  Changes since snapshot:
+    + NN-C-014 (no PII in logs) — added 2026-03-15
+    ~ NN-C-007 (transactional boundaries) — modified 2026-04-05
+    - NN-C-012 — RETIRED 2026-04-18
+
+Options:
+  1. Re-spec — dispatch `spec` skill to update Non-Negotiables Honored
+     and Coding Rules Honored sections. Best if new entries (+) apply to
+     this piece's scope.
+  2. Re-plan — dispatch `plan` skill to update per-phase charter
+     allocation. Best if the phase decomposition shifts because of
+     modified entries (~).
+  3. Accept — document the divergence in the spec without changing
+     citations. Best if none of the changes actually apply to this
+     piece's scope.
+
+Which option? (1/2/3, default 3)
+```
+
+### Option 1 — Re-spec
+
+1. Dispatch `spec` skill in a constrained mode: only the `### Non-Negotiables Honored` and `### Coding Rules Honored` sections are eligible for edit. Phase 1 context reload reads the new charter; Phase 2 Socratic is skipped for non-NN/CR sections.
+2. After `qa-spec` and user sign-off, update `charter_snapshot` for the touched file in spec.md front-matter to today's date.
+3. If the piece status is `planned`, the new citation may require a new phase allocation — offer Option 2 as a follow-up.
+4. Commit: `spec(<piece>): re-spec NN/CR citations against updated charter`.
+
+### Option 2 — Re-plan
+
+1. Dispatch `plan` skill to re-run Phase 2 allocation-only (phases, ACs, implementation tracks unchanged; only the "Charter constraints honored in this phase" slots regenerate).
+2. `qa-plan` re-runs allocation checks. Human sign-off.
+3. Update `charter_snapshot` in plan.md for the touched file to today's date.
+4. Commit: `plan(<piece>): re-allocate charter citations against updated charter`.
+
+### Option 3 — Accept
+
+1. Append a new `### Accepted Charter Divergence` section to spec.md if not present. Add an entry:
+   ```markdown
+   ### Accepted Charter Divergence
+   
+   - **charter/<file>.md** (snapshot 2026-03-01, current 2026-04-20) accepted on 2026-04-20.
+     - Reason: <user-provided paragraph explaining why the changes don't apply to this piece>
+   ```
+2. Update `charter_snapshot` for the touched file in spec.md to today's date (marks the divergence as resolved).
+3. No QA dispatch. User's rationale is the audit trail.
+4. Commit: `spec(<piece>): accept charter divergence for <file>`.
+
+### Post-resolution
+
+After processing all diverged files, re-run divergence detection. If any file is still diverged (e.g., user aborted mid-flow), leave those flags in place. Otherwise report: *"Divergence resolved for `<piece-name>`."*
