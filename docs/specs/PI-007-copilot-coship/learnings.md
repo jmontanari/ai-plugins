@@ -209,6 +209,21 @@ With both findings in hand, the `.agent.md` symlinks committed in `8e4e2b1` (smo
 
 The final shape: the same `.md` files serve both hosts. No symlinks, no dual extensions, no content translation. Closer to the superpowers-copilot prior art and closer to the "single source of truth" NFR the spec demanded.
 
+### Negative result: marketplace-root install is NOT supported by Copilot CLI
+
+Tested `/plugin install jmontanari/ai-plugins` (no subdirectory suffix) on Copilot CLI v1.0.34. Result:
+
+```
+Failed to install plugin: No plugin.json found in repository. Tried:
+.plugin/plugin.json, plugin.json, .github/plugin/plugin.json, .claude-plugin/plugin.json
+```
+
+**Meaning:** Copilot CLI's `/plugin install owner/repo` probes exactly four root paths for a `plugin.json` file. It does NOT read `.claude-plugin/marketplace.json` — marketplace.json is a Claude Code concept, not a Copilot CLI concept. This contradicts the earlier hypothesis that DwainTR/superpowers-copilot's marketplace.json enables root-install on Copilot; on closer look, that repo ships an `install.sh` script for the marketplace path, and `/plugin install DwainTR/superpowers-copilot` (root-install) likely fails on Copilot for the same reason ours does.
+
+**Implication for spec-flow:** the subdirectory syntax `/plugin install jmontanari/ai-plugins:plugins/spec-flow` is the only working Copilot CLI install path for multi-plugin marketplace repos. This is the syntax the README documents and the smoketest validated. No change required; the negative result confirms the documented install command.
+
+**Future piece opportunity:** if we want `/plugin install jmontanari/ai-plugins` to work on Copilot CLI, we'd need to add a `.claude-plugin/plugin.json` file (or one at `.github/plugin/plugin.json`, etc.) at the repo root. That file can only describe ONE plugin, not a marketplace of plugins — so it would elect spec-flow as the "default" plugin for the repo while other plugins stay at `owner/repo:subdir`. Not in scope for PI-007; worth evaluating if spec-flow becomes the dominant plugin in the marketplace.
+
 ### Related but out-of-scope findings from the Copilot CLI research
 
 - **`/fleet`** is a Copilot CLI built-in command that parallelizes plan execution across multiple subagent dispatches (GitHub docs + [Copilot blog post](https://github.blog/ai-and-ml/github-copilot/run-multiple-agents-at-once-with-fleet-in-copilot-cli/)). Plugin agents are discoverable targets for `/fleet`. Spec-flow's execute skill already implements an orchestration mode (the Phase Scheduler + Phase Groups) that could complement or be complemented by `/fleet`. Whether this is an integration opportunity or an orthogonal concern is worth a future piece — NOT in scope for PI-007.
