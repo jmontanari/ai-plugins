@@ -73,7 +73,7 @@ pieces:
     description: Apply superpowers-style co-ship pattern to plugins/spec-flow/ so GitHub Copilot CLI users can install and invoke it. Master stays pure Claude (no Copilot-specific artifacts); a POSIX-bash post-commit hook produces a derived mirror branch `master-copilot` where `plugins/spec-flow/` is projected to the repo root with `CLAUDE.md` renamed to `AGENTS.md` and `agents/*.md` renamed to `agents/*.agent.md`. Copilot users install via `/plugin install <git-url>#master-copilot`. No rsync — POSIX `cp`/`rm`/`find`/`mv` only. `master-copilot` is a derived mirror branch (never author-committed). Replaces the superseded PI-005/PI-006 with a different architecture: no content translation, no Copilot-specific artifacts on master. In-repo dogfood via manual smoketest at execute time (FR-PI-007-006 / AC-8 requires PASS outcome).
     prd_sections: [G-3]
     dependencies: []
-    status: specced
+    status: planned
 
 coverage:
   total_prd_sections: 15
