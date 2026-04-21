@@ -5,8 +5,7 @@
     "name": "Joe"
   },
   "metadata": {
-    "description": "Shared plugin marketplace hosting multiple Claude Code plugins",
-    "pluginRoot": "./plugins"
+    "description": "Shared plugin marketplace hosting multiple Claude Code plugins"
   },
   "plugins": [
     {

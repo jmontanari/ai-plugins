@@ -9,12 +9,13 @@ Added GitHub Copilot CLI install compatibility via a **dual-path co-ship** patte
 ### Added
 
 - Plugin-level overview at `plugins/spec-flow/CLAUDE.md` summarizing the pipeline and entry-point skills. Read by both hosts: Claude Code treats it as the plugin-level README; Copilot CLI auto-loads it as plugin context.
-- GitHub Copilot CLI install path via subdirectory syntax: `/plugin install jmontanari/ai-plugins:plugins/spec-flow`. Confirmed with Copilot CLI v1.0.34 install + `/status` skill invocation.
+- GitHub Copilot CLI install paths documented — two supported forms: direct subdirectory install (`/plugin install jmontanari/ai-plugins:plugins/spec-flow`) and marketplace install (`/plugin marketplace install jmontanari/ai-plugins` followed by `/plugin install spec-flow@shared-plugins`). Both confirmed with Copilot CLI v1.0.34.
 - YAML frontmatter added to `fix-doc.md`, `qa-plan.md`, `qa-prd-review.md`, and `qa-spec.md` (they were missing it — pre-existing CR-001 violations surfaced by Copilot CLI's stricter schema validation). `implementer.md`'s description now double-quotes the "Mode: TDD" / "Mode: Implement" substrings so YAML doesn't parse the colons as nested mappings. Both hosts now load all top-level agents without warnings.
 
 ### Changed
 
-- The README's "Install on GitHub Copilot CLI" section now documents subdirectory-install (the working syntax) and the invocation form differences between Claude Code's `/<plugin>:<skill>` sigil and Copilot CLI's bare skill name.
+- The README's "Install on GitHub Copilot CLI" section now documents both install paths (direct and marketplace) and the invocation form differences between Claude Code's `/<plugin>:<skill>` sigil and Copilot CLI's bare skill name.
+- Root `.claude-plugin/marketplace.json` — removed `metadata.pluginRoot` field. It was causing Copilot CLI's marketplace install to concatenate `pluginRoot` + `source` and produce a duplicated `plugins/plugins/spec-flow` resolution path. `source` values are already resolved correctly relative to the marketplace.json directory, so both hosts work without the explicit root hint.
 
 ### Notes for upgraders
 

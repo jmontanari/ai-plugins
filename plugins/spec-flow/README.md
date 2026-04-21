@@ -323,13 +323,26 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 
 ## Install on GitHub Copilot CLI
 
-spec-flow installs on GitHub Copilot CLI directly from its subdirectory in this multi-plugin marketplace. No mirror branch, no sync script — one source tree serves both hosts.
+spec-flow installs on GitHub Copilot CLI directly from this multi-plugin marketplace. No mirror branch, no sync script — one source tree serves both hosts. Two install paths are supported; pick whichever fits your workflow.
+
+**Option 1 — direct subdirectory install (1 step):**
 
 ```text
 /plugin install jmontanari/ai-plugins:plugins/spec-flow
 ```
 
-Copilot CLI's subdirectory-install syntax (`owner/repo:path/to/plugin`) discovers `.claude-plugin/plugin.json` at `plugins/spec-flow/.claude-plugin/plugin.json` and loads the plugin from the repo's default branch. Confirmed with Copilot CLI v1.0.34.
+Installs spec-flow only, without registering the marketplace. Copilot CLI's `owner/repo:path/to/plugin` syntax discovers `.claude-plugin/plugin.json` at `plugins/spec-flow/.claude-plugin/plugin.json` and loads from the repo's default branch.
+
+**Option 2 — marketplace install (2 steps):**
+
+```text
+/plugin marketplace install jmontanari/ai-plugins
+/plugin install spec-flow@shared-plugins
+```
+
+Registers the `shared-plugins` marketplace, then installs spec-flow from it. Future plugins added to this marketplace become discoverable by name afterward. Recommended if you expect to install multiple plugins from this repo over time.
+
+Both paths confirmed with Copilot CLI v1.0.34.
 
 **Invocation form differs from Claude Code.** Copilot CLI does not use the `/<plugin>:<skill>` colon-delimited sigil — use the bare skill name:
 

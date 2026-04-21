@@ -209,20 +209,56 @@ With both findings in hand, the `.agent.md` symlinks committed in `8e4e2b1` (smo
 
 The final shape: the same `.md` files serve both hosts. No symlinks, no dual extensions, no content translation. Closer to the superpowers-copilot prior art and closer to the "single source of truth" NFR the spec demanded.
 
-### Negative result: marketplace-root install is NOT supported by Copilot CLI
+### Copilot CLI marketplace install — 2-step flow confirmed
 
-Tested `/plugin install jmontanari/ai-plugins` (no subdirectory suffix) on Copilot CLI v1.0.34. Result:
+Initial test of `/plugin install jmontanari/ai-plugins` (no subdirectory suffix) on Copilot CLI v1.0.34 returned:
 
 ```
 Failed to install plugin: No plugin.json found in repository. Tried:
 .plugin/plugin.json, plugin.json, .github/plugin/plugin.json, .claude-plugin/plugin.json
 ```
 
-**Meaning:** Copilot CLI's `/plugin install owner/repo` probes exactly four root paths for a `plugin.json` file. It does NOT read `.claude-plugin/marketplace.json` — marketplace.json is a Claude Code concept, not a Copilot CLI concept. This contradicts the earlier hypothesis that DwainTR/superpowers-copilot's marketplace.json enables root-install on Copilot; on closer look, that repo ships an `install.sh` script for the marketplace path, and `/plugin install DwainTR/superpowers-copilot` (root-install) likely fails on Copilot for the same reason ours does.
+This is because `/plugin install owner/repo` looks for a single `plugin.json` at one of four root paths — it doesn't read `.claude-plugin/marketplace.json` as a discovery manifest.
 
-**Implication for spec-flow:** the subdirectory syntax `/plugin install jmontanari/ai-plugins:plugins/spec-flow` is the only working Copilot CLI install path for multi-plugin marketplace repos. This is the syntax the README documents and the smoketest validated. No change required; the negative result confirms the documented install command.
+Follow-on test: Copilot CLI DOES support marketplaces via a two-step command flow:
 
-**Future piece opportunity:** if we want `/plugin install jmontanari/ai-plugins` to work on Copilot CLI, we'd need to add a `.claude-plugin/plugin.json` file (or one at `.github/plugin/plugin.json`, etc.) at the repo root. That file can only describe ONE plugin, not a marketplace of plugins — so it would elect spec-flow as the "default" plugin for the repo while other plugins stay at `owner/repo:subdir`. Not in scope for PI-007; worth evaluating if spec-flow becomes the dominant plugin in the marketplace.
+```
+/plugin marketplace install jmontanari/ai-plugins
+/plugin install spec-flow@shared-plugins
+```
+
+The `@shared-plugins` suffix is the `"name"` field from `.claude-plugin/marketplace.json`. Adding the marketplace registers all plugins it lists; then each plugin installs by `<plugin-name>@<marketplace-name>`. This matches Claude Code's marketplace model.
+
+**Two install paths now documented:**
+
+1. **Direct (1 step):** `/plugin install jmontanari/ai-plugins:plugins/spec-flow` — installs only spec-flow without registering the marketplace.
+2. **Marketplace (2 steps):** `/plugin marketplace install jmontanari/ai-plugins` then `/plugin install spec-flow@shared-plugins` — registers the shared-plugins marketplace and installs spec-flow from it. Future plugins added to the marketplace are then discoverable by name.
+
+### Path-duplication bug in marketplace install — fixed
+
+Initial attempt at the 2-step flow hit:
+
+```
+✗ Failed to install plugin: Plugin source directory not found:
+/home/joe/.cache/copilot/marketplaces/jmontanari-ai-plugins/plugins/plugins/spec-flow
+```
+
+Note the `plugins/plugins/spec-flow` — a path duplication. Root cause: `.claude-plugin/marketplace.json` originally had two fields that both named `plugins`:
+
+```json
+"metadata": {
+  "pluginRoot": "./plugins"
+},
+"plugins": [
+  { "name": "spec-flow", "source": "./plugins/spec-flow", ... }
+]
+```
+
+Copilot CLI concatenated `pluginRoot` + `source` → `./plugins/./plugins/spec-flow` → `plugins/plugins/spec-flow`. Claude Code treats `metadata.pluginRoot` as optional metadata and doesn't concatenate, so this went undetected until the Copilot marketplace install path was exercised.
+
+**Fix:** remove `metadata.pluginRoot` from `.claude-plugin/marketplace.json`. `source` is already correct relative to the marketplace.json directory (`plugins/spec-flow` at repo root), so both hosts resolve it identically without the explicit root hint. Committed as part of PI-007.
+
+The README documents both paths. The marketplace path is the recommended option for users who expect to install multiple plugins from this repo over time.
 
 ### Related but out-of-scope findings from the Copilot CLI research
 
