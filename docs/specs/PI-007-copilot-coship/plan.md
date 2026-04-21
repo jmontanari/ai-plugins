@@ -36,7 +36,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
 **Exit Gate:** `plugins/spec-flow/CLAUDE.md` exists as plain markdown with exactly one H1 and the four required H2 sections; AC-1's shell pipeline passes.
 **ACs Covered:** AC-1 (complete).
 
-- [ ] **[Implement]** Author the plugin-level overview.
+- [x] **[Implement]** Author the plugin-level overview.
   - Order sub-items in checkpoint progression:
     1. Create the file `plugins/spec-flow/CLAUDE.md` with an H1 title matching the plugin name (e.g., `# spec-flow`).
     2. Immediately below the H1, author a one-paragraph preamble that names the plugin's purpose: PRD-to-code pipeline for Claude Code, charter → prd → spec → plan → execute, with adversarial QA at every stage. Reuse phrasing from the existing `plugins/spec-flow/README.md` opening to keep tone consistent, but keep the preamble shorter (≤5 sentences).
@@ -52,7 +52,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     - Target length: ~100–200 lines per spec guidance. Keep it scannable.
   - Follow existing patterns: `plugins/spec-flow/README.md` for section tone; the existing doctrine file for TDD-summary distillation.
 
-- [ ] **[Verify]** AC-1 shell pipeline from spec:
+- [x] **[Verify]** AC-1 shell pipeline from spec:
   - Run (from worktree root):
     ```bash
     test -f plugins/spec-flow/CLAUDE.md || { echo "FAIL: missing"; exit 1; }
@@ -64,7 +64,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     ```
   - Expected: prints `AC-1 PASS` and exits 0.
 
-- [ ] **[QA]** Phase review.
+- [x] **[QA]** Phase review.
   - Review against: AC-1, FR-PI-005-001 equivalent content completeness (plugin-level overview covers the four topics), CR-009, CR-005, NN-P-001.
   - Diff baseline: `git diff phase-1-start..HEAD` (single new file, no modifications elsewhere).
 
