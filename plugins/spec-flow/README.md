@@ -323,18 +323,34 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 
 ## Install on GitHub Copilot CLI
 
-spec-flow is available on GitHub Copilot CLI via a derived mirror branch that projects this plugin to a standalone-plugin layout.
+spec-flow installs on GitHub Copilot CLI directly from its subdirectory in this multi-plugin marketplace. No mirror branch, no sync script — one source tree serves both hosts.
 
 ```text
-/plugin install https://github.com/<maintainer>/ai-plugins.git#master-copilot
+/plugin install jmontanari/ai-plugins:plugins/spec-flow
 ```
 
-The `master-copilot` branch is maintained automatically by a post-commit hook in the marketplace repo. **Do not push directly to it** — it is a derived branch regenerated from `master` on every commit that touches `plugins/spec-flow/**`.
+Copilot CLI's subdirectory-install syntax (`owner/repo:path/to/plugin`) discovers `.claude-plugin/plugin.json` at `plugins/spec-flow/.claude-plugin/plugin.json` and loads the plugin from the repo's default branch. Confirmed with Copilot CLI v1.0.34.
 
-The `scripts/setup-mirror-hook.sh` bootstrap script is a **maintainer-only** tool; contributors working on the marketplace repo do not need to run it.
+**Invocation form differs from Claude Code.** Copilot CLI does not use the `/<plugin>:<skill>` colon-delimited sigil — use the bare skill name:
 
-Example invocation after install (syntax per Copilot CLI):
+| Claude Code | Copilot CLI |
+|-------------|-------------|
+| `/spec-flow:status` | `/status` |
+| `/spec-flow:spec`   | `/spec`   |
+| `/spec-flow:plan`   | `/plan`   |
+| `/spec-flow:execute`| `/execute`|
+| `/spec-flow:charter`| `/charter`|
+| `/spec-flow:prd`    | `/prd`    |
 
-```text
-/spec-flow:status
-```
+**Dual-path details that make this work:**
+
+- `plugins/spec-flow/CLAUDE.md` is read by both hosts. Copilot CLI reads CLAUDE.md directly as plugin context; Claude Code treats it as the plugin-level overview. No `AGENTS.md` symlink needed.
+- `plugins/spec-flow/skills/<name>/SKILL.md` is the cross-tool Agent Skills open standard — identical file, both hosts.
+- `plugins/spec-flow/agents/<name>.agent.md` are git symlinks pointing at `<name>.md`. Copilot CLI's custom-agent discovery looks for `*.agent.md`; Claude Code looks for `*.md`. Same file on disk, two extensions visible — both hosts find their agents. Nested subdirs (`agents/reflection/`, `agents/review-board/`) are NOT symlinked; Copilot CLI's agent discovery is flat-glob per its plugin docs, so those nested agents work only on Claude Code.
+
+**Known limitations on Copilot CLI:**
+
+- Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI (flat-glob only). Skills that dispatch those agents may fail when run on Copilot CLI. This is a Copilot CLI design constraint, not a spec-flow defect.
+- Copilot CLI does not support branch-pinning (`#branch` or `@branch`) in `/plugin install` as of v1.0.34 (tracked in `github/copilot-cli#1296`). Users always install from the repo's default branch.
+
+Windows users on Git for Windows need `core.symlinks=true` for the `.agent.md` symlinks to resolve correctly. WSL and macOS/Linux installs work out of the box.

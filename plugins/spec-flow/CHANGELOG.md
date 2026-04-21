@@ -4,19 +4,24 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [2.1.0] — 2026-04-21
 
-Added GitHub Copilot CLI install compatibility via a derived-mirror-branch pattern (PI-007-copilot-coship). Master stays a pure Claude plugin directory; a POSIX-bash post-commit hook produces the Copilot-ready branch on every commit that touches `plugins/spec-flow/**`.
+Added GitHub Copilot CLI install compatibility via a **dual-path co-ship** pattern (PI-007-copilot-coship). One source tree under `plugins/spec-flow/` serves both Claude Code and Copilot CLI. No mirror branch, no sync script, no content translation — each host discovers what it understands from the same files.
 
 ### Added
 
-- Plugin-level overview at `plugins/spec-flow/CLAUDE.md` summarizing the pipeline and entry-point skills.
-- GitHub Copilot CLI install path via the `master-copilot` mirror branch. Copilot users install with `/plugin install <git-url>#master-copilot` (exact branch-pin syntax verified during execute-time smoketest). See the plugin README section "Install on GitHub Copilot CLI".
-- Marketplace-level scripts supporting the mirror branch: `scripts/lib/sync-plugin-to-mirror.sh`, `scripts/mirror-copilot-post-commit.sh`, `scripts/setup-mirror-hook.sh`.
+- Plugin-level overview at `plugins/spec-flow/CLAUDE.md` summarizing the pipeline and entry-point skills. Read by both hosts: Claude Code treats it as the plugin-level README; Copilot CLI auto-loads it as plugin context.
+- GitHub Copilot CLI install path via subdirectory syntax: `/plugin install jmontanari/ai-plugins:plugins/spec-flow`. Confirmed with Copilot CLI v1.0.34 install + `/status` skill invocation.
+- `plugins/spec-flow/agents/<name>.agent.md` symlinks (one per top-level agent, 12 total) pointing at the corresponding `<name>.md`. Enables Copilot CLI's custom-agent discovery (`agents/*.agent.md` convention) while preserving Claude Code's discovery (`agents/*.md`). Single source of truth; dual extensions.
+
+### Changed
+
+- The README's "Install on GitHub Copilot CLI" section now documents subdirectory-install (the working syntax) and the invocation form differences between Claude Code's `/<plugin>:<skill>` sigil and Copilot CLI's bare skill name.
 
 ### Notes for upgraders
 
-- The `scripts/setup-mirror-hook.sh` bootstrap is **for the repo maintainer who pushes `master-copilot`**. Contributors working only on `master` or on feature branches do NOT need to run it — a missing hook on a contributor's clone is not a defect.
-- The `master-copilot` branch is a derived mirror — it receives no author commits directly. Any push should come from the post-commit hook's output only.
-- The `master-copilot` branch visible in `git branch -a` is a derived mirror branch, not a second trunk. Contributors do not need to check it out or push to it. It is maintained by the marketplace repo's post-commit hook on the maintainer's machine and by explicit maintainer pushes. See `plugins/spec-flow/CLAUDE.md` for the plugin overview and `scripts/setup-mirror-hook.sh` for maintainer setup.
+- **No maintainer setup required.** There is no mirror branch to push, no post-commit hook to install, no bootstrap script to run. Pull, commit, push as normal — both hosts get the updates.
+- **Windows users:** the `.agent.md` symlinks require `git config --global core.symlinks true`. WSL, macOS, and Linux users don't need this. Git for Windows users who encounter broken agent files should enable symlinks or check out via WSL.
+- **Copilot CLI limitation:** Copilot CLI does not support branch-pinning in `/plugin install` (tracked at `github/copilot-cli#1296`). Copilot users always install from the default branch. Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI's flat-glob agent discovery; skills that dispatch those nested agents work only on Claude Code. Top-level agents work on both.
+- **Historical note:** An earlier PI-007 design (2026-04-21 morning) shipped a `master-copilot` mirror branch + POSIX-bash post-commit hook + setup script. Phase-7 smoketest revealed that branch-pinning doesn't exist in Copilot CLI yet, so the mirror branch couldn't be consumed. The design was refactored to the dual-path pattern above. The mirror infrastructure was removed; the historical commits remain visible in the feature branch's history for anyone curious about the design journey.
 
 ## [2.0.0] — 2026-04-20
 
