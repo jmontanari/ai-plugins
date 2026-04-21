@@ -19,7 +19,7 @@ Read the `charter:` block from `.spec-flow.yaml` (added in v2.0.0). Two keys: `r
 - If `<docs_root>/charter/` exists → continue; charter content is available for PRD import (you can cite `NN-C-xxx` from `<docs_root>/charter/non-negotiables.md` when classifying PRD constraints).
 - If `<docs_root>/charter/` does not exist and `charter.required: false` → continue. Treat this as a pre-charter project; the PRD holds all non-negotiables as unprefixed `NN-xxx` (legacy) until the project chooses to retrofit.
 
-Legacy layout detection (informational): if `<docs_root>/prd.md` exists at the legacy flat path (v1.5.x and prior) rather than `<docs_root>/prd/prd.md`, note this and offer: *"Detected legacy docs layout. Piece 6 (charter retrofit) migrates to the new layout. For now, this skill reads and writes the legacy path."*
+Legacy layout detection: if `<docs_root>/prd.md` exists at the legacy flat path (v1.5.x and prior) rather than `<docs_root>/prd/prd.md`, note this and offer: *"Detected legacy docs layout (pre-v2.0). Run `/spec-flow:charter --retrofit` to migrate to the new charter-aware layout — nine-step, commit-per-step, fully revertable. Until then, this `prd` skill continues to read and write the legacy path for backward compat."*
 
 ## Modes
 
