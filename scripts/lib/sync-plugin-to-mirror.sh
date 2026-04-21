@@ -89,15 +89,24 @@ sync_plugin_to_mirror() {
     local master_sha
     master_sha=$(git -C "$repo_root" rev-parse --short HEAD)
 
-    cd "$worktree"
-    git add -A
+    # CRITICAL: when this function is invoked from a git hook (post-commit fired
+    # from a different worktree), git sets GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE
+    # pointing at the HOOK'S repo — not the mirror worktree. If we don't unset
+    # those, `git add -A` and `git commit` run against the wrong repo and corrupt
+    # the wrong branch. Wrap the commit block in a subshell that unsets those env
+    # vars so git re-discovers the repo from $worktree's on-disk context.
+    (
+        unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+        cd "$worktree"
+        git add -A
 
-    if git diff --cached --quiet; then
-        # Nothing changed — silent no-op per NN-C-005.
-        return 0
-    fi
+        if git diff --cached --quiet; then
+            # Nothing changed — silent no-op per NN-C-005.
+            exit 0
+        fi
 
-    git commit -m "sync: master $master_sha"
+        git commit -m "sync: master $master_sha"
+    )
 
-    return 0
+    return $?
 }
