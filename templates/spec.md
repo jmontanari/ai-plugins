@@ -1,6 +1,17 @@
+---
+charter_snapshot:
+  architecture: {{date}}
+  non-negotiables: {{date}}
+  tools: {{date}}
+  processes: {{date}}
+  flows: {{date}}
+  coding-rules: {{date}}
+---
+
 # Spec: {{piece_name}}
 
 **PRD Sections:** {{prd_sections}}
+**Charter:** docs/charter/ (binding — see Non-Negotiables Honored / Coding Rules Honored below)
 **Status:** draft
 **Dependencies:** {{dependencies}}
 
@@ -21,8 +32,21 @@
 ### Non-Functional Requirements
 - {{nfr_id}}: {{requirement}}
 
-### Non-Negotiables (from PRD)
-- {{nn_id}}: {{how_this_piece_honors_it}}
+### Non-Negotiables Honored
+
+Enumerate every charter (`NN-C-xxx`) and product (`NN-P-xxx`) non-negotiable whose scope this piece touches, with a per-entry line on how the piece honors it.
+
+**Project (NN-C — from `docs/charter/non-negotiables.md`):**
+- {{nn_c_id}} ({{short_name}}): {{how_this_piece_honors_it}}
+
+**Product (NN-P — from `docs/prd/prd.md`):**
+- {{nn_p_id}} ({{short_name}}): {{how_this_piece_honors_it}}
+
+### Coding Rules Honored
+
+Cite relevant `CR-xxx` entries from `docs/charter/coding-rules.md` whose scope this piece touches, with how each is honored.
+
+- {{cr_id}} ({{short_name}}): {{how_this_piece_honors_it}}
 
 ## Acceptance Criteria
 AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}}

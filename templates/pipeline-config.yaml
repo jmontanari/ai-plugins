@@ -25,3 +25,13 @@ phase_groups: auto
 #   auto    — dispatch reflection agents (process-retro + future-opportunities); append findings to <docs_root>/improvement-backlog.md (default)
 #   off     — skip Step 4.5; learnings.md authored without reflection-agent input (pre-v1.5 behavior)
 reflection: auto
+
+# charter: configures the charter stage (new in v2.0.0)
+#   required      — if true, prd/spec/plan skills fail fast when docs/charter/ is missing (piece 3 enforces)
+#                   default: false for backward compat; new projects default to true after running /spec-flow:charter
+#   doctrine_load — list of charter files (by base name) to auto-load into session context via the SessionStart hook
+#                   default: [non-negotiables, architecture]
+#                   set to [] to disable auto-load entirely
+charter:
+  required: false
+  doctrine_load: [non-negotiables, architecture]
