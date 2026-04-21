@@ -2,6 +2,30 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-piece.1] — 2026-04-20
+
+### Added (piece 1 of 7 — charter stage bootstrap)
+- `/spec-flow:charter` skill (bootstrap mode only) at `skills/charter/SKILL.md`
+- `qa-charter` adversarial review agent at `agents/qa-charter.md`
+- Six charter templates in `templates/charter/`:
+  - `architecture.md` — layers, dependency direction, component ownership
+  - `non-negotiables.md` — `NN-C-xxx` structured schema (Type: Rule / Reference)
+  - `tools.md` — language, framework, test runner, linter, CI, approved/banned libraries
+  - `processes.md` — branching, review, release, CI gates, incident response
+  - `flows.md` — request/auth/data-write and other critical flows
+  - `coding-rules.md` — `CR-xxx` structured schema
+
+### Deferred to pieces 2–7
+- Piece 2: template updates + pipeline-config.yaml + session-start doctrine load
+- Piece 3: downstream skill charter wiring (prd/spec/plan/execute/status)
+- Piece 4: agent updates (implementer, qa-spec, qa-plan, qa-phase, review-board)
+- Piece 5: update mode + divergence detection
+- Piece 6: retrofit mode + migration pipeline
+- Piece 7: README + full CHANGELOG for v2.0.0 + diagrams
+
+### Migration (piece 1 only)
+- No breaking changes in piece 1. Charter files are standalone; downstream skills are unchanged. Projects upgrading from v1.5.x pick up the new charter skill but continue to work without calling it.
+
 ## [1.5.0] — 2026-04-19
 
 ### Added
