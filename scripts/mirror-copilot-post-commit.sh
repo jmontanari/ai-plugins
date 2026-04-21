@@ -24,6 +24,17 @@ unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 WORKTREE="$REPO_ROOT/worktrees/master-copilot"
 
+# --- no-op path 0: hook fired from a worktree that doesn't ship the scripts/
+# tree (e.g., master-copilot itself, which is a projection of plugins/spec-flow/
+# with no marketplace-level scripts dir). The hook's raison d'être is to mirror
+# the plugin on commits to the main/feature trunk; firing it on master-copilot
+# is noise. Silent no-op when the shared library isn't present at the expected
+# path. This also protects against infinite recursion: master-copilot's own
+# sync commits would otherwise retrigger the hook.
+if [ ! -f "$REPO_ROOT/scripts/lib/sync-plugin-to-mirror.sh" ]; then
+    exit 0
+fi
+
 # Source the shared sync library (Phase 2).
 source "$REPO_ROOT/scripts/lib/sync-plugin-to-mirror.sh"
 
