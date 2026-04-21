@@ -20,10 +20,15 @@ pieces:
       cd1eb7a piece 7 - README + consolidated CHANGELOG + version bump
 
   - name: PI-001-marketplace-version-sync
-    description: Update `.claude-plugin/marketplace.json` to reflect spec-flow's actual version (2.0.0). Currently stale at 1.1.1 — caught during charter bootstrap. First NN-C-001 violation in the history of the repo; fixing it is straightforward.
+    description: Update `.claude-plugin/marketplace.json` to reflect spec-flow's actual version (2.0.0). Was stale at 1.1.1 — caught during charter bootstrap. First NN-C-001 violation in the history of the repo; fixing it was straightforward.
     prd_sections: [FR-001, NN-C-001]
     dependencies: []
-    status: open
+    status: done
+    notes: |
+      Fixed 2026-04-21. marketplace.json spec-flow entry bumped 1.1.1 → 2.0.0
+      to match plugins/spec-flow/.claude-plugin/plugin.json. No plugin-level
+      version bump for this change since the edit is outside plugins/*/
+      scope (NN-C-009 scope exclusion).
 
   - name: PI-002-version-sync-ci
     description: Minimal CI job (or pre-commit hook) that enforces NN-C-001 across all plugins in the marketplace. Compares `plugin.json` version to the matching `marketplace.json` entry. Fails if any plugin drifts. Shell + `jq` only.
