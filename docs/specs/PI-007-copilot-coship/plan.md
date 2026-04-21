@@ -124,7 +124,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
 **Exit Gate:** `scripts/mirror-copilot-post-commit.sh` exists, executable (mode 0755), sources the Phase 2 library, applies the diff-tree guard, and delegates sync to `sync_plugin_to_mirror`. Full AC-2 (hook + library) passes.
 **ACs Covered:** AC-2 (complete, covering both the hook and library checks).
 
-- [ ] **[Implement]** Author the post-commit hook.
+- [x] **[Implement]** Author the post-commit hook.
   - Order sub-items in checkpoint progression:
     1. Create `scripts/mirror-copilot-post-commit.sh` with mode 0755.
     2. File header: `#!/usr/bin/env bash` + `set -euo pipefail` + comment block citing the spec's FR-PI-007-002.
@@ -140,7 +140,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     - NFR-PI-007-004 (hook failure must not unwind master commit): this is a git-native guarantee — post-commit hooks run after the commit is already written; their exit code is reported but master's commit is immutable once the hook fires. Inline comment reminder.
   - Follow existing patterns: `plugins/spec-flow/hooks/run-hook.cmd` for bash shebang + set-flags style.
 
-- [ ] **[Verify]** Full AC-2 pipeline from spec (covers hook + library):
+- [x] **[Verify]** Full AC-2 pipeline from spec (covers hook + library):
   - Run:
     ```bash
     test -x scripts/mirror-copilot-post-commit.sh || { echo "FAIL: hook not executable"; exit 1; }
@@ -160,7 +160,7 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     ```
   - Expected: prints `AC-2 PASS` and exits 0.
 
-- [ ] **[QA]** Phase review.
+- [x] **[QA]** Phase review.
   - Review against: AC-2 (complete), FR-PI-007-002, NN-C-002, NN-C-005 (both no-op paths verified), NFR-PI-007-004 (hook failure isolation — documented via comment, not mechanically tested here but verified in Phase 6's sentinel test).
   - Diff baseline: `git diff phase-2-end..HEAD` (expect only the new hook file).
 
