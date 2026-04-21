@@ -401,8 +401,9 @@ All file paths in `[Implement]` steps are relative to the worktree root: `/mnt/c
     # AC-4: structural
     git show-ref --verify --quiet refs/heads/master-copilot || { echo "FAIL: master-copilot branch missing"; exit 1; }
     test -d worktrees/master-copilot || { echo "FAIL: worktree missing"; exit 1; }
-    test -L .git/hooks/post-commit || { echo "FAIL: post-commit hook symlink missing"; exit 1; }
-    readlink .git/hooks/post-commit | grep -q 'mirror-copilot-post-commit' || { echo "FAIL: post-commit symlink points to wrong target"; exit 1; }
+    GIT_HOOKS_DIR=$(git rev-parse --git-common-dir)/hooks
+    test -L "$GIT_HOOKS_DIR/post-commit" || { echo "FAIL: post-commit hook symlink missing"; exit 1; }
+    readlink "$GIT_HOOKS_DIR/post-commit" | grep -q 'mirror-copilot-post-commit' || { echo "FAIL: post-commit symlink points to wrong target"; exit 1; }
     git -C worktrees/master-copilot cat-file -e HEAD:AGENTS.md 2>/dev/null || { echo "FAIL: AGENTS.md missing on mirror"; exit 1; }
     git -C worktrees/master-copilot cat-file -e HEAD:CLAUDE.md 2>/dev/null && { echo "FAIL: CLAUDE.md still present on mirror (should have been renamed)"; exit 1; } || true
     agent_count=$(git -C worktrees/master-copilot ls-tree --name-only HEAD agents/ 2>/dev/null | grep -cE '\.agent\.md$' || true)

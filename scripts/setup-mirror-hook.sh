@@ -12,7 +12,7 @@ set -euo pipefail
 #   1. Create the master-copilot branch via git subtree split (REQUIRED mechanism
 #      per FR-PI-007-003 step 2; AC-9 verifies non-orphan history — no alternative).
 #   2. Create the worktrees/master-copilot git worktree.
-#   3. Install the post-commit hook symlink at .git/hooks/post-commit.
+#   3. Install the post-commit hook symlink at $GIT_COMMON_DIR/hooks/post-commit (worktree-aware).
 #   4. Seed initial sync by invoking sync_plugin_to_mirror() from the shared library,
 #      bypassing the hook's diff-tree guard.
 #   5. Sanity-check: verify AGENTS.md is present on master-copilot HEAD.
@@ -37,8 +37,16 @@ else
 fi
 
 # --- Step 3: install hook symlink (NN-C-006: refuse to overwrite unexpected hook) ---
-HOOK="$REPO_ROOT/.git/hooks/post-commit"
-TARGET="../../scripts/mirror-copilot-post-commit.sh"
+# Worktree-aware: use git's common dir to find the real hooks directory.
+# From a linked worktree, .git is a file and direct access fails; --git-common-dir
+# returns the shared .git across all worktrees.
+GIT_COMMON_DIR=$(git -C "$REPO_ROOT" rev-parse --git-common-dir)
+# --git-common-dir returns a RELATIVE path in some git versions; resolve to absolute.
+GIT_COMMON_DIR=$(cd "$GIT_COMMON_DIR" && pwd)
+HOOK="$GIT_COMMON_DIR/hooks/post-commit"
+# TARGET: absolute path so the symlink resolves correctly regardless of which
+# worktree triggers the commit. The hook needs to find the script deterministically.
+TARGET="$REPO_ROOT/scripts/mirror-copilot-post-commit.sh"
 if [ -L "$HOOK" ] && [ "$(readlink "$HOOK")" = "$TARGET" ]; then  # post-commit symlink already correct
     :  # no-op
 elif [ -e "$HOOK" ]; then
