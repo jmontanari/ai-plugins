@@ -52,7 +52,7 @@ pieces:
     description: Produce docs/architecture/copilot-cli-parity.md — a reference document mapping every marketplace-level and plugin-internal Claude Code capability to its GitHub Copilot CLI equivalent, with conversion recipes and a DIRECT/APPROXIMATE/GAP tier classification per row. Every GAP row specifies a degradation strategy (INLINE-INTO-INSTRUCTIONS, DROP-WITH-WARNING, EMIT-SHIM, or HARD-ERROR). Desk research only; empirical dogfood deferred to a separate maintainer-controlled project during/after PI-006. Source-of-truth input for PI-006.
     prd_sections: [G-3]
     dependencies: []
-    status: planned
+    status: implementing
 
   - name: PI-006-copilot-mirror-ci
     description: CI/CD pipeline plus bash conversion script that encodes PI-005's mapping doc and produces a `master-copilot` branch mirroring `master` on every commit with Claude→Copilot conversions applied. Dogfooded in a separate maintainer-controlled project, not in this repo.
