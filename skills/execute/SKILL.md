@@ -269,7 +269,9 @@ If skipped, proceed directly to Step 6. Otherwise:
 
    - **`## Phase ACs`** — attach ONLY the acceptance criteria for this phase (mapped via plan.md), not the full spec. Use the plan's "AC map" section or the spec's AC sections that the plan references for this phase.
 
-   - **`## Non-negotiables`** — project constraints (short file).
+   - **`## Non-negotiables`** — project constraints. Attach `<docs_root>/charter/non-negotiables.md` (NN-C, project-wide) and the `## Non-Negotiables (Product)` section from `<docs_root>/prd/prd.md` (or legacy `<docs_root>/prd.md`) (NN-P, product-specific). If `<docs_root>/charter/` is absent (pre-charter project), attach only the legacy NN section from the PRD.
+
+   - **`## Coding rules cited by this phase`** — if the plan's phase block's "Charter constraints honored in this phase" slot cites any `CR-xxx` entries from `<docs_root>/charter/coding-rules.md`, attach those specific entries (not the full file). Absent slot or no citations → skip this block.
 
    **Do NOT attach:** full spec, PRD sections, full plan, or full test-runner output. PRD alignment is the Final Review board's job (`review-board/prd-alignment.md`). Per-phase QA is about correctness against the plan, not PRD compliance.
 
@@ -505,9 +507,9 @@ Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board/` and dispatc
 ```
 Agent({ description: "Blind review (iter 1, full)", prompt: <blind.md + Input Mode: Full + diff only>, model: "opus" })
 Agent({ description: "Edge case review (iter 1, full)", prompt: <edge-case.md + Input Mode: Full + diff + codebase note>, model: "opus" })
-Agent({ description: "Spec compliance review (iter 1, full)", prompt: <spec-compliance.md + Input Mode: Full + diff + spec + plan>, model: "opus" })
+Agent({ description: "Spec compliance review (iter 1, full)", prompt: <spec-compliance.md + Input Mode: Full + diff + spec + plan + (charter NN-C/CR + prd NN-P for claim verification)>, model: "opus" })
 Agent({ description: "PRD alignment review (iter 1, full)", prompt: <prd-alignment.md + Input Mode: Full + diff + spec + PRD + manifest>, model: "opus" })
-Agent({ description: "Architecture review (iter 1, full)", prompt: <architecture.md + Input Mode: Full + diff + arch docs + non-negotiables>, model: "opus" })
+Agent({ description: "Architecture review (iter 1, full)", prompt: <architecture.md + Input Mode: Full + diff + charter (all six files if present; else legacy arch docs) + NN-C + NN-P>, model: "opus" })
 ```
 
 ### Step 2: Triage

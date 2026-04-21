@@ -2,6 +2,37 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-piece.3] — 2026-04-20
+
+### Added (piece 3 of 7 — downstream skill charter wiring)
+- **Charter prerequisite check** in `skills/prd/SKILL.md` (Step 0.5). If `charter.required: true` and `<docs_root>/charter/` is missing, prd halts and directs the user to run `/spec-flow:charter` first. Legacy flat-layout detection surfaces a migration hint pointing to piece 6.
+- **NN classification during PRD import.** `prd` skill now asks the user whether each extracted non-negotiable is project-wide (promoted to `NN-C-xxx` in `<docs_root>/charter/non-negotiables.md`) or product-specific (written as `NN-P-xxx` to PRD). Pre-charter projects fall back to unprefixed `NN-xxx`.
+- **Charter loading in `skills/spec/SKILL.md`.** Phase 1 step 3 now reads `<docs_root>/charter/` (all six files) with fallback to legacy `<docs_root>/architecture/`. Phase 1 step 5 scans for binding rules across NN-C / NN-P / CR namespaces.
+- **Phase 2 step 1a** in `skills/spec/SKILL.md` — identify charter constraints touched by the piece, confirm with user, record list for spec sections.
+- **`charter_snapshot` front-matter** populated at spec write time (Phase 3) and plan write time (`skills/plan/SKILL.md` Phase 2). Used by piece 5 divergence detection.
+- **Charter in exploration priors** in `skills/plan/SKILL.md` Phase 1.
+- **Per-phase charter-constraints allocation** — plan skill distributes every NN-C/NN-P/CR cited by the spec into exactly one phase's "Charter constraints honored" slot (no drops, no duplicates).
+- **Charter in QA prompts** — `qa-spec` and `qa-plan` iter-1 full prompts now interpolate charter files alongside spec/plan/PRD.
+- **Charter in review-board dispatches** (`skills/execute/SKILL.md`): architecture reviewer receives all six charter files (or legacy arch docs); spec-compliance reviewer receives NN-C, NN-P, CR for claim verification.
+- **Phase-QA prompt updates** — `## Non-negotiables` block sources from NN-C + NN-P; new `## Coding rules cited by this phase` block attaches specific CR entries cited by the phase.
+- **Charter presence indicator + divergence flag** in `skills/status/SKILL.md`. Top-line `Charter: present (last_updated YYYY-MM-DD)` when charter exists; per-piece `⚠ Charter diverged` line when any current `last_updated` > snapshot.
+
+### Changed
+- **New layout is preferred for writes.** `prd` writes to `<docs_root>/prd/prd.md` + `<docs_root>/prd/manifest.yaml` on new projects. Legacy-layout projects continue to read/write the flat paths until they retrofit.
+- **Status skill reads manifest from either layout** — checks `<docs_root>/prd/manifest.yaml` first, falls back to `<docs_root>/manifest.yaml`.
+
+### Deferred to pieces 4–7
+- Piece 4: agent updates (implementer, qa-spec, qa-plan, qa-phase, qa-prd-review, review-board/*)
+- Piece 5: update mode + divergence detection (divergence is *surfaced* by status in piece 3 but the update-mode flow is piece 5)
+- Piece 6: retrofit mode + migration pipeline
+- Piece 7: README + diagrams
+
+### Migration (piece 3)
+- **Backward compat preserved.** All five skills read both new and legacy layouts. `charter.required` defaults to `false`, so pre-charter projects continue to work unchanged.
+- **New projects are nudged toward new layout.** The `prd` skill writes to `<docs_root>/prd/` on new bootstraps. Run `/spec-flow:charter` first if `charter.required: true`.
+- **Existing specs without `charter_snapshot` front-matter** are handled silently — divergence check skips those pieces (no false warnings).
+- Run `/reload-plugins` to pick up skill changes.
+
 ## [2.0.0-piece.2] — 2026-04-20
 
 ### Added (piece 2 of 7 — templates, config, doctrine load)
