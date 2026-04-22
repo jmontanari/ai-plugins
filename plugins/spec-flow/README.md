@@ -44,9 +44,13 @@ plugins/spec-flow/
 │   ├── qa-prd-review.md     # End-of-pipeline: did we actually fulfill the PRD?
 │   ├── fix-code.md          # Targeted fixes after QA findings
 │   ├── fix-doc.md           # Same, for spec/plan/charter documents
-│   └── review-board/        # Final 5-agent parallel review before merge
-│       ├── blind.md, edge-case.md, spec-compliance.md,
-│       └── prd-alignment.md, architecture.md
+│   ├── review-board-blind.md            # Final Review — blind reviewer (diff-only)
+│   ├── review-board-edge-case.md        # Final Review — edge-case hunter
+│   ├── review-board-spec-compliance.md  # Final Review — spec compliance
+│   ├── review-board-prd-alignment.md    # Final Review — PRD alignment
+│   ├── review-board-architecture.md     # Final Review — architecture + charter
+│   ├── reflection-process-retro.md      # End-of-piece — orchestration retro
+│   └── reflection-future-opportunities.md  # End-of-piece — forward-looking ideas
 │
 ├── templates/       # Starting shapes for PRD, spec, plan, manifest, charter
 │   └── charter/     # Six charter templates (architecture, non-negotiables, tools, processes, flows, coding-rules)
@@ -304,7 +308,7 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 - **Templates** — edit `templates/prd.md`, `spec.md`, `plan.md`, `manifest.yaml` to match your team's shape.
 - **Doctrine** — `reference/spec-flow-doctrine.md` is loaded on every session. Adjust the TDD laws, safeguards, or testing ratios to your engineering culture.
 - **Agents** — each agent is a short Markdown template under `agents/`. Rules, context shape, and output format are all text you can tune.
-- **Review board** — add or remove reviewers under `agents/review-board/`. The final review dispatches whatever is in that directory in parallel.
+- **Review board** — add or remove reviewers by dropping / deleting `agents/review-board-<lens>.md` files. The final review dispatches whatever flat-name agents match that prefix in parallel.
 - **Internal vs. user-facing agents** — user-facing skills (`spec-flow:prd`, `spec-flow:spec`, `spec-flow:plan`, `spec-flow:execute`, `spec-flow:status`) are the documented API. Internal agents (`implementer`, `tdd-red`, `verify`, `refactor`, `qa-phase`, `qa-phase-lite`, `fix-code`) are dispatched by the execute skill with orchestrator-injected context; they are not meant to be called directly and will BLOCK on a first-turn entrypoint check if invoked without the correct context. If you customize an internal agent, preserve the Rule 0 check — it's the safety net against direct-dispatch contamination.
 
 ---
@@ -367,9 +371,8 @@ Once installed, spec-flow exposes the same skills on either host:
 
 - `plugins/spec-flow/CLAUDE.md` is read by both hosts. Copilot CLI reads CLAUDE.md directly as plugin context; Claude Code treats it as the plugin-level overview. No `AGENTS.md` symlink needed.
 - `plugins/spec-flow/skills/<name>/SKILL.md` is the cross-tool Agent Skills open standard — identical file, both hosts.
-- `plugins/spec-flow/agents/<name>.md` are plain Markdown files with YAML frontmatter. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its [Custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) reference, so the same files Claude Code discovers are picked up by Copilot CLI — no symlinks or dual extensions needed. Nested subdirs (`agents/reflection/`, `agents/review-board/`) are not part of Copilot CLI's flat-glob agent discovery per its plugin docs, so those nested agents work only on Claude Code.
+- `plugins/spec-flow/agents/<name>.md` are plain Markdown files with YAML frontmatter. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its [Custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) reference, so the same files Claude Code discovers are picked up by Copilot CLI — no symlinks or dual extensions needed. All agents ship flat at `agents/*.md` (no nested subdirectories) with prefixed names (`review-board-<lens>.md`, `reflection-<scope>.md`) so Copilot CLI's flat-glob loader finds every agent.
 
 **Known limitations on Copilot CLI:**
 
-- Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI (flat-glob only). Skills that dispatch those agents may fail when run on Copilot CLI. This is a Copilot CLI design constraint, not a spec-flow defect.
 - Copilot CLI does not support branch-pinning (`#branch` or `@branch`) in `/plugin install` as of v1.0.34 (tracked in `github/copilot-cli#1296`). Users always install from the repo's default branch.

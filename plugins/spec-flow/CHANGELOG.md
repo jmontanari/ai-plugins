@@ -2,6 +2,32 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.2.0] — 2026-04-22
+
+Completes the dual-host co-ship started in v2.1.0: every agent is now discoverable on both Claude Code and Copilot CLI, with no subdirectory carve-outs.
+
+### Changed
+
+- **Flattened `agents/reflection/` and `agents/review-board/` subdirectories.** Seven agents were living in nested subdirectories that Copilot CLI's flat-glob loader could not see. They are now top-level with prefixed names:
+  - `agents/reflection/process-retro.md` → `agents/reflection-process-retro.md`
+  - `agents/reflection/future-opportunities.md` → `agents/reflection-future-opportunities.md`
+  - `agents/review-board/architecture.md` → `agents/review-board-architecture.md`
+  - `agents/review-board/blind.md` → `agents/review-board-blind.md`
+  - `agents/review-board/edge-case.md` → `agents/review-board-edge-case.md`
+  - `agents/review-board/prd-alignment.md` → `agents/review-board-prd-alignment.md`
+  - `agents/review-board/spec-compliance.md` → `agents/review-board-spec-compliance.md`
+- **Added CR-001-compliant YAML frontmatter to the five review-board agents.** They were lacking `name:` / `description:` entirely (pre-existing CR-001 violation, inherited from before the charter was adopted). Each now declares its role and reinforces the "do not call directly" dispatch boundary.
+- Updated `plugins/spec-flow/skills/execute/SKILL.md`, the plugin README, root README, and user guide to reference the flat filenames.
+
+### Fixed
+
+- Skills that dispatch end-of-piece reflection or review-board agents now work on Copilot CLI. Previously, these dispatches would fail on Copilot because the target agents were not discoverable.
+
+### Notes for upgraders
+
+- **No user-visible API change.** Skill commands and dispatch behavior are unchanged on both hosts. The plugin's public surface (skills, user-invocable commands) is identical to v2.1.0.
+- **Internal agent names changed** — any external tooling that referenced the old nested paths (`review-board/blind`, `reflection/process-retro`, etc.) must update to the flat names. spec-flow's `execute` skill is the only supported dispatcher, and it has been updated.
+
 ## [2.1.0] — 2026-04-21
 
 Added GitHub Copilot CLI install compatibility via a **dual-path co-ship** pattern (PI-007-copilot-coship). One source tree under `plugins/spec-flow/` serves both Claude Code and Copilot CLI. No mirror branch, no sync script, no content translation — each host discovers what it understands from the same files.
@@ -23,7 +49,7 @@ Added GitHub Copilot CLI install compatibility via a **dual-path co-ship** patte
 - **No dual-extension trick.** Agent files are plain `.md`. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its Custom agents configuration reference, so no symlinks, extension aliases, or content translation are required. The same files Claude Code reads are the files Copilot CLI reads.
 - **Early adopters — refresh your marketplace cache.** If you added the `shared-plugins` marketplace on Copilot CLI before v2.1.0 and now hit `Plugin source directory not found: .../plugins/plugins/spec-flow` when installing spec-flow, your local marketplace cache has the pre-fix manifest. Run `/plugin marketplace remove jmontanari/ai-plugins` then `/plugin marketplace add jmontanari/ai-plugins` before retrying `/plugin install spec-flow@shared-plugins`. See the README's install section for the full sequence.
 - **Minimum Copilot CLI version: v1.0.34** (check `copilot --version`). Earlier Copilot CLI builds may lack the `/plugin` command family.
-- **Copilot CLI limitation:** Copilot CLI does not support branch-pinning in `/plugin install` (tracked at `github/copilot-cli#1296`). Copilot users always install from the default branch. Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI's flat-glob agent discovery; skills that dispatch those nested agents work only on Claude Code. Top-level agents work on both.
+- **Copilot CLI limitation:** Copilot CLI does not support branch-pinning in `/plugin install` (tracked at `github/copilot-cli#1296`). Copilot users always install from the default branch. Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI's flat-glob agent discovery; skills that dispatch those nested agents work only on Claude Code. Top-level agents work on both. **Resolved in v2.2.0** — the nested agents were flattened.
 - **Historical note:** Two earlier PI-007 designs were explored on 2026-04-21 before landing on the current dual-path pattern. A morning design shipped a `master-copilot` mirror branch + POSIX-bash post-commit hook + setup script; Phase-7 smoketest revealed Copilot CLI lacks branch-pinning, so the mirror branch couldn't be consumed. A mid-day revision added `.agent.md` symlinks alongside the `.md` files; the `/agents` smoketest plus GitHub's Custom agents configuration reference together showed the symlinks were redundant (Copilot scans both extensions and deduplicates). Both design detours were removed; the commits remain in the feature branch's history.
 
 ## [2.0.0] — 2026-04-20

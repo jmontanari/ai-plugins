@@ -44,7 +44,7 @@ This is the API boundary. The skill composes a prompt with exactly what the agen
 
 ## Why internal agents block on direct invocation
 
-Several spec-flow agents (implementer, tdd-red, verify, refactor, qa-phase, fix-code, reflection/*) have a **first-turn entrypoint check** that rejects the dispatch if orchestrator-injected context is missing. If you invoke `implementer` directly (without the execute skill) it will respond:
+Several spec-flow agents (implementer, tdd-red, verify, refactor, qa-phase, fix-code, reflection-process-retro, reflection-future-opportunities) have a **first-turn entrypoint check** that rejects the dispatch if orchestrator-injected context is missing. If you invoke `implementer` directly (without the execute skill) it will respond:
 
 > BLOCKED — entrypoint violation. This agent is dispatched internally by `spec-flow:execute`. Calling it directly bypasses context-injection invariants (Mode flag, pre-flight snapshot, oracle anchors, matrix validation). Re-run through `spec-flow:execute` with a valid plan.
 

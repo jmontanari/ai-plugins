@@ -6,7 +6,7 @@ A cross-host plugin marketplace. One repository hosts one or more plugins that i
 
 | Plugin | Version | Description |
 |---|---|---|
-| [**spec-flow**](./plugins/spec-flow) | 2.1.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. |
+| [**spec-flow**](./plugins/spec-flow) | 2.2.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. |
 
 More plugins will live here over time. Each is self-contained and independently versioned.
 
@@ -114,7 +114,7 @@ New to spec-flow? Start with **[the user guide](./plugins/spec-flow/docs/usergui
 **Known limitations on Copilot CLI:**
 
 - Copilot CLI does not support branch-pinning in `/plugin install` ([copilot-cli#1296](https://github.com/github/copilot-cli/issues/1296)). Installs always resolve against the repo's default branch.
-- Nested subagent directories (`plugins/<plugin>/agents/reflection/`, `agents/review-board/`) are not discovered by Copilot CLI's flat-glob agent loader. Skills that dispatch those nested agents work only on Claude Code. Top-level agents work on both hosts.
+- Copilot CLI's custom-agent loader is flat-glob (does not recurse into subdirectories). spec-flow ships all agents flat at `plugins/spec-flow/agents/*.md` with prefixed names (e.g., `review-board-blind.md`, `reflection-process-retro.md`) so every agent is discovered on both hosts.
 
 ## How cross-host co-ship works
 

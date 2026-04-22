@@ -76,6 +76,8 @@ Copilot CLI session output after install + `/status`:
 
 **Known limitations / future-work items:**
 
+> **Resolved in v2.2.0 (2026-04-22):** the nested-agent discoverability gap below was closed by flattening `agents/reflection/` and `agents/review-board/` into top-level prefixed files (`reflection-<scope>.md`, `review-board-<lens>.md`). All agents are now discovered on both Claude Code and Copilot CLI. Historical text below preserved for context.
+
 - Agent dispatch was not tested in this smoketest. The status skill doesn't dispatch a subagent. Agents live in `plugins/spec-flow/agents/*.md` (top-level 12 files) and nested `agents/reflection/`, `agents/review-board/` (7 more files). Per Copilot CLI plugin docs, custom agents are expected at `agents/*.agent.md` — with `.agent.md` extension. On master (without the mirror-branch rename), the agents are `.md` not `.agent.md`. Whether Copilot discovers them is unknown and will need a follow-up smoketest invoking a skill that dispatches an agent (e.g., `/spec`).
 - Nested agent subdirs (`agents/reflection/`, `agents/review-board/`) may not be discovered by Copilot's flat-glob `agents/*.agent.md` even if the rename were applied. This is a Copilot CLI design constraint, not a spec-flow bug.
 - The hook/setup infrastructure from Phases 2–6 is **preserved but currently dead code** with respect to the Copilot install path. It still represents useful groundwork for:
