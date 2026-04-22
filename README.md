@@ -6,9 +6,65 @@ A cross-host plugin marketplace. One repository hosts one or more plugins that i
 
 | Plugin | Version | Description |
 |---|---|---|
-| [**spec-flow**](./plugins/spec-flow) | 2.1.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. Turns requirements docs into shipped, reviewed code through a chain of skills (`/prd`, `/spec`, `/plan`, `/execute`, `/status`, `/charter`) and specialized subagents. |
+| [**spec-flow**](./plugins/spec-flow) | 2.1.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. |
 
-Each plugin has its own README with the full design, pipeline walkthrough, and usage reference. Start there after install.
+More plugins will live here over time. Each is self-contained and independently versioned.
+
+---
+
+# What is spec-flow (and why)
+
+spec-flow is the flagship plugin in this marketplace. It turns a product requirements document into shipped, reviewed code through a chain of AI skills and specialized subagents. The sections below are the high-level pitch; for the full walkthrough, concepts, and per-command drill-downs see **[the user guide](./plugins/spec-flow/docs/userguide/README.md)**.
+
+## The problem
+
+AI coding agents are excellent at code but terrible at ambiguity. A vague PRD ("let users export their data") becomes a confident-but-wrong implementation — the agent guesses about format, scope, error handling, authorization, and cheerfully ships something that looks right and fails in production. Once ambiguity is baked into code, review catches syntax, not conceptual drift.
+
+The usual remedy is discipline: write a spec, review it, write tests first, do adversarial review. The trouble is that *discipline-by-intention* collapses under deadline pressure, especially with an AI pair that is always ready to skip ahead.
+
+## The core idea — progressive narrowing
+
+Every pipeline stage takes an ambiguous artifact and produces a less ambiguous one.
+
+```
+charter → prd → spec → plan → execute
+(constraints) (requirements) (criteria) (paths + signatures) (code + tests)
+```
+
+A PRD is ambiguous by nature. A spec resolves it into acceptance criteria. A plan resolves the spec into file paths and function signatures. By the time code is written, the implementer is a narrow executor — every design decision was already made, reviewed, and signed off.
+
+## The three principles
+
+1. **Progressive narrowing.** Ambiguity gets squeezed out one stage at a time, never allowed to skip ahead into code.
+2. **Adversarial review at every boundary.** Each artifact (charter, spec, plan, phase diff, final worktree) passes through a dedicated reviewer agent with no context from the conversation that produced it. Reviewers find problems; they don't confirm hunches.
+3. **Context isolation via subagents.** Implementation agents never see brainstorming history, spec rationale, or each other's conversations. They see the plan and their oracle of done, nothing more. Main-window context never leaks into code.
+
+## What you get
+
+- **PRD-to-code traceability.** Every line of code maps back to a spec acceptance criterion, which maps to a PRD requirement, which maps to a charter-level non-negotiable.
+- **TDD discipline baked in.** Red/Build/Verify/Refactor is enforced by the orchestrator, not the human's memory.
+- **Adversarial QA at every stage** — spec review, plan review, per-phase review, final 5-reviewer board before merge.
+- **Circuit breakers everywhere.** Agents that loop on the same failure hit a retry cap, then escalate to you. The pipeline is designed not to waste your compute on doomed loops.
+- **Charter governance.** Project-wide constraints (architecture, non-negotiables, coding rules) are cited by ID in every spec and enforced at every review gate.
+- **Cross-host support.** Runs on Claude Code and GitHub Copilot CLI from the same installation. Same skills, same agents, same workflow.
+
+## What it's not
+
+- **Not a "build this app for me" button.** It won't turn a two-line feature request into shipped code without input. You still brainstorm the PRD, you still sign off on every artifact, you still make judgment calls.
+- **Not a replacement for design taste.** The pipeline catches ambiguity and enforces process. It can't tell you whether the product decision is right.
+- **Not a silver bullet for trivial work.** Overkill for one-line bug fixes or throwaway experiments.
+
+## Who it's for
+
+Individuals and teams shipping non-trivial features where **correctness**, **traceability**, or **multi-stage review** actually matters. Projects where "tests pass and CI is green" isn't strong enough evidence that the code does what the PRD asked for. Anyone who has watched an AI pair confidently implement the wrong thing and wants structural prevention rather than vigilance.
+
+## When NOT to use it
+
+- One-line bug fixes or single-file tweaks — the pipeline's overhead exceeds the problem's size.
+- Exploratory prototypes and throwaway spikes — rigor slows discovery.
+- Work that doesn't survive past the current week — the traceability investment doesn't pay back.
+
+---
 
 ## Install on Claude Code
 
@@ -44,14 +100,16 @@ Registers the `shared-plugins` marketplace and then installs a plugin from it. R
 
 Once spec-flow is installed, these skills are available on either host via the same slash-command form:
 
-| Command | Description |
-|---|---|
-| `/spec-flow:status` | Pipeline dashboard — shows which pieces are in which stage and what to work on next. Start here. |
-| `/spec-flow:charter` | Bootstrap, update, or retrofit the project charter (six binding constraint files). |
-| `/spec-flow:prd` | Import or normalize a PRD and decompose it into implementable pieces. |
-| `/spec-flow:spec` | Author a detailed specification for one piece from the manifest. |
-| `/spec-flow:plan` | Turn an approved spec into an exhaustive phase-by-phase implementation plan. |
-| `/spec-flow:execute` | Orchestrate implementation of an approved plan phase-by-phase via subagents. |
+| Command | Description | Details |
+|---|---|---|
+| `/spec-flow:status` | Pipeline dashboard — start here. Shows which pieces are in which stage and what to work on next. | [guide](./plugins/spec-flow/docs/userguide/commands/status.md) |
+| `/spec-flow:charter` | Bootstrap, update, or retrofit the project charter (six binding constraint files). | [guide](./plugins/spec-flow/docs/userguide/commands/charter.md) |
+| `/spec-flow:prd` | Import or normalize a PRD and decompose it into implementable pieces. | [guide](./plugins/spec-flow/docs/userguide/commands/prd.md) |
+| `/spec-flow:spec` | Author a detailed specification for one piece from the manifest. | [guide](./plugins/spec-flow/docs/userguide/commands/spec.md) |
+| `/spec-flow:plan` | Turn an approved spec into an exhaustive phase-by-phase implementation plan. | [guide](./plugins/spec-flow/docs/userguide/commands/plan.md) |
+| `/spec-flow:execute` | Orchestrate implementation of an approved plan phase-by-phase via subagents. | [guide](./plugins/spec-flow/docs/userguide/commands/execute.md) |
+
+New to spec-flow? Start with **[the user guide](./plugins/spec-flow/docs/userguide/README.md)** for the pipeline narrative, concepts, and per-command walkthroughs.
 
 **Known limitations on Copilot CLI:**
 
@@ -77,11 +135,11 @@ See the spec-flow plugin's [PI-007 learnings](./docs/specs/PI-007-copilot-coship
 │   └── marketplace.json         marketplace manifest — lists all plugins
 ├── plugins/
 │   └── spec-flow/               one plugin per directory; self-contained
-│       ├── .claude-plugin/
-│       │   └── plugin.json
+│       ├── .claude-plugin/plugin.json
 │       ├── CLAUDE.md            plugin-level overview (both hosts read)
-│       ├── README.md            human-facing plugin docs
-│       ├── CHANGELOG.md         Keep-a-Changelog-format release notes
+│       ├── README.md            technical reference
+│       ├── CHANGELOG.md         Keep-a-Changelog release notes
+│       ├── docs/userguide/      human-facing walkthrough (start here)
 │       ├── skills/              entry-point orchestrators
 │       ├── agents/              narrow subagent templates
 │       ├── templates/           starting-shape files
