@@ -42,6 +42,9 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 | Safeguard | Enforcement |
 |-----------|-------------|
 | Test must fail for right reason | Orchestrator reads failure output, validates it matches expected missing feature |
+| Red commit has zero passing new tests | Orchestrator re-runs the suite scoped to paths in `## Tests Written` and reconciles against the oracle block's FAILED list; any `passed` among new tests rejects the phase and triggers one retry before escalation |
+| Build run has every Red test in PASSED | Orchestrator diffs the Red oracle block's FAILED IDs against the Build run's PASSED set; any Red ID that is SKIPPED, xfailed, or missing from the run (collection error, empty parameterize, deleted test) rejects the phase. Symmetric to the Red-side invariant above — catches silent skip decorators and test disappearance that "full suite green" alone permits |
+| Red tests pass theater review before Build | `qa-tdd-red` agent (Sonnet, read-only) dispatched between Red and Build scores every authored test against the 11-pattern Theater Pattern Catalog + AC-binding check. FAIL verdict re-dispatches Red once with findings surfaced; second consecutive fail escalates. Verify Full-mode runs the full catalog as Opus-tier backstop; Verify Audit-mode spot-checks the top 5 patterns. `qa-phase` runs the full catalog end-of-phase as final Opus backstop |
 | Minimal implementation only | Verify agent checks for over-engineering beyond test requirements |
 | No test modification to pass | Orchestrator diffs test files between Red and Verify — modified tests = rejection |
 | Circuit breaker | 2 failed build attempts → escalate to human |
@@ -78,6 +81,28 @@ Used by QA agents and the orchestrator before marking any phase complete:
 - [ ] Edge cases and error paths covered
 - [ ] No over-engineering beyond test requirements
 - [ ] Refactoring stayed within phase scope
+
+## Theater Pattern Catalog
+
+Theater tests are tests that pass by trivia, mock-echoing, or assertion omission rather than by exercising real behavior. They are the AI-generated TDD failure mode this pipeline spends a Sonnet dispatch specifically to prevent (the `qa-tdd-red` agent, Step 2.5 of `execute`).
+
+The catalog is the authoritative list. `qa-tdd-red` applies all 11 patterns pre-Build; `verify` Full mode re-applies all 11 as Opus-tier backstop; `verify` Audit mode spot-checks the top 5; `qa-phase` applies all 11 end-of-phase.
+
+Examples are Python/pytest because it's the reference stack — adapt the syntax for Jest, Vitest, Go, Rust, RSpec, etc.
+
+1. **Tautology as sole assertion** — `assert True`, `assert 1 == 1`, `assert result is not None` as the only assertion. Passes regardless of the production code.
+2. **Self-referential** — `assert foo(5) == foo(5)`. Always true whatever `foo` does.
+3. **Mock-echo assertion** — `m = Mock(return_value=42); assert subject(m) == 42`. Tests the mock's configured return, not the production code path.
+4. **Call-count only** — `assert mock.called` or `mock.assert_called()` without verifying args, return, or call order. Passes if the function is called for any reason — including an error path.
+5. **Assert-the-assignment** — `obj.x = 5; assert obj.x == 5` with no intervening behavior. Tests attribute setting, not any logic.
+6. **Truthy-only** — `result = do_thing(); assert result` where `result` could be a wrong type, empty dict, string `"False"`, etc. and still pass.
+7. **Exception swallowing** — `try: do_thing(); assert <something>; except: pass` or overly broad `except Exception` wrapping the assertion. Swallows `AssertionError` itself — test reports pass regardless.
+8. **No assertion at all** — test invokes the code but never asserts. Runners count these as passed (pytest, Jest, Vitest all do).
+9. **Name-vs-body mismatch** — `test_handles_empty_list` that passes `[1]`. `test_rejects_negative` that passes `1`. Name implies a case the body doesn't exercise.
+10. **Implementation-coupled** — asserting on private attributes (`_internal_state`), class names, specific exception message strings unlikely to stay stable, or call order of private methods. Passes until any refactor; fails for reasons unrelated to the AC.
+11. **Redundant cluster** — 3+ tests asserting the same invariant with permuted inputs that don't exercise different branches. One test would cover it; the extras are inflation.
+
+**AC-binding check (applied by `qa-tdd-red` alongside the catalog):** for each test, answer "If I implemented [the AC] incorrectly in some specific way, would this test catch it?" If the answer is "no" or "I can't tell," the test fails AC binding — regardless of whether it matched any catalog pattern.
 
 ## First Action
 

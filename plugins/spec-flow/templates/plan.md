@@ -35,6 +35,11 @@ A phase must have exactly one of these markers. The executor branches mechanical
 - [ ] **[TDD-Red]** Write failing tests
   - {{test_details}}
 
+- [ ] **[QA-Red]** Reject theater tests before Build
+  - Review Red's authored tests against the theater-pattern catalog (tautology, mock-echo, truthy-only, no-assertion, name/body mismatch, implementation coupling, etc.)
+  - Verify each test adversarially binds to its claimed AC ({{ac_list}})
+  - On FAIL: one Red retry with findings surfaced, then escalate
+
 - [ ] **[Build]** Write minimal code to pass
   - Order bullets in checkpoint progression (types → constructors → public API → internals → error paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.
   - {{implementation_details}}
@@ -87,6 +92,11 @@ A phase must have exactly one of these markers. The executor branches mechanical
 - [ ] **[TDD-Red]** Write failing tests for this sub-phase
   - {{test_details}}
 
+- [ ] **[QA-Red]** Reject theater tests before Build
+  - Review Red's authored tests against the theater-pattern catalog
+  - Verify adversarial binding to this sub-phase's ACs ({{sub_phase_ac_subset}})
+  - On FAIL: one Red retry with findings surfaced, then escalate
+
 - [ ] **[Build]** Implement this sub-phase
   - Order bullets in checkpoint progression (types → constructors → public API → internals → error paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.
   - {{implementation_details}}
@@ -124,6 +134,7 @@ A phase must have exactly one of these markers. The executor branches mechanical
 | Task Type | Receives | Does NOT receive |
 |-----------|----------|-----------------|
 | TDD-Red | Phase requirements, test patterns, spec ACs | Implementation code, prior conversation |
+| QA-TDD-Red | Red's `## Tests Written` list, authored test source, phase's [TDD-Red] block, phase ACs, Red's oracle block | Production source, prior phases' tests, brainstorming history |
 | Implementer (Mode: TDD) | `Mode: TDD` flag, failing tests (verbatim), plan details, arch constraints, pattern pointers | Spec rationale, brainstorming history |
 | Implementer (Mode: Implement) | `Mode: Implement` flag, plan [Implement] tasks, spec ACs, plan's [Verify] command, arch constraints, pattern pointers | Spec rationale, brainstorming history |
 | Verify | Verification output (tests or plan-specified command), spec ACs | Implementation reasoning |

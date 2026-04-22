@@ -34,6 +34,7 @@ plugins/spec-flow/
 │
 ├── agents/          # Subagent templates dispatched by the skills above
 │   ├── tdd-red.md           # Writes failing tests (TDD mode only)
+│   ├── qa-tdd-red.md        # Reviews Red's tests for theater patterns before Build (TDD mode only, v2.5.0)
 │   ├── implementer.md       # Unified code-writer; runs in Mode: TDD or Mode: Implement
 │   ├── verify.md            # Confirms correctness against spec ACs
 │   ├── refactor.md          # Phase-scoped cleanup
@@ -98,8 +99,8 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
                                                 ▼
   ┌──────────┐     per-phase loop:
   │ execute  │     ┌───────────────────────────────────────────────────┐
-  └──────────┘     │  (TDD mode)   tdd-red → implementer → verify →    │
-                   │                refactor → qa-phase                │
+  └──────────┘     │  (TDD mode)   tdd-red → qa-tdd-red → implementer │
+                   │                → verify → refactor → qa-phase     │
                    │  (Implement)  implementer → verify → (refactor?)→ │
                    │                qa-phase                           │
                    └───────────────────────────────────────────────────┘
@@ -122,7 +123,7 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 | **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prd/prd.md` + `docs/prd/manifest.yaml` with numbered FR/NFR/NN-P/SC and a piece list | Human (during brainstorm) | — |
 | **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/specs/<piece>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
 | **plan** | Approved spec + charter | `docs/specs/<piece>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
-| **execute** | Approved plan | Working code on `spec/<piece>` branch, phase-by-phase, with commits | `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **execute** | Approved plan | Working code on `spec/<piece>` branch, phase-by-phase, with commits | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
 
 ---
@@ -131,7 +132,7 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 
 Not all code benefits from test-first development. A YAML config, a Terraform module, a migration script, or wiring between two existing services doesn't. The plan skill picks one track per phase:
 
-- **TDD track** — phase has a `[TDD-Red]` checkbox. Used for behavior-bearing code. Flow: failing tests → implementer (Mode: TDD) → verify → refactor → QA.
+- **TDD track** — phase has a `[TDD-Red]` checkbox. Used for behavior-bearing code. Flow: failing tests → qa-tdd-red (theater-pattern gate) → implementer (Mode: TDD) → verify → refactor → QA.
 - **Implement track** — phase has an `[Implement]` checkbox (no `[TDD-Red]`). Used for config, infra, scaffolding, glue code, docs-as-code. Flow: implementer (Mode: Implement) → verify against a plan-specified command (lint, build, smoke run, integration test) → optional refactor → QA.
 
 The same `implementer.md` agent handles both. The orchestrator sets a `Mode: TDD` or `Mode: Implement` flag at the top of the agent's prompt, and the mode determines the oracle of done — failing tests going green (TDD) or a verification command passing (Implement). Every other rule is shared: follow the plan exactly, respect architecture, stay in scope, BLOCKED over guessing.

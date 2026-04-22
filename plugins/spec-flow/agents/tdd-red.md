@@ -33,6 +33,9 @@ You write failing tests for a phase of implementation. Your tests must fail beca
 5. Tests must be runnable — correct imports, valid syntax.
 6. **Commit at logical checkpoints, then a final commit when done.** A checkpoint is any boundary where the tests you've written so far are lint-clean and syntactically valid — typically one commit per test file or per AC group. Each commit runs hooks (cheap lint/format/type-check). Failing tests are expected; the hook won't reject them unless the project has a test-running hook (see *Rule: committing failing tests*). See *Rule: literal file list on commit* for staging discipline.
 7. Run the tests and report the failure output verbatim.
+8. **Zero passing tests among the ones you authored.** Every test ID listed in `## Tests Written` MUST appear in the `FAILED` (or `SKIPPED` with an explicit reason) list of your `## Oracle block`. The runner summary for the paths you created or modified must report `0 passed`. If any of your new tests passes on first run, STOP and report — do not commit a Red phase with passing new tests. A passing test in Red means one of two things, both errors:
+   - The feature already exists → this test belongs in a Verify regression check, not in this phase's Red. Escalate so the plan can be corrected.
+   - The assertion is tautological or over-mocked → the test doesn't exercise the missing behavior. Rewrite the assertion to bind to the feature that doesn't exist yet.
 
 ## Rule: literal file list on commit
 
@@ -80,13 +83,18 @@ FAILED <test identifier> — <one-line cause, ideally first line of the failure 
 FAILED <test identifier> — <cause>
 ...
 SKIPPED <test identifier> — <reason, if intentional>
-<summary line from the test runner, e.g. "N failed, M passed, K skipped in T">
+<summary line from the test runner, e.g. "N failed, 0 passed, K skipped in T">
 ```
 
 (Use whatever identifier format your test runner produces — e.g.
 `path/to/test.py::TestClass::test_name` for pytest, `describe > it`
 for Jest/Vitest, `TestFoo/SubTest` for Go, `test module::test_fn` for
 Rust, `path#test_name` for Ruby.)
+
+The `0 passed` in the summary is the Red invariant: every test you authored
+must be in the `FAILED` (or `SKIPPED` with reason) list above. If the runner
+reports any `passed` among the paths in `## Tests Written`, see Rule 8 — do
+not commit.
 
 ## Failure Analysis
 Each test fails because: <expected missing feature, not setup error>

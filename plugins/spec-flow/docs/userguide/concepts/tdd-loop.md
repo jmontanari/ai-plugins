@@ -15,13 +15,14 @@ These are load-bearing. They prevent the two failure modes that normally emerge 
 
 By writing exactly one failing test, then exactly the code to pass it, and repeating, the resulting code can only contain behavior that has a test behind it.
 
-## The four agents
+## The five agents
 
 | Agent | Role |
 |---|---|
 | **tdd-red** | Writes a single failing test (or a small set of tests for one behavior). The failure output is captured verbatim by the orchestrator as the oracle. |
+| **qa-tdd-red** | Reviews Red's authored tests against the 11-pattern theater catalog (tautology, mock-echo, truthy-only, no-assertion, name/body mismatch, implementation coupling, etc.) + an AC-binding check. Runs between Red and Build. Rejects theater tests before Build writes production code fit to weak assertions. |
 | **implementer** | Given the failing test output, writes the simplest code that turns it green. Cannot modify test files. |
-| **verify** | Independently confirms the test actually passes and that the test integrity wasn't violated (no test edits during Build). |
+| **verify** | Independently confirms the test actually passes and that the test integrity wasn't violated (no test edits during Build). Full mode re-runs the full theater catalog as Opus-tier backstop; Audit mode spot-checks the top 5 patterns. |
 | **refactor** | Cleans up phase-scoped files while keeping tests green. Cannot add new functionality. |
 
 The execute orchestrator dispatches them in sequence, runs validation between steps, and only advances when each oracle is clean.
@@ -33,14 +34,26 @@ For a TDD-track phase (behavior-bearing code):
 ### Step 1 — Red
 - **tdd-red** writes failing tests for this phase.
 - Orchestrator runs the test suite.
-- **Validation:** tests fail for the *right reason* (feature missing, not setup broken).
+- **Validation (two invariants, both required):**
+  - **Zero passing new tests** — a re-run scoped to the authored test paths must report `0 passed`. A passing new test means the feature already exists (wrong phase) or the assertion is tautological.
+  - **Right failure reason** — each failing test fails because the feature is missing, not from a typo / import / fixture error.
 - The verbatim failing output becomes the oracle for Step 2.
+
+### Step 1.5 — QA-Red
+- **qa-tdd-red** reviews Red's authored tests before Build is dispatched.
+- Applies the 11-pattern theater catalog (tautology, self-referential, mock-echo, call-count only, assert-the-assignment, truthy-only, exception swallowing, no-assertion, name/body mismatch, implementation coupling, redundant cluster) + an AC-binding check ("if I implemented this AC wrong, would this test catch it?").
+- **Validation:** PASS advances to Build; FAIL re-dispatches `tdd-red` once with findings surfaced. Two consecutive FAIL verdicts escalate — the phase's ACs are likely too vague (spec defect) or the plan's `[TDD-Red]` block directs Red toward un-testable surface (plan defect).
+- Runs Sonnet-tier; scope is narrow (just the authored test files).
 
 ### Step 2 — Build
 - **implementer** receives `Mode: TDD`, the failing-test output, the plan's `[Build]` block, and pre-flight snapshots (LOC, existing patterns, symbol presence, pre-commit hook inventory).
 - Implementer writes the simplest code that turns the failing tests green.
 - Orchestrator runs the full test suite.
-- **Validation:** suite is fully green AND no test files were modified since Red (caught by a `git diff tests/` check).
+- **Validation (three invariants, all required):**
+  - **Full suite green** — zero failures across the project.
+  - **Every Red ID is in PASSED** — the orchestrator set-diffs the Red oracle block's FAILED IDs against the Build run's PASSED set; any Red test missing from PASSED rejects the phase.
+  - **Zero Red IDs in SKIPPED** — catches silent `@skip` / `.skip()` / `t.Skip()` / xfail decorators added during Build, plus collection errors and empty parameterize lists that would otherwise let a Red test quietly disappear.
+- A downstream integrity check at Verify (`git diff tests/`) also rejects any test-file modification since Red.
 
 ### Step 3 — Verify
 - **verify** re-runs the oracle, checks AC coverage, scans for over-engineering.

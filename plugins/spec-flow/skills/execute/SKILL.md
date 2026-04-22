@@ -124,9 +124,11 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      model: "sonnet"
    })
    ```
-4. **Validate:** Run the test suite. Confirm tests FAIL.
-   - Check failure messages: do they indicate missing features (good) or setup errors (bad)?
-   - If setup errors: the agent wrote bad tests. Retry once with error output. If still failing for wrong reason: escalate.
+4. **Validate against two invariants.** Both must hold or the Red phase is rejected:
+   - **(a) All new tests are in the FAILED list.** Every test ID the agent listed in `## Tests Written` must appear in its `## Oracle block` FAILED list (or SKIPPED with an explicit reason). Diff the two sets; any `## Tests Written` entry missing from FAILED/SKIPPED is a violation.
+   - **(b) Zero passing new tests.** Re-run the test suite scoped to the paths in `## Tests Written` (e.g. `pytest <paths>`, `vitest run <paths>`, `go test <pkgs>`, whatever the project's runner supports). The summary must report `0 passed`. If the runner cannot be scoped, parse the full run's per-test results and confirm none of the `## Tests Written` IDs are in the passed set.
+   - **Failure-reason sanity:** for each FAILED test, check the message indicates a missing feature (good), not a typo / import error / fixture error (bad).
+   - **On any violation:** the agent wrote a Red phase that breaks discipline. Retry once with the specific offense appended (passing test IDs, setup-error output, or missing FAILED entries). A passing new test in Red means either the feature already exists (wrong phase — escalate, the plan needs correction) or the assertion is tautological (rewrite). If the second attempt still violates either invariant: escalate to human.
 5. **Capture the Oracle block:** extract the Red agent's `## Oracle block` section verbatim. Hold in orchestrator state as `phase_N_oracle_block` — Step 3 splices it into the implementer prompt without paraphrase.
 6. **Post-commit contamination check.** After the Red commit lands, reconcile the committed file list against the agent's `## Tests Written` paths:
    ```bash
@@ -135,6 +137,31 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    diff /tmp/red_committed.txt /tmp/red_reported.txt
    ```
    If the two lists diverge, the commit is contaminated — most often because a concurrent agent's uncommitted work in the same worktree was swept in. Pause and ask the human whether to split the commit. Do NOT auto-reset.
+
+### Step 2.5: QA-TDD-Red — Reject Theater Tests
+
+*(Mode: TDD only. Runs between Red's commit and the implementer dispatch. Catches theater tests — tautology, mock-echo, assert-the-assignment, truthy-only, exception swallowing, no-assertion, name/body mismatch, implementation coupling, redundant clusters — before Build writes production code fit to weak assertions.)*
+
+1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-tdd-red.md`
+2. Compose prompt with:
+   - Red's `## Tests Written` list
+   - The phase's `[TDD-Red]` block from plan.md (reference by file path + line range)
+   - The phase's spec ACs
+   - The FAILED IDs from `phase_N_oracle_block` (captured in Step 2.5)
+
+   The qa-tdd-red agent reads the authored test files directly; do not paste their contents into the prompt.
+3. Dispatch:
+   ```
+   Agent({
+     description: "QA-TDD-Red: review Phase N tests for theater patterns",
+     prompt: <composed>,
+     model: "sonnet"
+   })
+   ```
+4. **Parse the verdict:**
+   - **PASS** — proceed to Step 3 (Implement/Build).
+   - **FAIL** — re-dispatch `tdd-red` once with the qa findings appended (pattern IDs, AC-binding weaknesses, coverage gaps). Use the 1-attempt retry budget: if the second Red attempt ALSO fails qa-tdd-red, escalate to human with both reports attached. Two consecutive failures means the phase's ACs are too vague (spec defect) or the plan's `[TDD-Red]` block is directing Red toward un-testable surface (plan defect).
+5. On PASS, Red's oracle block is unchanged — no new state to capture. Proceed to Step 3 with `phase_N_oracle_block` as captured in Step 2.5.
 
 ### Step 3: Implement — Write the Code
 
@@ -177,7 +204,11 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    })
    ```
 5. **Validate:** Run the mode's oracle.
-   - Mode: TDD — full test suite must be GREEN.
+   - Mode: TDD — three invariants, all required:
+     - **(a) Full suite green** — `0 failed` across the whole test suite.
+     - **(b) Every Red ID is in PASSED** — parse the current run's PASSED set and diff against the FAILED IDs captured in `phase_N_oracle_block` from Step 2.5. Every Red test ID must appear in the PASSED set. Missing IDs (collection errors, empty parameterize, deleted tests) are a rejection signal.
+     - **(c) Zero Red IDs in SKIPPED** — any Red ID marked `@pytest.mark.skip`, `.skip()`, `t.Skip()`, `xfail`, or otherwise non-run is a rejection signal. This catches silent skip decorators added during Build.
+     - On violation of (b) or (c): retry within the 2-attempt budget with the specific offending IDs surfaced to the agent (e.g. "tests X, Y were SKIPPED in your run; you cannot pass Red tests by skipping them"). Escalate on second failure — a Red test that cannot go green without skipping means the plan or the Red tests themselves are wrong.
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
 6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
 7. **AC Coverage Matrix validation gate.** After the oracle passes, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment.

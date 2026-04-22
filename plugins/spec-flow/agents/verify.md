@@ -27,7 +27,7 @@ Used when Build reported everything clean: oracle ran GREEN on first attempt, ze
 - **Implementation diff:** Files Build created/modified.
 - **Spec ACs:** The acceptance criteria for this phase.
 
-**Do NOT re-run tests or the [Verify] command.** Build already did that cleanly. Your job is narrower: confirm each AC→test mapping is real (the named test actually exercises the AC; the named assertion actually checks it), and scan the diff for obvious over-reach. Skip test-quality review — that's Full mode's job.
+**Do NOT re-run tests or the [Verify] command.** Build already did that cleanly. Your job is narrower: confirm each AC→test mapping is real (the named test actually exercises the AC; the named assertion actually checks it), and scan the diff for obvious over-reach. Also spot-check for the top 5 theater patterns on the tests the AC matrix cites — patterns #1 (tautology), #3 (mock-echo), #6 (truthy-only), #8 (no assertion), #10 (implementation-coupled). A full 11-pattern catalog review is Full mode's job; Audit's spot-check is the cheap safety net for slips the pre-Build `qa-tdd-red` gate may have let through.
 
 Emit the abbreviated Audit output format.
 
@@ -36,12 +36,13 @@ Emit the abbreviated Audit output format.
 1. **Tests pass:** Confirm all tests pass with clean output (no warnings, no errors).
 2. **AC coverage:** For each acceptance criterion mapped to this phase, identify which test(s) verify it. Flag any AC without a corresponding test.
 3. **Over-engineering:** Review the implementation. Is there code that no test exercises? Are there parameters, methods, or abstractions beyond what the tests require? Flag them.
-4. **Test quality:** Are tests testing behavior or implementation details? Are mocks justified?
+4. **Test quality:** Are tests testing behavior or implementation details? Are mocks justified? Run the full Theater Pattern Catalog against every test touched in this phase — flag any match. The 11 patterns are: (1) tautology as sole assertion, (2) self-referential, (3) mock-echo assertion, (4) call-count only, (5) assert-the-assignment, (6) truthy-only, (7) exception swallowing, (8) no assertion at all, (9) name-vs-body mismatch, (10) implementation-coupled, (11) redundant cluster. See `reference/spec-flow-doctrine.md` "Theater Pattern Catalog" for the full definitions and examples. A pre-Build `qa-tdd-red` gate catches most of these, but it runs Sonnet-tier — your Full-mode pass is the Opus-tier backstop that catches what Sonnet missed.
 
 ## Review Tasks (Audit mode only)
 
 1. **AC matrix sanity check:** For each line in Build's AC Coverage Matrix, inspect the named test (or assertion) and confirm it actually exercises the claimed AC. Flag any mapping that is false or thin (e.g. test only checks the function exists, not the behavior).
 2. **Obvious over-reach:** Scan the diff for code unrelated to any AC in the matrix. Flag files or blocks that don't trace back to an AC.
+3. **Theater-pattern spot-check (top 5):** For each test cited in Build's AC Coverage Matrix, confirm it does NOT match patterns #1 (tautology), #3 (mock-echo assertion), #6 (truthy-only), #8 (no assertion at all), or #10 (implementation-coupled). See `reference/spec-flow-doctrine.md` "Theater Pattern Catalog" for definitions. If you spot any of these five, return FAIL with `Recommend: Full mode re-verify` — the full 11-pattern catalog is Full mode's job.
 
 Audit is intentionally quick — target ≤3 minutes of agent time. If either check turns up something non-trivial, return FAIL with `Recommend: Full mode re-verify` so the orchestrator escalates.
 

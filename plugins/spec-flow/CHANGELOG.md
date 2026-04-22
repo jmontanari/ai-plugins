@@ -2,6 +2,66 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.5.0] — 2026-04-22
+
+Adds an adversarial test-quality gate between Red and Build: the new `qa-tdd-red` agent rejects theater tests (tautological, mock-echoing, truthy-only, no-assertion, implementation-coupled, etc.) before Build writes production code fit to weak assertions. Completes the TDD discipline trilogy started in v2.3.0 (Red → zero-passing) and v2.4.0 (Build → every-Red-passes): Red now also has a semantic quality floor, not just structural invariants.
+
+### Added
+
+- **New agent: `agents/qa-tdd-red.md`** (Sonnet, read-only). Dispatched between `tdd-red` and `implementer` in every TDD-track phase. Input: Red's `## Tests Written` list, authored test source, phase's `[TDD-Red]` block, phase ACs, Red's oracle block. Applies the 11-pattern Theater Pattern Catalog + an AC-binding check ("if I implemented this AC incorrectly, would this test catch it?"). FAIL re-dispatches Red once with findings surfaced; two consecutive FAILs escalate — signals spec or plan defect.
+- **`reference/spec-flow-doctrine.md` — new "Theater Pattern Catalog" section.** Authoritative catalog of the 11 patterns `qa-tdd-red` enforces: (1) tautology, (2) self-referential, (3) mock-echo, (4) call-count only, (5) assert-the-assignment, (6) truthy-only, (7) exception swallowing, (8) no assertion at all, (9) name-vs-body mismatch, (10) implementation-coupled, (11) redundant cluster. Each pattern has a definition and a Python/pytest example. `qa-tdd-red` applies all 11 pre-Build; `verify` Full mode re-applies all 11 as Opus backstop; `verify` Audit mode spot-checks the top 5; `qa-phase` applies all 11 end-of-phase.
+- **`skills/execute/SKILL.md` — new Step 2.5 (QA-TDD-Red)** inserted between Red (Step 2) and Implement/Build (Step 3) for Mode: TDD phases. Dispatches the new agent; parses PASS/FAIL; orchestrates one Red retry with findings on FAIL; escalates on second consecutive FAIL.
+- **Plan template and plan skill updated** to emit a `[QA-Red]` checkbox between `[TDD-Red]` and `[Build]` in every TDD-track phase (flat and Phase Group sub-phases). Agent Context Summary table updated to include qa-tdd-red's inputs/exclusions.
+
+### Changed
+
+- **`agents/qa-plan.md` — criterion 3 (TDD structure)** now requires every TDD-track phase and every sub-phase with a `[TDD-Red]` block to include a `[QA-Red]` block immediately after. Missing `[QA-Red]` is a must-fix — plans without it would silently skip the theater gate at execute time.
+- **`agents/verify.md` — Full-mode Review Task #4 (Test quality)** now references the full 11-pattern Theater Pattern Catalog in doctrine as the authoritative checklist instead of the old one-line "behavior not implementation details" criterion. Audit-mode "skip test-quality review" carve-out replaced with a top-5-pattern spot-check — the cheapest possible backstop for slips the pre-Build `qa-tdd-red` gate may have let through.
+- **`agents/qa-phase.md` — criterion #6 (Test quality)** now references the full 11-pattern catalog as the Opus-tier adversarial backstop at phase end.
+- **`reference/spec-flow-doctrine.md` — new safeguards-table row ("Red tests pass theater review before Build")** documenting the layered enforcement: Sonnet `qa-tdd-red` pre-Build → Opus `verify` Full-mode backstop → Sonnet `verify` Audit-mode spot-check → Opus `qa-phase` final backstop.
+- **`docs/userguide/concepts/tdd-loop.md`** — "four agents" becomes "five agents" with `qa-tdd-red` added to the table; Step 1.5 (QA-Red) documented between Red and Build with the theater-catalog overview.
+- **`README.md`** — pipeline diagram updated (`tdd-red → qa-tdd-red → implementer → ...`); stages table updated for execute; TDD-track flow description updated.
+
+### Notes for upgraders
+
+- **No user-visible API change.** Skill commands and orchestrator entry points are unchanged. The new gate runs automatically inside `execute` for TDD-track phases; Implement-track phases are unaffected.
+- **New Sonnet dispatch per TDD phase.** Cost is small (scope is just the authored test files, typically <100 LOC), and it saves a full Build+Verify round-trip when theater is caught pre-Build instead of downstream.
+- **Plans written pre-2.5.0** will have TDD phases without `[QA-Red]` checkboxes. The orchestrator still runs the gate (the step is in the skill, not the plan), but `qa-plan` will flag the missing checkboxes as must-fix on any re-review. Regenerate plans through `/spec-flow:plan` to pick up the new template, or let `qa-plan` drive the correction.
+- **Caught defects shift left.** Under 2.4.0 and earlier, theater tests in Red could reach Build; the implementer would satisfy them with equally-theatrical production code; `verify` Full-mode would flag the test-quality issue but the Build commit was already landed. Under 2.5.0, the rejection lands at Red — cheaper to rewrite tests than tests + implementation.
+- **Completes the TDD trilogy.** v2.3.0 enforced "Red has 0 passing tests" (structural — do all authored tests fail?). v2.4.0 enforced "Build has every Red test in PASSED" (structural — does the production code turn them green without skipping?). v2.5.0 enforces "Red's tests are non-theatrical" (semantic — do the assertions actually bind to the ACs?). Together: Red tests must fail, for the right reason, bound to the right ACs, with real assertions, and Build must make all of them pass without hiding any.
+
+## [2.4.0] — 2026-04-22
+
+Tightens the Build-side TDD discipline symmetrically to v2.3.0's Red-side tightening: every Red test must actually pass in the Build run — not merely "full suite green." Closes three evasion modes that `full suite must be GREEN` alone did not catch: silent skip decorators on Red tests, empty parameterize / collection errors that drop Red tests from the run entirely, and Red test deletion caught only later at Verify's integrity diff.
+
+### Changed
+
+- **`agents/implementer.md` — new TDD-mode-only rule ("Every Red test must pass — zero skipped, zero missing").** Every test ID from the `## Oracle` block must appear in the PASSED set of the final oracle run. Zero may be SKIPPED. Zero may be missing from the run (collection errors, empty `@pytest.mark.parametrize`, `describe.skip`, `t.Skip()`, etc.). If a Red test cannot go green without skipping it, report BLOCKED — do not land a "green suite" that silently drops Red tests.
+- **`skills/execute/SKILL.md` — Step 3.5 validation expanded for Mode: TDD** from one invariant ("full suite green") to three: (a) full suite green, (b) every Red ID from `phase_N_oracle_block` is in the Build run's PASSED set, (c) zero Red IDs in SKIPPED. The orchestrator set-diffs the Red oracle block's FAILED list against the Build run's PASSED/SKIPPED sets. On violation of (b) or (c): one retry within the existing 2-attempt oracle budget with the offending IDs surfaced; escalate on second failure.
+- **`reference/spec-flow-doctrine.md` — new Agent-Specific Safeguards row ("Build run has every Red test in PASSED").** Companion to v2.3.0's Red-side row — together they enforce the round-trip invariant: Red declares a set of tests that must fail; Build must turn every one of them into a pass, not a skip or a silent drop.
+- **`docs/userguide/concepts/tdd-loop.md` — Step 2 Build section** rewritten to document all three invariants user-visibly instead of the previous "suite is fully green" one-liner.
+
+### Notes for upgraders
+
+- **No user-visible API change.** Skill commands and orchestrator entry points are unchanged. Well-behaved Build runs — which already had every Red test actually passing — are unaffected.
+- **Stricter rejection.** Phases where the implementer previously got a "green suite" by adding a skip decorator, by an implicit collection error, or by tests silently disappearing will now be rejected at Build time (previously caught only partially by Verify's downstream test-file integrity diff, or not at all when the cause wasn't a test-file edit). The orchestrator will retry once with the offending IDs surfaced, then escalate if unresolved.
+- **Symmetric with v2.3.0.** Red says "every test you authored must fail (0 passing, 0 missing from FAILED)." Build now says "every Red test must pass (0 skipped, 0 missing from PASSED)." The pair guarantees that what the Red agent declared as the phase's oracle of done is exactly what Build proved.
+
+## [2.3.0] — 2026-04-22
+
+Tightens the TDD-Red discipline: the Red phase must now produce **zero passing new tests**, not merely "at least one failing test." Closes a loophole where Red runs reporting `N failed, M passed` (with M > 0) were silently accepted by the orchestrator, allowing a phase's new test set to include already-green assertions that didn't exercise missing behavior.
+
+### Changed
+
+- **`agents/tdd-red.md` — new Rule 8 ("Zero passing tests among the ones you authored").** Every test ID listed in `## Tests Written` must appear in the `FAILED` (or `SKIPPED` with reason) list of the oracle block. The Output Format example summary now reads `"N failed, 0 passed, K skipped in T"` instead of the old `"N failed, M passed, K skipped in T"`, and a new paragraph below the identifier-format note spells out the invariant. A passing test in Red means either the feature already exists (wrong phase — escalate) or the assertion is tautological (rewrite).
+- **`skills/execute/SKILL.md` — Step 2.4 ("Validate") rewritten as a two-invariant gate.** The old loose instruction ("Confirm tests FAIL") is replaced with: (a) every `## Tests Written` ID must appear in the oracle block's FAILED/SKIPPED list, and (b) a re-run scoped to the `## Tests Written` paths must report `0 passed`. On violation: one scoped retry with the specific offense appended; escalate on second failure.
+- **`reference/spec-flow-doctrine.md` — new Agent-Specific Safeguards row ("Red commit has zero passing new tests").** Documents the orchestrator-side enforcement introduced in `execute/SKILL.md`.
+
+### Notes for upgraders
+
+- **No user-visible API change.** Skill commands and orchestrator entry points are unchanged. Well-behaved Red runs — which already reported `0 passed` — are unaffected.
+- **Stricter rejection.** Plans that historically passed Red validation by relying on the looser "at least one failing test" reading may now be rejected. The orchestrator will retry once with the passing test IDs surfaced, and escalate if the agent cannot produce a Red run with zero passing new tests. If the escalation reveals the feature already exists, the plan needs correction — the test belongs in Verify as a regression check, not in this phase's Red.
+
 ## [2.2.0] — 2026-04-22
 
 Completes the dual-host co-ship started in v2.1.0: every agent is now discoverable on both Claude Code and Copilot CLI, with no subdirectory carve-outs.

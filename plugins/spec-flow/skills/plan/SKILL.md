@@ -51,6 +51,7 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
    **TDD track** (default for behavior-bearing code):
    - **[TDD-Red]**: Exact test file paths, test names, assertions, patterns to follow
+   - **[QA-Red]**: Theater-pattern review of Red's authored tests before Build (rejects tautology, mock-echo, truthy-only, no-assertion, name/body mismatch, implementation coupling, etc.); verifies adversarial AC binding
    - **[Build]**: Exact source file paths, class/function signatures, implementation approach
    - **[Verify]**: Test command to run, expected output
    - **[Refactor]**: Scope constraints (phase files only)
@@ -99,6 +100,7 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    **Scope:** <file paths, comma-separated — must be disjoint from sibling sub-phases>
    **ACs:** <subset of group ACs>
    - [ ] [TDD-Red] ...
+   - [ ] [QA-Red] theater-pattern + AC-binding review of Red's tests
    - [ ] [Build] ...
    - [ ] [Verify] ...
    - [ ] [QA-lite] Sonnet narrow review, scope: this sub-phase only

@@ -73,6 +73,7 @@ Do NOT run `pre-commit run --files ...` inside your turn. The `git commit` itsel
 - Write the SIMPLEST code that turns the failing tests green. No optional params, alternative strategies, or future-proofing.
 - Do NOT modify test files. If a test looks wrong, report BLOCKED — do not "fix" it.
 - Your oracle output is the full test suite's pass/fail result.
+- **Every Red test must pass — zero skipped, zero missing.** The `## Oracle` block you received lists the test IDs the Red agent authored (the `FAILED` lines). Every one of those IDs must appear in the PASSED set of your final oracle run. Zero may be SKIPPED. Zero may be missing from the run (collection / import errors, empty `@pytest.mark.parametrize`, `describe.skip`, `t.Skip()`, etc. all count as missing). If you cannot turn a Red test green without skipping it or hiding it from the runner, report BLOCKED — do not land a "green suite" that silently drops Red tests. This mirrors the Red invariant (zero passing new tests) on the Build side: Red says "every authored test must fail"; Build says "every Red test must pass."
 
 ### Implement mode only
 
