@@ -19,10 +19,10 @@ Install succeeded via Copilot CLI's subdirectory syntax (`owner/repo:path/to/plu
 ### Skill invocation
 
 ```
-/status
+/spec-flow/status
 ```
 
-**Not** `/spec-flow:status` — Claude's plugin-prefixed sigil (`/<plugin>:<skill>`) does NOT port to Copilot CLI. Copilot accepts the bare skill name. This is consistent with the [Copilot Agent Skills doc](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) which describes skills as discovered and loaded automatically by relevance rather than explicitly invoked with a plugin sigil.
+Skill names are preserved on Copilot CLI — only the plugin-separator character differs between hosts. Claude Code uses `/<plugin>:<skill>` (colon), Copilot CLI uses `/<plugin>/<skill>` (slash). The smoketest transcript below used the bare form `/status` which Copilot also accepts for disambiguation, but the canonical plugin-prefixed form is `/spec-flow/status`. (An earlier draft of this note claimed Copilot CLI stripped the plugin prefix entirely; that was wrong — confirmed by the maintainer during post-merge verification that `/spec-flow/<skill>` is the correct form.)
 
 ### Transcript excerpt
 
@@ -71,7 +71,7 @@ Copilot CLI session output after install + `/status`:
 
 - **Branch pinning is not supported.** The plan's whole `master-copilot` mirror-branch premise assumed a `#branch` or `@branch` syntax that does not exist in Copilot CLI v1.0.34. Issue #1296 is an open feature request. This invalidates a core assumption of PI-007's design.
 - **Subdirectory install works directly.** `/plugin install jmontanari/ai-plugins:plugins/spec-flow` installs cleanly from master's plugin subdirectory without any mirror. This means the mirror branch is currently architecturally unnecessary for the Copilot install path.
-- **Plugin-prefixed invocation sigil does not port.** `/<plugin>:<skill>` is Claude-specific; Copilot uses bare skill names. The rewrite rule in the spec's Phase 5 encoding checklist (bullet 4: "Drop every `/<plugin>:<skill>` sigil … rewrite to a natural-language skill mention") is therefore relevant at a documentation-content level, but the SKILL.md file itself ports as-is because Copilot's skill-invocation uses the file's frontmatter `name` field.
+- **Plugin-prefixed invocation differs only in the separator character.** Claude Code uses `/<plugin>:<skill>` (colon); Copilot CLI uses `/<plugin>/<skill>` (slash). Skill names are preserved. The spec's Phase 5 encoding checklist (bullet 4: "Drop every `/<plugin>:<skill>` sigil … rewrite to a natural-language skill mention") is therefore relevant only for documentation where the literal Claude sigil appears — the SKILL.md file itself ports as-is. (Correction: an earlier draft of this note claimed Copilot strips the plugin prefix entirely — the maintainer's post-merge verification proved that was wrong.)
 - **CLAUDE.md at the plugin root was not required for skill discovery.** Copilot CLI discovered and invoked the `status` skill without any AGENTS.md or special naming at the plugin level. The `CLAUDE.md → AGENTS.md` rename the spec required may only matter for agent-level files; skill-level discovery is via `skills/<name>/SKILL.md` which is cross-tool.
 
 **Known limitations / future-work items:**
@@ -223,7 +223,7 @@ This is because `/plugin install owner/repo` looks for a single `plugin.json` at
 Follow-on test: Copilot CLI DOES support marketplaces via a two-step command flow:
 
 ```
-/plugin marketplace install jmontanari/ai-plugins
+/plugin marketplace add jmontanari/ai-plugins
 /plugin install spec-flow@shared-plugins
 ```
 
@@ -232,7 +232,7 @@ The `@shared-plugins` suffix is the `"name"` field from `.claude-plugin/marketpl
 **Two install paths now documented:**
 
 1. **Direct (1 step):** `/plugin install jmontanari/ai-plugins:plugins/spec-flow` — installs only spec-flow without registering the marketplace.
-2. **Marketplace (2 steps):** `/plugin marketplace install jmontanari/ai-plugins` then `/plugin install spec-flow@shared-plugins` — registers the shared-plugins marketplace and installs spec-flow from it. Future plugins added to the marketplace are then discoverable by name.
+2. **Marketplace (2 steps):** `/plugin marketplace add jmontanari/ai-plugins` then `/plugin install spec-flow@shared-plugins` — registers the shared-plugins marketplace and installs spec-flow from it. Future plugins added to the marketplace are then discoverable by name.
 
 ### Path-duplication bug in marketplace install — fixed
 

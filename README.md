@@ -36,22 +36,13 @@ Installs a single plugin without registering the marketplace. Best if you only n
 **Option 2 — marketplace install (2 steps):**
 
 ```text
-/plugin marketplace install jmontanari/ai-plugins
+/plugin marketplace add jmontanari/ai-plugins
 /plugin install spec-flow@shared-plugins
 ```
 
 Registers the `shared-plugins` marketplace and then installs a plugin from it. Recommended if you expect to install multiple plugins from this repo over time.
 
-**Skill invocation form differs from Claude Code.** Copilot CLI uses the bare skill name without the plugin-prefixed sigil:
-
-| Claude Code | Copilot CLI |
-|---|---|
-| `/spec-flow:status` | `/status` |
-| `/spec-flow:spec` | `/spec` |
-| `/spec-flow:plan` | `/plan` |
-| `/spec-flow:execute` | `/execute` |
-| `/spec-flow:charter` | `/charter` |
-| `/spec-flow:prd` | `/prd` |
+**Skill invocation differs only in the plugin-separator character** — skill names are preserved across hosts. Claude Code uses a colon (`/spec-flow:status`); Copilot CLI uses a slash (`/spec-flow/status`). Substitute the separator when porting commands between hosts.
 
 **Known limitations on Copilot CLI:**
 

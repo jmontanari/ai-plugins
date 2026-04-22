@@ -336,7 +336,7 @@ Installs spec-flow only, without registering the marketplace. Copilot CLI's `own
 **Option 2 — marketplace install (2 steps):**
 
 ```text
-/plugin marketplace install jmontanari/ai-plugins
+/plugin marketplace add jmontanari/ai-plugins
 /plugin install spec-flow@shared-plugins
 ```
 
@@ -348,20 +348,11 @@ Both paths confirmed with Copilot CLI v1.0.34. **Minimum version: v1.0.34** — 
 
 ```text
 /plugin marketplace remove jmontanari/ai-plugins
-/plugin marketplace install jmontanari/ai-plugins
+/plugin marketplace add jmontanari/ai-plugins
 /plugin install spec-flow@shared-plugins
 ```
 
-**Invocation form differs from Claude Code.** Copilot CLI does not use the `/<plugin>:<skill>` colon-delimited sigil — use the bare skill name:
-
-| Claude Code | Copilot CLI |
-|-------------|-------------|
-| `/spec-flow:status` | `/status` |
-| `/spec-flow:spec`   | `/spec`   |
-| `/spec-flow:plan`   | `/plan`   |
-| `/spec-flow:execute`| `/execute`|
-| `/spec-flow:charter`| `/charter`|
-| `/spec-flow:prd`    | `/prd`    |
+**Invocation form differs only in the plugin-separator character** — skill names are preserved across hosts. Claude Code uses a colon (`/spec-flow:status`); Copilot CLI uses a slash (`/spec-flow/status`). Substitute the separator when porting commands between hosts.
 
 **Dual-path details that make this work:**
 
