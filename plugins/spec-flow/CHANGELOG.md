@@ -14,7 +14,7 @@ Added GitHub Copilot CLI install compatibility via a **dual-path co-ship** patte
 
 ### Changed
 
-- The README's "Install on GitHub Copilot CLI" section now documents both install paths (direct and marketplace) and the invocation form difference between hosts — Claude Code uses `/<plugin>:<skill>` (colon separator), Copilot CLI uses `/<plugin>/<skill>` (slash separator). Skill names are preserved across hosts.
+- The README's "Install on GitHub Copilot CLI" section now documents both install paths (direct and marketplace) and includes a high-level skills table. Slash-command invocation (`/<plugin>:<skill>`) works identically on both hosts — no host-specific rewriting needed.
 - Root `.claude-plugin/marketplace.json` — removed `metadata.pluginRoot` field. It was causing Copilot CLI's marketplace install to concatenate `pluginRoot` + `source` and produce a duplicated `plugins/plugins/spec-flow` resolution path. `source` values are already resolved correctly relative to the marketplace.json directory, so both hosts work without the explicit root hint.
 
 ### Notes for upgraders

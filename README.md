@@ -19,8 +19,6 @@ Add the marketplace, then install the plugin you want:
 /plugin install spec-flow@shared-plugins
 ```
 
-Skills are then invocable with the plugin-prefixed sigil: `/spec-flow:status`, `/spec-flow:spec`, etc.
-
 ## Install on GitHub Copilot CLI
 
 Two paths are supported (Copilot CLI v1.0.34+). Pick whichever fits your workflow.
@@ -42,7 +40,18 @@ Installs a single plugin without registering the marketplace. Best if you only n
 
 Registers the `shared-plugins` marketplace and then installs a plugin from it. Recommended if you expect to install multiple plugins from this repo over time.
 
-**Skill invocation differs only in the plugin-separator character** — skill names are preserved across hosts. Claude Code uses a colon (`/spec-flow:status`); Copilot CLI uses a slash (`/spec-flow/status`). Substitute the separator when porting commands between hosts.
+## Skills
+
+Once spec-flow is installed, these skills are available on either host via the same slash-command form:
+
+| Command | Description |
+|---|---|
+| `/spec-flow:status` | Pipeline dashboard — shows which pieces are in which stage and what to work on next. Start here. |
+| `/spec-flow:charter` | Bootstrap, update, or retrofit the project charter (six binding constraint files). |
+| `/spec-flow:prd` | Import or normalize a PRD and decompose it into implementable pieces. |
+| `/spec-flow:spec` | Author a detailed specification for one piece from the manifest. |
+| `/spec-flow:plan` | Turn an approved spec into an exhaustive phase-by-phase implementation plan. |
+| `/spec-flow:execute` | Orchestrate implementation of an approved plan phase-by-phase via subagents. |
 
 **Known limitations on Copilot CLI:**
 

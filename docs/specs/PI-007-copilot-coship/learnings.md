@@ -19,10 +19,10 @@ Install succeeded via Copilot CLI's subdirectory syntax (`owner/repo:path/to/plu
 ### Skill invocation
 
 ```
-/spec-flow/status
+/spec-flow:status
 ```
 
-Skill names are preserved on Copilot CLI — only the plugin-separator character differs between hosts. Claude Code uses `/<plugin>:<skill>` (colon), Copilot CLI uses `/<plugin>/<skill>` (slash). The smoketest transcript below used the bare form `/status` which Copilot also accepts for disambiguation, but the canonical plugin-prefixed form is `/spec-flow/status`. (An earlier draft of this note claimed Copilot CLI stripped the plugin prefix entirely; that was wrong — confirmed by the maintainer during post-merge verification that `/spec-flow/<skill>` is the correct form.)
+The `/<plugin>:<skill>` slash-command form works identically on both Claude Code and Copilot CLI — skill names and the plugin prefix port across hosts with no rewriting. The smoketest transcript below used the bare form `/status` which Copilot also accepts for disambiguation, but the canonical plugin-prefixed form is `/spec-flow:status`. (An earlier draft of this note claimed Copilot CLI stripped the plugin prefix and required bare skill names; that was wrong — confirmed by the maintainer during post-merge verification that the same slash-command form works on both hosts.)
 
 ### Transcript excerpt
 
@@ -71,7 +71,7 @@ Copilot CLI session output after install + `/status`:
 
 - **Branch pinning is not supported.** The plan's whole `master-copilot` mirror-branch premise assumed a `#branch` or `@branch` syntax that does not exist in Copilot CLI v1.0.34. Issue #1296 is an open feature request. This invalidates a core assumption of PI-007's design.
 - **Subdirectory install works directly.** `/plugin install jmontanari/ai-plugins:plugins/spec-flow` installs cleanly from master's plugin subdirectory without any mirror. This means the mirror branch is currently architecturally unnecessary for the Copilot install path.
-- **Plugin-prefixed invocation differs only in the separator character.** Claude Code uses `/<plugin>:<skill>` (colon); Copilot CLI uses `/<plugin>/<skill>` (slash). Skill names are preserved. The spec's Phase 5 encoding checklist (bullet 4: "Drop every `/<plugin>:<skill>` sigil … rewrite to a natural-language skill mention") is therefore relevant only for documentation where the literal Claude sigil appears — the SKILL.md file itself ports as-is. (Correction: an earlier draft of this note claimed Copilot strips the plugin prefix entirely — the maintainer's post-merge verification proved that was wrong.)
+- **Plugin-prefixed invocation ports as-is.** `/<plugin>:<skill>` is the slash-command form on both Claude Code and Copilot CLI — no rewriting needed across hosts. The spec's Phase 5 encoding checklist bullet 4 ("Drop every `/<plugin>:<skill>` sigil … rewrite to a natural-language skill mention") was predicated on the assumption that the sigil was Claude-specific; it isn't, and that rewrite rule does not apply. The SKILL.md file ports as-is. (Correction: an earlier draft of this note claimed Copilot uses bare skill names without the prefix — the maintainer's post-merge verification proved that was wrong.)
 - **CLAUDE.md at the plugin root was not required for skill discovery.** Copilot CLI discovered and invoked the `status` skill without any AGENTS.md or special naming at the plugin level. The `CLAUDE.md → AGENTS.md` rename the spec required may only matter for agent-level files; skill-level discovery is via `skills/<name>/SKILL.md` which is cross-tool.
 
 **Known limitations / future-work items:**

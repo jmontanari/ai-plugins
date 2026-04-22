@@ -352,7 +352,16 @@ Both paths confirmed with Copilot CLI v1.0.34. **Minimum version: v1.0.34** — 
 /plugin install spec-flow@shared-plugins
 ```
 
-**Invocation form differs only in the plugin-separator character** — skill names are preserved across hosts. Claude Code uses a colon (`/spec-flow:status`); Copilot CLI uses a slash (`/spec-flow/status`). Substitute the separator when porting commands between hosts.
+Once installed, spec-flow exposes the same skills on either host:
+
+| Command | Description |
+|---|---|
+| `/spec-flow:status` | Pipeline dashboard — shows which pieces are in which stage and what to work on next. Start here. |
+| `/spec-flow:charter` | Bootstrap, update, or retrofit the project charter. |
+| `/spec-flow:prd` | Import or normalize a PRD and decompose it into pieces. |
+| `/spec-flow:spec` | Author a detailed specification for one piece. |
+| `/spec-flow:plan` | Generate an exhaustive phase-by-phase implementation plan from an approved spec. |
+| `/spec-flow:execute` | Orchestrate implementation phase-by-phase via subagents. |
 
 **Dual-path details that make this work:**
 
