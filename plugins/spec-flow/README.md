@@ -320,3 +320,56 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 **Why five parallel reviewers at merge time.** Each reviewer has a lens: blind (no context, just the diff), edge-case, spec-compliance, PRD-alignment, architecture. Running them in parallel with fresh context is cheap (one round-trip) and catches the things a single reviewer would rationalize away.
 
 **Why circuit breakers everywhere.** AI coding agents will cheerfully loop on the same failure forever. 2 build attempts, 3 QA cycles, 3 review cycles — then escalate. If the pipeline can't make progress, the human is the right solver, not another retry.
+
+## Install on GitHub Copilot CLI
+
+spec-flow installs on GitHub Copilot CLI directly from this multi-plugin marketplace. No mirror branch, no sync script — one source tree serves both hosts. Two install paths are supported; pick whichever fits your workflow.
+
+**Option 1 — direct subdirectory install (1 step):**
+
+```text
+/plugin install jmontanari/ai-plugins:plugins/spec-flow
+```
+
+Installs spec-flow only, without registering the marketplace. Copilot CLI's `owner/repo:path/to/plugin` syntax discovers `.claude-plugin/plugin.json` at `plugins/spec-flow/.claude-plugin/plugin.json` and loads from the repo's default branch.
+
+**Option 2 — marketplace install (2 steps):**
+
+```text
+/plugin marketplace install jmontanari/ai-plugins
+/plugin install spec-flow@shared-plugins
+```
+
+Registers the `shared-plugins` marketplace, then installs spec-flow from it. Future plugins added to this marketplace become discoverable by name afterward. Recommended if you expect to install multiple plugins from this repo over time.
+
+Both paths confirmed with Copilot CLI v1.0.34. **Minimum version: v1.0.34** — earlier Copilot CLI builds may not support the `/plugin` command family. Check with `copilot --version`.
+
+**Recovery for the "plugins/plugins/spec-flow" error.** spec-flow v2.1.0 ships a fix for a path-duplication bug in the marketplace manifest that affected early adopters who registered the marketplace before this release. If you hit `Plugin source directory not found: .../plugins/plugins/spec-flow` during `/plugin install spec-flow@shared-plugins`, refresh the stale marketplace cache before retrying:
+
+```text
+/plugin marketplace remove jmontanari/ai-plugins
+/plugin marketplace install jmontanari/ai-plugins
+/plugin install spec-flow@shared-plugins
+```
+
+**Invocation form differs from Claude Code.** Copilot CLI does not use the `/<plugin>:<skill>` colon-delimited sigil — use the bare skill name:
+
+| Claude Code | Copilot CLI |
+|-------------|-------------|
+| `/spec-flow:status` | `/status` |
+| `/spec-flow:spec`   | `/spec`   |
+| `/spec-flow:plan`   | `/plan`   |
+| `/spec-flow:execute`| `/execute`|
+| `/spec-flow:charter`| `/charter`|
+| `/spec-flow:prd`    | `/prd`    |
+
+**Dual-path details that make this work:**
+
+- `plugins/spec-flow/CLAUDE.md` is read by both hosts. Copilot CLI reads CLAUDE.md directly as plugin context; Claude Code treats it as the plugin-level overview. No `AGENTS.md` symlink needed.
+- `plugins/spec-flow/skills/<name>/SKILL.md` is the cross-tool Agent Skills open standard — identical file, both hosts.
+- `plugins/spec-flow/agents/<name>.md` are plain Markdown files with YAML frontmatter. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its [Custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) reference, so the same files Claude Code discovers are picked up by Copilot CLI — no symlinks or dual extensions needed. Nested subdirs (`agents/reflection/`, `agents/review-board/`) are not part of Copilot CLI's flat-glob agent discovery per its plugin docs, so those nested agents work only on Claude Code.
+
+**Known limitations on Copilot CLI:**
+
+- Nested subagents under `agents/reflection/` and `agents/review-board/` are not discovered by Copilot CLI (flat-glob only). Skills that dispatch those agents may fail when run on Copilot CLI. This is a Copilot CLI design constraint, not a spec-flow defect.
+- Copilot CLI does not support branch-pinning (`#branch` or `@branch`) in `/plugin install` as of v1.0.34 (tracked in `github/copilot-cli#1296`). Users always install from the repo's default branch.

@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Writes production code from failing tests (Mode: TDD) or from a plan's [Implement] block (Mode: Implement). Requires orchestrator-injected Mode flag, pre-flight snapshot, and oracle context.
+description: "Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Writes production code from failing tests (Mode: TDD) or from a plan's [Implement] block (Mode: Implement). Requires orchestrator-injected Mode flag, pre-flight snapshot, and oracle context."
 ---
 
 # Implementer Agent
