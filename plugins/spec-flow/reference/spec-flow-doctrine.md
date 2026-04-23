@@ -46,7 +46,7 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 | Build run has every Red test in PASSED | Orchestrator diffs the Red oracle block's FAILED IDs against the Build run's PASSED set; any Red ID that is SKIPPED, xfailed, or missing from the run (collection error, empty parameterize, deleted test) rejects the phase. Symmetric to the Red-side invariant above — catches silent skip decorators and test disappearance that "full suite green" alone permits |
 | Red tests pass theater review before Build | `qa-tdd-red` agent (Sonnet, read-only) dispatched between Red and Build scores every authored test against the 11-pattern Theater Pattern Catalog + AC-binding check. FAIL verdict re-dispatches Red once with findings surfaced; second consecutive fail escalates. Verify Full-mode runs the full catalog as Opus-tier backstop; Verify Audit-mode spot-checks the top 5 patterns. `qa-phase` runs the full catalog end-of-phase as final Opus backstop |
 | Minimal implementation only | Verify agent checks for over-engineering beyond test requirements |
-| No test modification to pass | Orchestrator diffs test files between Red and Verify — modified tests = rejection |
+| No test modification to pass | Orchestrator snapshots a path-keyed SHA-256 manifest of Red's staged tests at Step 2.6, then re-hashes each test file in the implementer's unified commit (and again after Refactor if it runs). Any hash drift = rejection. Replaces the pre-v2.7.0 `git diff $red_sha..HEAD -- tests/` check since Red no longer commits. |
 | Circuit breaker | 2 failed build attempts → escalate to human |
 | No mock abuse | Real object > fake > stub > mock. Agent must justify any mock in report |
 | Full error feedback | Failed test output passed verbatim to next agent — no summarizing |
@@ -55,24 +55,31 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 
 ## Commit Cadence
 
-**Default: one commit per agent-step.** Each TDD cycle (Red → Build → [Refactor]) produces 2–3 commits total — one per agent-step, not one per file.
+**Default: one commit per TDD cycle.** Each TDD cycle (Red → Build → green) lands as a SINGLE commit in git history — the implementer's unified commit containing Red's staged tests + Build's production code. An optional Refactor commit may follow on clean-up phases.
 
-| Agent-step | Commits produced | What's batched |
+| Agent-step | Commits produced | What's in the commit |
 |---|---|---|
-| Red | 1 | All authored tests for the phase |
-| Build | 1 | All production code that turns the Red tests green |
-| Refactor (if run) | 1 | All cleanups that preserve behavior |
+| Red | 0 (stages only) | Authored tests are `git add`-ed with literal paths; NOT committed. A `## Staged test manifest` with SHA-256 per path is emitted for the orchestrator to snapshot. |
+| Build (Mode: TDD) | 1 (unified) | Red's staged tests + Build's production code, committed together. File list must equal (Red manifest paths ∪ Build reported paths). |
+| Build (Mode: Implement) | 1 | Build's authored files only (no prior staging). |
+| Refactor (if run) | 1 | All cleanups that preserve behavior. |
 
-**Why not per-file.** Checkpointing per file was the historical default, rationalized by "faster error surfacing, bisect-within-phase, intermediate recovery." For AI-driven TDD these benefits are theoretical: the agent processes hook errors in the same turn regardless of when they surface, the orchestrator retries at phase scope not commit scope, and nobody navigates intra-phase git history. The cost of per-file commits is real — pre-commit hooks (~3–5s of lint/format/type-check) run N times per step, adding 10–25s of pure overhead per phase with no corresponding benefit.
+**Net per TDD phase:** 1 commit (happy path, no refactor), 2 commits (with refactor). Down from pre-v2.6.0's 3–5+ commits (per-file) and pre-v2.7.0's 2–3 (per-agent-step).
 
-**Opt-out (rare).** Individual agents MAY checkpoint at sub-step boundaries if:
+**Why unified, not separate Red and Build commits.** A TDD cycle represents one complete behavior addition. Splitting it into a "failing-tests" commit followed by a "production-code" commit split the narrative: each half of the cycle was individually incoherent (tests-without-code broke CI; code-without-tests preceded its own justification). Merging them into one commit makes each commit in git history represent one complete green behavior delta, and runs the pre-commit hook once per cycle instead of twice (~3–5s saved per phase; across 10 phases, 30–50s saved).
+
+**Why not per-file.** Checkpointing per file was the original default (pre-v2.6.0), rationalized by "faster error surfacing, bisect-within-phase, intermediate recovery." For AI-driven TDD these benefits are theoretical: the agent processes hook errors in the same turn regardless of when they surface, the orchestrator retries at phase scope not commit scope, and nobody navigates intra-phase git history. The cost of per-file commits was real — pre-commit hooks (~3–5s each) ran N times per step, adding 10–25s of pure overhead per phase with no corresponding benefit.
+
+**Integrity preserved via SHA-256.** The pre-v2.7.0 anti-cheat check was `git diff $red_sha..HEAD -- tests/` to detect test-file edits during Build. Under the unified-commit model there's no intermediate Red SHA — so the orchestrator snapshots a path-keyed SHA-256 manifest of Red's staged tests before dispatching the implementer, and re-hashes each test file in the unified commit against the manifest. Any drift = rejection + retry. Content-hash integrity is equivalent to diff-based detection in power and is cheaper to compute.
+
+**Opt-out (rare).** Agents MAY split into multiple commits at sub-step boundaries if:
 - Phase delta exceeds ~200 LOC
 - A hook failure on the batched diff would be hard to debug (e.g. a refactor touching 10 files where tracing which change broke the type-check would take longer than the hook-amortization savings)
 - The agent explicitly reasons about the tradeoff in its report
 
-Otherwise, the default is the single commit. Per-file commits are not the baseline.
+Otherwise, the default is the single unified commit. Per-file commits are not the baseline.
 
-**Contamination discipline preserved.** `Rule: literal file list on commit` (tdd-red agent) still applies: stage files by literal path, never by pattern. The cadence rule is about commit count per step, not about staging shortcuts.
+**Contamination discipline preserved.** `Rule: literal file list when staging` (tdd-red agent) and `ONE unified commit` (implementer agent Rule 8) both require literal-path discipline: stage and commit by exact path, never by pattern. The cadence rule is about commit count per cycle, not about staging shortcuts — `git add .`, `git add -A`, and `git commit -a` remain banned.
 
 ## Testing Strategy
 

@@ -11,8 +11,8 @@ You write code from an approved plan. The orchestrator tells you which MODE you'
 
 The orchestrator sets exactly one of:
 
-- `Mode: TDD` — a prior agent wrote failing tests for this phase. The prompt includes verbatim failing-test output. Your oracle of done is: those tests go GREEN without you modifying them. The principle that narrows your work is "simplest code that passes the failing tests."
-- `Mode: Implement` — no pre-written tests. Your oracle of done is the plan's `[Verify]` command (lint, type check, build, smoke run, integration test — whatever the plan specifies). The principle that narrows your work is "exactly what the plan specifies — no more."
+- `Mode: TDD` — a prior agent wrote failing tests for this phase and **staged them without committing**. Your working tree has Red's test files in the staging area when you start. The prompt includes verbatim failing-test output plus a `## Red staged test manifest` (paths + SHA-256 hashes). Your oracle of done is: those tests go GREEN without you modifying them. You create the unified commit containing BOTH Red's staged tests AND your production code. The principle that narrows your work is "simplest code that passes the failing tests."
+- `Mode: Implement` — no pre-written tests. Your oracle of done is the plan's `[Verify]` command (lint, type check, build, smoke run, integration test — whatever the plan specifies). You commit your own work normally (nothing staged beforehand). The principle that narrows your work is "exactly what the plan specifies — no more."
 
 If the `Mode:` line is missing or not one of the two values above: STOP and report BLOCKED. Do not guess which mode you are in.
 
@@ -25,7 +25,7 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 
 ### Additional context by mode
 
-- **TDD mode:** Verbatim failing-test output (your oracle)
+- **TDD mode:** Verbatim failing-test output (your oracle) + Red's `## Staged test manifest` (paths with SHA-256 hashes). The test files are already in `git add`'s staging area when you start.
 - **Implement mode:** The verification command the plan specifies and its expected output (your oracle)
 
 ## Rules (both modes)
@@ -48,7 +48,17 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 5. Do not modify files outside the phase scope listed in the plan.
 6. If the plan is ambiguous or contradicts the spec, STOP and report BLOCKED with the specific ambiguity. Do not guess.
 7. Run your mode's oracle command before reporting DONE and include its verbatim output.
-8. **ONE commit at the end of your Build/Implement step, when the oracle passes.** Default cadence is one commit per agent-step — not per file, not per sub-task from the plan's [Build]/[Implement] bullets. Hooks run once (lint/format/type-check, ~3–5s) instead of N times, saving ~3–5s × (N–1) per phase. The single commit must satisfy your mode's oracle: green tests for Mode: TDD, the [Verify] command for Mode: Implement. If a hook fails, address the issue and re-commit — do not bypass with `--no-verify`. Spec-flow projects are expected to keep test runs OUT of pre-commit hooks (tests run at pre-push or as the orchestrator's oracle gate, not per-commit). **Opt-out (rare):** for exceptionally large phases (>200 LOC delta OR where a hook failure on the batched diff would be hard to debug), you MAY checkpoint at public-surface boundaries — but the default is the single commit. Per-file commits are not the default; the theoretical benefits of checkpointing (faster error surfacing, bisect-within-phase, intermediate recovery) are weak for AI agents — hook errors are processed in the same turn regardless of when they surface, the orchestrator retries at phase scope not commit scope, and nobody bisects intra-phase SHAs.
+8. **ONE unified commit at the end, containing everything staged.**
+
+   **Mode: TDD.** Your working tree starts with Red's test files staged (but not committed). Write production code, stage it with `git add -- <literal paths>`, run the oracle (the staged tests must all pass — they're picked up by the runner from the working tree). When the oracle is green, commit ONCE. The commit's file list must equal (`Red's ## Staged test manifest` paths ∪ your `## Files Created/Modified` paths). Do NOT use `git commit -a` or `git add -A` — they'd sweep in concurrent agents' unstaged work. Do NOT commit before the oracle is green — the commit's tests must pass. The orchestrator runs two post-commit gates: (i) re-hashes each test file in HEAD against Red's stage manifest — any drift means you modified Red's tests to make them pass (rejected); (ii) reconciles the commit's file list against the expected union — any stray file (rejected).
+
+   **Mode: Implement.** No staged tests from a prior step. Write code per the plan, stage with `git add -- <literal paths>`, run the plan's `[Verify]` command, commit ONCE when it passes. Same literal-path staging discipline.
+
+   **Hook behavior.** The pre-commit hook runs once per phase on your commit (lint/format/type-check on the full phase diff). Failing hooks surface as commit errors — address the complaint and re-commit; do not bypass with `--no-verify`. Spec-flow projects keep test runs OUT of pre-commit hooks (tests run at pre-push or as the orchestrator's oracle gate, not per-commit), so the one commit's hook run is cheap.
+
+   **Opt-out (rare).** For exceptionally large phases (>200 LOC delta OR where a hook failure on the batched diff would be hard to debug), you MAY split into multiple commits at public-surface boundaries — but the default is the single unified commit. Each additional commit costs another hook run without earning meaningful benefit for AI-driven TDD (agents don't bisect intra-phase SHAs; the orchestrator retries at phase scope).
+
+   **What "Red test modification" means.** Any change to a file in Red's `## Staged test manifest` — including auto-formatting via an editor, accidental save, or attempting to "fix" a test that looks wrong. If a Red test really is wrong, STOP and report BLOCKED; do not edit it. The content-hash integrity check is strict and unforgiving by design.
 
 ## Rule: orchestrator pre-decisions are binding
 
@@ -71,9 +81,10 @@ Do NOT run `pre-commit run --files ...` inside your turn. The `git commit` itsel
 ### TDD mode only
 
 - Write the SIMPLEST code that turns the failing tests green. No optional params, alternative strategies, or future-proofing.
-- Do NOT modify test files. If a test looks wrong, report BLOCKED — do not "fix" it.
-- Your oracle output is the full test suite's pass/fail result.
+- Do NOT modify test files (the content-hash gate in Rule 8 rejects any change to a file in Red's `## Staged test manifest`). If a test looks wrong, report BLOCKED — do not "fix" it.
+- Your oracle output is the full test suite's pass/fail result, run against the working tree (Red's staged tests + your staged production code).
 - **Every Red test must pass — zero skipped, zero missing.** The `## Oracle` block you received lists the test IDs the Red agent authored (the `FAILED` lines). Every one of those IDs must appear in the PASSED set of your final oracle run. Zero may be SKIPPED. Zero may be missing from the run (collection / import errors, empty `@pytest.mark.parametrize`, `describe.skip`, `t.Skip()`, etc. all count as missing). If you cannot turn a Red test green without skipping it or hiding it from the runner, report BLOCKED — do not land a "green suite" that silently drops Red tests. This mirrors the Red invariant (zero passing new tests) on the Build side: Red says "every authored test must fail"; Build says "every Red test must pass."
+- **Your single unified commit must contain Red's staged tests AND your production code** (Rule 8). Red did not commit — its tests are in the staging area when you start. Add your production files via `git add -- <literal paths>`, verify the oracle is green, then run ONE `git commit` that captures everything staged. The orchestrator verifies the commit's file list equals (Red manifest paths ∪ your reported Build paths) and re-hashes Red's tests to catch any tampering.
 
 ### Implement mode only
 
@@ -88,6 +99,10 @@ Do NOT run `pre-commit run --files ...` inside your turn. The `git commit` itsel
 TDD | Implement
 
 ## Files Created/Modified
+(Mode: TDD — list ONLY the production/non-test files YOU created or modified. Red's staged
+tests are tracked separately via the orchestrator's stage manifest and MUST NOT appear
+here — they are in the unified commit but are not YOUR files.)
+(Mode: Implement — list all files you created or modified.)
 - <file_path>: <what was implemented>
 
 ## Verification

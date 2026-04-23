@@ -2,6 +2,61 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.7.0] — 2026-04-22
+
+Architectural shift: **one commit per TDD cycle**. Red no longer commits — it stages its tests via `git add` and emits a SHA-256 content-hash manifest. The implementer creates a SINGLE unified commit containing Red's staged tests + Build's production code, so each TDD cycle lands as one commit in git history (one behavior addition, one commit) instead of two (tests, then code). The pre-commit hook runs once per cycle instead of twice; the old `git diff $red_sha..HEAD -- tests/` anti-cheat check is replaced by path-keyed SHA-256 re-hashing.
+
+This is the third step of the commit-cadence optimization arc:
+- **v2.6.0** — per-agent-step default (Red, Build, Refactor = 3 commits per phase)
+- **v2.7.0** — per-cycle default (Build unified commit, Refactor = 1–2 commits per phase)
+
+### Changed
+
+- **`agents/tdd-red.md` — Red agent stages but does not commit.**
+  - Rule 6 replaced: "Stage your tests, do NOT commit." Red runs `git add -- <literal paths>` after writing tests; any subsequent `git commit` on Red's turn is a contract violation.
+  - Rule 9 added: emit `## Staged test manifest` listing every authored path with its SHA-256 content hash. The orchestrator snapshots this for the post-commit integrity check.
+  - "Rule: committing failing tests" replaced with "Rule: no commit, no hook concern" — Red no longer triggers pre-commit hooks, so the `--no-verify` test-running-hook carve-out is obsolete.
+  - "Rule: literal file list on commit" renamed to "Rule: literal file list when staging" with updated language.
+  - Output format adds `## Staged test manifest` section.
+  - Anti-patterns: "Commit your own changes" and "Omit the `## Staged test manifest`" added.
+
+- **`agents/implementer.md` — Mode: TDD creates the unified commit.**
+  - Rule 8 rewritten: ONE unified commit at the end containing Red's staged tests (already in staging area) + Build's production code. File list must equal (Red manifest paths ∪ Build reported paths). Content-hash integrity gate rejects any modification to Red's tests.
+  - Mode descriptions updated: `Mode: TDD` now notes that the working tree starts with Red's tests staged; the unified commit captures both sets.
+  - "TDD mode only" section updated: new bullet on the unified commit requirement; content-hash integrity cross-referenced.
+  - Output format: `## Files Created/Modified` (TDD mode) now explicitly lists ONLY production/non-test files the implementer authored — Red's tests are tracked separately via the stage manifest and must not appear in this section.
+
+- **`skills/execute/SKILL.md` — orchestrator workflow.**
+  - Step 2 (Red): renamed "TDD-Red — Write Failing Tests (Stage, Don't Commit)"; dispatch prompt notes Red does NOT commit; the old `--no-verify` test-hook carve-out is removed.
+  - Step 2.4 (Red validation): on-violation cleanup now uses `git restore --staged --worktree -- <failed paths>` to reset the staging area for the retry (no commit to revert).
+  - Step 2.6 (new): capture `phase_N_red_stage_manifest` verbatim from Red's output; re-hash every file to detect manifest-vs-actual drift at capture time; persist a copy to `/tmp/spec-flow/phase-N-red-manifest.json` for resume resilience.
+  - Step 3 (Implement): prompt template adds `## Red staged test manifest` (Mode: TDD) and `## Commit` instructions explaining the unified-commit requirement.
+  - Step 3.7 (new): post-commit integrity and reconciliation gates — (a) content-hash integrity check re-hashes each test file in HEAD against the stage manifest, any drift rejects; (b) unified commit reconciliation verifies the commit's file list equals (Red manifest ∪ Build reported files), strays or missings reject.
+  - Step 4.5 (test integrity): simplified — primary tampering check runs at Step 3.7a, so Step 4.5 only re-runs content-hash against HEAD if a Refactor commit intervenes.
+  - Step 6b (hook sanity): language updated — Red no longer commits, so hooks only run on the implementer's unified commit (where Red's tests ride along), Refactor, and fix-code commits.
+  - Step G4 (Phase Group sub-phase flow): notes shared-staging-area safety — scope disjointness (Step G2) + literal-path staging/commit discipline means parallel sub-phases don't cross-contaminate even though the git index is shared.
+  - Stale prose in "Per-Phase Loop" setup and "Session Resumability" that claimed "phases do not commit internally" was genuinely wrong pre-v2.7.0 (Red, Build, Refactor all committed); it's now corrected and accurate under the unified-commit model.
+
+- **`reference/spec-flow-doctrine.md` — Commit Cadence section rewritten.**
+  - Table now shows Red = 0 commits (stages only), Build (Mode: TDD) = 1 unified commit, Build (Mode: Implement) = 1, Refactor (if run) = 1. Net 1–2 commits per TDD phase vs. 2–3 in v2.6.0 vs. 3–5+ pre-v2.6.0.
+  - New "Why unified, not separate Red and Build commits" paragraph explains the narrative-coherence rationale — a TDD cycle is one complete behavior addition; splitting it into tests-then-code separated halves that were each individually incoherent.
+  - New "Integrity preserved via SHA-256" paragraph explains why the anti-cheat check moved from `git diff` to path-keyed content hash.
+  - Agent-Specific Safeguards row "No test modification to pass" updated from diff-based to hash-based enforcement.
+
+- **`docs/userguide/concepts/tdd-loop.md` — user-facing Step 1 and Step 2 rewritten** to describe stage-then-unified-commit flow; the "Test integrity — the anti-cheat" section explains the new SHA-256 mechanism with a historical note about the pre-v2.7.0 diff-based approach.
+
+- **`templates/plan.md` — Agent Context Summary table** updated with the new Red-stages-implementer-commits handoff, including what context each agent receives and produces.
+
+### Notes for upgraders
+
+- **No plan-file change required.** Plans authored for v2.6.0 (or earlier) work unchanged under v2.7.0 — the `[TDD-Red]` / `[QA-Red]` / `[Build]` / `[Verify]` / `[Refactor]` / `[QA]` checkbox structure is preserved. The commit model is an agent-behavior and orchestrator-gate change, not a plan-schema change.
+- **Git history looks different.** Pre-v2.7.0, a TDD phase produced a Red commit (`tests for X`) followed by a Build commit (`implement X`). Post-v2.7.0, the same phase produces one commit (`phase N: X` containing both). `git log` becomes terser; each commit represents one complete working behavior. Bisect across the piece stays functional; intra-phase bisect (which was theoretical anyway for AI-driven TDD) is no longer available.
+- **Anti-cheat strictness is unchanged.** The pre-v2.7.0 `git diff $red_sha..HEAD -- tests/` would flag any test-file edit. The v2.7.0 SHA-256 re-hash flags exactly the same set of violations (any content change to any path in the Red manifest). Detection power is equivalent; only the mechanism changed. Auto-format changes, whitespace fixes, and comment tweaks all trip both.
+- **Red retry discipline.** When qa-tdd-red or Red validation rejects, the orchestrator now runs `git restore --staged --worktree -- <paths>` to unstage and revert before re-dispatching Red. Under pre-v2.7.0 the rejected Red commit had to be reset (`git reset HEAD~1`) or amended; the staging-area model is cleaner.
+- **Resume behavior.** If a session is interrupted between Red's stage and Build's commit, resume detects Red's staged manifest via the `/tmp/spec-flow/phase-N-red-manifest.json` sidecar and the actual staged files in the index. If either is missing or drifted, the orchestrator escalates — it does not attempt automatic recovery because lost Red work must be re-authored, not guessed.
+- **Parallel sub-phases (Phase Groups) share the staging area.** This is safe because (a) scope disjointness is validated at Step G2 and (b) each sub-phase stages and commits by literal path. Documented in Step G4.
+- **The `--no-verify` carve-out is gone.** Pre-v2.7.0, projects with test-running pre-commit hooks had to let Red use `--no-verify` (since Red's tests were expected to fail and would block the commit). Under v2.7.0 there's no Red commit; by the time the unified commit runs, tests pass, so a test-running hook approves it normally. Projects that added custom handling for the Red `--no-verify` case can remove it.
+
 ## [2.6.0] — 2026-04-22
 
 Optimizes commit cadence: each TDD cycle now produces 2–3 commits total (one per agent-step: Red, Build, optional Refactor) instead of one per file. Pre-commit hooks (lint / format / type-check) run 2–3× per phase instead of N×, saving ~10–25s of pure hook overhead per phase with no loss of orchestrator guarantees.

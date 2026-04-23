@@ -19,9 +19,9 @@ By writing exactly one failing test, then exactly the code to pass it, and repea
 
 | Agent | Role |
 |---|---|
-| **tdd-red** | Writes a single failing test (or a small set of tests for one behavior). The failure output is captured verbatim by the orchestrator as the oracle. |
+| **tdd-red** | Writes a single failing test (or a small set of tests for one behavior), **stages them via `git add` but does NOT commit** (v2.7.0+). The failure output is captured verbatim by the orchestrator as the oracle, and the orchestrator snapshots a SHA-256 manifest of each staged file for the anti-tampering check later. |
 | **qa-tdd-red** | Reviews Red's authored tests against the 11-pattern theater catalog (tautology, mock-echo, truthy-only, no-assertion, name/body mismatch, implementation coupling, etc.) + an AC-binding check. Runs between Red and Build. Rejects theater tests before Build writes production code fit to weak assertions. |
-| **implementer** | Given the failing test output, writes the simplest code that turns it green. Cannot modify test files. |
+| **implementer** | Given the failing test output, writes the simplest code that turns it green. Cannot modify test files (enforced by SHA-256 content-hash integrity check). In Mode: TDD, creates the SINGLE unified commit containing Red's staged tests + its own production code (v2.7.0+). |
 | **verify** | Independently confirms the test actually passes and that the test integrity wasn't violated (no test edits during Build). Full mode re-runs the full theater catalog as Opus-tier backstop; Audit mode spot-checks the top 5 patterns. |
 | **refactor** | Cleans up phase-scoped files while keeping tests green. Cannot add new functionality. |
 
@@ -31,9 +31,10 @@ The execute orchestrator dispatches them in sequence, runs validation between st
 
 For a TDD-track phase (behavior-bearing code):
 
-### Step 1 — Red
-- **tdd-red** writes failing tests for this phase.
-- Orchestrator runs the test suite.
+### Step 1 — Red (stage, don't commit)
+- **tdd-red** writes failing tests for this phase and `git add`s them by literal path. Does NOT commit.
+- Orchestrator runs the test suite against the staged tests (no commit needed — the runner reads from the working tree).
+- Orchestrator captures a `## Staged test manifest` (path → SHA-256) for the anti-tampering check later.
 - **Validation (two invariants, both required):**
   - **Zero passing new tests** — a re-run scoped to the authored test paths must report `0 passed`. A passing new test means the feature already exists (wrong phase) or the assertion is tautological.
   - **Right failure reason** — each failing test fails because the feature is missing, not from a typo / import / fixture error.
@@ -45,15 +46,17 @@ For a TDD-track phase (behavior-bearing code):
 - **Validation:** PASS advances to Build; FAIL re-dispatches `tdd-red` once with findings surfaced. Two consecutive FAIL verdicts escalate — the phase's ACs are likely too vague (spec defect) or the plan's `[TDD-Red]` block directs Red toward un-testable surface (plan defect).
 - Runs Sonnet-tier; scope is narrow (just the authored test files).
 
-### Step 2 — Build
-- **implementer** receives `Mode: TDD`, the failing-test output, the plan's `[Build]` block, and pre-flight snapshots (LOC, existing patterns, symbol presence, pre-commit hook inventory).
-- Implementer writes the simplest code that turns the failing tests green.
+### Step 2 — Build (unified commit)
+- **implementer** receives `Mode: TDD`, the failing-test output, Red's `## Staged test manifest`, the plan's `[Build]` block, and pre-flight snapshots (LOC, existing patterns, symbol presence, pre-commit hook inventory). Red's test files are in the staging area when implementer starts.
+- Implementer writes the simplest code that turns the failing tests green, `git add`s its production files by literal path, then creates ONE unified commit containing Red's staged tests + its own code.
 - Orchestrator runs the full test suite.
 - **Validation (three invariants, all required):**
   - **Full suite green** — zero failures across the project.
   - **Every Red ID is in PASSED** — the orchestrator set-diffs the Red oracle block's FAILED IDs against the Build run's PASSED set; any Red test missing from PASSED rejects the phase.
   - **Zero Red IDs in SKIPPED** — catches silent `@skip` / `.skip()` / `t.Skip()` / xfail decorators added during Build, plus collection errors and empty parameterize lists that would otherwise let a Red test quietly disappear.
-- A downstream integrity check at Verify (`git diff tests/`) also rejects any test-file modification since Red.
+- **Post-commit integrity and reconciliation gates** (v2.7.0+):
+  - **Content-hash integrity** — orchestrator re-hashes each test file in HEAD against Red's stage manifest. Any drift = rejection (implementer modified Red's tests).
+  - **Unified commit reconciliation** — commit's file list must equal (Red manifest paths ∪ implementer's reported Build paths). Strays or missings = rejection.
 
 ### Step 3 — Verify
 - **verify** re-runs the oracle, checks AC coverage, scans for over-engineering.
@@ -85,13 +88,16 @@ The plan author picks the track per phase. Behavior-bearing code → TDD. Config
 
 ## Test integrity — the anti-cheat
 
-The most common failure mode in AI-driven TDD is the agent silently editing tests to make them pass. spec-flow guards against this:
+The most common failure mode in AI-driven TDD is the agent silently editing tests to make them pass. spec-flow guards against this with a SHA-256 content-hash check (v2.7.0+):
 
-- `tdd-red` writes tests, then the orchestrator captures the failing output verbatim.
-- After Build, the orchestrator runs `git diff $phase_start_sha..HEAD -- tests/` and rejects the phase if any test file changed.
+- `tdd-red` writes tests and `git add`s them (no commit). The orchestrator captures both the failing test output verbatim AND a `## Staged test manifest` listing every path with its SHA-256 content hash.
+- After the implementer's unified commit lands, the orchestrator re-hashes each test file in HEAD against the stage manifest. Any drift = rejection (agent cheating detected).
+- If Refactor runs, the same re-hash check runs again against HEAD after Refactor's commit.
 - `implementer` has an explicit rule: *"Do NOT modify test files. If a test looks wrong, report BLOCKED — do not 'fix' it."*
 
-If the implementer really does find a broken test, it escalates to you rather than touching the test file.
+If the implementer really does find a broken test, it escalates to you rather than touching the test file. The integrity check is strict and unforgiving by design — even an auto-format or whitespace change trips it.
+
+Pre-v2.7.0, integrity was checked via `git diff $red_sha..HEAD -- tests/`. Under the unified-commit model there's no intermediate Red SHA (Red no longer commits), so the check moved to path-keyed SHA-256. Same detection power, different mechanism.
 
 ## AC Coverage Matrix — the gate between phases
 

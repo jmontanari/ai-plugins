@@ -133,9 +133,9 @@ A phase must have exactly one of these markers. The executor branches mechanical
 ## Agent Context Summary
 | Task Type | Receives | Does NOT receive |
 |-----------|----------|-----------------|
-| TDD-Red | Phase requirements, test patterns, spec ACs | Implementation code, prior conversation |
-| QA-TDD-Red | Red's `## Tests Written` list, authored test source, phase's [TDD-Red] block, phase ACs, Red's oracle block | Production source, prior phases' tests, brainstorming history |
-| Implementer (Mode: TDD) | `Mode: TDD` flag, failing tests (verbatim), plan details, arch constraints, pattern pointers | Spec rationale, brainstorming history |
+| TDD-Red | Phase requirements, test patterns, spec ACs | Implementation code, prior conversation. **Stages** tests (does NOT commit — v2.7.0+); the implementer's unified commit captures Red's staged tests + Build's production code together. |
+| QA-TDD-Red | Red's `## Tests Written` list, authored test source (read from staging area / working tree), phase's [TDD-Red] block, phase ACs, Red's oracle block | Production source, prior phases' tests, brainstorming history |
+| Implementer (Mode: TDD) | `Mode: TDD` flag, failing tests (verbatim), Red's `## Staged test manifest` (paths + SHA-256), plan details, arch constraints, pattern pointers. Working tree starts with Red's tests already staged. | Spec rationale, brainstorming history. **Creates ONE unified commit** containing Red's staged tests + Build's production code; orchestrator verifies integrity via SHA-256 re-hash and file-list reconciliation post-commit. |
 | Implementer (Mode: Implement) | `Mode: Implement` flag, plan [Implement] tasks, spec ACs, plan's [Verify] command, arch constraints, pattern pointers | Spec rationale, brainstorming history |
 | Verify | Verification output (tests or plan-specified command), spec ACs | Implementation reasoning |
 | QA-lite (sub-phase) | `Mode:` flag, sub-phase diff, sub-phase ACs, AC matrix (from Build), sub-phase scope block | Full piece spec, PRD sections, other sub-phases' diffs |

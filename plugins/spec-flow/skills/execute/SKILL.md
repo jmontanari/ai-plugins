@@ -78,7 +78,7 @@ Record the current HEAD into orchestrator state as `phase_N_start_sha`. No tag, 
 git rev-parse HEAD
 ```
 
-On resume mid-phase (phase not yet marked complete in plan.md), recover the SHA the same way: `git rev-parse HEAD`. Phase steps do not commit, so HEAD stays anchored at phase start until Step 7 runs.
+On resume mid-phase (phase not yet marked complete in plan.md), recover the SHA the same way: `git rev-parse HEAD`. Under the v2.7.0 unified-commit model, the phase produces at most two work-commits before Step 7 — the implementer's unified commit (Red's staged tests + Build's production code) and the optional Refactor commit. If the phase is resumed AFTER the implementer's commit lands, `git rev-parse HEAD` will return that commit, not the pre-Red SHA — and that's fine, because the post-commit integrity and reconciliation gates have already run. The `phase_N_start_sha` used for diff-baseline calculations (Verify inputs, QA surface map, Step 6b hook sweep) is always computed from the resume-time HEAD minus the commits produced by this phase's already-completed steps, inferred from plan.md's checked boxes.
 
 ### Step 1a: Detect Phase Mode
 
@@ -110,12 +110,12 @@ Compose two attachments for later steps:
 
 If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents commit normally without any hooks running.
 
-### Step 2: TDD-Red — Write Failing Tests
+### Step 2: TDD-Red — Write Failing Tests (Stage, Don't Commit)
 
-*(Mode: TDD only)*
+*(Mode: TDD only. As of v2.7.0, Red stages its tests via `git add` but does NOT commit. The implementer in Step 3 creates the unified commit containing Red's staged tests + Build's production code. This makes each TDD cycle land as one commit in git history.)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/tdd-red.md`
-2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. Red commits normally — the commit triggers hooks like any other. The one exception: when the pre-flight hook inventory flagged a test-running hook, Red's template is authorized to use `--no-verify` for its own commit (Red's tests are expected to fail; a test-running pre-commit hook would block it).
+2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. Red does NOT commit — the pre-commit hook does not run during its turn. The `--no-verify` test-running-hook carve-out from pre-v2.7.0 is obsolete (there's no Red commit for the hook to block).
 3. Dispatch:
    ```
    Agent({
@@ -126,17 +126,27 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    ```
 4. **Validate against two invariants.** Both must hold or the Red phase is rejected:
    - **(a) All new tests are in the FAILED list.** Every test ID the agent listed in `## Tests Written` must appear in its `## Oracle block` FAILED list (or SKIPPED with an explicit reason). Diff the two sets; any `## Tests Written` entry missing from FAILED/SKIPPED is a violation.
-   - **(b) Zero passing new tests.** Re-run the test suite scoped to the paths in `## Tests Written` (e.g. `pytest <paths>`, `vitest run <paths>`, `go test <pkgs>`, whatever the project's runner supports). The summary must report `0 passed`. If the runner cannot be scoped, parse the full run's per-test results and confirm none of the `## Tests Written` IDs are in the passed set.
+   - **(b) Zero passing new tests.** Re-run the test suite scoped to the paths in `## Tests Written` (e.g. `pytest <paths>`, `vitest run <paths>`, `go test <pkgs>`, whatever the project's runner supports). The re-run reads from the working tree + staging area, no commit required. The summary must report `0 passed`. If the runner cannot be scoped, parse the full run's per-test results and confirm none of the `## Tests Written` IDs are in the passed set.
    - **Failure-reason sanity:** for each FAILED test, check the message indicates a missing feature (good), not a typo / import error / fixture error (bad).
-   - **On any violation:** the agent wrote a Red phase that breaks discipline. Retry once with the specific offense appended (passing test IDs, setup-error output, or missing FAILED entries). A passing new test in Red means either the feature already exists (wrong phase — escalate, the plan needs correction) or the assertion is tautological (rewrite). If the second attempt still violates either invariant: escalate to human.
+   - **On any violation:** the agent wrote a Red phase that breaks discipline. Before retry, clean up the staging area from the failed attempt:
+     ```bash
+     git restore --staged --worktree -- <paths from failed Red's ## Tests Written>
+     ```
+     This unstages the rejected tests and reverts working-tree changes, giving the retry a clean slate. Retry once with the specific offense appended (passing test IDs, setup-error output, or missing FAILED entries). A passing new test in Red means either the feature already exists (wrong phase — escalate, the plan needs correction) or the assertion is tautological (rewrite). If the second attempt still violates either invariant: escalate to human.
 5. **Capture the Oracle block:** extract the Red agent's `## Oracle block` section verbatim. Hold in orchestrator state as `phase_N_oracle_block` — Step 3 splices it into the implementer prompt without paraphrase.
-6. **Post-commit contamination check.** After the Red commit lands, reconcile the committed file list against the agent's `## Tests Written` paths:
+6. **Capture the stage manifest.** Extract Red's `## Staged test manifest` section verbatim. Hold in orchestrator state as `phase_N_red_stage_manifest` — a dict of `path → sha256`. This replaces the old post-commit contamination check: the orchestrator uses it after the implementer's unified commit to (a) re-hash each test file in HEAD and detect tampering, and (b) reconcile the commit's file list against the expected union of Red's staged paths + Build's reported paths.
+
+   **Defensive re-hash at capture time.** Before trusting Red's self-reported manifest, re-hash each listed file in the working tree (where the staged content lives) and compare:
    ```bash
-   git show --name-only --pretty= HEAD | sort > /tmp/red_committed.txt
-   # Extract paths from the agent's ## Tests Written section into /tmp/red_reported.txt (sorted).
-   diff /tmp/red_committed.txt /tmp/red_reported.txt
+   for path in <paths from manifest>; do
+     actual=$(sha256sum "$path" | cut -d' ' -f1)
+     reported=<hash from Red's manifest for this path>
+     [ "$actual" = "$reported" ] || echo "manifest mismatch: $path"
+   done
    ```
-   If the two lists diverge, the commit is contaminated — most often because a concurrent agent's uncommitted work in the same worktree was swept in. Pause and ask the human whether to split the commit. Do NOT auto-reset.
+   If any path's self-reported hash does not match the file content, reject Red's output — the manifest is either stale or wrong. Retry once with the mismatch reported. Also sanity-check that every `## Tests Written` path appears in the manifest (and vice versa); a divergence here means Red's output is internally inconsistent and the orchestrator should reject before proceeding.
+
+   Also persist the stage manifest to a temp file (e.g. `/tmp/spec-flow/phase-N-red-manifest.json`) so that if the worktree is clobbered externally before Step 3 completes, the orchestrator can detect it on resume and escalate with a clear signal.
 
 ### Step 2.5: QA-TDD-Red — Reject Theater Tests
 
@@ -189,8 +199,17 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    - Mode: Implement — include the plan's `[Verify]` command and
      expected output.
 
+   ## Red staged test manifest (Mode: TDD only)
+   <splice `phase_N_red_stage_manifest` from Step 2.6 verbatim — paths
+   with SHA-256 hashes. The implementer must NOT modify these files;
+   the orchestrator's post-commit gate re-hashes them against this manifest.>
+
    ## Commit
-   <concise message referencing phase N and mode>
+   The implementer creates ONE unified commit containing:
+   - Mode: TDD — Red's staged tests (already in the staging area when you
+     start) + your production code (stage with `git add -- <literal paths>`).
+   - Mode: Implement — only your authored files (no prior staging).
+   Message references phase N and mode.
    ```
 
 3. For tasks marked [P] (parallel): dispatch multiple Agent calls concurrently, each with the same mode flag.
@@ -203,7 +222,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      model: "sonnet"
    })
    ```
-5. **Validate:** Run the mode's oracle.
+5. **Validate oracle:** Run the mode's oracle.
    - Mode: TDD — three invariants, all required:
      - **(a) Full suite green** — `0 failed` across the whole test suite.
      - **(b) Every Red ID is in PASSED** — parse the current run's PASSED set and diff against the FAILED IDs captured in `phase_N_oracle_block` from Step 2.5. Every Red test ID must appear in the PASSED set. Missing IDs (collection errors, empty parameterize, deleted tests) are a rejection signal.
@@ -211,7 +230,27 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      - On violation of (b) or (c): retry within the 2-attempt budget with the specific offending IDs surfaced to the agent (e.g. "tests X, Y were SKIPPED in your run; you cannot pass Red tests by skipping them"). Escalate on second failure — a Red test that cannot go green without skipping means the plan or the Red tests themselves are wrong.
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
 6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
-7. **AC Coverage Matrix validation gate.** After the oracle passes, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment.
+7. **Post-commit integrity and reconciliation gates (Mode: TDD only).** After the implementer's unified commit lands (HEAD now points to it), run two cheap checks before accepting the phase:
+
+   - **(a) Content-hash integrity.** For every path in `phase_N_red_stage_manifest`, re-hash the file AS COMMITTED in HEAD and compare against the manifest:
+     ```bash
+     for path in <manifest paths>; do
+       commit_hash=$(git show HEAD:"$path" | sha256sum | cut -d' ' -f1)
+       manifest_hash=<manifest hash for path>
+       [ "$commit_hash" = "$manifest_hash" ] || echo "integrity fail: $path"
+     done
+     ```
+     Any mismatch means the implementer modified one of Red's tests — the anti-cheat safeguard replacing pre-v2.7.0's `git diff tests/` check. Reject the phase and retry within the 2-attempt budget (the retry must recreate the commit without touching Red's tests). Escalate on second failure.
+
+   - **(b) Unified commit reconciliation.** The commit's file list must equal the union of Red's manifest paths and Build's `## Files Created/Modified` paths:
+     ```bash
+     git show --name-only --pretty= HEAD | sort > /tmp/commit_files.txt
+     # Compose expected = sort(manifest paths ∪ Build's reported paths) > /tmp/expected_files.txt
+     diff /tmp/commit_files.txt /tmp/expected_files.txt
+     ```
+     Any stray file (in commit but not in expected) or missing file (in expected but not in commit) rejects the phase. Strays typically mean a concurrent agent's uncommitted changes were swept in via `git commit -a` or `git add -A`; missings typically mean the implementer forgot to stage one of its own files. Retry within the 2-attempt budget.
+
+8. **AC Coverage Matrix validation gate.** After the oracle passes and post-commit gates are clean, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment.
 
 ### Step 4: Verify — Confirm Correctness
 
@@ -235,11 +274,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      model: "sonnet"
    })
    ```
-5. **Validate test integrity (Mode: TDD only):** Diff test files between the phase-start SHA and now:
-   ```bash
-   git diff $phase_N_start_sha..HEAD -- tests/
-   ```
-   (Substitute the SHA captured in Step 1.) If test files were modified since the Red step (and not by the Red agent): REJECT. Agent cheating detected. This check applies under both Audit and Full — it's a cheap orchestrator-side diff, unrelated to the Verify agent.
+5. **Test integrity (Mode: TDD only).** As of v2.7.0, the primary anti-tampering safeguard runs at Step 3.7a (content-hash check of Red's staged test manifest against Red's test files in HEAD). By the time Step 4 runs, that gate has already passed — so no additional diff is needed here. If the phase produces a Refactor commit in Step 5, re-run the content-hash check against HEAD after Refactor lands (Refactor is phase-scoped and must not touch test files the Red agent authored; re-hashing catches drift). If any hash drifts at Refactor time: REJECT, revert the refactor commit, and flag the Refactor agent for re-dispatch with the offending paths surfaced.
 6. Parse verify report.
    - **Audit Mode returned PASS** — proceed to Refactor (Step 5).
    - **Audit Mode returned FAIL** with `Recommend: Full mode re-verify` — re-dispatch as Mode: Full, treat that result as authoritative.
@@ -343,7 +378,7 @@ If skipped, proceed directly to Step 6. Otherwise:
 
 ### Step 6b: Phase Hook Sanity Check
 
-Every intermediate commit in the phase already ran hooks (Red, Build, Refactor, and fix-code commits all trigger pre-commit normally), so the cumulative phase diff has been lint/format/type-check-clean at each step. This step is a single defensive sweep against any autofix residue or staging-area drift that might have slipped through.
+Every intermediate commit in the phase already ran hooks (the implementer's unified commit, Refactor, and fix-code commits all trigger pre-commit normally — Red does not commit and therefore does not trigger hooks, but its tests ride along in the implementer's commit where the hook DOES run over the unified diff), so the cumulative phase diff has been lint/format/type-check-clean at each commit. This step is a single defensive sweep against any autofix residue or staging-area drift that might have slipped through.
 
 1. Run pre-commit over the phase's changed files:
    ```bash
@@ -395,11 +430,13 @@ Dispatch mechanism: issue all sub-phase Red agent dispatches in the same orchest
 Rate limiting: dispatch all `[P]` sub-phases in parallel by default. If you hit inference-provider rate limits on large groups (observed when 8+ sub-phases fire concurrently against Opus/Sonnet tiers simultaneously), fall back to serial execution for that group and log the cause. No config knob is exposed today — rate-limit handling is the orchestrator's responsibility, not the plan author's.
 
 Per-sub-phase internal flow — each sub-phase runs the same checks as the Per-Phase Loop:
-- Red step (Step 2)
-- Build step (Step 3) with Step 3 item 7 AC matrix validation gate
+- Red step (Step 2) — stages tests (sub-phase-scoped), emits its own `phase_N_red_stage_manifest` keyed by sub-phase id
+- Build step (Step 3) with Step 3 item 7 AC matrix validation gate + item 8 post-commit integrity + reconciliation gates
 - Verify step (Step 4) with Audit/Full mode selection
 - QA-lite step — dispatch `qa-phase-lite.md`, Sonnet. Same iter-1/iter-2 loop as the current full QA, with Step 6's `qa_iter2` skip predicate still applying (small self-verified fix-diffs skip the iter-2 re-dispatch).
 - Sub-phase Progress is implicit (no separate progress commit per sub-phase — the group progress commit covers all)
+
+**Shared staging area safety (v2.7.0).** Parallel sub-phases share the same git index, but scope disjointness is enforced at Step G2 (pairwise literal-path check) and literal-path staging discipline in Rule 6 (tdd-red) + Rule 8 (implementer) means each sub-phase's `git add` + `git commit` references only its own paths. A sibling sub-phase's staged-but-uncommitted tests remain in the index but are NOT swept into another sub-phase's unified commit because the implementer commits by literal path. The orchestrator's Step 3.7b reconciliation (commit file list = sub-phase's Red manifest ∪ sub-phase's Build reported files) catches any cross-contamination.
 
 ### Step G5: Barrier — wait for all sub-phases
 
@@ -663,7 +700,7 @@ Update `docs/manifest.yaml` on main: piece status → `done`, update coverage se
 - Implementer can't pass its oracle (green tests in Mode: TDD, plan `[Verify]` command in Mode: Implement) after 2 attempts → escalate
 - Missing or invalid `Mode:` flag in the implementer's prompt → the orchestrator must not dispatch; fix the composition
 - Phase has both `[TDD-Red]` and `[Implement]` markers, or neither → escalate (malformed plan)
-- Test files modified during Implement (Mode: TDD) or Refactor (detected via `git diff $phase_N_start_sha..HEAD -- tests/`) → reject and escalate
+- Test files modified during Implement (Mode: TDD) or Refactor (detected via the Step 3.7a content-hash integrity check against `phase_N_red_stage_manifest`, re-run after Refactor) → reject and escalate
 - Parallel agents modify shared file → reject, re-dispatch sequentially
 - Merge conflicts → escalate
 
