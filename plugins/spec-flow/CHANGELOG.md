@@ -2,6 +2,25 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.6.0] — 2026-04-22
+
+Optimizes commit cadence: each TDD cycle now produces 2–3 commits total (one per agent-step: Red, Build, optional Refactor) instead of one per file. Pre-commit hooks (lint / format / type-check) run 2–3× per phase instead of N×, saving ~10–25s of pure hook overhead per phase with no loss of orchestrator guarantees.
+
+### Changed
+
+- **`agents/tdd-red.md` Rule 6 — "ONE commit at the end of your Red step, containing all authored tests."** Previous phrasing encouraged "logical checkpoints, typically one commit per test file or per AC group" — agents over-interpreted as one-per-file. New default is the single batched commit; opt-out to AC-group checkpointing only for exceptionally large Red blocks (>200 LOC of tests).
+- **`agents/implementer.md` Rule 8 — "ONE commit at the end of your Build/Implement step, when the oracle passes."** Previous phrasing allowed checkpointing "per file / per public-API surface / per sub-task." New default is the single batched commit; opt-out for exceptionally large phases (>200 LOC delta).
+- **`agents/refactor.md` Rule 4 — "ONE commit at the end of your Refactor step."** Previous phrasing encouraged checkpointing per independent cleanup (dedup, rename, extraction). New default is the single batched commit; opt-out for exceptionally large refactors or multiple unrelated cleanups.
+- **`reference/spec-flow-doctrine.md` — new "Commit Cadence" section** codifying the default across all three agents, documenting why the historical checkpointing rationale (faster error surfacing, bisect-within-phase, intermediate recovery) is weak for AI-driven TDD, and explaining the rare opt-out conditions.
+
+### Notes for upgraders
+
+- **No API change.** Skill commands and orchestrator entry points are unchanged. Orchestrator gates (contamination check after Red commit, test-integrity diff between Red and Verify, scoped re-runs) still operate on the same commit boundaries — they just see 2–3 commits per phase instead of many.
+- **No agent-retry budget change.** Oracle retries, QA retries, and the 2-attempt circuit breaker are untouched.
+- **Per-file commit is still allowed** as a documented opt-out for large phases. It is no longer the default; agents report the rationale when choosing it.
+- **Expect quieter git history.** Commits per piece drop from ~3–5× (plan phases × files) to ~2–3× (plan phases × agent-steps). `git log` + `git blame` become more readable; intra-phase navigation was never the point.
+- **Contamination discipline unchanged.** `Rule: literal file list on commit` still applies — stage files by literal path, never by pattern. The cadence change is about count-per-step, not staging shortcuts.
+
 ## [2.5.0] — 2026-04-22
 
 Adds an adversarial test-quality gate between Red and Build: the new `qa-tdd-red` agent rejects theater tests (tautological, mock-echoing, truthy-only, no-assertion, implementation-coupled, etc.) before Build writes production code fit to weak assertions. Completes the TDD discipline trilogy started in v2.3.0 (Red → zero-passing) and v2.4.0 (Build → every-Red-passes): Red now also has a semantic quality floor, not just structural invariants.

@@ -30,7 +30,7 @@ You clean up code while keeping all tests green. You may ONLY modify files creat
    When dispatched at Phase Group level (Step G7 of the execute skill's Phase Group Loop), "phase files" means the union of all sub-phase `**Scope:**` declarations in the group. The orchestrator's prompt will pass you the union as your scope list — treat it as the authoritative file list for this dispatch.
 2. Run tests after every change. If tests break, revert immediately.
 3. No new behavior. No changing what code does — only how it's organized.
-4. **Commit at logical checkpoints, then a final commit when done.** Good checkpoints: after each independent refactor (one dedup, one rename, one extraction). Each commit runs hooks and must leave tests green — don't checkpoint while tests are red. If a hook fails, address the issue and re-commit; do not bypass with `--no-verify`.
+4. **ONE commit at the end of your Refactor step, when all cleanups are done and tests are green.** Default cadence is one commit per Refactor step — not per independent cleanup (one dedup, one rename, one extraction). Hooks run once (lint/format/type-check) instead of N times. The single commit must leave tests green. If a hook fails, address the issue and re-commit; do not bypass with `--no-verify`. **Opt-out (rare):** for exceptionally large refactors (>200 LOC delta OR multiple unrelated cleanups that would be hard to review as one diff), you MAY checkpoint at independent-refactor boundaries — but the default is the single commit.
 
 ## Rule: no pre-commit self-check
 

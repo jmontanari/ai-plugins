@@ -53,6 +53,27 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 | No agent cheating | Hard-coded return values, over-fitted tests, trivial implementations flagged by QA |
 | Refactor scope | Refactor agent may only touch files created/changed in current phase |
 
+## Commit Cadence
+
+**Default: one commit per agent-step.** Each TDD cycle (Red → Build → [Refactor]) produces 2–3 commits total — one per agent-step, not one per file.
+
+| Agent-step | Commits produced | What's batched |
+|---|---|---|
+| Red | 1 | All authored tests for the phase |
+| Build | 1 | All production code that turns the Red tests green |
+| Refactor (if run) | 1 | All cleanups that preserve behavior |
+
+**Why not per-file.** Checkpointing per file was the historical default, rationalized by "faster error surfacing, bisect-within-phase, intermediate recovery." For AI-driven TDD these benefits are theoretical: the agent processes hook errors in the same turn regardless of when they surface, the orchestrator retries at phase scope not commit scope, and nobody navigates intra-phase git history. The cost of per-file commits is real — pre-commit hooks (~3–5s of lint/format/type-check) run N times per step, adding 10–25s of pure overhead per phase with no corresponding benefit.
+
+**Opt-out (rare).** Individual agents MAY checkpoint at sub-step boundaries if:
+- Phase delta exceeds ~200 LOC
+- A hook failure on the batched diff would be hard to debug (e.g. a refactor touching 10 files where tracing which change broke the type-check would take longer than the hook-amortization savings)
+- The agent explicitly reasons about the tradeoff in its report
+
+Otherwise, the default is the single commit. Per-file commits are not the baseline.
+
+**Contamination discipline preserved.** `Rule: literal file list on commit` (tdd-red agent) still applies: stage files by literal path, never by pattern. The cadence rule is about commit count per step, not about staging shortcuts.
+
 ## Testing Strategy
 
 **Ratios (guideline, not rigid):**
