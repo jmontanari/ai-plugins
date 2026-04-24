@@ -74,6 +74,20 @@ pieces:
     prd_sections: [G-3]
     dependencies: []
     status: done
+
+  - name: PI-008-multi-prd-v3.0.0
+    description: |
+      Multi-PRD support — restructures the spec-flow docs layout so a project can hold multiple PRDs in parallel under a single shared charter. Replaces today's single `docs/prd/` + flat `docs/specs/` with `docs/prds/<prd-slug>/{prd.md, manifest.yaml, specs/<piece-slug>/, backlog.md}` sibling namespaces. Adds:
+        - PRD lifecycle states (drafting / active / shipped / archived) carried in the PRD's front-matter
+        - Dual backlog: per-PRD `backlog.md` for capability-scoped items, global `docs/improvement-backlog.md` for cross-PRD learnings and spec-flow process findings
+        - Short-slug naming for worktrees (`worktrees/prd-<prd-slug>/piece-<piece-slug>/`) and branches (`spec/<prd-slug>-<piece-slug>` etc.)
+        - Automatic charter-drift detection in every skill's Phase-1 context load (no new user-facing skill; inline resolution via focused qa-spec mode)
+        - Cross-PRD piece dependencies via qualified references (`depends_on: <prd-slug>/<piece-slug>`) — declarative only; orchestration stays manual for v3.0
+        - Migration flow (new `/spec-flow:migrate` skill) that upgrades existing v1.x (`docs/prd.md` flat) and v2.x (`docs/prd/prd.md` + `docs/prd/manifest.yaml`) projects to the v3 layout using `git mv` to preserve history
+      Breaking change — ships as spec-flow v3.0.0 (major bump per NN-C-003 and NN-C-009). Ad-hoc task work (lightweight spec→plan→execute for out-of-band work) is out of scope and deferred to a separate future PRD (captured in improvement-backlog.md).
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-001, NN-P-003, NN-C-003]
+    dependencies: []
+    status: open
     notes: |
       Delivered as a dual-path co-ship (not the original mirror-branch design). The spec and plan carry amendment blocks at the top documenting the two design pivots (mirror-branch → dual-path with `.agent.md` symlinks → plain-`.md`). See `docs/specs/PI-007-copilot-coship/learnings.md` for the three smoketest records and out-of-scope findings (`/fleet`, `agent` tool, marketplace-root install path).
       Evidence: README "Install on GitHub Copilot CLI" section, CHANGELOG 2.1.0 entry, 12 top-level agents with valid CR-001 frontmatter, plugin.json + marketplace.json both at 2.1.0 (NN-C-009 three-place bump), scripts/ directory empty (mirror-sync infrastructure fully dismantled).
