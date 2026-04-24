@@ -2,6 +2,17 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [2.7.1] — 2026-04-24
+
+### Fixed
+
+- **Hook scripts now have the git executable bit set.** `hooks/run-hook.cmd` and `hooks/session-start` were committed as `100644` (non-executable) in git's index. On install, Claude Code's marketplace unpack preserves git file modes, so users saw a SessionStart hook error: `/bin/sh: 1: /.../hooks/run-hook.cmd: Permission denied`. Fixed via `git update-index --chmod=+x` on both files; they are now tracked as `100755` and execute correctly on install. No content change — same shebangs (`#!/usr/bin/env bash`), same script bodies. This bug existed from the hooks' introduction and is unrelated to any v2.x change.
+
+### Notes for upgraders
+
+- **Reinstall to pick up the fix.** If you installed v2.7.0 or earlier and hit the SessionStart permission error, the file mode in your cached copy (`~/.claude/plugins/cache/shared-plugins/spec-flow/<version>/hooks/`) is still `644`. Re-run `/plugin install spec-flow@shared-plugins` (or your host's equivalent) to fetch v2.7.1 with the correct mode.
+- **No doctrine or API change.** Every other v2.7.0 behavior is preserved.
+
 ## [2.7.0] — 2026-04-22
 
 Architectural shift: **one commit per TDD cycle**. Red no longer commits — it stages its tests via `git add` and emits a SHA-256 content-hash manifest. The implementer creates a SINGLE unified commit containing Red's staged tests + Build's production code, so each TDD cycle lands as one commit in git history (one behavior addition, one commit) instead of two (tests, then code). The pre-commit hook runs once per cycle instead of twice; the old `git diff $red_sha..HEAD -- tests/` anti-cheat check is replaced by path-keyed SHA-256 re-hashing.
