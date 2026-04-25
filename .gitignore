@@ -6,3 +6,10 @@
 node_modules/
 proposals/
 worktrees/
+
+# Local Claude Code session state (per-developer)
+.claude/
+
+# Auto-copied by SessionStart hook from templates/pipeline-config.yaml.
+# Per-developer overrides live here; the template is the authoritative source.
+.spec-flow.yaml
