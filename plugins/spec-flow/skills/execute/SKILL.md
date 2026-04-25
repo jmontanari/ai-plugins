@@ -147,9 +147,20 @@ Sub-steps per phase, in order: **Step 0a** (mid-piece Opus QA pass, FR-9 — run
 
 At the start of each phase iteration, evaluate the mid-piece trigger before doing any other work for this phase.
 
-**Resume guard:** before evaluating conditions 1-3, check whether a `chore(<piece-slug>): mid-piece Opus QA pass dispatched at phase <N>` commit (where `<N>` matches any digit sequence — regex: `chore\(<piece-slug>\): mid-piece Opus QA pass dispatched at phase [0-9]+`) already exists in `git log --oneline $(git merge-base origin/main HEAD)..HEAD`. If so, set `mid_piece_opus_pass: not-triggered (resumed-after-prior-dispatch)` and proceed to Step 1 — do not re-fire the dispatch. The marker-commit message embeds the resolved phase number (not the literal 'K+1') for unambiguous detection by this resume guard. If the dispatch is a re-fire scenario (the prior dispatch did NOT result in a recorded commit because fix-code rolled back, etc.), the orchestrator's session log is the authoritative source — see Session Resumability.
+**Resume guard (v3.1.1+ two-source check):** before evaluating conditions 1-3, the orchestrator consults TWO independent sources for whether a prior mid-piece dispatch has already fired this piece. EITHER source positive → skip the dispatch.
+
+  1. **Session-state file** (primary, survives history rewrites): read `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.orchestra-state.json`. If it contains `{"mid_piece_opus_pass_dispatched": true, "at_phase": <N>}`, the dispatch already fired in a prior session — set `mid_piece_opus_pass: not-triggered (resumed-after-prior-dispatch via state file)` and proceed to Step 1. The state file is gitignored or removed by Step 6 merge; it persists across orchestrator session restarts but not across squash-merge to master.
+  2. **Marker commit** (secondary, falls back when state file is absent): check whether a `chore(<piece-slug>): mid-piece Opus QA pass dispatched at phase <N>` commit (regex: `chore\(<piece-slug>\): mid-piece Opus QA pass dispatched at phase [0-9]+`) already exists in `git log --oneline $(git merge-base origin/main HEAD)..HEAD`. If so, set `mid_piece_opus_pass: not-triggered (resumed-after-prior-dispatch via marker commit)` and proceed to Step 1.
+
+The marker-commit message embeds the resolved phase number (not the literal 'K+1') for unambiguous detection. The state-file source is checked FIRST because it survives interactive rebases / squash-merges that would erase the marker commit. If neither source returns positive, the trigger evaluation proceeds.
+
+**Pre-commit hook compatibility (v3.1.1+):** if the project's pre-commit configuration rejects empty commits (some configs enforce a "commits must touch at least one file" rule), the `git commit --allow-empty` marker commit at step 4 below will fail. In that case, the state-file source above is mandatory — write `.orchestra-state.json` BEFORE attempting the marker commit; if the marker commit fails, the state file alone carries the resume signal.
 
 **Trigger evaluation:**
+
+**Phase counting clarification (v3.1.1+):** N counts each top-level scheduler unit as 1. A `## Phase Group <letter>` heading wrapping ≥2 `[P]`-marked sub-phases is **one** unit (sub-phases are internal to the group). Phases declared with individual `### Phase <num>` headings — even when titled `Group B.1`, `Group B.2`, etc. for AC-tracking purposes — each count as **one** unit because they have their own `### Phase` heading and dispatch sequentially. So pi-009-hardening with 1 Phase Group + 8 sequential `Group B.x`/`Group C.x`/`Phase D` flat phases = N=9, K=⌈9/2⌉=5.
+
+**Odd-N timing (v3.1.1+):** for odd N, K=⌈N/2⌉ means ⌊N/2⌋ phases run pre-half and ⌈N/2⌉ run post-half. The asymmetry is intentional — earlier dispatch is safer than later. Example: N=7 → K=4 → trigger fires before phase 5; phases 1-4 are reviewed by the mid-piece pass; phases 5-7 are post-mid-piece.
 
 - Let `N` = total number of phases declared in `plan.md`. Count `### Phase <num>` headings plus `## Phase Group <letter>` headings, where each Phase Group heading counts as one phase from the scheduler's view (its sub-phases are internal to that group).
 - Let `K` = ⌈N / 2⌉ (ceiling of N divided by 2).
@@ -353,9 +364,9 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      - On violation of (b) or (c): retry within the 2-attempt budget with the specific offending IDs surfaced to the agent (e.g. "tests X, Y were SKIPPED in your run; you cannot pass Red tests by skipping them"). Escalate on second failure — a Red test that cannot go green without skipping means the plan or the Red tests themselves are wrong.
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
 6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
-7. **Post-commit integrity and reconciliation gates (Mode: TDD only).** After the implementer's unified commit lands (HEAD now points to it), run two cheap checks before accepting the phase:
+7. **Post-commit integrity and reconciliation gates (Mode: TDD + Implement, v3.1.1+).** After the implementer's commit lands (HEAD now points to it), run cheap checks before accepting the phase. Gate (a) is TDD-only (uses Red's manifest); gate (b) is HARD FAIL on BOTH modes — strays or missings reject the phase. The Implement-track extension was added in v3.1.1 per pi-009-hardening's Phase Group A contamination event, where A.2 silently swept in A.4's staged files because the gate was previously gated `Mode: TDD only`.
 
-   - **(a) Content-hash integrity.** For every path in `phase_N_red_stage_manifest`, re-hash the file AS COMMITTED in HEAD and compare against the manifest:
+   - **(a) Content-hash integrity (Mode: TDD only).** For every path in `phase_N_red_stage_manifest`, re-hash the file AS COMMITTED in HEAD and compare against the manifest:
      ```bash
      for path in <manifest paths>; do
        commit_hash=$(git show HEAD:"$path" | sha256sum | cut -d' ' -f1)
@@ -365,13 +376,18 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      ```
      Any mismatch means the implementer modified one of Red's tests — the anti-cheat safeguard replacing pre-v2.7.0's `git diff tests/` check. Reject the phase and retry within the 2-attempt budget (the retry must recreate the commit without touching Red's tests). Escalate on second failure.
 
-   - **(b) Unified commit reconciliation.** The commit's file list must equal the union of Red's manifest paths and Build's `## Files Created/Modified` paths:
+     For Mode: Implement, this gate is skipped (no Red manifest exists); proceed directly to (b).
+
+   - **(b) Unified commit reconciliation (Mode: TDD AND Mode: Implement).** The commit's file list must equal the **expected file set**:
+     - **Mode: TDD:** `expected = Red's manifest paths ∪ Build's `## Files Created/Modified` paths`.
+     - **Mode: Implement:** `expected = Build's `## Files Created/Modified` paths` only (no Red manifest).
+
      ```bash
      git show --name-only --pretty= HEAD | sort > /tmp/commit_files.txt
-     # Compose expected = sort(manifest paths ∪ Build's reported paths) > /tmp/expected_files.txt
+     # Compose expected per the mode above; write sorted list to /tmp/expected_files.txt
      diff /tmp/commit_files.txt /tmp/expected_files.txt
      ```
-     Any stray file (in commit but not in expected) or missing file (in expected but not in commit) rejects the phase. Strays typically mean a concurrent agent's uncommitted changes were swept in via `git commit -a` or `git add -A`; missings typically mean the implementer forgot to stage one of its own files. Retry within the 2-attempt budget.
+     Any stray file (in commit but not in expected) or missing file (in expected but not in commit) rejects the phase. Strays typically mean a concurrent agent's uncommitted changes were swept in via `git commit -a` or `git add -A` — for Phase Group sub-phases dispatching concurrently, this is the staging-area race the gate is built to detect. Missings typically mean the implementer forgot to stage one of its own files. On rejection: for Mode: Implement, escalate immediately — strays on Implement track usually mean a sibling sub-phase swept in, which is unrecoverable by re-dispatching the same agent. Mode: TDD retries within the 2-attempt budget.
 
 8. **AC Coverage Matrix validation gate.** After the oracle passes and post-commit gates are clean, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment. After validation, persist Build's `## AC Coverage Matrix` to orchestrator state as `phase_<id>_ac_matrix`, where `<id>` is the phase identifier (e.g., `phase_2`, `phase_3`, `group_a_subphase_a1`, `phase_group_a` for the union, etc.) — the orchestrator chooses a unique identifier per phase or sub-phase. Keys never collide; multiple phases produce multiple keys. Used by Step 0a's mid-piece dispatch.
 
@@ -513,7 +529,18 @@ After each QA iteration (regardless of whether must-fix findings remain), scan t
 
 1. **Parse each occurrence:**
    - **Deferring reviewer:** the agent name from the dispatch context — `qa-phase`, `qa-phase-lite`, or `qa-spec` / `qa-plan` / `qa-charter` for spec/plan/charter QA gates.
-   - **Finding text:** the verbatim prose immediately following `Deferred to reflection:` up to the next blank line or list-item boundary (whichever comes first). Preserve the original wording exactly.
+   - **Finding text (v3.1.1+ formal boundary grammar):** the verbatim prose immediately following `Deferred to reflection:` up to the FIRST line that is either: (a) entirely whitespace (a blank line), or (b) a new list item AT THE SAME OR LESSER INDENT than the line where `Deferred to reflection:` appeared, or (c) a markdown heading (`^#+ `). Whichever comes first terminates the capture. Sub-bullets at GREATER indent than the marker line are part of the same finding (captured verbatim). Preserve the original wording exactly.
+
+   Worked example — nested case:
+
+   ```
+   - Deferred to reflection: spec FR-005 ambiguity unresolved
+     - sub-bullet adding context that's part of the same finding
+     - another supporting sub-bullet
+   - Next sibling bullet (terminates capture — same indent as marker line)
+   ```
+
+   Captured finding: "spec FR-005 ambiguity unresolved\n  - sub-bullet adding context that's part of the same finding\n  - another supporting sub-bullet" (the first two sub-bullets are at greater indent and are included; the third bullet at same indent terminates).
    - **Commit SHA:** run `git rev-parse HEAD` at deferral time — before any subsequent fix-code or progress commits — to capture the state the finding refers to.
 
 2. **Append a stub** to `<docs_root>/prds/<prd-slug>/backlog.md`:

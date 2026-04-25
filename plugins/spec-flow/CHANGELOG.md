@@ -2,6 +2,33 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.1.1] — 2026-04-25
+
+### Fixed
+
+- **Step 3.7b reconciliation gate now extends to Implement track** (was previously `Mode: TDD only`). Per pi-009-hardening's Phase Group A contamination event — A.2's commit silently swept in A.4's staged files because the gate didn't fire on Implement track. v3.1.1 makes the unified-commit-reconciliation check (b) a HARD FAIL on both modes; for Mode: Implement, strays in the commit (files outside Build's `## Files Created/Modified`) escalate immediately rather than retry.
+- **Phase-sizing predicate filtering** — counting rule now excludes HTML comments (`^\s*<!--` through `-->`), fenced code blocks (everything between `` ``` `` or `~~~ `` fence pairs), markdown horizontal rules, and table separators. A plan section that quotes a 200-line shell example inside a fenced block no longer falsely trips the 150-line warning.
+- **Deferred-finding parser boundary grammar** — Step 6a verbatim-finding extraction now uses formal indent-based termination: stops at the first blank line, OR a sibling/shallower list-item at the same-or-lesser indent, OR a markdown heading. Sub-bullets at greater indent are part of the finding. Worked example added.
+- **Mid-piece QA pass resume guard now uses two-source check** — primary source is `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.orchestra-state.json` (survives interactive rebases / squash-merges that erase the marker commit); marker commit is the secondary fallback. Either source positive → skip dispatch.
+- **Pre-commit-hook compatibility** for the empty `--allow-empty` marker commit — when a project's hook config rejects empty commits, the state-file source is mandatory; the orchestrator writes `.orchestra-state.json` BEFORE attempting the marker commit so the resume signal persists even if the marker fails.
+
+### Changed
+
+- **Plan-skill exit-gate semantics validator** gains an `exit_gate_override: <reason>` escape hatch (parallel to existing `phase_size_override`). Use ONLY for legitimate quoted prose — meta-plans whose `[Verify]` block describes the rejected pattern itself, or `[Verify]` steps that assert the absence of the pattern in some target file. Override is logged for posterity and surfaces in QA-loop input.
+- **Step 0a phase-counting clarification** — `## Phase Group <letter>` headings count as 1 unit; `### Phase <num>` headings (even when titled `Group B.x` for AC-tracking) each count as 1 unit. Resolves the ambiguity flagged by pi-009-hardening's edge-case reviewer.
+- **Step 0a odd-N timing documentation** — for odd N, K=⌈N/2⌉ produces ⌊N/2⌋ pre-half phases and ⌈N/2⌉ post-half phases. Asymmetry is intentional (earlier dispatch is safer). Worked example for N=7.
+
+### Removed
+
+- (none — all changes are bug fixes or backwards-compatible additions per NN-C-003.)
+
+### Migration notes for upgraders
+
+- **No user action required.** All v3.1.1 changes are bug fixes or escape-hatch additions to existing v3.1.0 surfaces. User `.spec-flow.yaml` configs continue to load without changes.
+- **Behavior change for Implement-track phases:** the Step 3.7b reconciliation gate now fires on Implement track. If your plan's `[Implement]` Build agents have been writing files outside their declared `## Files Created/Modified` set (typically a sign of a staging-area race or a wildcard `git add -A`), v3.1.1 will reject those phases and escalate. Fix the agent's staging discipline (literal paths only) and re-run.
+- **Phase Group sub-phase agents:** the reconciliation extension makes concurrent-staging races visible immediately rather than silently absorbing them. If you've been running 3+ parallel sub-phases that share file-staging conventions, v3.1.1 will surface contamination earlier — same root cause, faster failure mode.
+- **`exit_gate_override` and `phase_size_override`** are plan-author escape hatches; use sparingly and only with stated reason. They appear in plan QA output for reviewer visibility.
+
 ## [3.1.0] — 2026-04-25
 
 ### Added

@@ -67,11 +67,17 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
    Pick the track that matches reality. Don't force TDD onto a YAML file; don't skip TDD for a business rule.
 
-2a. **Phase-sizing check (FR-11).** After defining each phase's or sub-phase's `[Implement]` (or `[Build]`) block, count the non-blank, non-comment lines inside it — the actionable bullets and ordered-list items that prescribe what the implementer agent does. A "non-blank, non-comment" line is any line that is not empty and does not begin with a `- [ ] **[` checkbox marker. If the count exceeds 150 for any single phase or sub-phase, emit a warning:
+2a. **Phase-sizing check (FR-11; v3.1.1+ filter rules).** After defining each phase's or sub-phase's `[Implement]` (or `[Build]`) block, count the **behavioral-prose lines** inside it — the actionable bullets and ordered-list items that prescribe what the implementer agent does. If the count exceeds 150 for any single phase or sub-phase, emit a warning:
 
     ```
     WARNING: Phase <num> (<title>): <N> lines of behavioral prose exceeds 150-line threshold; recommend split into a Phase Group with 2-3 sub-phases.
     ```
+
+    **Counting rules (v3.1.1+):** a line counts toward the total if and only if it is non-blank AND not filtered by any of:
+    - **Checkbox markers:** lines beginning with `- [ ] **[` or `- [x] **[` (the block-boundary markers themselves).
+    - **HTML comments:** lines matching `^\s*<!--` through their closing `-->` (multi-line comments span their full extent and do not count).
+    - **Fenced code blocks:** every line between an opening `` ``` `` (or `` ~~~ ``) fence and its closing fence does not count, including the fence lines themselves. Example shell snippets, YAML examples, and synthetic plan fragments quoted inside the `[Implement]` block are therefore excluded.
+    - **Markdown horizontal rules and table separator lines** (`^---+$`, `|---|`).
 
     The plan author may suppress the warning by adding `phase_size_override: <reason>` as a single-line preamble to the offending phase's body (between the phase heading line and the `**Exit Gate:**` line). When an override is present the warning is suppressed but logged for posterity. The check counts from the start of the `[Implement]` (or `[Build]`) block inclusive to the next checkbox marker (`- [ ] **[`) exclusive.
 
@@ -89,6 +95,8 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
     ```
 
     Plan authoring cannot proceed until the offending phase is rewritten or the piece is split. This check runs BEFORE the QA-loop dispatch in Phase 3 — structural validation precedes adversarial review.
+
+    **Escape hatch (v3.1.1+):** the plan author may suppress the validator on a phase by adding `exit_gate_override: <reason>` as a single-line preamble to the offending phase's body (same convention as `phase_size_override`). Use ONLY when the matched pattern is legitimate quoted prose — e.g., a `[Verify]` block that asserts the absence of the forbidden pattern in some target file, or a meta-plan whose body documents the rejected pattern itself. The override is logged for posterity and surfaces in the plan's QA-loop input as `exit_gate_override active: <phase> — <reason>`. Per CR-008 the validator stays orchestrator-side; the override is a plan-author declaration, not an agent-side decision.
 
 3. Use semantic anchors (function names, class names) NOT line numbers
 4. Mark parallel-eligible tasks with `[P]` — verify no file overlap
