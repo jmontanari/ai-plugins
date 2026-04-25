@@ -86,7 +86,7 @@ Every manifest piece carries one of the following statuses. FR-011's `depends_on
 - **FR-002:** Every PRD front-matter carries `slug: <short-id>` (required), `status: drafting | active | shipped | archived` (required), `version: <int>` (required).
 - **FR-003:** Every manifest piece entry accepts `slug:` (optional — falls back to `name` kebab-cased). When present, the piece's worktree and branches use the slug.
 - **FR-004:** Worktree creation in `spec`, `plan`, and `execute` skills produces `worktrees/prd-<prd-slug>/piece-<piece-slug>/` paths.
-- **FR-005:** Branch naming for piece work is `{spec,plan,execute}/<prd-slug>-<piece-slug>`. Slug validator rules (enforced by every skill that creates a worktree or branch — `prd`, `spec`, `plan`, `execute`, `migrate`):
+- **FR-005:** A piece uses a single shared `spec/<prd-slug>-<piece-slug>` branch from spec authoring through plan and execute. The same branch carries spec, plan, and execute commits; squash-merge collapses them into one merge commit on master at release time. Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md`. Slug validator rules (enforced wherever a slug is interpolated into a path or branch name — invoked by `prd` (slug assignment), `spec` (worktree + branch creation), `plan` (branch reuse + path resolution), `execute` (branch reuse + path resolution), `migrate` (path generation)):
   - Each slug: max 20 characters, charset `[a-z0-9-]`, must not start or end with `-`.
   - No reserved words at this time (placeholder for future expansion).
   - Total branch length must remain ≤ 50 characters.
@@ -218,6 +218,15 @@ Every manifest piece carries one of the following statuses. FR-011's `depends_on
 
 - **AC-20:** Given a project that already has a PRD with `slug: auth` at `docs/prds/authentication/prd.md`, When the user runs `/spec-flow:prd auth` to create a second PRD with the same slug, Then `/spec-flow:prd` refuses with an error naming the colliding PRD path and exits without creating any files.
   Independent Test: seed `docs/prds/authentication/prd.md` with `slug: auth` in front-matter → run `/spec-flow:prd auth` → assert refusal message names `docs/prds/authentication/prd.md` → assert no new directory under `docs/prds/` was created.
+
+- **AC-21:** Given a new piece begins spec authoring, When the spec skill creates the worktree branch, Then the branch is `spec/<prd-slug>-<piece-slug>` and is the only branch created.
+  Independent Test: `git branch | grep -E "^\s*\* spec/" | wc -l` returns 1 on the worktree.
+
+- **AC-22:** Given a piece's plan skill runs after spec sign-off, When the plan skill commits plan.md, Then the commit lands on the same `spec/<prd-slug>-<piece-slug>` branch (no new `plan/...` branch is created).
+  Independent Test: `git log --all --oneline | grep "plan: add"` shows the commit on the existing `spec/...` branch.
+
+- **AC-23:** Given a piece's execute skill runs phases, When per-phase commits land, Then they all land on the same `spec/<prd-slug>-<piece-slug>` branch (no new `execute/...` branch is created).
+  Independent Test: `git log --all --oneline --graph` on the worktree shows a single linear branch from the spec commit through all execute phase commits, with no branch divergence/re-converge.
 
 ## Technical Approach
 
@@ -393,3 +402,5 @@ None. All originally-open questions have been resolved inline in the requirement
 - OQ-5 (drift-mode checks newly-added NN/CR entries): resolved as expanded FR-009 input bundle.
 - OQ-6 (v1 no-manifest shape): resolved as the v0 refusal in FR-012 — pointing the user at `/spec-flow:charter` retrofit.
 - OQ-7 (slug collision check at `prd` creation): resolved as FR-023.
+
+Resolved 2026-04-25 by pi-009-hardening (CAP-1 / FR-1) — single-branch model adopted; rationale in pi-009-hardening/spec.md CAP-1 paragraph.

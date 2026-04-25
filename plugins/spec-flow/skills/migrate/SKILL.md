@@ -31,6 +31,20 @@ Capture: `slug_arg` (string or null), `inspect` (bool), `force` (bool).
 
 ---
 
+## Environment preconditions
+
+Three host-side capabilities are required to run this skill:
+
+- **LLM-driven execution context with file-reading and inline YAML/JSON parsing.** The migrate skill is authored as natural-language instructions the LLM agent follows; every read-and-rewrite step uses the agent's native parsing capability — no specific language runtime is mandated.
+- **`git` ≥ 2.5** — required for `git mv` (history-preserving rename) and `git status --short` parsing.
+- **POSIX shell** — required for `cd`, `mkdir -p`, and `git` invocation.
+
+Explicitly: no external parser/runtime is required. `python3`, `yq`, `jq`, `ruby`, `node`, and similar tools may be present on the host, but the migrate skill does not invoke them.
+
+These capabilities live in the LLM agent's runtime, not in the user's installed plugin. NN-C-002 binds plugin-internal runtime dependencies; this skill ships only markdown text.
+
+---
+
 ## Step 1: Detect source layout
 
 Inspect the filesystem in the current repo root.

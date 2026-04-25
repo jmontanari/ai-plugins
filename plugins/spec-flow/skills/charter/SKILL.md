@@ -102,6 +102,8 @@ Charter files live on `main` (not a worktree — charter is project-global, not 
 
 ### Phase 4: QA loop
 
+Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-until-clean; 3-iter circuit breaker).
+
 Read the agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-charter.md`.
 
 **Iteration 1 (full review):** Compose prompt with `Input Mode: Full` — interpolate all six charter files, detection signal summary, user-supplied source list. Dispatch:

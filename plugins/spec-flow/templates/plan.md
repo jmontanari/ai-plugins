@@ -71,7 +71,7 @@ A phase must have exactly one of these markers. The executor branches mechanical
   - Architecture constraints this phase must honor: {{arch_constraints}}
 
 - [ ] **[Verify]** Confirm the implementation is sound
-  - Run: {{verification_command}}  (e.g. `ruff check .`, `tsc --noEmit`, `terraform validate`, `make build`, `pytest tests/integration/...`)
+  - Run: {{verification_command}}  (e.g. `ruff check .`, `tsc --noEmit`, `terraform validate`, `make build`, `pytest tests/integration/...`) — For YAML/JSON validation: use LLM-agent-step framing (e.g., "Read the file at <path> and confirm it parses as valid YAML/JSON; report any error inline") rather than yq/jq/language-specific runtime shell-outs. For other validations (lint, type check, build, smoke run): standard shell commands are fine.
   - Expected: {{expected_output}}
 
 - [ ] **[Refactor]** (optional — include only if cleanup is likely needed) Clean up (scope: Phase 2 files only)

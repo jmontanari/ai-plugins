@@ -35,7 +35,7 @@ The skill is invoked as `/spec-flow:prd [<prd-slug>] [--review]` (FR-006, FR-023
 
 ## Modes
 
-Detect which mode based on arguments and current state. Path resolution everywhere below follows `${CLAUDE_PLUGIN_ROOT}/reference/v3-path-conventions.md` — the v3 layout is `<docs_root>/prds/<prd-slug>/{prd.md, manifest.yaml, backlog.md, specs/<piece-slug>/...}`. With the default `docs_root: docs`, that resolves to literal `docs/prds/<prd-slug>/...`.
+Detect which mode based on arguments and current state. Path resolution everywhere below follows `${CLAUDE_PLUGIN_ROOT}/reference/v3-path-conventions.md` — the v3 layout is `<docs_root>/prds/<prd-slug>/{prd.md, manifest.yaml, backlog.md, specs/<piece-slug>/...}`. With the default `docs_root: docs`, that resolves to literal `docs/prds/<prd-slug>/...`. Each piece's worktree lives at `{{worktree_root}}` (resolves to `worktrees/prd-<prd-slug>/piece-<piece-slug>` at orchestrator dispatch time — see `${CLAUDE_PLUGIN_ROOT}/reference/v3-path-conventions.md`, section `## Worktree-root template token`).
 
 - **Import mode (greenfield):** `<docs_root>/prds/<slug>/prd.md` does not exist for the supplied slug, and (typically) `<docs_root>/prds/` is empty or absent. First-time creation of this PRD.
 - **Update mode:** `<docs_root>/prds/<slug>/prd.md` exists. User wants to add pieces, reprioritize, or amend the PRD. Resolve `<slug>` from the argument or the no-arg default rule above.

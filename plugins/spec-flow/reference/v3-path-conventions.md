@@ -60,6 +60,16 @@ In every branch (warning emitted, silent, or error), the hook exits 0 with valid
 
 Every path that contains `<prd-slug>` or `<piece-slug>` is subject to the rules in [plugins/spec-flow/reference/slug-validator.md](slug-validator.md): max 20 characters per slug, charset `[a-z0-9-]`, no leading or trailing `-`, ≤ 50-char branch length total. Path resolution does not silently sanitize a slug — the slug must already be valid by the time it reaches a path-formation call. Skills validate at branch/worktree creation time and refuse with an explicit error on violation.
 
+## Worktree-root template token (`{{worktree_root}}`)
+
+`{{worktree_root}}` is a template token that resolves to `worktrees/prd-<prd-slug>/piece-<piece-slug>` at orchestrator dispatch time. The orchestrator derives the slug pair from the active piece in `<docs_root>/prds/<prd-slug>/manifest.yaml`.
+
+Skill SKILL.md files use `{{worktree_root}}` in Agent({...}) dispatch templates and worktree-path documentation references in place of literal `worktrees/...` paths.
+
+Exemption: `## Step 0: Load Config` preamble lines documenting the `worktrees_root` config-key resolution rule retain literal `worktrees/` text — they document the config key, not a dispatch path.
+
+Resolution failure mode: when the token is rendered outside an active piece worktree (e.g., on master with no piece slug discoverable), the orchestrator emits a stderr warning `note: {{worktree_root}} unresolved — no active piece` and substitutes the empty string. The dispatched agent receives an empty path argument where the worktree root would have been, which surfaces as a path error downstream when the agent attempts to operate on the empty path. (Per NN-C-005, the resolver itself does not abort.)
+
 ## See also
 
 - [plugins/spec-flow/reference/slug-validator.md](slug-validator.md) — slug rules, branch length budget, refusal contract.

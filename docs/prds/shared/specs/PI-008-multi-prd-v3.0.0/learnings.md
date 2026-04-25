@@ -90,7 +90,7 @@ End-of-piece reflection for the spec-flow v3.0.0 multi-PRD migration. Captured a
 - **Type:** spec-amendment (follow-on piece in v3.x)
 - **Description:** Spec FR-005 prescribes three distinct branches per piece — `spec/<prd-slug>-<piece-slug>`, `plan/<prd-slug>-<piece-slug>`, `execute/<prd-slug>-<piece-slug>`. Phase Group A QA caught (and deferred) the conflict that the actual SKILL.md updates and v2 reality use a single shared `spec/...` branch through plan and execute. v3.0.0 ships with the single-branch model in code while the spec text says otherwise — that is unsustainable across patch releases.
 - **Why-now (PI-008-specific):** Group A QA explicitly deferred this. AC-16 / AC-17 only test the `spec/<prd>-<piece>` form; the `plan/...` and `execute/...` variants in FR-005 are uncovered by acceptance tests, which is how the divergence slipped through.
-- **Proposed-next-step:** v3.1.0 spec amendment that picks one model: either update FR-005 to match the single-branch reality, or amend SKILL.md to actually create three branches; add ACs covering all three branch verbs.
+- **Proposed-next-step:** ~~v3.1.0 spec amendment that picks one model: either update FR-005 to match the single-branch reality, or amend SKILL.md to actually create three branches; add ACs covering all three branch verbs.~~ **RESOLVED** 2026-04-25 by `pi-009-hardening` (CAP-1 / FR-1) — single-branch model adopted; FR-005 amended in `docs/prds/shared/specs/PI-008-multi-prd-v3.0.0/spec.md`; rationale in `docs/prds/shared/specs/pi-009-hardening/spec.md` CAP-1 paragraph; new ACs AC-21/AC-22/AC-23 added to PI-008's spec.md.
 
 ### 2. Charter-drift static analyzer (passive deep scan)
 

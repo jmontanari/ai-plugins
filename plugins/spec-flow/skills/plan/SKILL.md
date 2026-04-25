@@ -15,7 +15,7 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 - Piece must have status `specced` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
 - `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` must exist and be approved
-- Must be on the worktree branch `spec/<prd-slug>-<piece-slug>` (created by spec skill via `worktrees/prd-<prd-slug>/piece-<piece-slug>/`)
+- Must be on the worktree branch `spec/<prd-slug>-<piece-slug>` (created by spec skill via `{{worktree_root}}/`)
 
 ## Workflow
 
@@ -61,11 +61,34 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
    **Implement track** (for config, infra, scaffolding, glue/wiring, docs-as-code, fixtures, migrations — where unit-level TDD is ceremony without payoff):
    - **[Implement]**: Exact file paths, signatures/structure, pattern pointers, architecture constraints the phase must honor
-   - **[Verify]**: The verification command the plan author chooses (lint, type check, build, smoke run, integration test) and its expected output
+   - **[Verify]**: The verification command the plan author chooses (lint, type check, build, smoke run, integration test) and its expected output. For YAML/JSON validation in [Verify] blocks, default to LLM-agent-step framing per the plan template. External parsers (yq, jq, language interpreters) are not preconditions of this pipeline.
    - **[Refactor]** (optional): Include only if cleanup is plausibly needed
    - **[QA]**: ACs to review against, diff baseline
 
    Pick the track that matches reality. Don't force TDD onto a YAML file; don't skip TDD for a business rule.
+
+2a. **Phase-sizing check (FR-11).** After defining each phase's or sub-phase's `[Implement]` (or `[Build]`) block, count the non-blank, non-comment lines inside it — the actionable bullets and ordered-list items that prescribe what the implementer agent does. A "non-blank, non-comment" line is any line that is not empty and does not begin with a `- [ ] **[` checkbox marker. If the count exceeds 150 for any single phase or sub-phase, emit a warning:
+
+    ```
+    WARNING: Phase <num> (<title>): <N> lines of behavioral prose exceeds 150-line threshold; recommend split into a Phase Group with 2-3 sub-phases.
+    ```
+
+    The plan author may suppress the warning by adding `phase_size_override: <reason>` as a single-line preamble to the offending phase's body (between the phase heading line and the `**Exit Gate:**` line). When an override is present the warning is suppressed but logged for posterity. The check counts from the start of the `[Implement]` (or `[Build]`) block inclusive to the next checkbox marker (`- [ ] **[`) exclusive.
+
+2b. **Exit-gate semantics check (FR-12).** After all phases are drafted, scan each phase's `**Exit Gate:**` line and each `[Verify]` step's expected-output prose for the following patterns (case-insensitive):
+    - `is documented to run`
+    - `documented to run later`
+    - `deferred to release`
+    - `deferred to release time`
+    - `documented for release`
+
+    If any pattern matches, plan validation FAILS immediately with:
+
+    ```
+    ERROR: Phase <num> (<title>): exit-gate downgrade not allowed — string "<matched>" implies "X is documented" rather than "X ran." Per FR-12, this is rejected. If pre-merge execution truly is not possible, split the piece into PI-N (the artifact ships) and PI-Nb (the artifact is run on a real project).
+    ```
+
+    Plan authoring cannot proceed until the offending phase is rewritten or the piece is split. This check runs BEFORE the QA-loop dispatch in Phase 3 — structural validation precedes adversarial review.
 
 3. Use semantic anchors (function names, class names) NOT line numbers
 4. Mark parallel-eligible tasks with `[P]` — verify no file overlap
@@ -133,9 +156,11 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
 Write the plan to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md`. Populate the `charter_snapshot:` front-matter with each charter file's `last_updated` date captured during Phase 1 exploration. Populate each phase's "Charter constraints honored in this phase" slot with the subset of NN-C/NN-P/CR entries from the spec that the phase implements (every entry must appear in exactly one phase — no drops, no duplicates).
 
-**Worktree/branch naming** (per FR-004 / FR-005): the plan skill operates on the worktree at `worktrees/prd-<prd-slug>/piece-<piece-slug>/` on branch `spec/<prd-slug>-<piece-slug>` (created by the spec skill). Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
+**Worktree/branch naming** (per FR-004 / FR-005): the plan skill operates on the worktree at `{{worktree_root}}/` on branch `spec/<prd-slug>-<piece-slug>` (created by the spec skill). Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
 
 ### Phase 3: QA Loop
+
+Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-until-clean; 3-iter circuit breaker).
 
 1. Read template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-plan.md`
 

@@ -46,12 +46,14 @@ Socratic dialogue with the user, one question at a time:
 2. **Validate slugs before any branch or worktree creation.** Run both `<prd-slug>` and `<piece-slug>` through the rules in `plugins/spec-flow/reference/slug-validator.md` (max 20 chars, charset `[a-z0-9-]`, no leading/trailing `-`, total branch length ≤ 50 chars). On any violation, refuse with the exact error contract from that reference doc — name which slug is offending, its actual value, the current length or offending character, and the limit. There is no silent truncation, no auto-fix; the user must edit `docs/prds/<prd-slug>/manifest.yaml` (or rename the PRD) and re-run.
 3. Create worktree (before writing, so all work lives on the feature branch). Worktree path and branch name follow `plugins/spec-flow/reference/v3-path-conventions.md`:
    ```bash
-   git worktree add worktrees/prd-<prd-slug>/piece-<piece-slug> -b spec/<prd-slug>-<piece-slug>
+   git worktree add {{worktree_root}} -b spec/<prd-slug>-<piece-slug>
    ```
 4. Write `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` in the worktree directory
 5. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/spec.md` as the structural guide. Populate the `charter_snapshot:` front-matter with each charter file's `last_updated` date captured in Phase 1 step 3. If a charter file is absent, omit its key from the snapshot block (do not write a blank/null value).
 
 ### Phase 4: QA Loop
+
+Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-until-clean; 3-iter circuit breaker).
 
 1. Read the agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-spec.md`
 

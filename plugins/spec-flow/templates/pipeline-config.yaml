@@ -16,9 +16,10 @@ layout_version: 3
 #   never   — never run Refactor (useful for repetitive-pattern tracks like adapters)
 refactor: auto
 
-# qa_iter2: controls QA iteration-2 re-review after a fix-code commit
-#   auto    — skip iter-2 re-dispatch when fix diff < 50 LOC AND fix-code reported all findings resolved AND oracle green (default)
-#   always  — always re-dispatch iter-2
+# qa_iter2: DEPRECATED in 3.1.0 — see plugins/spec-flow/reference/qa-iteration-loop.md
+# The orchestrator no longer reads this key. Iter-until-clean is now the default
+# for all QA gates; the 3-iter circuit breaker handles escalation. The key is
+# retained to keep existing user .spec-flow.yaml files parseable.
 qa_iter2: auto
 
 # phase_groups: controls Phase Group parallel execution (new in v1.4.0)

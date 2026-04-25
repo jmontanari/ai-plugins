@@ -18,6 +18,8 @@ Argument parsing order: check for `--resolve` first (if present, jump to the Div
 
 ## Workflow (scan flow)
 
+Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag enables the citation-drift deep scan defined below.
+
 **Order:** PRD discovery → all-PRDs default view → drill-in mode → archive filter → drift surfacing.
 
 0. **Load config:** Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
@@ -57,7 +59,7 @@ Argument parsing order: check for `--resolve` first (if present, jump to the Div
 
    Pieces with no `charter_snapshot:` front-matter (pre-charter pieces) are skipped silently.
 
-5. **Check worktrees:** Run `git worktree list` to identify active worktrees. Match against the v3 branch/path convention `worktrees/prd-<prd-slug>/piece-<piece-slug>/` with branches `{spec,plan,execute}/<prd-slug>-<piece-slug>` so the correct PRD grouping is displayed alongside each piece.
+5. **Check worktrees:** Run `git worktree list` to identify active worktrees. Match against the v3 branch/path convention `{{worktree_root}}/` (see `plugins/spec-flow/reference/v3-path-conventions.md`) with branches `{spec,plan,execute}/<prd-slug>-<piece-slug>` so the correct PRD grouping is displayed alongside each piece.
 
 6. **Present status — all-PRDs default view:** Group output by PRD. For each PRD in the `active-set` (and the `archived-set` if `--include-archived`):
 
@@ -93,7 +95,7 @@ Argument parsing order: check for `--resolve` first (if present, jump to the Div
    Pieces: 5
 
      ● token-refresh       in-progress   spec ✓   plan ✓   execute ✓   ⚠ drift: non-negotiables
-         Worktree: worktrees/prd-auth/piece-token-refresh/
+         Worktree: {{worktree_root}}/
          Branch:   execute/auth-token-refresh
          Phase:    3 of 5 (Refactor)
 
@@ -198,3 +200,43 @@ Which option? (1/2/3, default 3)
 ### Post-resolution
 
 After processing all diverged files, re-run divergence detection. If any file is still diverged (e.g., user aborted mid-flow), leave those flags in place. Otherwise report: *"Divergence resolved for `<piece-name>`."*
+
+## Citation drift deep scan (`--include-drift`, FR-2 / FR-3)
+
+Skip this section unless the skill was invoked with `--include-drift`. The default `/spec-flow:status` invocation (without this flag) never executes the steps below.
+
+### Trigger
+
+Invoked only when `--include-drift` is present in the argument list. Compatible with all other flags: `--include-drift` may appear alongside `--include-archived`, a `<prd-slug>` positional, or alone.
+
+### Scan procedure
+
+Walk every `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (per `plugins/spec-flow/reference/v3-path-conventions.md`). For each spec file found:
+
+1. **Extract cited IDs.** Read the `### Non-Negotiables Honored` block. Match all `NN-C-[0-9]+` and `NN-P-[0-9]+` patterns. Read the `### Coding Rules Honored` block. Match all `CR-[0-9]+` patterns.
+
+2. **Verify each ID against its charter file.**
+   - For each `NN-C-` ID: confirm the heading `### NN-C-N:` exists in `<docs_root>/charter/non-negotiables.md` and is not under a `RETIRED` tombstone marker. Drift if absent or retired.
+   - For each `NN-P-` ID: confirm the heading `### NN-P-N:` exists in `<docs_root>/prds/<prd-slug>/prd.md`. Drift if absent or retired.
+   - For each `CR-` ID: confirm the heading `### CR-N:` exists in `<docs_root>/charter/coding-rules.md`. Drift if absent or retired.
+
+3. **Missing-section behavior (NN-C-005):** When a spec lacks both the `### Non-Negotiables Honored` and `### Coding Rules Honored` sections, treat as "no citations to verify" — count the spec in N but record zero drift for it.
+
+4. **Missing-charter-file behavior (NN-C-005):** When `<docs_root>/charter/non-negotiables.md`, `<docs_root>/charter/coding-rules.md`, or a PRD file is absent, the scan counts specs normally but cannot verify the citations that rely on the missing file. In that case: emit a stderr note `note: charter file <path> absent; <K> NN-C/NN-P/CR citations not verified.` and continue. Exit 0 regardless. No error, no stderr escalation beyond the note.
+
+### Output format
+
+- **Drift found:** print one line per offence, then exit with code 2:
+  ```
+  Citation drift in <spec-path>: cited <ID> not present in <expected-charter-file>
+  ```
+  Example:
+  ```
+  Citation drift in docs/prds/auth/specs/token-refresh/spec.md: cited NN-C-099 not present in docs/charter/non-negotiables.md
+  ```
+
+- **No drift:** print one summary line and exit 0:
+  ```
+  No citation drift detected across <N> specs.
+  ```
+  where `<N>` is the count of spec files scanned (N=0 is valid — if no specs exist, print `No citation drift detected across 0 specs.`).

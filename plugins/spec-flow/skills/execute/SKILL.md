@@ -15,7 +15,7 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 - Piece must have status `planned` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
 - `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` must exist and be approved
-- Must be on the worktree branch `execute/<prd-slug>-<piece-slug>` at `worktrees/prd-<prd-slug>/piece-<piece-slug>/`. Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
+- Must be on the worktree branch `execute/<prd-slug>-<piece-slug>` at `{{worktree_root}}/` (resolves to `worktrees/prd-<prd-slug>/piece-<piece-slug>/` at dispatch time — see `plugins/spec-flow/reference/v3-path-conventions.md`). Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
 - All manifest dependencies for this piece must have `status: merged` or `status: done` (per the spec's piece-status state machine). The `depends_on:` precondition in Phase 1 (below) enforces this before any phase dispatch. The `--ignore-deps` flag (FR-021) bypasses this precondition only; it does NOT bypass per-phase QA or end-of-piece review-board (NN-P-002).
 
 ## API encapsulation — this skill is the sole entrypoint for internal agents
@@ -64,7 +64,7 @@ All paths below resolve against `plugins/spec-flow/reference/v3-path-conventions
 
 - Manifest: `docs/prds/<prd-slug>/manifest.yaml`
 - Spec / plan: `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` and `plan.md`
-- Worktree: `worktrees/prd-<prd-slug>/piece-<piece-slug>/`
+- Worktree: `{{worktree_root}}/` (resolves to `worktrees/prd-<prd-slug>/piece-<piece-slug>/` — see `plugins/spec-flow/reference/v3-path-conventions.md`)
 - Branch: `execute/<prd-slug>-<piece-slug>`
 - Reflection targets (consumed in Final Review Step 4.5): `docs/improvement-backlog.md` for process-retro, `docs/prds/<prd-slug>/backlog.md` for future-opportunities. Execute dispatches with the correct PRD slug context; the reflection agents themselves own the writes.
 
@@ -140,6 +140,57 @@ Scope validation before dispatching any sub-phases in a group: parse each sub-ph
 ## Per-Phase Loop
 
 For each phase in plan.md (skip phases where all checkboxes are [x]):
+
+Sub-steps per phase, in order: **Step 0a** (mid-piece Opus QA pass, FR-9 — runs only at the half-way phase boundary of ≥6-phase pieces), then **Steps 1–7** (the standard per-phase pipeline).
+
+### Step 0a: Mid-piece Opus QA pass (FR-9)
+
+At the start of each phase iteration, evaluate the mid-piece trigger before doing any other work for this phase.
+
+**Resume guard:** before evaluating conditions 1-3, check whether a `chore(<piece-slug>): mid-piece Opus QA pass dispatched at phase <N>` commit (where `<N>` matches any digit sequence — regex: `chore\(<piece-slug>\): mid-piece Opus QA pass dispatched at phase [0-9]+`) already exists in `git log --oneline $(git merge-base origin/main HEAD)..HEAD`. If so, set `mid_piece_opus_pass: not-triggered (resumed-after-prior-dispatch)` and proceed to Step 1 — do not re-fire the dispatch. The marker-commit message embeds the resolved phase number (not the literal 'K+1') for unambiguous detection by this resume guard. If the dispatch is a re-fire scenario (the prior dispatch did NOT result in a recorded commit because fix-code rolled back, etc.), the orchestrator's session log is the authoritative source — see Session Resumability.
+
+**Trigger evaluation:**
+
+- Let `N` = total number of phases declared in `plan.md`. Count `### Phase <num>` headings plus `## Phase Group <letter>` headings, where each Phase Group heading counts as one phase from the scheduler's view (its sub-phases are internal to that group).
+- Let `K` = ⌈N / 2⌉ (ceiling of N divided by 2).
+- The trigger fires **if and only if all three conditions hold:**
+  1. `N ≥ 6`
+  2. The current phase is phase number `K + 1` (i.e., the first phase strictly past the half-way point).
+  3. Every phase from 1 through K returned `skip` from the Opus skip-predicate defined in `### Step 6: Phase QA` (the (a)/(b)/(c) structured predicate that decides whether to dispatch Opus QA for the phase, sharpened in this same release per FR-8). Phases that routed to Opus QA — for any reason — disqualify the trigger.
+
+If the trigger does NOT fire, set `mid_piece_opus_pass: not-triggered` for this phase and proceed immediately to **Step 1**.
+
+**Mid-piece pass dispatch (when trigger fires):**
+
+1. Compose a self-contained prompt from `${CLAUDE_PLUGIN_ROOT}/agents/qa-phase.md` with `Input Mode: Mid-piece full review` on line 1. The prompt MUST include — and only these inputs (NN-C-008: no conversation history, no per-phase QA reports):
+   - **Cumulative diff:** `git diff $(git merge-base origin/main HEAD)..HEAD` output (the full diff from piece start through the last completed phase). The cumulative diff baseline is computed at dispatch time as `git merge-base origin/main HEAD` — the piece's branch point from main. Resume-safe because it's recomputed each time.
+   - **Full spec:** the complete text of `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md`.
+   - **AC matrix:** the union of `## AC Coverage Matrix` rows from all completed phase Build reports, held in orchestrator state since Step 3.8's validation gate captured them per-phase as `phase_<id>_ac_matrix` keys (one per phase / sub-phase). Format: phase-N | AC-id | status | pointer.
+   - **Charter raw text (always-attach):** verbatim contents of `<docs_root>/charter/non-negotiables.md` and the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md`. Plus, if the spec's `### Coding Rules Honored` block cites any `CR-xxx` entries, attach those specific entries (not the full file) extracted from `<docs_root>/charter/coding-rules.md`. Match Step 6's existing extraction pattern.
+
+2. Dispatch:
+   ```
+   Agent({
+     description: "Mid-piece QA for <piece-name> (phase <resolved-phase-number>)",
+     prompt: <composed self-contained prompt>,
+     model: "opus"
+   })
+   ```
+
+3. **Iter-until-clean** (see `### Step 6: Phase QA` iter-until-clean fix-code dispatch pattern; same loop semantics)**:** if the mid-piece pass returns must-fix findings:
+   - Dispatch `fix-code` (Sonnet) with the findings and plan context. The fix agent does NOT commit; it ends with `## Diff of changes`.
+   - Commit the fix diff: `git add -- <files>; git commit -m "fix: mid-piece QA iter M"`. Hooks run normally.
+   - Re-dispatch `qa-phase.md` with `Input Mode: Focused re-review`, the prior must-fix findings, and the fix diff.
+   - **Circuit breaker:** 3 iterations maximum. On third circuit-breaker hit, surface to human and do NOT auto-resume.
+
+4. On clean (must-fix = None): append a marker commit to record the dispatch (enables the resume guard above):
+   ```bash
+   git commit --allow-empty -m "chore(<piece-slug>): mid-piece Opus QA pass dispatched at phase 5"
+   # (replace 5 with the actual resolved phase number at commit time — e.g. K+1 resolved to 5)
+   ```
+   Then log `mid_piece_opus_pass: dispatched` with iteration count for the session summary; proceed to **Step 1**.
+
+5. On circuit-breaker escalation: log `mid_piece_opus_pass: escalated`; surface to human; halt.
 
 ### Step 1: Capture Phase Start SHA
 
@@ -322,7 +373,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      ```
      Any stray file (in commit but not in expected) or missing file (in expected but not in commit) rejects the phase. Strays typically mean a concurrent agent's uncommitted changes were swept in via `git commit -a` or `git add -A`; missings typically mean the implementer forgot to stage one of its own files. Retry within the 2-attempt budget.
 
-8. **AC Coverage Matrix validation gate.** After the oracle passes and post-commit gates are clean, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment.
+8. **AC Coverage Matrix validation gate.** After the oracle passes and post-commit gates are clean, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment. After validation, persist Build's `## AC Coverage Matrix` to orchestrator state as `phase_<id>_ac_matrix`, where `<id>` is the phase identifier (e.g., `phase_2`, `phase_3`, `group_a_subphase_a1`, `phase_group_a` for the union, etc.) — the orchestrator chooses a unique identifier per phase or sub-phase. Keys never collide; multiple phases produce multiple keys. Used by Step 0a's mid-piece dispatch.
 
 ### Step 4: Verify — Confirm Correctness
 
@@ -389,6 +440,23 @@ If skipped, proceed directly to Step 6. Otherwise:
 
 ### Step 6: Phase QA
 
+**Opus QA dispatch decision (FR-8 — sharpened skip predicate):** before composing the iter-1 prompt, evaluate whether to dispatch Opus QA for this phase or skip Opus entirely. Skip Opus only when ALL three conditions hold for the phase diff:
+
+  - **(a)** Diff content is composed exclusively of: added markdown sections / paragraphs / lists, added or modified YAML keys with literal scalar values, or added comments and whitespace.
+  - **(b)** No file in the diff is under `plugins/*/skills/*/SKILL.md` AND newly created (a new skill body always routes to Opus regardless of LOC).
+  - **(c)** No file in the diff contains a script in any procedural language with branching control-flow constructs (conditionals, loops, short-circuit operators). The detection pattern set targets shell-style constructs (since spec-flow's hooks are shell scripts today) — extensible if spec-flow ever adopts hooks in another language.
+
+Otherwise route to Opus. "Small LOC" is no longer sufficient justification for skipping; control-flow density is the actual risk signal.
+
+Worked examples:
+- **Example A (skip):** a phase that adds three new H3 sections to a SKILL.md file with no code blocks. → all three conditions hold → skip Opus.
+- **Example B (do not skip):** a phase that adds a 14-line bash hook with one `if` block to `plugins/spec-flow/hooks/`. → condition (c) fails → route to Opus.
+- **Example C (do not skip):** a phase that creates a new `plugins/spec-flow/skills/<name>/SKILL.md` file. → condition (b) fails → route to Opus.
+
+Record the decision (`opus_dispatched: true|false (reason)`) for the session summary and for Step 0a's mid-piece trigger evaluation.
+
+Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 3-iter circuit breaker).
+
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-phase.md`
 
 2. **Iteration 1 (full review):** Build a structured surface map instead of dumping the raw diff + full spec + PRD. The goal is to hand Opus pre-digested context so it does adversarial review, not re-discovery.
@@ -433,20 +501,50 @@ If skipped, proceed directly to Step 6. Otherwise:
      ```
      Hooks run on the commit. If a hook fails, re-dispatch the fix agent with the hook error appended to its context; do not bypass with `--no-verify`.
 
-   - **Conditional skip of re-dispatch.** Read the `qa_iter2` key from `.spec-flow.yaml` (valid values: `auto`, `always`; default `auto`). In `auto` mode, skip the iter-M+1 QA re-dispatch if **all** of:
-     - `iter_M_fix_diff` line count (excluding diff headers) < 50 LOC
-     - The fix agent reported all findings resolved (no `## Blocked findings` section or it's empty)
-     - The mode's oracle is green after the fix commit (re-run it; cheap vs. another Opus dispatch)
-
-     When skipped, treat the fix agent's self-verification as the gate and proceed to Step 7. Log `qa_iter2_skipped: true` with the fix diff line count for the session summary. Rationale: across observed sessions iter-2 found new must-fix in roughly 1 out of 6 runs — low yield for a 15–30 min Opus dispatch, and the class of finding that hits (cross-file semantic issues like stale fixture references) tends to get caught by Final Review's board anyway. The small-diff + self-verified heuristic is conservative enough to not mask genuine regressions.
-
-     In `always` mode, always re-dispatch.
-
-   - **Re-dispatch (when not skipped):** QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings. The agent template's iter-2 rules hard-cap out-of-scope reads (return BLOCKED rather than fetching).
+   - **Re-dispatch:** QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings. The agent template's iter-2 rules hard-cap out-of-scope reads (return BLOCKED rather than fetching).
    - **Circuit breaker:** 3 iterations max, then escalate.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate — no point re-running QA.
 
-4. When QA returns must-fix=None (or iter-2 re-dispatch was skipped by the conditional above), proceed to **Step 7**.
+### Step 6a: Deferred-finding tracking (FR-10)
+
+**Dedup check:** before appending a stub, scan the existing PRD-local backlog for any `## [Deferred QA finding]` entry whose `Finding (verbatim)` body matches the about-to-be-appended finding (case-insensitive substring match) within the current piece's session. If a duplicate is found, skip the append; do NOT create a second stub for the same finding.
+
+After each QA iteration (regardless of whether must-fix findings remain), scan the QA agent's full report for `Deferred to reflection:` markers (case-insensitive match). If any are found:
+
+1. **Parse each occurrence:**
+   - **Deferring reviewer:** the agent name from the dispatch context — `qa-phase`, `qa-phase-lite`, or `qa-spec` / `qa-plan` / `qa-charter` for spec/plan/charter QA gates.
+   - **Finding text:** the verbatim prose immediately following `Deferred to reflection:` up to the next blank line or list-item boundary (whichever comes first). Preserve the original wording exactly.
+   - **Commit SHA:** run `git rev-parse HEAD` at deferral time — before any subsequent fix-code or progress commits — to capture the state the finding refers to.
+
+2. **Append a stub** to `<docs_root>/prds/<prd-slug>/backlog.md`:
+
+   ```markdown
+   ## [Deferred QA finding] <YYYY-MM-DD> — <piece-slug>
+
+   - **Deferring reviewer:** <agent-name>
+   - **Captured at commit:** <sha>
+   - **Finding (verbatim):** <prose>
+   - **Status:** unresolved — reflection step (4.5) classifies as incorporated / deferred / obsolete.
+   ```
+
+   Use today's date (`date +%F`) for `<YYYY-MM-DD>`. If the backlog file does not yet exist, create it using `plugins/spec-flow/templates/backlog.md` as the template (replacing `{{prd_name}}` and `{{date}}` placeholders) before appending.
+
+3. **Commit the backlog edit** on the piece branch:
+
+   ```bash
+   git add <docs_root>/prds/<prd-slug>/backlog.md
+   git commit -m "chore(<piece-slug>): record deferred QA finding"
+   ```
+
+   One commit per QA iteration that contains at least one `Deferred to reflection:` marker. If an iteration has N markers, append all N stubs in a single commit.
+
+4. **Do not block phase progression.** The iter-until-clean loop terminates when must-fix=None. `Deferred to reflection:` items are NOT counted as must-fix findings. The phase advances normally once all must-fix findings are resolved, regardless of how many deferred items were recorded.
+
+5. **Convention, not requirement.** The `Deferred to reflection:` marker is a convention that QA agents may emit voluntarily — per CR-008 + NN-C-008, the agent templates are NOT modified to require or instruct this behaviour. The orchestrator-side parser records whatever the agent emits; it never mandates the marker.
+
+**Step 4.5 (end-of-piece reflection)** reads the accumulated backlog file and prompts the user to classify each `[Deferred QA finding]` entry as one of: **incorporated** (resolved within this piece), **deferred** (move to active backlog as a future piece candidate), or **obsolete** (no longer applies).
+
+4. When QA returns must-fix=None, proceed to **Step 7**.
 
 ### Step 6b: Phase Hook Sanity Check
 
@@ -505,7 +603,7 @@ Per-sub-phase internal flow — each sub-phase runs the same checks as the Per-P
 - Red step (Step 2) — stages tests (sub-phase-scoped), emits its own `phase_N_red_stage_manifest` keyed by sub-phase id
 - Build step (Step 3) with Step 3 item 7 AC matrix validation gate + item 8 post-commit integrity + reconciliation gates
 - Verify step (Step 4) with Audit/Full mode selection
-- QA-lite step — dispatch `qa-phase-lite.md`, Sonnet. Same iter-1/iter-2 loop as the current full QA, with Step 6's `qa_iter2` skip predicate still applying (small self-verified fix-diffs skip the iter-2 re-dispatch).
+- QA-lite step — dispatch `qa-phase-lite.md`, Sonnet. Iter-until-clean per `plugins/spec-flow/reference/qa-iteration-loop.md` — full review on iter-1, focused re-review on iter-2+, 3-iter circuit breaker.
 - Sub-phase Progress is implicit (no separate progress commit per sub-phase — the group progress commit covers all)
 
 **Shared staging area safety (v2.7.0).** Parallel sub-phases share the same git index, but scope disjointness is enforced at Step G2 (pairwise literal-path check) and literal-path staging discipline in Rule 6 (tdd-red) + Rule 8 (implementer) means each sub-phase's `git add` + `git commit` references only its own paths. A sibling sub-phase's staged-but-uncommitted tests remain in the index but are NOT swept into another sub-phase's unified commit because the implementer commits by literal path. The orchestrator's Step 3.7b reconciliation (commit file list = sub-phase's Red manifest ∪ sub-phase's Build reported files) catches any cross-contamination.
@@ -547,7 +645,7 @@ Dispatch the `qa-phase.md` agent at Opus tier. Compose the prompt using the exis
 - `## Phase ACs` — union of all sub-phase ACs
 - `## Non-negotiables` — unchanged
 
-If Group Deep QA returns must-fix: run the same iter-2 loop as the flat-phase QA does (Step 6's `qa_iter2` skip predicate applies — small self-verified fix-diffs skip the iter-2 re-dispatch), dispatching fix-code agents for findings. Each fix-code dispatch operates on the specific sub-phase scope the finding points to.
+If Group Deep QA returns must-fix: run the iter-until-clean loop per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 3-iter circuit breaker), dispatching fix-code agents for findings. Each fix-code dispatch operates on the specific sub-phase scope the finding points to.
 
 ### Step G9: Step 6b hook sweep over the group diff
 
@@ -699,7 +797,7 @@ Agent({ description: "Future opportunities for <prd-slug>/<piece-slug>", prompt:
 ```
 
 **Process-retro prompt context:**
-- Session-end metrics summary (per the Measurement section — Build duration, Build token count, Verify mode chosen, Refactor skipped, QA iter-2 skipped, Step 6b outcome, Phase Group auto-triage outcomes if any group ran)
+- Session-end metrics summary (per the Measurement section — Build duration, Build token count, Verify mode chosen, Refactor skipped, QA iteration count, Step 6b outcome, Phase Group auto-triage outcomes if any group ran)
 - Per-phase escalation log (every circuit-breaker hit, BLOCKED report, contamination event, scope violation observed during the piece)
 - Plan structure (plan.md's phase outline)
 - Cumulative diff (`git diff $piece_start_sha..HEAD`)
@@ -756,7 +854,7 @@ git commit -m "learnings: <prd-slug>/<piece-slug>"
 git checkout main
 git merge --squash execute/<prd-slug>-<piece-slug>
 git commit -m "execute/<prd-slug>-<piece-slug>: <summary of what was built>"
-git worktree remove worktrees/prd-<prd-slug>/piece-<piece-slug>
+git worktree remove {{worktree_root}}
 git branch -d execute/<prd-slug>-<piece-slug>
 ```
 
@@ -789,13 +887,13 @@ Progress tracked via [x] checkboxes in plan.md:
 
 ## Measurement
 
-At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), **Refactor skipped** (auto-skip predicate matched), **QA iter-2 skipped** (small-diff predicate matched), and **Step 6b outcome** (pass / autofix / fix-code dispatched). Observable properties:
+At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), **Refactor skipped** (auto-skip predicate matched), **QA iteration count** (iter-1 / iter-2 / iter-3 mix per phase), **Step 6b outcome** (pass / autofix / fix-code dispatched), **mid_piece_opus_pass** (`dispatched` with iteration count / `not-triggered` / `escalated`), and **deferred_findings_recorded** (count of `Deferred to reflection:` stubs written to backlog across all QA iterations for this piece). Observable properties:
 
 1. Build token count is materially lower than a comparable-scope phase would have been without pre-flight digests and scoped QA prompts — pre-flight facts + pitfall checklist reduce agent rediscovery and self-iteration.
 2. Build tool-use count drops commensurately.
 3. Verify: majority of clean-Build phases use Audit mode (3–5 min) rather than Full (10–15 min). Driven by Step 3's AC matrix gate — a clean matrix unlocks Audit.
 4. Step 6b passes cleanly on the majority of phases (no-op), because per-commit hooks caught issues at each intermediate commit rather than letting them accumulate.
-5. Refactor is skipped on clean-Build phases; QA iter-2 is skipped when the fix-diff is small and self-verified.
+5. Refactor is skipped on clean-Build phases; QA iterations run until reviewer returns must-fix=None or the 3-iter circuit breaker fires.
 
 If (1)/(2) don't hold on two consecutive large phases, something other than the pre-flight inefficiencies is dominating — re-audit before adding more machinery. If (3) doesn't hold, inspect Implement's AC coverage matrix — the matrix is likely incomplete or inconsistent, forcing Full mode unnecessarily. If Step 6b consistently dispatches fix-code, the project's pre-commit config includes checks that depend on full-repo context (e.g. global mypy or whole-repo type checking); move those to pre-push.
 

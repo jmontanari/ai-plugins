@@ -117,7 +117,7 @@ pieces:
       Minor bump (NN-C-003: backwards-compatible additions). 11 items, plan likely splits into 2-3 Phase Groups (capability vs. orchestrator vs. plan-skill rules) so per-area QA stays focused. Brainstorm during spec authoring will negotiate FR-005 path-pick and confirm migrate-skill stays on path 1.
     prd_sections: [FR-004, NFR-003, NFR-004]
     dependencies: [PI-008-multi-prd-v3.0.0]
-    status: implementing
+    status: done
 
 coverage:
   total_prd_sections: 15

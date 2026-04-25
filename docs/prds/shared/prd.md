@@ -41,7 +41,7 @@ version: 1
 - **NFR-001:** Plugin installation and session-start are both fast — SessionStart hook output under 500ms on a warm cache; no blocking network calls.
 - **NFR-002:** Plugins work fully offline. No network access is required for any core skill or agent.
 - **NFR-003:** Plugin upgrades within a major version preserve user-project compatibility (per NN-C-003).
-- **NFR-004:** Documentation is the source of truth. No hidden behavior outside what a user can read in `README.md`, `CHANGELOG.md`, and the `SKILL.md` / agent files they invoke.
+- **NFR-004:** Documentation is the source of truth. No hidden behavior outside what a user can read in `README.md`, `CHANGELOG.md`, and the `SKILL.md` / agent files they invoke — including documenting environment preconditions for skills that operate on user repos. The `plugins/spec-flow/skills/migrate/SKILL.md` skill's `## Environment preconditions` section is the canonical example: skills that prescribe host-side actions document the host-side capabilities they assume.
 
 ## Success Metrics
 

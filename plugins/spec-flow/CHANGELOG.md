@@ -2,6 +2,38 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.1.0] — 2026-04-25
+
+### Added
+
+- Charter-drift deep scan via `/spec-flow:status --include-drift` — surfaces semantic drift in spec NN/CR citations against current charter content (CAP-2 / FR-2, FR-3).
+- `{{worktree_root}}` template token resolved by orchestrator from active piece slug pair; replaces literal `worktrees/...` paths in Agent dispatch templates across spec/plan/execute/status/prd/migrate SKILL.md files (CAP-3 / FR-4, FR-5).
+- `## Environment preconditions` section in `plugins/spec-flow/skills/migrate/SKILL.md` — documents host-side capabilities (LLM-agent runtime + git + POSIX shell) without mandating any specific language runtime (CAP-4 / FR-6).
+- Mid-piece Opus QA pass for ≥6-phase pieces — orchestrator inserts one Opus QA dispatch at the half-way commit when prior phases auto-skipped (ORC-2 / FR-9).
+- Deferred-finding tracking — orchestrator parses `Deferred to reflection:` markers in QA reports and writes structured stubs to PRD-local backlog at deferral time (ORC-3 / FR-10).
+- `plugins/spec-flow/reference/qa-iteration-loop.md` — canonical reference doc for the iter-until-clean QA loop pattern; spec/plan/charter/execute SKILL.md cite it (ORC-7 / FR-14, FR-15).
+- Plan-skill phase-sizing warning when a single phase exceeds 150 LOC of behavioral prose (ORC-4 / FR-11).
+- Plan-skill exit-gate semantics validator rejecting "X is documented to run later" downgrades (ORC-5 / FR-12).
+
+### Changed
+
+- PI-008 spec FR-005 amended to single-branch model (`spec/<prd-slug>-<piece-slug>` from spec authoring through plan and execute) — matches shipped code; replaces the v3.0.0 spec text that prescribed three branches per piece (CAP-1 / FR-1).
+- NFR-004 in `docs/prds/shared/prd.md` clarified that "Documentation is the source of truth" includes documenting environment preconditions for skills that operate on user repos (CAP-4 / FR-7).
+- Sharpened Opus QA skip-predicate — skips only for additive markdown / YAML / pure config; routes to Opus when phase touches scripts with control-flow constructs or new skill bodies regardless of LOC (ORC-1 / FR-8).
+- Plan template `[Verify]` examples for YAML/JSON validation use LLM-agent-step framing instead of `yq`/`jq` shell-outs (ORC-6 / FR-13).
+- All QA gates (spec, plan, charter, execute per-phase, mid-piece Opus, Final Review fix-up) iterate until reviewer reports zero must-fix findings; iter-1 = full review, iter-2+ = focused re-review on the fix diff; 3-iter circuit breaker stays as escalation guard (ORC-7 / FR-14).
+
+### Removed
+
+- (none — no public-surface item removed; `qa_iter2` config key is retained as deprecated, see Migration notes below.)
+
+### Migration notes for upgraders
+
+- **`qa_iter2` config key is deprecated.** The orchestrator no longer reads this key. Users with `qa_iter2: auto` or `qa_iter2: always` in their `.spec-flow.yaml` continue to load without error or warning — the key syntax is preserved for backwards compatibility per NN-C-003. The behavior change: iter-2 QA re-dispatch is now the default for all gates (no more conditional skip on small fix diffs). Users who relied on the auto-skip for throughput should expect more iterations on phases where fix-code surfaces residual must-fix items.
+- **`/spec-flow:status --include-drift` is opt-in.** Default `/spec-flow:status` invocation is unchanged. Run with `--include-drift` to surface citation drift across all specs.
+- **Mid-piece Opus QA pass triggers on long pieces.** Pieces declaring ≥6 phases where the first ⌈N/2⌉ all auto-skip Opus will see one additional Opus dispatch at the half-way commit. No user action required; the dispatch is observable in the session summary as `mid_piece_opus_pass: dispatched`.
+- **Dog-food evidence:** v3.1.0 was end-to-end dog-fooded on this repo as the `pi-009-hardening` piece. End-of-piece reflection is captured in `docs/prds/shared/specs/pi-009-hardening/learnings.md` — covering all 12 sub-phases (Group A.1–A.4, Group B.1–B.4, Group C.1–C.3, Phase D), with what-worked / what-didn't entries per sub-phase.
+
 ## [3.0.0] — 2026-04-25
 
 ### Added
