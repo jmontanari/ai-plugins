@@ -121,7 +121,16 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
    If only one phase touches the coordination files, skip Scaffold — it's overhead without payoff.
 
-8. **Phase Groups for parallelizable work.** When a piece contains ≥2 units of work that touch disjoint file scopes and have no symbol dependencies on each other (classic examples: N independent adapters, N independent endpoints, per-table migrations), decompose them into a **Phase Group** with `[P]`-marked **Sub-Phases** instead of a single combined phase or a serial chain of flat phases.
+8. **Phase Groups for parallelizable work — parallel-by-default (v3.1.3+).** When a piece contains ≥2 units of work that touch disjoint file scopes and have no symbol dependencies on each other (classic examples: N independent adapters, N independent endpoints, per-table migrations), the **default authoring pattern** is a **Phase Group** with `[P]`-marked **Sub-Phases**. A serial chain of flat phases for the same disjoint work is a deviation from default and requires explicit justification (see `Why serial:` below). Rationale: the executor only dispatches what the plan declares as parallel — flat phases run sequentially regardless of how disjoint their scopes are. Defaulting to Phase Groups when work is genuinely disjoint moves wall-clock time off the table by the fan-out factor.
+
+   **`Why serial:` escape hatch.** When the plan author has a deliberate reason to keep parallelizable work as serial flat phases — preserving per-phase Opus QA for regulatory/audit reasons, anticipating later coupling, sequencing for review-board readability, etc. — declare the rationale via a single-line preamble on at least one of the affected phases:
+   ```markdown
+   ### Phase 3: <name>
+   Why serial: phase 4 imports types defined here; cannot parallelize until <future piece> extracts the shared types.
+   ...
+   ```
+   One `Why serial:` line covers the chain it heads. Multiple distinct reasons → multiple lines on the affected phases. The qa-plan agent reads this line as the "I considered parallel and chose serial deliberately" signal; absence of the line on a flat-phase plan with disjoint scopes is a should-fix finding (criterion 11).
+
 
    **Structure a Phase Group as:** (note heading levels — the execute skill's Phase Scheduler detects `## Phase Group` at H2 and `#### Sub-Phase` at H4; deviating breaks detection)
    ```markdown

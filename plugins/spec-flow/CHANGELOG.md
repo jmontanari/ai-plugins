@@ -2,6 +2,22 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.1.3] — 2026-04-25
+
+### Changed
+
+- **Plan SKILL rule 8 ("Phase Groups for parallelizable work") flips from recommendation to default.** When ≥2 units of work touch disjoint file scopes and have no symbol dependencies on each other, a Phase Group with `[P]`-marked sub-phases is now the default authoring pattern; a serial chain of flat phases for the same disjoint work requires explicit justification via a `Why serial: <reason>` preamble line on the affected phase(s). Reason: in practice, plan authors were defaulting to flat phases even for genuinely parallelizable work, leaving execute-time concurrency on the table because the orchestrator only dispatches what the plan declares as parallel.
+
+### Added
+
+- **qa-plan criterion 11 — missed parallelism (should-fix).** The plan QA agent now flags flat-phase plans where ≥2 phases declare disjoint file scopes (path-set intersection empty AND no symbol cross-references) without a `Why serial:` rationale on either of the disjoint-scope phases. **Should-fix**, not must-fix — plan authors retain judgment, but the check makes "did you consider parallel?" visible at QA gate time so the parallel-by-default rule actually shapes plans over time. Detection is static text analysis against the plan document only (per-pair path-set intersection + symbol-reference scan); no codebase access required.
+
+### Migration notes for upgraders
+
+- **No user action required for in-flight pieces.** Plans already approved through qa-plan continue to execute identically; the new criterion only fires on plans authored or re-reviewed under v3.1.3+.
+- **Authoring impact:** plan authors who deliberately structure parallelizable work as serial flat phases (preserving per-phase Opus QA for regulatory reasons, anticipating later coupling, etc.) must now declare the rationale via `Why serial: <reason>` on the affected phase(s). One line per phase suffices; multiple distinct reasons → multiple lines on the affected phases.
+- **Behavior change for execute-time concurrency:** plans authored under v3.1.3+ should converge toward more Phase Groups for genuinely parallelizable work. Execute-time wall-clock for those pieces drops by the parallel-fan-out factor (typically 2–4× for adapter/endpoint families). No execute-skill changes — this is purely upstream plan-authoring guidance + QA enforcement.
+
 ## [3.1.2] — 2026-04-25
 
 ### Fixed
