@@ -32,7 +32,7 @@ You (the main window) are a PURE CONDUCTOR. You:
 - Run verification commands (test suite, type checker, linter)
 - Evaluate agent reports and QA findings
 - Decide: proceed / retry / escalate
-- Track progress via plan.md checkboxes
+- Track progress via BOTH plan.md checkboxes AND a harness task list (`TaskCreate` once at start, `TaskUpdate` per phase) — see "Pre-Loop: Build Task List" below. Both are required; neither alone is sufficient.
 
 You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git grep`, reading `.pre-commit-config.yaml`) are explicitly part of the conductor role — they are cheap reads that collapse 5–15 agent tool calls per dispatch. Synthesis and code-writing still come from subagents.
 
@@ -136,6 +136,24 @@ Read the `phase_groups` key from `.spec-flow.yaml` (valid values: `auto`, `alway
 - `off` — treat every top-level unit as a flat phase, ignoring Phase Group headings. Escape hatch for rollback or for plans authored before v1.4.0.
 
 Scope validation before dispatching any sub-phases in a group: parse each sub-phase's `**Scope:**` declaration (literal file paths only, no globs) and check for pairwise overlap. If two sibling sub-phases declare overlapping files, fall back to serial execution for that group (each sub-phase runs as a flat phase in declaration order) and log a warning naming the overlap.
+
+## Pre-Loop: Build Task List
+
+Before the Per-Phase Loop dispatches anything, build a complete harness task list mirroring plan.md's structure. Using the unit list the Phase Scheduler resolved above, call `TaskCreate` once per dispatch unit, in plan order, all marked `pending`. A "dispatch unit" is:
+
+- Each `### Phase <N>` (flat phase) → one task.
+- Each `#### Sub-Phase <letter>.<n>` inside a `## Phase Group` → one task. The group heading itself does NOT get a task; the sub-phases ARE the dispatched units.
+
+This rule is binding. Do NOT create tasks lazily one phase at a time, do NOT create only the first task, and do NOT skip the task list when a piece has only one phase. A complete list up front makes the work visible to the user, the run resumable, and interruption recovery unambiguous.
+
+Suggested task title format: `Phase <N>: <plan heading title>` for flat phases, `Sub-Phase <letter>.<n>: <plan heading title>` for sub-phases. Keep titles ≤ 80 chars.
+
+Update task status as the loop runs:
+- `in_progress` when the phase enters **Step 1: Capture Phase Start SHA**.
+- `completed` when **Step 7** finishes (plan.md checkbox tick + phase commit landed).
+- On phase circuit-breaker escalation (oracle 2-attempt budget exhausted, agent BLOCKED, post-commit gate rejected twice, etc.), leave the task `in_progress` and surface to human — do NOT mark `completed`.
+
+Resume case: if `TaskList` already returns tasks for this piece (a prior session created them), do NOT call `TaskCreate` again. Reconcile against plan.md's current checkbox state: phases with all boxes `[x]` → `completed`; the next unchecked phase → `in_progress` when its Step 1 begins. A mismatch between the existing task list and the plan's current unit list (plan edited mid-flight) surfaces to human — do NOT auto-rebuild silently.
 
 ## Per-Phase Loop
 

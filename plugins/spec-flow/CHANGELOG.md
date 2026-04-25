@@ -2,6 +2,17 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.1.2] — 2026-04-25
+
+### Fixed
+
+- **Execute orchestrator now binding-creates a harness task list up front.** Prior wording said only "Track progress via plan.md checkboxes," which produced inconsistent behavior across runs — sometimes the full task list was created, sometimes only the first task, sometimes none. v3.1.2 adds an explicit **Pre-Loop: Build Task List** section to `plugins/spec-flow/skills/execute/SKILL.md` requiring one `TaskCreate` per dispatch unit (each `### Phase <N>` and each `#### Sub-Phase <letter>.<n>`, in plan order, all `pending`) before any phase dispatches. Group headings do NOT get their own task — sub-phases ARE the dispatched units. Status transitions are spelled out: `in_progress` at Step 1, `completed` at Step 7, escalation leaves `in_progress`. Resume case (`TaskList` already returns tasks for the piece) is reconciled against plan.md checkbox state, not rebuilt — plan-edited-mid-flight mismatches surface to human rather than silently auto-rebuilding.
+
+### Migration notes for upgraders
+
+- **No user action required.** This is a documentation-clarification change to the `execute` skill. The new wording codifies one of the two existing behaviors as canonical. No `.spec-flow.yaml` config changes; existing pieces in flight continue to execute identically (Step 7 commits, plan.md checkboxes, oracle gates, and review-board behavior are unchanged).
+- **Visibility change for orchestrator runs:** if your runs were creating tasks lazily (one at a time) or skipping the task list when a piece had only one phase, those runs will now create the full list up front. End state is identical; intermediate visibility and resumability improve.
+
 ## [3.1.1] — 2026-04-25
 
 ### Fixed
