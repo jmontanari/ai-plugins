@@ -5,7 +5,7 @@ description: Internal agent — dispatched by spec-flow:execute at end-of-piece 
 
 # Future Opportunities Agent
 
-You examine what was just shipped and what surrounds it (the spec it implemented, the plan it followed, the manifest of other pieces, the current improvement backlog) to surface forward-looking ideas worth considering for future pieces. The output feeds the project's improvement backlog and the next piece's spec brainstorm.
+You examine what was just shipped and what surrounds it (the spec it implemented, the plan it followed, the manifest of other pieces, the current PRD-local backlog) to surface forward-looking ideas worth considering for future pieces. The output feeds the PRD-local backlog at `docs/prds/<prd-slug>/backlog.md` (the orchestrator passes the exact path) and the next piece's spec brainstorm within that PRD.
 
 ## Rules
 
@@ -13,7 +13,8 @@ You examine what was just shipped and what surrounds it (the spec it implemented
    - The final spec for this piece (with acceptance criteria, including any deferred ACs)
    - The final plan (with any `NOT COVERED` rows from Build's AC matrix)
    - The cumulative diff (`git diff $piece_start_sha..HEAD`)
-   - The current `<docs_root>/improvement-backlog.md` contents (or "(file does not exist yet)" on first piece)
+   - The target backlog path (the PRD-local `docs/prds/<prd-slug>/backlog.md` for the PRD this piece belongs to — the orchestrator computes this from the current piece's PRD and supplies it explicitly)
+   - The current contents of that PRD-local backlog (or "(file does not exist yet)" if this is the first piece in the PRD)
    - The `<docs_root>/manifest.yaml` (so you can see other pieces' status)
 
    If the prompt asks you to modify code (you are read-only), OR any required block is absent, STOP and report:
@@ -24,7 +25,7 @@ You examine what was just shipped and what surrounds it (the spec it implemented
 
 - You have CLEAN CONTEXT — no memory of the implementation conversation.
 - Every item you propose MUST reference a concrete artifact (deferred AC ID, plan section, file:symbol, manifest piece). Items without a concrete reference are speculation, not findings — omit them.
-- Cross-check against the existing improvement backlog: do NOT propose duplicates of items already there. If you would propose something already in the backlog, skip it (the orchestrator will surface the existing one in the next spec brainstorm).
+- Cross-check against the existing PRD-local backlog content provided in your prompt: do NOT propose duplicates of items already there. If you would propose something already in the backlog, skip it (the orchestrator will surface the existing one in the next spec brainstorm for this PRD).
 - Do NOT modify any files. Output structured findings only.
 
 ## Context Provided
@@ -32,7 +33,8 @@ You examine what was just shipped and what surrounds it (the spec it implemented
 - **Spec:** the approved spec for this piece (acceptance criteria, deferred ACs)
 - **Plan:** the approved plan (phase structure, AC matrix `NOT COVERED` rows with their forward pointers)
 - **Cumulative diff:** `git diff $piece_start_sha..HEAD`
-- **Current improvement backlog:** contents of `<docs_root>/improvement-backlog.md`, or marker that the file does not exist yet
+- **Target backlog path:** the PRD-local `docs/prds/<prd-slug>/backlog.md` for the PRD this piece belongs to — passed explicitly by the orchestrator (execute skill, Step 4.5), which computes it from the current piece's PRD. Findings route here, NOT to the global `docs/improvement-backlog.md` (that file is reserved for the paired `reflection-process-retro` agent's process/orchestration findings).
+- **Current PRD-local backlog:** contents of the target backlog file, or marker that the file does not exist yet (first piece in the PRD)
 - **Manifest:** `<docs_root>/manifest.yaml` showing all pieces (open / specced / planned / implementing / done)
 
 ## Review focus (ordered)
@@ -57,7 +59,7 @@ You examine what was just shipped and what surrounds it (the spec it implemented
 
 ## Output Format
 
-Emit at H3 level so the orchestrator can nest your output cleanly under the per-piece H2 wrapper in the improvement backlog. Do NOT emit a top-level H2 — the orchestrator wraps your output with one.
+Findings append under the PRD-local backlog's `## Recent findings` H2 section (the orchestrator creates that section in `docs/prds/<prd-slug>/backlog.md` if it doesn't already exist). Emit at H3 level so the orchestrator can nest your output cleanly under that `## Recent findings` H2. Do NOT emit a top-level H2 — the orchestrator owns the section header.
 
 ```
 ### Future opportunities for <piece-name>

@@ -13,10 +13,10 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 ## Prerequisites
 
-- Piece must have status `planned` in manifest
-- `docs/specs/<piece-name>/plan.md` must exist and be approved
-- Must be on the worktree branch `spec/<piece-name>`
-- All manifest dependencies for this piece must have status `done`
+- Piece must have status `planned` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
+- `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` must exist and be approved
+- Must be on the worktree branch `execute/<prd-slug>-<piece-slug>` at `worktrees/prd-<prd-slug>/piece-<piece-slug>/`. Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
+- All manifest dependencies for this piece must have `status: merged` or `status: done` (per the spec's piece-status state machine). The `depends_on:` precondition in Phase 1 (below) enforces this before any phase dispatch. The `--ignore-deps` flag (FR-021) bypasses this precondition only; it does NOT bypass per-phase QA or end-of-piece review-board (NN-P-002).
 
 ## API encapsulation — this skill is the sole entrypoint for internal agents
 
@@ -36,19 +36,91 @@ You (the main window) are a PURE CONDUCTOR. You:
 
 You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git grep`, reading `.pre-commit-config.yaml`) are explicitly part of the conductor role — they are cheap reads that collapse 5–15 agent tool calls per dispatch. Synthesis and code-writing still come from subagents.
 
-## Pre-Loop: Mark Piece as Implementing
+## Pre-Loop: Mark Piece as In-Progress
 
-Before the first phase runs (and only on a fresh start, not a resume), update the manifest on `main` to mark this piece's status as `implementing`. Skip if it's already `implementing` (resumed session).
+Before the first phase runs (and only on a fresh start, not a resume), update the PRD's manifest on `main` to mark this piece's status as `in-progress` (per the spec's piece-status state machine). Skip if it's already `in-progress` (resumed session).
 
 ```bash
 git checkout main
-# update manifest.yaml: set this piece's status to "implementing"
-git add docs/manifest.yaml
-git commit -m "manifest: mark <piece-name> as implementing"
-git checkout spec/<piece-name>
+# update docs/prds/<prd-slug>/manifest.yaml: set this piece's status to "in-progress"
+git add docs/prds/<prd-slug>/manifest.yaml
+git commit -m "manifest: mark <prd-slug>/<piece-slug> as in-progress"
+git checkout execute/<prd-slug>-<piece-slug>
 ```
 
-This makes `status` report an accurate picture — a piece is `implementing` while execute is in progress, and flips to `done` after the final merge.
+This makes `status` report an accurate picture — a piece is `in-progress` while execute is in progress, and flips to `merged` (or the `done` alias) after the final merge.
+
+## Phase 1: Load Context + Charter Drift + Dependency Preconditions
+
+Before the Phase Scheduler dispatches any phase, execute resolves `<prd-slug>` and `<piece-slug>` (from the user argument or by scanning `docs/prds/*/manifest.yaml` for the named piece), loads the plan at `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` and spec at `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md`, then runs the four gates below in order.
+
+### 1a. Charter-drift check (always applies — runs first)
+
+A piece reaching execute stage already has a spec carrying a `charter_snapshot:` front-matter and a plan aligned to that snapshot. Before any phase dispatch, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live `<docs_root>/charter/` files. If drift is detected, halt Phase 1 and escalate per the reference doc — do not dispatch phases against stale charter constraints.
+
+### 1b. Path resolution
+
+All paths below resolve against `plugins/spec-flow/reference/v3-path-conventions.md`. In particular:
+
+- Manifest: `docs/prds/<prd-slug>/manifest.yaml`
+- Spec / plan: `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` and `plan.md`
+- Worktree: `worktrees/prd-<prd-slug>/piece-<piece-slug>/`
+- Branch: `execute/<prd-slug>-<piece-slug>`
+- Reflection targets (consumed in Final Review Step 4.5): `docs/improvement-backlog.md` for process-retro, `docs/prds/<prd-slug>/backlog.md` for future-opportunities. Execute dispatches with the correct PRD slug context; the reflection agents themselves own the writes.
+
+Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
+
+### 1c. `depends_on:` precondition (FR-011, AC-11)
+
+After the manifest has been loaded and before any phase is dispatched, check the current piece's dependency declarations:
+
+1. Read the current piece's `depends_on:` list from its entry in `docs/prds/<prd-slug>/manifest.yaml`.
+2. For each entry, resolve it to a target piece:
+   - **Qualified ref** `<dep-prd-slug>/<dep-piece-slug>` — look up the entry in `docs/prds/<dep-prd-slug>/manifest.yaml`.
+   - **Bare ref** `<dep-piece-slug>` — resolve against the current PRD's manifest (i.e. `docs/prds/<prd-slug>/manifest.yaml`).
+3. For each resolved dependency, read its `status:` field. Per the spec's piece-status state machine, only `merged` or `done` (the backward-compatible alias) permit a downstream piece to start `execute`. All other statuses — `open`, `specced`, `planned`, `in-progress`, `superseded`, `blocked` — fail the precondition.
+4. If any dependency's status is not `merged` and not `done`, refuse to start. Print a blocking-deps list naming each unsatisfied dependency and its current status verbatim, then exit. Example:
+
+   ```
+   REFUSED — unmet depends_on preconditions:
+     - auth/login-flow   status: planned   (needs: merged or done)
+     - billing/invoices  status: blocked   (needs: merged or done)
+   Re-run once these dependencies are merged, or pass --ignore-deps to proceed anyway (see FR-021).
+   ```
+
+5. **NN-P-002 preservation:** this precondition is a BLOCKER ONLY. It never bypasses the per-phase QA gate (Step 6) or the end-of-piece review-board sign-off (Final Review Step 4). Both human gates remain mandatory regardless of dependency state — `depends_on:` and `--ignore-deps` do NOT bypass per-phase QA or review-board.
+
+### 1d. `--ignore-deps` flag (FR-021)
+
+When invoked as `/spec-flow:execute <piece> --ignore-deps`, execute skips the refusal in 1c but does NOT skip the check itself — the list of unmet dependencies is still computed and surfaced loudly before any phase dispatches. Per NN-C-006's "explicit confirmation" posture for deliberate deviations, print a multi-line yellow warning (≥ 5 lines, bracketed by separator characters) naming each ignored dependency and its current status. Example format:
+
+```
+════════════════════════════════════════════════════════════════════
+WARNING — --ignore-deps active. The following depends_on preconditions
+are UNMET but will be bypassed for this execute run (FR-021, NN-C-006):
+  - auth/login-flow   status: planned   (expected: merged or done)
+  - billing/invoices  status: blocked   (expected: merged or done)
+Proceeding anyway at the operator's explicit request. Cross-piece
+integration issues introduced by running against unmerged dependencies
+are the operator's responsibility to triage.
+════════════════════════════════════════════════════════════════════
+```
+
+The flag bypasses the 1c precondition only. It does NOT bypass per-phase QA (Step 6) or end-of-piece review-board (Final Review Step 4) — those two human sign-off gates remain mandatory per NN-P-002. The flag also does not bypass the charter-drift check (1a), the AC matrix gate (Step 3 item 8), the post-commit integrity gates (Step 3 item 7), or any other gate described elsewhere in this skill.
+
+**Structural-failure deps refuse even with `--ignore-deps`.** Two dependency statuses signal *structural* failure rather than transient blocking:
+- `superseded` — the dep was abandoned and replaced by another piece. It will never reach `merged`. Running against a superseded dep almost always indicates the operator is looking at a stale `depends_on:` entry that should be rewritten or removed.
+- `blocked` — the dep has external blockers preventing progress. Running against a blocked dep risks compounding the blocker downstream.
+
+For both statuses, refuse even when `--ignore-deps` is passed, with: `dep <ref> status: <superseded|blocked> — --ignore-deps does not apply to structural-failure statuses; update depends_on or unblock the dependency before re-running.` The transient statuses (`open`, `specced`, `planned`, `in-progress`) ARE bypassable via `--ignore-deps`; structural failures are not.
+
+**Refusal contract for malformed/missing depends_on refs.** If any entry in `depends_on:` cannot be resolved, refuse before reaching the status check:
+- Malformed qualified ref (e.g. `auth/`, `/login`, `auth//login`) → `malformed depends_on ref '<ref>' — expected <prd-slug>/<piece-slug> or bare <piece-slug>. Fix the manifest entry.`
+- Qualified ref names a PRD that doesn't exist → `unmet depends_on — PRD '<prd-slug>' not found at docs/prds/<prd-slug>/. Check spelling.`
+- Qualified or bare ref names a piece that isn't in the resolved manifest → `unmet depends_on — '<ref>' does not resolve to any known piece. Check spelling.`
+- Self-reference (the current piece's own slug appears in its own `depends_on:`) → `self-referential depends_on — '<ref>' is the piece you're trying to execute. Remove the entry.`
+
+These refusals fire BEFORE the status-based 1c check and are NOT bypassable via `--ignore-deps`.
 
 ## Phase Scheduler — detection
 
@@ -184,9 +256,9 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    Mode: TDD | Implement
 
    ## Plan reference
-   Execute `docs/specs/<piece>/plan.md` Phase <N> [Build] | [Implement]
-   block verbatim (lines <X>-<Y>). The plan is binding; this prompt
-   only supplies context the plan doesn't.
+   Execute `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` Phase <N>
+   [Build] | [Implement] block verbatim (lines <X>-<Y>). The plan is
+   binding; this prompt only supplies context the plan doesn't.
 
    ## Pre-flight snapshot
    <LOC snapshot, schema samples, symbol presence, hook inventory from Step 1b>
@@ -335,7 +407,7 @@ If skipped, proceed directly to Step 6. Otherwise:
 
    - **`## Phase ACs`** — attach ONLY the acceptance criteria for this phase (mapped via plan.md), not the full spec. Use the plan's "AC map" section or the spec's AC sections that the plan references for this phase.
 
-   - **`## Non-negotiables`** — project constraints. Attach `<docs_root>/charter/non-negotiables.md` (NN-C, project-wide) and the `## Non-Negotiables (Product)` section from `<docs_root>/prd/prd.md` (or legacy `<docs_root>/prd.md`) (NN-P, product-specific). If `<docs_root>/charter/` is absent (pre-charter project), attach only the legacy NN section from the PRD.
+   - **`## Non-negotiables`** — project constraints. Attach `<docs_root>/charter/non-negotiables.md` (NN-C, project-wide) and the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` (NN-P, product-specific). If `<docs_root>/charter/` is absent (pre-charter project), attach only the legacy NN section from the PRD.
 
    - **`## Coding rules cited by this phase`** — if the plan's phase block's "Charter constraints honored in this phase" slot cites any `CR-xxx` entries from `<docs_root>/charter/coding-rules.md`, attach those specific entries (not the full file). Absent slot or no citations → skip this block.
 
@@ -399,7 +471,7 @@ Every intermediate commit in the phase already ran hooks (the implementer's unif
 
 Update plan.md: mark all phase checkboxes [x]. Commit:
 ```bash
-git add docs/specs/<piece-name>/plan.md
+git add docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
 git commit -m "progress: Phase N complete"
 ```
 
@@ -484,7 +556,7 @@ Run `pre-commit run --files $(git diff --name-only $group_start_sha..HEAD)`. Sam
 ### Step G10: Group Progress commit
 
 ```bash
-git add docs/specs/<piece-name>/plan.md
+git add docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
 git commit -m "progress: Phase Group <letter> complete"
 ```
 
@@ -616,11 +688,14 @@ Present to user:
 
 Read the `reflection` key from `.spec-flow.yaml` (valid values: `auto`, `off`; default `auto`). If `off`, skip this step entirely and proceed directly to Step 5 with no reflection inputs (Step 5 falls back to free-form authoring).
 
-In `auto` mode, dispatch two reflection agents concurrently (read-only, Sonnet):
+In `auto` mode, dispatch two reflection agents concurrently (read-only, Sonnet). Execute dispatches each with the resolved `<prd-slug>` and `<piece-slug>` context — the reflection agents themselves own the writes to their respective backlog targets per the v3 path conventions:
+
+- **Process-retro** writes to the global `<docs_root>/improvement-backlog.md` (cross-PRD process learnings).
+- **Future-opportunities** writes to the PRD-local `<docs_root>/prds/<prd-slug>/backlog.md` (PRD-scoped deferred work).
 
 ```
-Agent({ description: "Process retro for <piece>", prompt: <process-retro composed>, model: "sonnet" })
-Agent({ description: "Future opportunities for <piece>", prompt: <future-opportunities composed>, model: "sonnet" })
+Agent({ description: "Process retro for <prd-slug>/<piece-slug>", prompt: <process-retro composed>, model: "sonnet" })
+Agent({ description: "Future opportunities for <prd-slug>/<piece-slug>", prompt: <future-opportunities composed>, model: "sonnet" })
 ```
 
 **Process-retro prompt context:**
@@ -628,33 +703,31 @@ Agent({ description: "Future opportunities for <piece>", prompt: <future-opportu
 - Per-phase escalation log (every circuit-breaker hit, BLOCKED report, contamination event, scope violation observed during the piece)
 - Plan structure (plan.md's phase outline)
 - Cumulative diff (`git diff $piece_start_sha..HEAD`)
+- Target: `<docs_root>/improvement-backlog.md` (the agent appends here)
 
 **Future-opportunities prompt context:**
 - Final spec for this piece (with acceptance criteria, including any deferred ACs)
 - Final plan (with `NOT COVERED` rows from Build's AC matrix)
 - Cumulative diff (`git diff $piece_start_sha..HEAD`)
-- Current `<docs_root>/improvement-backlog.md` contents, OR the literal string "(file does not exist yet)" if absent
-- `<docs_root>/manifest.yaml`
+- Current `<docs_root>/prds/<prd-slug>/backlog.md` contents, OR the literal string "(file does not exist yet)" if absent
+- `<docs_root>/prds/<prd-slug>/manifest.yaml`
+- Target: `<docs_root>/prds/<prd-slug>/backlog.md` (the agent appends here)
 
-Wait for both agents to complete. Collect their structured outputs.
-
-**Append findings to `<docs_root>/improvement-backlog.md`** (create the file if it does not exist):
+Wait for both agents to complete. Each reflection agent appends its findings to its own target file in this format:
 
 ```
-## <piece-name> — <YYYY-MM-DD>
+## <prd-slug>/<piece-slug> — <YYYY-MM-DD>
 
-<process-retro output verbatim — emits ### Process retro for <piece-name> at H3>
-
-<future-opportunities output verbatim — emits ### Future opportunities for <piece-name> at H3>
+<reflection output verbatim — emits ### Process retro for <prd-slug>/<piece-slug> or ### Future opportunities for <prd-slug>/<piece-slug> at H3>
 
 ---
 ```
 
-Commit the backlog append as a separate commit on the worktree branch (this lands BEFORE Step 5's learnings.md commit so that even if Step 5 fails, the raw findings are preserved):
+Commit the backlog appends as a single reflection commit on the worktree branch (this lands BEFORE Step 5's learnings.md commit so that even if Step 5 fails, the raw findings are preserved):
 
 ```bash
-git add <docs_root>/improvement-backlog.md
-git commit -m "reflection: <piece-name> — append findings to improvement backlog"
+git add <docs_root>/improvement-backlog.md <docs_root>/prds/<prd-slug>/backlog.md
+git commit -m "reflection: <prd-slug>/<piece-slug> — append findings to backlogs"
 ```
 
 Hold both reflection outputs in orchestrator state for Step 5 synthesis.
@@ -663,7 +736,7 @@ Hold both reflection outputs in orchestrator state for Step 5 synthesis.
 
 Synthesize a human-readable `learnings.md` from the reflection findings (Step 4.5 outputs) + the cumulative diff. The synthesized doc focuses on narrative — what worked, what to repeat, what to change next time — not raw findings (those live in the improvement backlog from Step 4.5).
 
-Write `docs/specs/<piece-name>/learnings.md` on the worktree branch with sections:
+Write `docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md` on the worktree branch with sections:
 - Patterns that worked well
 - Issues QA caught
 - Recommendations for future specs
@@ -673,25 +746,25 @@ If Step 4.5 was skipped (`reflection: off`), fall back to pre-v1.5 behavior: orc
 Commit on worktree branch before merge:
 
 ```bash
-git add docs/specs/<piece-name>/learnings.md
-git commit -m "learnings: <piece-name>"
+git add docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md
+git commit -m "learnings: <prd-slug>/<piece-slug>"
 ```
 
 ### Step 6: Merge
 
 ```bash
 git checkout main
-git merge --squash spec/<piece-name>
-git commit -m "spec/<piece-name>: <summary of what was built>"
-git worktree remove worktrees/<piece-name>
-git branch -d spec/<piece-name>
+git merge --squash execute/<prd-slug>-<piece-slug>
+git commit -m "execute/<prd-slug>-<piece-slug>: <summary of what was built>"
+git worktree remove worktrees/prd-<prd-slug>/piece-<piece-slug>
+git branch -d execute/<prd-slug>-<piece-slug>
 ```
 
 If merge conflicts: escalate to human.
 
 ### Step 7: Update Manifest
 
-Update `docs/manifest.yaml` on main: piece status → `done`, update coverage section. Commit.
+Update `docs/prds/<prd-slug>/manifest.yaml` on main: piece status → `merged` (or the `done` alias), update coverage section. Commit.
 
 ## Escalation Rules
 

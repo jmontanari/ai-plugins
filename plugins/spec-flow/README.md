@@ -63,6 +63,88 @@ Every skill is a thin orchestrator. Every agent is a narrow executor. Templates 
 
 ---
 
+## Multi-PRD support (v3.0.0+)
+
+Spec-flow v3.0.0 lifts the single-PRD-per-project assumption. A repo can host multiple PRDs in parallel under a singular `docs/charter/`, each with its own pieces, specs, plans, manifest, and lifecycle state. The charter remains one per project — it captures project-wide architectural constraints that apply across every PRD.
+
+**Layout.** Each PRD lives at `docs/prds/<prd-slug>/`:
+
+```
+docs/
+├── charter/                          # Singular — applies to every PRD in the repo
+│   ├── architecture.md
+│   ├── non-negotiables.md            # NN-C-xxx (project-wide)
+│   ├── tools.md
+│   ├── processes.md
+│   ├── flows.md
+│   └── coding-rules.md               # CR-xxx
+│
+├── prds/                             # One subdirectory per PRD
+│   ├── <prd-slug>/
+│   │   ├── prd.md                    # Includes status front-matter
+│   │   ├── manifest.yaml             # PRD-local piece manifest
+│   │   ├── backlog.md                # PRD-local deferred work
+│   │   └── specs/
+│   │       └── <piece-slug>/
+│   │           ├── spec.md
+│   │           ├── plan.md
+│   │           └── learnings.md
+│   └── <other-prd-slug>/
+│       └── ...
+│
+└── improvement-backlog.md            # Global — cross-PRD learnings + spec-flow process retros
+```
+
+See `plugins/spec-flow/reference/v3-path-conventions.md` for the canonical path map (every input/output by skill, plus worktree and branch shapes).
+
+**PRD lifecycle states.** Each PRD declares `status:` in its front-matter — one of `drafting | active | shipped | archived`. `/spec-flow:status` filters by status (active by default; archived hidden unless `--include-archived`). Archived PRDs stay in place as a historical record; there is no `docs/archive/` move convention.
+
+**Slug naming.** Slugs (≤10 chars, charset `[a-z0-9-]`, ≤50-char branch length when combined with `<prd-slug>-<piece-slug>`) keep paths and branches readable. See `plugins/spec-flow/reference/slug-validator.md` for rules and the validator behavior the skills enforce.
+
+**Cross-PRD piece dependencies.** A piece in PRD A can declare a dependency on a piece in PRD B via a qualified `depends_on:` ref of the shape `<prd-slug>/<piece-slug>` (unqualified refs continue to mean same-PRD). `/spec-flow:execute` blocks on unmerged cross-PRD dependencies by default; pass `--ignore-deps` for deliberate deviations.
+
+**Dual backlog routing.** Two distinct backlogs serve two distinct audiences:
+
+- **`docs/prds/<prd-slug>/backlog.md`** (PRD-local) — capability-scoped deferred work surfaced by `reflection-future-opportunities`. Items here are candidates for future pieces *within this PRD*.
+- **`docs/improvement-backlog.md`** (global) — cross-PRD learnings and spec-flow process retros surfaced by `reflection-process-retro`. Items here inform pipeline-level improvements, not capability-level ones.
+
+The `spec` skill reads the PRD-local backlog at brainstorm start to surface candidate considerations for new pieces; the global backlog is read by spec-flow's own retros and is not surfaced into per-piece brainstorms.
+
+---
+
+## Migrating from v1.x or v2.x
+
+v3.0.0 is a breaking layout change. Existing v1.x or v2.x projects (single PRD at `docs/prd/`, specs at `docs/specs/<piece>/`, single manifest at `docs/manifest.yaml`) upgrade with the dedicated migration skill:
+
+```text
+/spec-flow:migrate <prd-slug>
+```
+
+You supply the slug for the existing PRD (the one currently at `docs/prd/`); the migration moves it to `docs/prds/<prd-slug>/` and rewrites every internal reference. File history is preserved via `git mv` — verify post-migration with `git log --follow docs/prds/<prd-slug>/prd.md`.
+
+**Flags:**
+
+- `--inspect` — dry-run mode. Reports every planned move and detected stale internal reference without touching the working tree. Use this first.
+- `--force` — override safety checks (uncommitted changes, in-flight worktrees, charter absence). Off by default; the migration prefers to refuse rather than partially-apply.
+
+**What the migration does:**
+
+1. `git mv docs/prd/ docs/prds/<prd-slug>/` (with rename detection preserving history).
+2. `git mv docs/specs/ docs/prds/<prd-slug>/specs/` (each piece directory carries forward unchanged).
+3. Rewrites internal references in PRDs, specs, plans, and manifests from old paths to new.
+4. Sets `layout_version: 3` in `.spec-flow.yaml`.
+5. Writes `MIGRATION_NOTES.md` at the repo root listing every move and any stale reference the rewriter flagged for human review.
+
+**Pre-migration requirements:**
+
+- A committed charter at `docs/charter/`. Pre-charter (v0) projects must run `/spec-flow:charter` retrofit first.
+- A clean working tree (no uncommitted changes). Override with `--force` if you understand the risk.
+- No active in-flight worktrees on `spec/<piece>` branches that would collide with the new `spec/<prd-slug>-<piece-slug>` naming.
+
+See `plugins/spec-flow/skills/migrate/SKILL.md` for the full reference (every step, rollback procedure, and edge-case handling).
+
+---
+
 ## The chain of events
 
 A piece of work flows through the pipeline linearly. Each stage has an output, a QA gate, and a status update in the manifest.
@@ -77,24 +159,24 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
                                                │
                                    binds everything below ↓
                               ┌──────────────────────────────────────────────┐
-                              │          docs/prd/prd.md                     │
-                              │          docs/prd/manifest.yaml              │
+                              │     docs/prds/<prd-slug>/prd.md              │
+                              │     docs/prds/<prd-slug>/manifest.yaml       │
                               │   (FR-001…, NFR-001…, NN-P-001…, SC-001…)   │
                               └──────────────────────────────────────────────┘
                                                │
                                        per piece ↓
   status: open ─────────────────────────────────┐
                                                 ▼
-  ┌──────────┐   Socratic   ┌─────────┐   QA    ┌───────────────────────┐
-  │   spec   │─ brainstorm ▶│  spec   │──loop──▶│ docs/specs/<p>/spec.md│
-  └──────────┘              └─────────┘  (Opus) │   + human sign-off    │
-                                                └───────────────────────┘
+  ┌──────────┐   Socratic   ┌─────────┐   QA    ┌──────────────────────────────────────────┐
+  │   spec   │─ brainstorm ▶│  spec   │──loop──▶│ docs/prds/<prd-slug>/specs/<piece>/spec.md│
+  └──────────┘              └─────────┘  (Opus) │           + human sign-off               │
+                                                └──────────────────────────────────────────┘
   status: specced ──────────────────────────────┐
                                                 ▼
-  ┌──────────┐   read-only  ┌─────────┐   QA    ┌───────────────────────┐
-  │   plan   │─ exploration▶│  plan   │──loop──▶│ docs/specs/<p>/plan.md│
-  └──────────┘              └─────────┘  (Opus) │   + human sign-off    │
-                                                └───────────────────────┘
+  ┌──────────┐   read-only  ┌─────────┐   QA    ┌──────────────────────────────────────────┐
+  │   plan   │─ exploration▶│  plan   │──loop──▶│ docs/prds/<prd-slug>/specs/<piece>/plan.md│
+  └──────────┘              └─────────┘  (Opus) │           + human sign-off               │
+                                                └──────────────────────────────────────────┘
   status: planned ──────────────────────────────┐
                                                 ▼
   ┌──────────┐     per-phase loop:
@@ -120,10 +202,10 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 | Stage | Input | Output | Reviewer | Main model |
 |---|---|---|---|---|
 | **charter** (v2.0.0) | Detection signals + user-supplied sources (team wikis, handbooks) | `docs/charter/` — six files with architecture, NN-C, tools, processes, flows, CR | `qa-charter` (Opus, up to 3 fix loops) | — |
-| **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prd/prd.md` + `docs/prd/manifest.yaml` with numbered FR/NFR/NN-P/SC and a piece list | Human (during brainstorm) | — |
-| **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/specs/<piece>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
-| **plan** | Approved spec + charter | `docs/specs/<piece>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
-| **execute** | Approved plan | Working code on `spec/<piece>` branch, phase-by-phase, with commits | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml` with numbered FR/NFR/NN-P/SC and a piece list | Human (during brainstorm) | — |
+| **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
+| **plan** | Approved spec + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
+| **execute** | Approved plan | Working code on `spec/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
 
 ---
@@ -174,7 +256,7 @@ Reference entries let you point at Maven conventions, Google Java Style, your ow
 ## Non-negotiables: two namespaces (v2.0.0)
 
 - **`NN-C-xxx`** (Charter) — project-wide. Applies across every product and every piece in the repo. Lives in `docs/charter/non-negotiables.md`. Changes rarely.
-- **`NN-P-xxx`** (Product) — product-specific. Tied to the current PRD. Lives in `docs/prd/prd.md` under `## Non-Negotiables (Product)`. Grows with each PRD import.
+- **`NN-P-xxx`** (Product) — product-specific. Tied to a single PRD. Lives in `docs/prds/<prd-slug>/prd.md` under `## Non-Negotiables (Product)`. Grows with each PRD import.
 - **`CR-xxx`** (Coding Rules) — a third citable namespace for coding conventions, separate from binding rules. Lives in `docs/charter/coding-rules.md`.
 
 Specs and plans cite specific IDs. Every piece's spec enumerates the NN-C, NN-P, and CR entries its scope touches under `### Non-Negotiables Honored` and `### Coding Rules Honored`, with a per-entry "how this piece honors it" line. Plans allocate each cited entry to exactly one phase's "Charter constraints honored in this phase" slot. QA checks that every claim is demonstrably honored in the final diff.
@@ -197,8 +279,8 @@ claude plugin install spec-flow
 
 1. `/status` — reports "No pipeline initialized."
 2. `/spec-flow:charter` — Socratic bootstrap of `docs/charter/`. Detects existing signals (`README`, `package.json`, `.github/workflows/`, etc.), asks for any additional sources (team wikis, handbooks), then walks you through six files one question at a time. `qa-charter` reviews. Per-file commits.
-3. `/prd` — imports your PRD. Classifies each extracted non-negotiable as `NN-C` (adds to charter) or `NN-P` (stays in PRD). Decomposes into pieces with you, writes `docs/prd/manifest.yaml`.
-4. `/spec` — authors a spec for the first `open` piece. Loads charter, identifies the NN-C/NN-P/CR entries this piece touches, brainstorms with you, creates a worktree on `spec/<piece>`, runs `qa-spec`, asks for sign-off.
+3. `/prd` — imports your PRD. Classifies each extracted non-negotiable as `NN-C` (adds to charter) or `NN-P` (stays in PRD). Decomposes into pieces with you, writes `docs/prds/<prd-slug>/manifest.yaml`.
+4. `/spec` — authors a spec for the first `open` piece. Loads charter, identifies the NN-C/NN-P/CR entries this piece touches, brainstorms with you, creates a worktree on `spec/<prd-slug>-<piece-slug>`, runs `qa-spec`, asks for sign-off.
 5. `/plan` — reads charter + spec, allocates every cited NN/CR to a specific phase, writes an exhaustive plan, runs `qa-plan`, asks for sign-off.
 6. `/execute` — runs the per-phase loop until all phases are green and the 5-agent final review is clean. Asks for merge approval.
 7. Repeat `/spec` → `/plan` → `/execute` for each remaining piece.
@@ -212,9 +294,9 @@ claude plugin install spec-flow
 
 ## Key concepts
 
-- **Manifest** (`docs/manifest.yaml`) — the source of truth for what pieces exist, what PRD sections each covers, and their statuses (`open` → `specced` → `planned` → `implementing` → `done`). PRD traceability is a first-class concept.
-- **Piece** — an independently implementable, testable unit of work that maps to specific PRD sections.
-- **Worktree** — each piece gets its own `spec/<piece>` branch in a separate working directory. No cross-piece contamination. Merged via squash when done.
+- **Manifest** (`docs/prds/<prd-slug>/manifest.yaml`, one per PRD) — the source of truth for what pieces exist within a PRD, what PRD sections each covers, and their statuses (`open` → `specced` → `planned` → `in-progress` → `merged`; `done` is the v2 backward-compatible alias of `merged`). Terminal statuses outside the happy path: `superseded`, `blocked`. PRD traceability is a first-class concept.
+- **Piece** — an independently implementable, testable unit of work that maps to specific PRD sections within a single PRD.
+- **Worktree** — each piece gets its own `spec/<prd-slug>-<piece-slug>` branch in a separate working directory at `worktrees/prd-<prd-slug>/piece-<piece-slug>/`. No cross-piece contamination. Merged via squash when done.
 - **Non-negotiables (NN-xxx)** — constraints the PRD flags as binding (security, compliance, architecture). Every QA gate checks against them.
 - **Oracle of done** — the single objective check that proves a phase is complete. TDD mode: green tests. Implement mode: the plan's `[Verify]` command passes. The implementer agent refuses to report DONE without passing its oracle.
 - **Circuit breakers** — every retry loop caps at 2–3 attempts, then escalates to the human. The pipeline refuses to burn tokens on stuck problems.
@@ -226,8 +308,9 @@ claude plugin install spec-flow
 On first use, a `.spec-flow.yaml` is created at the project root:
 
 ```yaml
-docs_root: docs            # Where prd.md, specs/, manifest.yaml live
+docs_root: docs            # Where charter/, prds/, improvement-backlog.md live
 worktrees_root: worktrees  # Where feature branches get checked out
+layout_version: 3          # v3.0.0+ — PRDs at docs/prds/<prd-slug>/. Absence triggers a SessionStart warning.
 
 # Orchestrator behavior
 refactor: auto             # auto | always | never — skip Refactor when Build is clean
@@ -296,7 +379,10 @@ Each piece ends with a two-agent reflection stage (Step 4.5 in execute) before t
 - **Process retro** (Sonnet, read-only) examines session metrics, per-phase escalation log, and the cumulative diff to identify orchestration patterns worth keeping or changing for future pieces. Output: `must-improve` / `worked-well` / `metrics` sections.
 - **Future opportunities** (Sonnet, read-only) examines the spec, plan, cumulative diff, current improvement backlog, and manifest to surface candidate future pieces (deferred ACs, hinted features, tech debt accrued, dependencies unlocked, cross-piece patterns). Every item must reference a concrete artifact — no speculation.
 
-Findings get appended to `<docs_root>/improvement-backlog.md` (project-level, committed, accumulates across pieces). The `spec` skill reads this file at brainstorm start (Phase 1, step 6) and surfaces ~5 most-relevant items as candidate considerations for the new piece. Items the user marks `incorporated` or `obsolete` during brainstorm get pruned from the backlog after spec sign-off (Phase 5, step 4); `deferred` items stay for future surface-up.
+Findings get routed to one of two backlogs (v3.0.0+):
+
+- **Future-opportunities findings** (capability-scoped) append to `docs/prds/<prd-slug>/backlog.md` (PRD-local). The `spec` skill reads this file at brainstorm start (Phase 1, step 6) and surfaces ~5 most-relevant items as candidate considerations for new pieces *within the same PRD*. Items the user marks `incorporated` or `obsolete` during brainstorm get pruned after spec sign-off (Phase 5, step 4); `deferred` items stay for future surface-up.
+- **Process-retro findings** (cross-PRD, pipeline-level) append to `docs/improvement-backlog.md` (global). Spec-flow's own retros consume this; per-piece brainstorms do not.
 
 The improvement backlog is intentionally pruneable working state, not an immutable log. Manually delete entries when they're addressed or no longer relevant.
 

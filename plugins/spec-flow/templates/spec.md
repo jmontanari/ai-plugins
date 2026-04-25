@@ -8,6 +8,7 @@ charter_snapshot:
   coding-rules: {{date}}
 ---
 
+<!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->
 # Spec: {{piece_name}}
 
 **PRD Sections:** {{prd_sections}}

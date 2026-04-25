@@ -2,6 +2,39 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] — 2026-04-25
+
+### Added
+- New `docs/prds/<prd-slug>/` layout supporting multiple PRDs per project under a singular `docs/charter/`.
+- PRD lifecycle states (`drafting | active | shipped | archived`) via PRD front-matter.
+- PRD-local backlog at `docs/prds/<prd-slug>/backlog.md` for capability-scoped deferred work; global `docs/improvement-backlog.md` reserved for cross-PRD learnings and spec-flow process retros.
+- Cross-PRD piece dependencies via qualified `depends_on:` refs (`<prd-slug>/<piece-slug>`).
+- New `/spec-flow:migrate` skill — one-shot v1.x/v2.x → v3.0.0 layout migration with `--inspect` (dry-run) and `--force` (override safety checks).
+- New `.spec-flow.yaml` config key: `layout_version: 3` (controls path resolution; absence triggers SessionStart warning).
+- Slug validator (≤10 chars, charset `[a-z0-9-]`, ≤50-char branch length) — see `plugins/spec-flow/reference/slug-validator.md`.
+- `qa-spec` agent: third Input Mode `Focused charter re-review` for automatic charter-drift detection.
+- `--ignore-deps` flag on `/spec-flow:execute` for deliberate deviations past unmerged dependencies.
+- `--include-archived` flag on `/spec-flow:status` to show archived PRDs.
+
+### Changed
+- `docs/specs/<piece>/` → `docs/prds/<prd-slug>/specs/<piece-slug>/` (paths now PRD-scoped).
+- `docs/prd/manifest.yaml` → `docs/prds/<prd-slug>/manifest.yaml` (manifest now per-PRD).
+- Worktrees: `worktrees/prd-<prd-slug>/piece-<piece-slug>/`.
+- Branches: `spec/<prd-slug>-<piece-slug>` (similarly for plan, execute, migrate).
+- SessionStart hook now emits a non-blocking yellow warning when `layout_version` is absent or `<3`.
+- `reflection-future-opportunities` writes findings to PRD-local backlog (was: global).
+- `reflection-process-retro` writes findings to global backlog (target unchanged; routing rule now load-bearing).
+
+### Removed
+- Single-PRD-only assumption in skills (every skill now scans `docs/prds/*/` for active PRDs).
+- `docs/archive/` directory convention — archived PRDs stay in place via `status: archived` front-matter.
+
+### Migration notes
+- v3.0.0 is a breaking major bump per NN-C-003. Run `/spec-flow:migrate <prd-slug>` to upgrade an existing v1.x or v2.x project. v0 (pre-charter) projects must run `/spec-flow:charter` retrofit first.
+- The migration uses `git mv` to preserve file history. Verify with `git log --follow docs/prds/<prd-slug>/prd.md` post-migration.
+- The migration writes a `MIGRATION_NOTES.md` at the repo root listing every move and any detected stale internal references.
+- This repo dog-foods the migration on itself before v3.0.0 is documented for external users (NN-P-003).
+
 ## [2.7.1] — 2026-04-24
 
 ### Fixed

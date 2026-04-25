@@ -1,8 +1,23 @@
 schema_version: 1
 generated: {{date}}
 last_updated: {{date}}
-prd_source: "{{docs_root}}/prd.md"
+prd_source: "{{docs_root}}/prd.md"   # legacy compat — kept for v0/v1/v2 manifests; v3 PRDs live at {{docs_root}}/prds/{{prd_slug}}/prd.md
 
+# pieces:
+#   Each piece describes one implementable unit under this PRD. Status values track the
+#   piece-status state machine from the spec: open → speccing → planning → executing → shipped
+#   (terminal: shipped, blocked, abandoned).
+#
+#   Example piece block (delete or replace):
+#
+#   - name: example-piece
+#     slug: ex-piece          # optional — defaults to kebab-cased `name` (≤10 chars, [a-z0-9-])
+#     status: open            # open | specced | planned | in-progress | merged | done | superseded | blocked
+#                             #   (see piece-status state machine in the spec-flow doctrine; `done` is the v2 alias of `merged`)
+#     prd_sections: [FR-001, FR-002]
+#     depends_on:             # qualified `<prd-slug>/<piece-slug>` (cross-PRD) or bare `<piece-slug>` (same PRD)
+#       - other-prd/some-piece
+#       - sibling-piece
 pieces: []
 
 coverage:

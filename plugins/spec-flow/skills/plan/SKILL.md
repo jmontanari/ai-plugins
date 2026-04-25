@@ -13,15 +13,17 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 ## Prerequisites
 
-- Piece must have status `specced` in manifest
-- `docs/specs/<piece-name>/spec.md` must exist and be approved
-- Must be on the worktree branch `spec/<piece-name>`
+- Piece must have status `specced` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
+- `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` must exist and be approved
+- Must be on the worktree branch `spec/<prd-slug>-<piece-slug>` (created by spec skill via `worktrees/prd-<prd-slug>/piece-<piece-slug>/`)
 
 ## Workflow
 
 ### Phase 1: Read-Only Exploration
 
-Extensively explore the codebase using ONLY read operations:
+**Charter-drift check (always applies — runs first).** A piece reaching plan stage already has a spec carrying a `charter_snapshot:` front-matter. Before any other exploration, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live `<docs_root>/charter/` files. If drift is detected, halt Phase 1 and escalate per the reference doc — do not proceed with planning on stale charter constraints.
+
+Then extensively explore the codebase using ONLY read operations:
 - `Read` — examine source files, test files, existing patterns
 - `Grep` — find function signatures, class definitions, import patterns
 - `Glob` — discover file structure and naming conventions
@@ -129,7 +131,9 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
    **Phase 0 Scaffold interacts with Phase Groups.** If sub-phases in a group each need to append entries to a shared coordination file (a common `__init__.py`, a shared fixtures file, a test registry), author a Phase 0 Scaffold BEFORE the Phase Group to pre-create the entries. Otherwise concurrent sub-phases will race on the shared file. The existing Scaffold guidance above (previous rule) covers this pattern.
 
-Write the plan to `<docs_root>/specs/<piece-name>/plan.md`. Populate the `charter_snapshot:` front-matter with each charter file's `last_updated` date captured during Phase 1 exploration. Populate each phase's "Charter constraints honored in this phase" slot with the subset of NN-C/NN-P/CR entries from the spec that the phase implements (every entry must appear in exactly one phase — no drops, no duplicates).
+Write the plan to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md`. Populate the `charter_snapshot:` front-matter with each charter file's `last_updated` date captured during Phase 1 exploration. Populate each phase's "Charter constraints honored in this phase" slot with the subset of NN-C/NN-P/CR entries from the spec that the phase implements (every entry must appear in exactly one phase — no drops, no duplicates).
+
+**Worktree/branch naming** (per FR-004 / FR-005): the plan skill operates on the worktree at `worktrees/prd-<prd-slug>/piece-<piece-slug>/` on branch `spec/<prd-slug>-<piece-slug>` (created by the spec skill). Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
 
 ### Phase 3: QA Loop
 
@@ -159,13 +163,13 @@ Write the plan to `<docs_root>/specs/<piece-name>/plan.md`. Populate the `charte
 2. Update manifest on main: piece status → `planned`
    ```bash
    git checkout main
-   # update manifest.yaml status for this piece (new layout: <docs_root>/prd/manifest.yaml; legacy: <docs_root>/manifest.yaml — whichever exists)
-   git add <docs_root>/prd/manifest.yaml   # or <docs_root>/manifest.yaml if still on legacy layout
-   git commit -m "manifest: mark <piece-name> as planned"
-   git checkout spec/<piece-name>
+   # update manifest.yaml status for this piece in its PRD-local manifest
+   git add <docs_root>/prds/<prd-slug>/manifest.yaml
+   git commit -m "manifest: mark <prd-slug>/<piece-slug> as planned"
+   git checkout spec/<prd-slug>-<piece-slug>
    ```
 3. Commit plan on worktree branch:
    ```bash
-   git add docs/specs/<piece-name>/plan.md
-   git commit -m "plan: add <piece-name> implementation plan"
+   git add <docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md
+   git commit -m "plan: add <prd-slug>/<piece-slug> implementation plan"
    ```

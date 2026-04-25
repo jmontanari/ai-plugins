@@ -19,6 +19,20 @@ doctrine_content=$(cat "${PLUGIN_ROOT}/reference/spec-flow-doctrine.md" 2>/dev/n
 docs_root=$(grep -E '^docs_root:' "$CONFIG_FILE" 2>/dev/null | sed -E 's/^docs_root:[[:space:]]*//' | tr -d '"' | head -n1 || true)
 docs_root="${docs_root:-docs}"
 
+layout_warning=""
+if [ -f "$CONFIG_FILE" ]; then
+  # Strip leading `layout_version:`, trailing `# comment` (if any), surrounding whitespace, and quotes (single or double).
+  layout_version=$(grep -E '^layout_version:' "$CONFIG_FILE" 2>/dev/null \
+    | sed -E 's/^layout_version:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]+$//' \
+    | tr -d "\"'" | head -n1 || true)
+  # Fire warning when: empty, non-integer (typos like "v3", trailing text), or numeric value < 3.
+  if [ -z "$layout_version" ] \
+     || ! printf '%s' "$layout_version" | grep -qE '^[0-9]+$' \
+     || [ "$layout_version" -lt 3 ]; then
+    layout_warning=$'\n\n⚠️  Layout is pre-v3. Run `/spec-flow:migrate` to adopt multi-PRD.'
+  fi
+fi
+
 charter_content=""
 charter_dir="${docs_root}/charter"
 if [ -d "$charter_dir" ]; then
@@ -56,7 +70,12 @@ if [ -n "$charter_content" ]; then
   charter_section="\n\nProject Charter (binding — every spec, plan, and implementation must honor these):\n${charter_escaped}"
 fi
 
-session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'status' skill to see current pipeline state and recommended next action.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}\n</IMPORTANT>"
+layout_warning_escaped=""
+if [ -n "$layout_warning" ]; then
+  layout_warning_escaped=$(escape_for_json "$layout_warning")
+fi
+
+session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'status' skill to see current pipeline state and recommended next action.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}${layout_warning_escaped}\n</IMPORTANT>"
 
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   printf '{\n  "additional_context": "%s"\n}\n' "$session_context"

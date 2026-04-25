@@ -3,6 +3,12 @@
 docs_root: docs
 worktrees_root: worktrees
 
+# layout_version: docs/ layout schema version
+#   3       — enables multi-PRD docs/prds/<prd-slug>/ layout (v3.0.0+)
+#   1, 2    — legacy single-PRD layouts (docs/prd/, docs/specs/<piece>/)
+#   absent  — treated as legacy; SessionStart hook emits a yellow warning prompting `/spec-flow:migrate`
+layout_version: 3
+
 # Orchestrator behavior
 # refactor: controls Step 5 (Refactor) dispatch
 #   auto    — skip when Build reports oracle clean on first attempt + no plan deviations + clean AC matrix (default)

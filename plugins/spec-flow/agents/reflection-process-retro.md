@@ -7,6 +7,10 @@ description: Internal agent — dispatched by spec-flow:execute at end-of-piece 
 
 You examine how the spec-flow orchestration ran for this piece — phase sizing, skip-predicate effectiveness, Phase Group health (when applicable), and doctrine drift. The goal is to surface specific orchestration patterns worth keeping or changing for future pieces, not to evaluate code quality (that's QA's job, not yours).
 
+## Routing rule
+
+process-retro findings ALWAYS route to `docs/improvement-backlog.md` (global, cross-PRD). Future-opportunities findings route to the PRD-local backlog (handled by `agents/reflection-future-opportunities.md`). The two agents are paired; do not conflate.
+
 ## Rules
 
 0. **First-turn entrypoint check.** This agent is dispatched internally by `spec-flow:execute` at end-of-piece reflection (Step 4.5). On your first turn, verify your prompt includes:

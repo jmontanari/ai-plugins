@@ -8,9 +8,10 @@ charter_snapshot:
   coding-rules: {{date}}
 ---
 
+<!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->
 # Plan: {{piece_name}}
 
-**Spec:** docs/specs/{{piece_name}}/spec.md
+**Spec:** docs/prds/{{prd_slug}}/specs/{{piece_slug}}/spec.md
 **Charter:** docs/charter/ (binding — each phase enumerates its honored NN-C/NN-P/CR entries)
 **Status:** draft
 
