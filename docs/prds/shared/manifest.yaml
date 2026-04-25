@@ -97,7 +97,7 @@ pieces:
 
   - name: pi-009-hardening
     description: |
-      v3.1.0 — bundles all v3.0.0-reflection-driven follow-up work into one minor release. Single bigger piece by design: ships a coherent v3.1.0 rather than 3+ point releases that each pay the spec/plan/release ceremony cost. Slug renamed from PI-009-v3.1.0-hardening to comply with v3 slug-validator rules ([a-z0-9-]+, ≤20 chars).
+      v3.1.0 — bundles all v3.0.0-reflection-driven follow-up work into one minor release. Single bigger piece by design: ships a coherent v3.1.0 rather than 3+ point releases that each pay the spec/plan/release ceremony cost. Slug renamed from PI-009-v3.1.0-hardening to comply with v3 slug-validator rules ([a-z0-9-]+, ≤20 chars). Spec authored 2026-04-25 in worktree spec/shared-pi-009-hardening; QA cleared after 3 iterations.
 
       Capability (user-visible):
         - FR-005 branch-design resolution — pick single-branch (current code reality) or three-branch (spec text). Update spec OR SKILL.md and add ACs covering the chosen model.
@@ -117,7 +117,7 @@ pieces:
       Minor bump (NN-C-003: backwards-compatible additions). 11 items, plan likely splits into 2-3 Phase Groups (capability vs. orchestrator vs. plan-skill rules) so per-area QA stays focused. Brainstorm during spec authoring will negotiate FR-005 path-pick and confirm migrate-skill stays on path 1.
     prd_sections: [FR-004, NFR-003, NFR-004]
     dependencies: [PI-008-multi-prd-v3.0.0]
-    status: open
+    status: specced
 
 coverage:
   total_prd_sections: 15
