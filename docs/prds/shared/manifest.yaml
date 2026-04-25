@@ -1,6 +1,6 @@
 schema_version: 1
 generated: 2026-04-21
-last_updated: 2026-04-21
+last_updated: 2026-04-25
 prd_source: "docs/prd/prd.md"
 
 pieces:
@@ -70,7 +70,8 @@ pieces:
       Aborted 2026-04-21 as part of the PI-005 abort. The mirror-branch conversion pipeline this piece proposed is the wrong pattern — the superpowers multi-host plugin demonstrates that co-shipping all hosts' manifests and hook-registrations in one tree eliminates the need for conversion entirely. See PI-005's notes for the discovery detail. Successor: PI-007-copilot-coship (shipped 2026-04-21).
 
   - name: PI-007-copilot-coship
-    description: Apply a superpowers-style co-ship pattern to the `spec-flow` plugin so GitHub Copilot CLI users can install and invoke it. Delivered as a single-path dual-host co-ship — one `plugins/spec-flow/` tree with plain-`.md` agent files serves both Claude Code and Copilot CLI. Copilot CLI users install via subdirectory syntax (`/plugin install jmontanari/ai-plugins:plugins/spec-flow`) or via the marketplace 2-step flow (`/plugin marketplace add jmontanari/ai-plugins` → `/plugin install spec-flow@shared-plugins`). No mirror branch, no sync scripts, no content translation. Supersedes PI-005 and PI-006 with a strictly simpler architecture. Three smoketests on Copilot CLI v1.0.34 recorded in `docs/specs/PI-007-copilot-coship/learnings.md`: install + `/spec-flow:status` (PASS), `/agents` discovery (PASS), `/agents` listing + frontmatter hygiene (PASS). Fixed a path-duplication bug in `metadata.pluginRoot` during review.
+    description: |
+      Apply a superpowers-style co-ship pattern to the `spec-flow` plugin so GitHub Copilot CLI users can install and invoke it. Delivered as a single-path dual-host co-ship — one `plugins/spec-flow/` tree with plain-`.md` agent files serves both Claude Code and Copilot CLI. Copilot CLI users install via subdirectory syntax (`/plugin install jmontanari/ai-plugins:plugins/spec-flow`) or via the marketplace 2-step flow (`/plugin marketplace add jmontanari/ai-plugins` → `/plugin install spec-flow@shared-plugins`). No mirror branch, no sync scripts, no content translation. Supersedes PI-005 and PI-006 with a strictly simpler architecture. Three smoketests on Copilot CLI v1.0.34 recorded in `docs/specs/PI-007-copilot-coship/learnings.md` — install + `/spec-flow:status` (PASS), `/agents` discovery (PASS), `/agents` listing + frontmatter hygiene (PASS). Fixed a path-duplication bug in `metadata.pluginRoot` during review.
     prd_sections: [G-3]
     dependencies: []
     status: done
@@ -93,6 +94,29 @@ pieces:
       NN-C-009 three-place version bump landed in commit 8ed685e (plugin.json + marketplace.json + CHANGELOG header all at 3.0.0). Final Review (5 parallel reviewers) returned: PRD-alignment + spec-compliance both 0 must-fix; architecture/edge-case/blind surfaced 11 distinct must-fix items, all applied in commit 40876e6 (hook layout_version regex robustness, slug minimum-length rule, charter-drift missing-field handling, 7 migrate-skill safety fixes including the critical missing `mkdir -p docs/prds`, execute structural-failure dependency refusal contract).
       Two intentional deferrals: (a) FR-005 branch-design ambiguity (spec lists 3 branches per piece vs v2 single-branch reality preserved in code) — captured in learnings.md as v3.1.0 spec-amendment candidate; (b) AC-15/AC-18 dog-food run + release commit — procedure documented in plugins/spec-flow/docs/release-v3.0.0.md, executed at human-driven release time per NN-P-003 framing.
       Reflection findings persisted to docs/specs/PI-008-multi-prd-v3.0.0/learnings.md (8 process-retro items, 6 future-opportunities). High-severity process-retro items (skip-predicate calibration, mid-piece Opus pass for ≥6-phase pieces, deferred-finding tracking) should migrate to global docs/improvement-backlog.md at release time.
+
+  - name: PI-009-v3.1.0-hardening
+    description: |
+      v3.1.0 — bundles all v3.0.0-reflection-driven follow-up work into one minor release. Single bigger piece by design: ships a coherent v3.1.0 rather than 3+ point releases that each pay the spec/plan/release ceremony cost.
+
+      Capability (user-visible):
+        - FR-005 branch-design resolution — pick single-branch (current code reality) or three-branch (spec text). Update spec OR SKILL.md and add ACs covering the chosen model.
+        - Charter-drift deep scan — extend `/spec-flow:status` with `--include-drift` mode that parses NN/CR citations in each spec and verifies them against current charter bodies (semantic drift, not just timestamp).
+        - Worktree-token sweep — add `{{worktree_root}}` template token; replace hard-coded `worktrees/` references across all 17 implementer agent prompts.
+        - Migrate-skill environment precondition — formally document "the migrate skill runs in an LLM environment with `yq`/`python3` available" as a precondition; update NFR-004 and clarify NN-C-002 scope. Path 2 (ship an embedded helper script) is deferred — it would need a charter brainstorm before being specced.
+
+      Orchestrator (no user-visible surface change):
+        - Sharpen Opus QA skip-predicate — skip only for additive markdown/YAML/config; default to Opus when phase touches shell/branching logic or new skill body.
+        - Mid-piece Opus QA pass for ≥6-phase pieces — insert at half-way commit; reviewer reads cumulative diff vs. spec.
+        - "Deferred to reflection" finding tracking — orchestrator appends stub to PRD-local backlog at deferral time so reflection agents see them as input.
+        - Plan-skill phase-sizing rule — split phases >150 LOC of new behavioral prose into Phase Groups.
+        - Plan-skill exit-gate semantics rule — "X ran" cannot downgrade to "X is documented to run later."
+        - Default `[Verify]` commands to `python3 -c` for YAML/JSON validation (drop yq/jq dependency in pipeline self-checks).
+
+      Minor bump (NN-C-003: backwards-compatible additions). 10 items, plan likely splits into 2-3 Phase Groups (capability vs. orchestrator vs. plan-skill rules) so per-area QA stays focused. Brainstorm during spec authoring will negotiate FR-005 path-pick and confirm migrate-skill stays on path 1.
+    prd_sections: [FR-004, FR-005, NFR-003, NFR-004]
+    dependencies: [PI-008-multi-prd-v3.0.0]
+    status: open
 
 coverage:
   total_prd_sections: 15
