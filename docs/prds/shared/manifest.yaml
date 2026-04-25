@@ -95,9 +95,9 @@ pieces:
       Two intentional deferrals: (a) FR-005 branch-design ambiguity (spec lists 3 branches per piece vs v2 single-branch reality preserved in code) — captured in learnings.md as v3.1.0 spec-amendment candidate; (b) AC-15/AC-18 dog-food run + release commit — procedure documented in plugins/spec-flow/docs/release-v3.0.0.md, executed at human-driven release time per NN-P-003 framing.
       Reflection findings persisted to docs/specs/PI-008-multi-prd-v3.0.0/learnings.md (8 process-retro items, 6 future-opportunities). High-severity process-retro items (skip-predicate calibration, mid-piece Opus pass for ≥6-phase pieces, deferred-finding tracking) should migrate to global docs/improvement-backlog.md at release time.
 
-  - name: PI-009-v3.1.0-hardening
+  - name: pi-009-hardening
     description: |
-      v3.1.0 — bundles all v3.0.0-reflection-driven follow-up work into one minor release. Single bigger piece by design: ships a coherent v3.1.0 rather than 3+ point releases that each pay the spec/plan/release ceremony cost.
+      v3.1.0 — bundles all v3.0.0-reflection-driven follow-up work into one minor release. Single bigger piece by design: ships a coherent v3.1.0 rather than 3+ point releases that each pay the spec/plan/release ceremony cost. Slug renamed from PI-009-v3.1.0-hardening to comply with v3 slug-validator rules ([a-z0-9-]+, ≤20 chars).
 
       Capability (user-visible):
         - FR-005 branch-design resolution — pick single-branch (current code reality) or three-branch (spec text). Update spec OR SKILL.md and add ACs covering the chosen model.
@@ -112,9 +112,10 @@ pieces:
         - Plan-skill phase-sizing rule — split phases >150 LOC of new behavioral prose into Phase Groups.
         - Plan-skill exit-gate semantics rule — "X ran" cannot downgrade to "X is documented to run later."
         - Default `[Verify]` commands to `python3 -c` for YAML/JSON validation (drop yq/jq dependency in pipeline self-checks).
+        - Iter-until-clean QA loop, applied universally — every QA gate (spec, plan, charter, execute per-phase, mid-piece Opus, Final Review fix-up) keeps iterating until the reviewer returns no must-fix findings. Iter-1 is full review; iter-2+ is focused re-review on the diff. Today's `qa_iter2: auto` skip predicate is retired; the 3-iter circuit breaker stays as the escalation guard, not as auto-stop. Codified in a single shared reference doc that all QA-running skills cite.
 
-      Minor bump (NN-C-003: backwards-compatible additions). 10 items, plan likely splits into 2-3 Phase Groups (capability vs. orchestrator vs. plan-skill rules) so per-area QA stays focused. Brainstorm during spec authoring will negotiate FR-005 path-pick and confirm migrate-skill stays on path 1.
-    prd_sections: [FR-004, FR-005, NFR-003, NFR-004]
+      Minor bump (NN-C-003: backwards-compatible additions). 11 items, plan likely splits into 2-3 Phase Groups (capability vs. orchestrator vs. plan-skill rules) so per-area QA stays focused. Brainstorm during spec authoring will negotiate FR-005 path-pick and confirm migrate-skill stays on path 1.
+    prd_sections: [FR-004, NFR-003, NFR-004]
     dependencies: [PI-008-multi-prd-v3.0.0]
     status: open
 
