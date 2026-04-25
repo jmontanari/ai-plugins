@@ -6,7 +6,7 @@ A cross-host plugin marketplace. One repository hosts one or more plugins that i
 
 | Plugin | Version | Description |
 |---|---|---|
-| [**spec-flow**](./plugins/spec-flow) | 2.2.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. |
+| [**spec-flow**](./plugins/spec-flow) | 3.0.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. |
 
 More plugins will live here over time. Each is self-contained and independently versioned.
 
@@ -124,7 +124,7 @@ One source tree serves both hosts without translation. Three pieces make this po
 - `plugins/<plugin>/skills/<name>/SKILL.md` is the cross-tool [Agent Skills open standard](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) — identical file, both hosts.
 - `plugins/<plugin>/agents/<name>.md` are plain Markdown with YAML frontmatter. Copilot CLI's loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its [Custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) reference, so the same files Claude Code discovers are picked up by Copilot CLI. No symlinks, no dual extensions.
 
-See the spec-flow plugin's [PI-007 learnings](./docs/specs/PI-007-copilot-coship/learnings.md) for the full design journey, smoketest transcripts, and the design-iteration detours that were rejected.
+See the spec-flow plugin's [PI-007 learnings](./docs/prds/shared/specs/PI-007-copilot-coship/learnings.md) for the full design journey, smoketest transcripts, and the design-iteration detours that were rejected.
 
 ## Repository layout
 
@@ -147,13 +147,18 @@ See the spec-flow plugin's [PI-007 learnings](./docs/specs/PI-007-copilot-coship
 │       └── reference/           auto-loaded doctrine
 ├── docs/
 │   ├── charter/                 project-wide binding constraints
-│   ├── prd/                     product requirements + piece manifest
-│   └── specs/                   per-piece spec + plan + learnings
+│   ├── improvement-backlog.md   cross-PRD process learnings
+│   └── prds/                    one directory per PRD (multi-PRD layout)
+│       └── <prd-slug>/          PRD root — currently `shared/`
+│           ├── prd.md           product requirements
+│           ├── manifest.yaml    piece enumeration with status + dependencies
+│           ├── backlog.md       PRD-scoped deferred work
+│           └── specs/<piece>/   per-piece spec + plan + learnings
 ```
 
 ## Doctrine and governance
 
-This marketplace is self-hosting — its own evolution is governed by the `spec-flow` plugin that lives inside it. New work is brainstormed into a PRD, decomposed into pieces in `docs/prd/manifest.yaml`, and each piece goes through `spec → plan → execute → review → merge` with TDD discipline and adversarial QA gates at every boundary.
+This marketplace is self-hosting — its own evolution is governed by the `spec-flow` plugin that lives inside it. New work is brainstormed into a PRD, decomposed into pieces in `docs/prds/<prd-slug>/manifest.yaml` (currently `docs/prds/shared/manifest.yaml`), and each piece goes through `spec → plan → execute → review → merge` with TDD discipline and adversarial QA gates at every boundary.
 
 Binding project-wide rules live under `docs/charter/`:
 
