@@ -1,6 +1,6 @@
 ---
 # slug, status, version are required.
-# slug: short id (≤10 chars, [a-z0-9-]); see plugins/spec-flow/reference/slug-validator.md
+# slug: short id (≤20 chars, [a-z0-9-]); see plugins/spec-flow/reference/slug-validator.md
 slug: {{prd_slug}}
 status: drafting   # drafting | active | shipped | archived
 version: 1

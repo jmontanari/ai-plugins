@@ -11,7 +11,7 @@ prd_source: "{{docs_root}}/prd.md"   # legacy compat — kept for v0/v1/v2 manif
 #   Example piece block (delete or replace):
 #
 #   - name: example-piece
-#     slug: ex-piece          # optional — defaults to kebab-cased `name` (≤10 chars, [a-z0-9-])
+#     slug: ex-piece          # optional — defaults to kebab-cased `name` (≤20 chars, [a-z0-9-])
 #     status: open            # open | specced | planned | in-progress | merged | done | superseded | blocked
 #                             #   (see piece-status state machine in the spec-flow doctrine; `done` is the v2 alias of `merged`)
 #     prd_sections: [FR-001, FR-002]

@@ -82,7 +82,7 @@ Determine the slug:
 2. Otherwise derive a default from the existing PRD's title:
    - For v2: read first H1 (or `name:` front-matter key) of `docs/prd/prd.md`.
    - For v1: read first H1 (or `name:` front-matter key) of `docs/prd.md`.
-   - Slugify (lowercase, hyphenate, strip non-alphanum-hyphen) and truncate to 10 chars.
+   - Slugify (lowercase, hyphenate, strip non-alphanum-hyphen) and truncate to 20 chars.
 3. Prompt: "Use slug `<derived>`? Override or press Enter to confirm:".
    - On Enter: keep derived slug.
    - On override: replace with user-supplied value.

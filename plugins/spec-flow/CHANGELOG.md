@@ -11,7 +11,7 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 - Cross-PRD piece dependencies via qualified `depends_on:` refs (`<prd-slug>/<piece-slug>`).
 - New `/spec-flow:migrate` skill — one-shot v1.x/v2.x → v3.0.0 layout migration with `--inspect` (dry-run) and `--force` (override safety checks).
 - New `.spec-flow.yaml` config key: `layout_version: 3` (controls path resolution; absence triggers SessionStart warning).
-- Slug validator (≤10 chars, charset `[a-z0-9-]`, ≤50-char branch length) — see `plugins/spec-flow/reference/slug-validator.md`.
+- Slug validator (≤20 chars, charset `[a-z0-9-]`, ≤50-char branch length) — see `plugins/spec-flow/reference/slug-validator.md`.
 - `qa-spec` agent: third Input Mode `Focused charter re-review` for automatic charter-drift detection.
 - `--ignore-deps` flag on `/spec-flow:execute` for deliberate deviations past unmerged dependencies.
 - `--include-archived` flag on `/spec-flow:status` to show archived PRDs.

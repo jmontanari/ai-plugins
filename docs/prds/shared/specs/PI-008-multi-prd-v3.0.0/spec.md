@@ -87,7 +87,7 @@ Every manifest piece carries one of the following statuses. FR-011's `depends_on
 - **FR-003:** Every manifest piece entry accepts `slug:` (optional — falls back to `name` kebab-cased). When present, the piece's worktree and branches use the slug.
 - **FR-004:** Worktree creation in `spec`, `plan`, and `execute` skills produces `worktrees/prd-<prd-slug>/piece-<piece-slug>/` paths.
 - **FR-005:** Branch naming for piece work is `{spec,plan,execute}/<prd-slug>-<piece-slug>`. Slug validator rules (enforced by every skill that creates a worktree or branch — `prd`, `spec`, `plan`, `execute`, `migrate`):
-  - Each slug: max 10 characters, charset `[a-z0-9-]`, must not start or end with `-`.
+  - Each slug: max 20 characters, charset `[a-z0-9-]`, must not start or end with `-`.
   - No reserved words at this time (placeholder for future expansion).
   - Total branch length must remain ≤ 50 characters.
   - On overflow or charset violation: the skill creating the branch refuses with an explicit error naming which slug is offending and what the limit is. No silent truncation.
@@ -297,7 +297,7 @@ pieces:
   - `spec/<prd-slug>-<piece-slug>`
   - `plan/<prd-slug>-<piece-slug>`
   - `execute/<prd-slug>-<piece-slug>`
-- Slug length target: ≤ 10 chars each to keep branch length manageable. Validated by `spec` skill at worktree-creation time.
+- Slug length target: ≤ 20 chars each to keep branch length manageable. Validated by `spec` skill at worktree-creation time.
 
 ### Charter-drift mechanism
 
@@ -317,7 +317,7 @@ pieces:
 - Single-phase orchestrator. No QA gate — migration is a mechanical file move, not a behavior change.
 - Phases:
   1. **Detect source layout:** inspect `docs/prd.md` (v1), `docs/prd/prd.md` (v2), or `docs/prds/` (already v3). Error if ambiguous or none.
-  2. **Gather inputs:** ask user for target PRD slug (or use argument). Derive default from existing PRD title. Validate slug (kebab-case, ≤ 10 chars, no slashes).
+  2. **Gather inputs:** ask user for target PRD slug (or use argument). Derive default from existing PRD title. Validate slug (kebab-case, ≤ 20 chars, no slashes).
   3. **Safety checks:** refuse if working tree dirty. Refuse if active worktrees under `worktrees/` point to pre-v3 branches. `--force` overrides but prints warnings.
   4. **Dry-run plan:** print every `git mv` that will be executed + every file that will get front-matter additions. Ask for confirmation.
   5. **Execute:**

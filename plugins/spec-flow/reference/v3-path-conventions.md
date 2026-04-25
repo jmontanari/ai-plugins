@@ -58,7 +58,7 @@ In every branch (warning emitted, silent, or error), the hook exits 0 with valid
 
 ## Cross-references to slug validator
 
-Every path that contains `<prd-slug>` or `<piece-slug>` is subject to the rules in [plugins/spec-flow/reference/slug-validator.md](slug-validator.md): max 10 characters per slug, charset `[a-z0-9-]`, no leading or trailing `-`, ≤ 50-char branch length total. Path resolution does not silently sanitize a slug — the slug must already be valid by the time it reaches a path-formation call. Skills validate at branch/worktree creation time and refuse with an explicit error on violation.
+Every path that contains `<prd-slug>` or `<piece-slug>` is subject to the rules in [plugins/spec-flow/reference/slug-validator.md](slug-validator.md): max 20 characters per slug, charset `[a-z0-9-]`, no leading or trailing `-`, ≤ 50-char branch length total. Path resolution does not silently sanitize a slug — the slug must already be valid by the time it reaches a path-formation call. Skills validate at branch/worktree creation time and refuse with an explicit error on violation.
 
 ## See also
 

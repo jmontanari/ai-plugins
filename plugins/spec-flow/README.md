@@ -99,7 +99,7 @@ See `plugins/spec-flow/reference/v3-path-conventions.md` for the canonical path 
 
 **PRD lifecycle states.** Each PRD declares `status:` in its front-matter — one of `drafting | active | shipped | archived`. `/spec-flow:status` filters by status (active by default; archived hidden unless `--include-archived`). Archived PRDs stay in place as a historical record; there is no `docs/archive/` move convention.
 
-**Slug naming.** Slugs (≤10 chars, charset `[a-z0-9-]`, ≤50-char branch length when combined with `<prd-slug>-<piece-slug>`) keep paths and branches readable. See `plugins/spec-flow/reference/slug-validator.md` for rules and the validator behavior the skills enforce.
+**Slug naming.** Slugs (≤20 chars, charset `[a-z0-9-]`, ≤50-char branch length when combined with `<prd-slug>-<piece-slug>`) keep paths and branches readable. See `plugins/spec-flow/reference/slug-validator.md` for rules and the validator behavior the skills enforce.
 
 **Cross-PRD piece dependencies.** A piece in PRD A can declare a dependency on a piece in PRD B via a qualified `depends_on:` ref of the shape `<prd-slug>/<piece-slug>` (unqualified refs continue to mean same-PRD). `/spec-flow:execute` blocks on unmerged cross-PRD dependencies by default; pass `--ignore-deps` for deliberate deviations.
 

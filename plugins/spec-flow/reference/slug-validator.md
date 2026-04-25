@@ -6,7 +6,7 @@ This document specifies the slug-validation rules every spec-flow skill must enf
 
 A slug (PRD slug or piece slug) must satisfy every rule below:
 
-- **Length:** must be **at least 1 character** and **at most 10 characters**. The empty string is rejected; a slug of length 0 (or composed entirely of stripped characters after normalization) is never a valid slug.
+- **Length:** must be **at least 1 character** and **at most 20 characters**. The empty string is rejected; a slug of length 0 (or composed entirely of stripped characters after normalization) is never a valid slug.
 - **Charset:** `[a-z0-9-]` only (lowercase ASCII letters, digits, and the hyphen).
 - **Hyphen position:** must not start with `-` and must not end with `-`. (Combined with the minimum-length rule, single-character slugs `a`–`z` and `0`–`9` are allowed; a single `-` is not.)
 - **Reserved words:** none at this time. This is a placeholder for future expansion; today the reserved-word list is empty.
@@ -29,12 +29,12 @@ branch:      spec/auth-tokref     (16 chars ≤ 50)
 Worked example — refused:
 
 ```
-prd-slug:    authentication-flow  (20 chars — violates 10-char max)
-piece-slug:  tokref               (6 chars)
-REFUSED — prd-slug "authentication-flow" exceeds 10-char limit; shorten to ≤ 10.
+prd-slug:    user-authentication-service  (27 chars — violates 20-char max)
+piece-slug:  tokref                       (6 chars)
+REFUSED — prd-slug "user-authentication-service" is 27 characters; limit is 20. Shorten to ≤ 20.
 ```
 
-The 10-char per-slug rule is the primary defense; the 50-char total length is a secondary defense for unusual verb/slug combinations and is checked independently.
+The 20-char per-slug rule is the primary defense; the 50-char total branch length is a secondary defense for unusual verb/slug combinations and is checked independently. With both slugs at the 20-char maximum and the longest verb (`migrate`, 7 chars), the worst-case branch is `migrate/<20>-<20>` = 49 characters, just inside the 50-char budget.
 
 ## Branch path-separator rule
 
@@ -49,14 +49,14 @@ When a slug fails any rule, the skill creating the branch refuses with an error 
 1. **Which slug** is offending (PRD slug vs piece slug).
 2. **The actual value** of the offending slug.
 3. **The current length** (when length is the violated rule) or the offending character (when charset is the violated rule).
-4. **The limit** (10 characters per slug, 50 characters per branch, or the charset spec `[a-z0-9-]`).
+4. **The limit** (20 characters per slug, 50 characters per branch, or the charset spec `[a-z0-9-]`).
 
 There is no silent truncation. There is no "did-you-mean" auto-fix. The user must edit the manifest (or rename the PRD) and re-run.
 
 Example error message:
 
 ```
-ERROR: piece-slug "authentication-flow" is 19 characters; limit is 10.
+ERROR: piece-slug "user-authentication-service" is 27 characters; limit is 20.
        Edit docs/prds/auth/manifest.yaml and shorten the slug, then re-run /spec-flow:spec.
 ```
 
