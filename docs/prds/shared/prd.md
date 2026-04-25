@@ -1,3 +1,10 @@
+---
+name: shared-plugins Marketplace
+slug: shared
+status: active
+version: 1
+---
+
 # Product Requirements Document — `shared-plugins` Marketplace
 
 **Project:** shared-plugins
