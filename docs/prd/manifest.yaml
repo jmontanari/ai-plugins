@@ -87,11 +87,12 @@ pieces:
       Breaking change — ships as spec-flow v3.0.0 (major bump per NN-C-003 and NN-C-009). Ad-hoc task work (lightweight spec→plan→execute for out-of-band work) is out of scope and deferred to a separate future PRD (captured in improvement-backlog.md).
     prd_sections: [G-2, FR-004, NFR-003, NN-P-001, NN-P-003, NN-C-003]
     dependencies: []
-    status: implementing
+    status: merged
     notes: |
-      Delivered as a dual-path co-ship (not the original mirror-branch design). The spec and plan carry amendment blocks at the top documenting the two design pivots (mirror-branch → dual-path with `.agent.md` symlinks → plain-`.md`). See `docs/specs/PI-007-copilot-coship/learnings.md` for the three smoketest records and out-of-scope findings (`/fleet`, `agent` tool, marketplace-root install path).
-      Evidence: README "Install on GitHub Copilot CLI" section, CHANGELOG 2.1.0 entry, 12 top-level agents with valid CR-001 frontmatter, plugin.json + marketplace.json both at 2.1.0 (NN-C-009 three-place bump), scripts/ directory empty (mirror-sync infrastructure fully dismantled).
-      This ships SC-002's Copilot-CLI install leg prerequisite (NN-P-003 dog-food: the maintainer ran the documented install on the same machine the README now recommends). SC-002 moves from uncovered-prerequisite to first-real-world-data-point collected.
+      Merged 2026-04-25. Delivered the spec-flow v3.0.0 multi-PRD layout: docs/prds/<prd-slug>/{prd.md, manifest.yaml, backlog.md, specs/<piece-slug>/} sibling namespaces under singular docs/charter/. New /spec-flow:migrate skill (370 LOC) handles v0/v1/v2 → v3 transitions via history-preserving git mv with --inspect (dry-run) and --force (override safety) flags. Three new reference docs (slug-validator, v3-path-conventions, charter-drift-check) factor shared rules. SessionStart hook emits a non-blocking yellow warning when layout_version is missing or pre-v3 (NN-C-005-compliant 6-scenario smoke test).
+      NN-C-009 three-place version bump landed in commit 8ed685e (plugin.json + marketplace.json + CHANGELOG header all at 3.0.0). Final Review (5 parallel reviewers) returned: PRD-alignment + spec-compliance both 0 must-fix; architecture/edge-case/blind surfaced 11 distinct must-fix items, all applied in commit 40876e6 (hook layout_version regex robustness, slug minimum-length rule, charter-drift missing-field handling, 7 migrate-skill safety fixes including the critical missing `mkdir -p docs/prds`, execute structural-failure dependency refusal contract).
+      Two intentional deferrals: (a) FR-005 branch-design ambiguity (spec lists 3 branches per piece vs v2 single-branch reality preserved in code) — captured in learnings.md as v3.1.0 spec-amendment candidate; (b) AC-15/AC-18 dog-food run + release commit — procedure documented in plugins/spec-flow/docs/release-v3.0.0.md, executed at human-driven release time per NN-P-003 framing.
+      Reflection findings persisted to docs/specs/PI-008-multi-prd-v3.0.0/learnings.md (8 process-retro items, 6 future-opportunities). High-severity process-retro items (skip-predicate calibration, mid-piece Opus pass for ≥6-phase pieces, deferred-finding tracking) should migrate to global docs/improvement-backlog.md at release time.
 
 coverage:
   total_prd_sections: 15
