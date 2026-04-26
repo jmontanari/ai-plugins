@@ -121,7 +121,7 @@ pieces:
         - Spec amendments (vs plan amendments) handled identically but with stricter budget (1 per piece) and full qa-spec re-dispatch since spec drift has PRD impact.
     prd_sections: [FR-004, NFR-003, NFR-004, NN-P-002]
     dependencies: [pi-009-hardening]
-    status: specced
+    status: planned
 
   - name: pi-009-hardening
     description: |
