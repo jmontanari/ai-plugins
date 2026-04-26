@@ -1,6 +1,6 @@
 schema_version: 1
 generated: 2026-04-21
-last_updated: 2026-04-25
+last_updated: 2026-04-26
 prd_source: "docs/prd/prd.md"
 
 pieces:
@@ -94,6 +94,34 @@ pieces:
       NN-C-009 three-place version bump landed in commit 8ed685e (plugin.json + marketplace.json + CHANGELOG header all at 3.0.0). Final Review (5 parallel reviewers) returned: PRD-alignment + spec-compliance both 0 must-fix; architecture/edge-case/blind surfaced 11 distinct must-fix items, all applied in commit 40876e6 (hook layout_version regex robustness, slug minimum-length rule, charter-drift missing-field handling, 7 migrate-skill safety fixes including the critical missing `mkdir -p docs/prds`, execute structural-failure dependency refusal contract).
       Two intentional deferrals: (a) FR-005 branch-design ambiguity (spec lists 3 branches per piece vs v2 single-branch reality preserved in code) — captured in learnings.md as v3.1.0 spec-amendment candidate; (b) AC-15/AC-18 dog-food run + release commit — procedure documented in plugins/spec-flow/docs/release-v3.0.0.md, executed at human-driven release time per NN-P-003 framing.
       Reflection findings persisted to docs/specs/PI-008-multi-prd-v3.0.0/learnings.md (8 process-retro items, 6 future-opportunities). High-severity process-retro items (skip-predicate calibration, mid-piece Opus pass for ≥6-phase pieces, deferred-finding tracking) should migrate to global docs/improvement-backlog.md at release time.
+
+  - name: pi-010-discovery
+    description: |
+      v3.2.0 — Synchronous discovery triage. Eliminates silent backlog deferrals by making the execution that finds new work also fix it. Today the pipeline writes deferred QA findings, "NOT COVERED — deferred" AC matrix rows, and reflection-future-opportunities findings to backlog files at end-of-piece, surfacing them only at the next piece's spec brainstorm. Operators have no signal that prerequisite work is undone until much later. This piece restructures discovery → resolution as a synchronous flow with operator triage at discovery time.
+
+      Operator principle (binding): "the execution that found the work also fixes it." Inline plan amendment is the default response to discovery, not a separate skill. The piece bundles five distinct sub-areas as Phase Groups:
+
+      Capability (user-visible):
+        - **`/spec-flow:defer` skill** (sub-area F) — sole supported path for writing to backlog files. Records source piece, source phase, finding text, operator's rationale for non-blocking. After this lands, every other skill's automatic backlog-write code path is removed.
+
+      Orchestrator (no new user-facing surface):
+        - **depends_on enforcement at spec/plan time** (sub-area A) — `/spec-flow:spec` and `/spec-flow:plan` gain a precondition check that surfaces unmet `depends_on` to the operator with three triage options (pull-deps-in as Phase 0, fork to manifest piece, proceed with `--ignore-deps`). Recorded as a `## Dependency triage` section in the spec or plan file. Today only `execute` reads `depends_on`.
+        - **AC matrix deferred-row rejection at Verify gate** (sub-area B) — verify-agent rejects any `NOT COVERED — deferred to ...` row by default. New required `Reason:` field with three values (`does-not-block-goal | requires-amendment | requires-fork`). Phase-in via `legacy_deferred_rows: true` plan flag for one release cycle, then strict.
+        - **Discovery triage + inline plan amendment** (sub-area D, load-bearing) — new step in `skills/execute/SKILL.md` between phase-complete and next-phase-start. Aggregates discoveries from the just-finished phase's QA review and AC matrix gate; on each discovery, prompts operator with amend / fork / defer. The amend path dispatches a new `plan-amend` agent (Sonnet) that emits a unified diff inserting suffix-named phases (`phase_<n>_amend_<k>`) before the next original phase, then the orchestrator commits `amend(plan): <reason>` and resumes. Budget: 2 amendments per piece. qa-plan re-review on diff + neighborhood. Auto-mode default: amend if absorption < 50% of cumulative diff, escalate otherwise. New `.discovery-log.md` artifact per piece records every discovery and its triage outcome. Final-Review-board misses route through the same triage flow (re-opening the piece for amendment phases instead of writing deferred-finding stubs).
+        - **Reflection agents emit triage reports** (sub-area E) — `reflection-future-opportunities` and `reflection-process-retro` stop writing directly to backlog files. They emit findings to the orchestrator at Step 4.5; orchestrator dispatches the same triage UX from sub-area D for each finding. Operator's `defer` choice invokes `/spec-flow:defer`. Process-retro `process-improvement` category items batch-confirm at end of piece (cross-PRD learnings get one batched defer prompt rather than per-finding triage).
+
+      Architectural shape: 5 Phase Groups (A, B, C-as-D-prep, D, E+F bundled). Plan-amend agent is a new Sonnet agent under `plugins/spec-flow/agents/plan-amend.md`. Discovery-log artifact is a new per-piece file. All other changes modify existing skill / agent prose plus minor templates.
+
+      Backwards-compatibility: minor bump (NN-C-003: additive + opt-in stricter behavior). The `legacy_deferred_rows: true` flag preserves today's AC matrix behavior for one release. Existing `backlog.md` entries are grandfathered (no one-time triage pass forced); operators may invoke a `--triage-existing-backlog` mode of /spec-flow:defer manually if desired (out of scope for this piece — captured for future).
+
+      Risks called out for spec brainstorm:
+        - Amendment loops bounded by per-piece budget (2). Hitting the budget escalates to "scope was wrong; abandon and re-spec."
+        - Triage prompt fatigue mitigated by auto-mode defaults and the principle that better specs/plans (which this feature's adoption pressures) produce fewer discoveries.
+        - Plan-amend agent's diff+neighborhood scope must include any phase that scopes the same SKILL.md block as an amended phase — inherits the cross-phase content-dependency lesson from pi-009 (Phase B.1 → B.4 collateral damage).
+        - Spec amendments (vs plan amendments) handled identically but with stricter budget (1 per piece) and full qa-spec re-dispatch since spec drift has PRD impact.
+    prd_sections: [FR-004, NFR-003, NFR-004, NN-P-002]
+    dependencies: [pi-009-hardening]
+    status: open
 
   - name: pi-009-hardening
     description: |

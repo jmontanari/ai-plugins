@@ -119,3 +119,67 @@ The following process-retro items from PI-008's reflection were specced into `do
 - **Step 3.7b reconciliation: harden from advisory to hard fail for Implement track** (HIGH; piece candidate). Implement track currently doesn't run reconciliation — Phase Group A's contamination event in this piece would have been caught if the gate covered Implement track.
 
 ---
+
+## Synchronous discovery triage — stop silent backlog deferral
+
+**Status:** concept — captured 2026-04-26 from operator feedback; awaiting dedicated PRD brainstorm
+**Severity:** HIGH — this is a structural defect in the discovery → resolution flow, not a localized bug
+
+### Problem
+
+Multiple discovery moments in the pipeline silently route newly-discovered work to a backlog file without operator dialogue at discovery time:
+
+- `execute` Step 6a writes deferred QA findings to `<docs_root>/prds/<prd-slug>/backlog.md` as stubs.
+- `execute` AC matrix accepts `NOT COVERED — deferred to <pointer>` rows, which feed reflection-future-opportunities at Step 4.5.
+- `reflection-future-opportunities` writes findings to the PRD-local `backlog.md` at end-of-piece.
+- `reflection-process-retro` writes findings to the global `improvement-backlog.md` at end-of-piece.
+
+In all four cases, the operator does not learn about the deferred work until the **next** session's `spec` brainstorm (Phase 1 step 6 of `skills/spec/SKILL.md`) — and even then only the ~5 most-relevant items surface. Items can sit in backlog files for multiple sessions without an explicit triage decision. The result observed in practice (2026-04-26): a downstream project shipped a piece whose plan referenced "carryover_from_phase_3" prerequisite work, which never made it into the manifest as `depends_on`-gated pieces. Subsequent pieces were freely specced and planned despite real prerequisites being undone, because:
+
+- `spec` and `plan` skills do **not** read `depends_on:` (only `execute` enforces it — `skills/execute/SKILL.md:73`).
+- `backlog.md` is purely informational; nothing parses it for gating.
+- `carryover_from_phase_*` is not a manifest schema field; the pipeline ignores free-form notes in YAML.
+
+### Operator's desired model
+
+**Synchronous principle:** Discovered work must be resolved synchronously with discussion. It cannot be silently deferred. **The execution that found the work also fixes it** — plan amendment is inline in execute, not a separate skill.
+
+When a discovery moment fires, the orchestrator should pause and offer the operator a triage choice:
+
+1. **Inline plan amendment + sub-phase absorption** (default) — execute edits plan.md in-place to add phases or modify scope, dispatches `qa-plan` against the diff, commits `amend(plan): <reason>` on the worktree branch, and resumes from the affected phase. Budget: 2 amendments per piece. The work that found the gap fixes it without leaving execute.
+2. **Fork to new manifest piece** — write a new piece into the manifest with `depends_on:` chains, block the current piece, halt execute. Reserved for discoveries that would change the piece's stated goals (not just its size).
+3. **Explicit defer** — operator confirms "this finding does not block the current piece's goals"; invokes `/spec-flow:defer` to write a backlog entry with rationale. Only this path writes to a backlog file.
+
+Today's pipeline implicitly takes option 3 for every discovery moment, and there is no mechanism for option 1 at all.
+
+### Discovery moments that need triage hooks
+
+| Moment | Currently | Should |
+|---|---|---|
+| `execute` start, unmet `depends_on` | Refuse or `--ignore-deps` | Offer Phase 0 absorption, fork, or explicit refusal |
+| Build/QA discovers new prerequisite mid-phase | 2-attempt budget → escalate or backlog stub | Pause; offer amend / sub-phase / fork / defer |
+| Verify finds AC matrix "NOT COVERED — deferred" | Accepted; flows to reflection at Step 4.5 | Block phase complete; force triage at the AC matrix gate |
+| Step 4.5 reflection-future-opportunities | Always writes to backlog | Triage prompt before write — operator classifies each finding |
+| Final review board flags missing scope | Becomes deferred QA finding stub | Same — triage prompt |
+
+The reflection-future-opportunities agent already produces the right shape of finding (rationale, dependencies, candidate piece sketch). The gap is positional: its output goes to a file instead of to a triage prompt at end-of-piece.
+
+### Design questions to resolve in PRD brainstorm
+
+1. Does plan amendment require a full `qa-plan` re-dispatch on the diff, or a lighter-touch `qa-plan-amend` agent that only reviews changed phases?
+2. What's the size threshold above which "Phase 0 absorption" is rejected and operator must fork to a new piece? Tied to phase-sizing rule (>150 LOC of behavioral prose).
+3. Does the triage prompt fire mid-phase (interrupt Build) or at phase boundaries only? Mid-phase interruption breaks the Implement→Verify atomic unit; phase-boundary triage may let operator miss in-flight discoveries.
+4. How do `--ignore-deps` and `--auto` interact with the new triage step? `--auto` should default to "fork to new piece" when prerequisites surface, since absorption is a scope decision.
+5. Should `spec` skill also gain a `depends_on` precondition check (currently only `execute` enforces it)? Operator's preference: yes — surface unmet deps at spec time and offer Phase 0 absorption then.
+6. Backlog files become **operator-only** writes (via explicit defer) rather than orchestrator writes. Migration question: do existing backlog entries need a one-time triage pass, or grandfather them?
+7. How does Final Review iter-1 must-fix volume budget interact with triage? Today's "≥4 critical → flag piece" rule (from pi-009 retro) presumes deferral; the new model would force resolution before the budget gate triggers.
+
+### Why this is HIGH severity
+
+The current pipeline can complete a piece end-to-end with documented prerequisite work undone, and the operator has no signal until they spec the next piece. This violates the operator's mental model of "if execute completed and review-board signed off, the piece is done." The pi-009 retro entry "exit-gate semantics: 'X ran' can't downgrade to 'X is documented'" (FR-12) is a localized version of the same underlying problem — unfinished work being treated as resolved by writing it down.
+
+### Prerequisites
+
+None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Plan amendment is the load-bearing new mechanism; sub-phase absorption is a scoped extension to existing plan/execute.
+
+---
