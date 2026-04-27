@@ -2,6 +2,16 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.2.0] — 2026-04-27
+
+### Added
+
+- **Dual-platform support for Copilot CLI.** The plugin now works with both Claude Code and GitHub Copilot CLI without code duplication.
+  - Root `plugin.json` symlink → `.claude-plugin/plugin.json`: Copilot CLI requires `plugin.json` at the plugin root; Claude Code reads `.claude-plugin/`. One symlink, one source of truth.
+  - `hooks/hooks.json` now contains both `SessionStart` (Claude Code) and `sessionStart` (Copilot CLI) hook blocks, coexisting on different JSON keys.
+  - `hooks/session-start` outputs `Plugin root:` to session context in Copilot CLI so `${CLAUDE_PLUGIN_ROOT}` references in skills resolve correctly.
+  - `skills/execute/SKILL.md` Pre-Loop now includes a platform note: use the built-in `sql` tool in Copilot CLI in place of `TaskCreate`/`TaskUpdate`/`TaskList`.
+
 ## [3.1.3] — 2026-04-25
 
 ### Changed
