@@ -24,6 +24,7 @@ Each phase uses exactly ONE of two tracks:
 
 - **TDD track** — phase contains `[TDD-Red]`. Use for behavior-bearing code that benefits from test-driven design.
 - **Implement track** — phase contains `[Implement]` (and NO `[TDD-Red]`). Use for config, infrastructure, scaffolding, glue/wiring code, docs-as-code, fixtures, and migrations — anything where unit-level TDD would be ceremony without payoff. The `[Verify]` step on this track runs whatever command validates the work (lint, type check, build, smoke run, integration test) — the plan author picks.
+- **Non-TDD mode** — the plan's front-matter declares `tdd: false`. ALL phases use `[Implement]` + `[Write-Tests]` structure. AC Coverage Matrix is not required. QA and Final Review remain fully intact.
 
 A phase must have exactly one of these markers. The executor branches mechanically on the checkbox it finds.
 
@@ -81,6 +82,37 @@ A phase must have exactly one of these markers. The executor branches mechanical
 - [ ] **[QA]** Phase review
   - Review against: {{ac_list}}
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
+
+### Phase 2 (Non-TDD mode): {{phase_name}}
+**Exit Gate:** {{exit_criteria}}
+**ACs Covered:** {{ac_list}}
+**Charter constraints honored in this phase:**
+- {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
+
+- [ ] **[Implement]** Write code per the plan
+    - Order sub-items in checkpoint progression (schema/types -> core wiring -> wrappers/adapters -> edge paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.
+    - Files: {{file_paths_with_signatures_or_structure}}
+    - Follow existing patterns: {{pattern_pointers}}
+    - Architecture constraints this phase must honor: {{arch_constraints}}
+
+- [ ] **[Write-Tests]** Write tests for the implemented code
+    - No "fail first" requirement — tests are written for existing code.
+    - Aim for reasonable coverage of the phase's ACs.
+    - Stage tests via `git add` (do NOT commit) so Verify can run them.
+
+- [ ] **[Verify]** Confirm the implementation is sound
+    - Run: {{verification_command}}     (e.g. `ruff check .`, `tsc --noEmit`, `terraform validate`, `make build`, `pytest tests/integration/...`)
+    - Expected: {{expected_output}}
+
+- [ ] **[Refactor]** (optional — include only if cleanup is likely needed) Clean up (scope: Phase N files only)
+    - Check for: duplication, naming, extract helpers
+    - Constraint: only modify files created/changed in this phase
+
+- [ ] **[QA]** Phase review
+    - Review against: {{ac_list}}
+    - Diff baseline: git diff {{phase_start_tag}}..HEAD
+
+A non-TDD phase uses `[Implement]` instead of `[TDD-Red]`, skips `[QA-Red]` and `[Build]`, and adds `[Write-Tests]` after implementation. No AC Coverage Matrix is required. Non-TDD mode is declared in the plan's front-matter as `tdd: false`.
 
 ## Phase Group A (example): {{group_name}}
 **Exit Gate:** all sub-phases pass their oracles + group Deep QA clean

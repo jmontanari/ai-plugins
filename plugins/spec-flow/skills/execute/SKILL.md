@@ -240,7 +240,7 @@ Inspect the phase's checkboxes in plan.md to determine the mode flag passed to t
 - Phase contains `[Implement]` and NO `[TDD-Red]` → **Mode: Implement**. Skip Step 2. Run Step 3 (Implement in Implement mode), then Step 4, then Step 5 only if the phase has a `[Refactor]` checkbox, then Step 6.
 - Both markers present, or neither: plan is malformed. Escalate to human.
 
-The orchestrator branches mechanically on the checkbox; it does not decide which mode applies. The mode decision was made by the plan author. The Implement mode exists for phases where TDD doesn't fit (config, infra, scaffolding, glue code, docs-as-code).
+The orchestrator branches mechanically on the checkbox; it does not decide which mode applies. The mode decision was made by the plan author. The Implement mode exists for phases where TDD doesn't fit (config, infra, scaffolding, glue code, docs-as-code) **and** for all phases when the plan uses non-TDD mode (`tdd: false` in plan front-matter).
 
 ### Step 1b: Phase Pre-Flight (read-only)
 
@@ -250,21 +250,22 @@ Before dispatching Red or Implement, the orchestrator collects facts the agents 
 2. **Schema shape** — if the plan references a config family (`configs/<X>/`, schemas, templates), sample one existing sibling: `head -20 configs/<X>/<any_existing>`. Attach as "Existing schema" context.
 3. **Symbol presence** — for each type/class/function the plan names that isn't already defined inside the phase's own scope, `git grep -l -E '^(class|def|function) <Name>\b'` (or equivalent scoped to likely source directories). Attach the hit paths or "(not found — define in Build)".
 4. **Pre-commit hook inventory** — if `.pre-commit-config.yaml` exists, read it. For each hook, check whether its `id` or `entry` invokes a test runner (substring match on `pytest`, `unittest`, `go test`, `jest`, `vitest`, or the project's declared test command from CLAUDE.md). Flag any matches. **Err on surfacing** — false positives only give the Red agent information it doesn't need; false negatives stall the pipeline when Red hits a hook wall.
-5. **Plan conditional resolution** — scan the phase's [Build]/[Implement] block for ONLY these two phrase patterns:
+5. **TDD mode flag** — check the plan's front-matter `tdd:` field. If `tdd: false`, note that this is a non-TDD piece (no AC matrix required; Verify defaults to Full mode; Write-Tests step applies).
+6. **Plan conditional resolution** — scan the phase's [Build]/[Implement] block for ONLY these two phrase patterns:
    - "extract ... if ... exceeds <N>" — evaluate using the LOC snapshot.
    - "if <file/symbol> exists, reuse; otherwise create ..." — evaluate using symbol presence.
    Resolve each into a bullet under `## Orchestrator pre-decisions`. Other conditional phrasings (runtime-state conditions, fuzzy natural-language conditionals) pass through unchanged — the orchestrator is not a general-purpose plan interpreter.
 
 Compose two attachments for later steps:
 
-- `## Pre-flight snapshot` — items 1–4 above, verbatim. Attached to BOTH the Red prompt (Step 2) and the Implement prompt (Step 3) — Red benefits from symbol presence and schema samples too.
-- `## Orchestrator pre-decisions` — item 5, one resolved decision per bullet. Attached only to the Implement prompt. Empty section OK (include the heading with "(none)" if no conditionals matched).
+- `## Pre-flight snapshot` — items 1–5 above, verbatim. Attached to BOTH the Red prompt (Step 2) and the Implement prompt (Step 3) — Red benefits from symbol presence and schema samples too.
+- `## Orchestrator pre-decisions` — item 6, one resolved decision per bullet. Attached only to the Implement prompt. Empty section OK (include the heading with "(none)" if no conditionals matched).
 
 If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents commit normally without any hooks running.
 
 ### Step 2: TDD-Red — Write Failing Tests (Stage, Don't Commit)
 
-*(Mode: TDD only. As of v2.7.0, Red stages its tests via `git add` but does NOT commit. The implementer in Step 3 creates the unified commit containing Red's staged tests + Build's production code. This makes each TDD cycle land as one commit in git history.)*
+*(Mode: TDD only. Skip this step entirely when the plan uses non-TDD mode (`tdd: false` in plan front-matter). As of v2.7.0, Red stages its tests via `git add` but does NOT commit. The implementer in Step 3 creates the unified commit containing Red's staged tests + Build's production code. This makes each TDD cycle land as one commit in git history.)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/tdd-red.md`
 2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. Red does NOT commit — the pre-commit hook does not run during its turn. The `--no-verify` test-running-hook carve-out from pre-v2.7.0 is obsolete (there's no Red commit for the hook to block).
@@ -302,7 +303,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
 
 ### Step 2.5: QA-TDD-Red — Reject Theater Tests
 
-*(Mode: TDD only. Runs between Red's commit and the implementer dispatch. Catches theater tests — tautology, mock-echo, assert-the-assignment, truthy-only, exception swallowing, no-assertion, name/body mismatch, implementation coupling, redundant clusters — before Build writes production code fit to weak assertions.)*
+*(Mode: TDD only. Skip this step when the plan uses non-TDD mode (`tdd: false` in plan front-matter). Runs between Red's commit and the implementer dispatch. Catches theater tests — tautology, mock-echo, assert-the-assignment, truthy-only, exception swallowing, no-assertion, name/body mismatch, implementation coupling, redundant clusters — before Build writes production code fit to weak assertions.)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-tdd-red.md`
 2. Compose prompt with:
@@ -407,7 +408,23 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      ```
      Any stray file (in commit but not in expected) or missing file (in expected but not in commit) rejects the phase. Strays typically mean a concurrent agent's uncommitted changes were swept in via `git commit -a` or `git add -A` — for Phase Group sub-phases dispatching concurrently, this is the staging-area race the gate is built to detect. Missings typically mean the implementer forgot to stage one of its own files. On rejection: for Mode: Implement, escalate immediately — strays on Implement track usually mean a sibling sub-phase swept in, which is unrecoverable by re-dispatching the same agent. Mode: TDD retries within the 2-attempt budget.
 
-8. **AC Coverage Matrix validation gate.** After the oracle passes and post-commit gates are clean, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 4. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment. After validation, persist Build's `## AC Coverage Matrix` to orchestrator state as `phase_<id>_ac_matrix`, where `<id>` is the phase identifier (e.g., `phase_2`, `phase_3`, `group_a_subphase_a1`, `phase_group_a` for the union, etc.) — the orchestrator chooses a unique identifier per phase or sub-phase. Keys never collide; multiple phases produce multiple keys. Used by Step 0a's mid-piece dispatch.
+8. **AC Coverage Matrix validation gate.**
+    - **Mode: TDD:** After the oracle passes and post-commit gates are clean, validate the Build report's `## AC Coverage Matrix` section. See `references/ac-matrix-contract.md` for the schema and parsing rules. In short: reject + re-dispatch (within the 2-attempt oracle budget above) if the section is missing, missing an in-scope AC row, contains a bare `NOT COVERED`, or a vague `covered` pointer. Clean matrix → proceed to Step 2.7. If validation fails twice, escalate — the plan likely has ambiguity about phase AC assignment. After validation, persist Build's `## AC Coverage Matrix` to orchestrator state as `phase_<id>_ac_matrix`, where `<id>` is the phase identifier (e.g., `phase_2`, `phase_3`, `group_a_subphase_a1`, `phase_group_a` for the union, etc.) — the orchestrator chooses a unique identifier per phase or sub-phase. Keys never collide; multiple phases produce multiple keys. Used by Step 0a's mid-piece dispatch.
+    - **Mode: Implement (non-TDD mode):** This gate is skipped. The AC Coverage Matrix is not required in non-TDD mode (`tdd: false` in plan front-matter). If the implementer provides one, it may be used to unlock Audit mode (see Step 4), but its absence does not reject the phase. Proceed to Step 2.7.
+
+### Step 2.7: Write-Tests (Non-TDD Mode Only)
+
+*(Skip this step when the plan uses TDD mode (`tdd: true` or no `tdd:` front-matter). This step exists only for non-TDD pieces where tests are written after implementation.)*
+
+1. Dispatch an agent to write tests for what was implemented in Step 3. The agent should:
+    - Read the phase's `[Implement]` block from plan.md and the implementation diff.
+    - Write tests that verify the implementation is correct, with reasonable coverage of the phase's ACs.
+    - No "fail first" requirement — tests are written for existing code.
+    - No theater-pattern review, no SHA-256 manifest.
+    - Stage tests via `git add` (do NOT commit) so the Verify step can run them.
+2. **Validate:** Run the test suite scoped to the authored test paths. All new tests should pass (they're written for existing code). If tests don't pass, the agent should fix them within the same turn.
+3. **No AC Coverage Matrix required.** Unlike TDD mode, there's no hard gate here. Just reasonable test coverage.
+4. Proceed to Step 4 (Verify).
 
 ### Step 4: Verify — Confirm Correctness
 
@@ -416,8 +433,9 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    - **`## Oracle Outcome`** — does it say the oracle ran clean on first attempt (no retries)?
    - **`## Plan Adherence`** — is `Deviations from plan: none`?
    - **`## AC Coverage Matrix`** — is it present, complete (every in-scope AC listed), and free of `NOT COVERED` entries?
+     - **Non-TDD override:** If the plan declares `tdd: false` in its front-matter, Condition 3 is treated as "not applicable" (the AC matrix is not expected in non-TDD mode). Only Conditions 1 and 2 determine the mode.
 
-   If **all three** are true, pick **Mode: Audit** — dispatch a narrow agent that sanity-checks the AC matrix without re-running the oracle (~3 min). If any is false, pick **Mode: Full** — dispatch the full verifier (~10 min).
+   If **all applicable conditions** are true, pick **Mode: Audit** — dispatch a narrow agent that sanity-checks the AC matrix without re-running the oracle (~3 min). If any is false, pick **Mode: Full** — dispatch the full verifier (~10 min).
 
    Record the decision in the dispatch log so session summaries can report the Audit/Full mix.
 3. Compose prompt. Line 1 is the mode flag:
@@ -431,7 +449,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      model: "sonnet"
    })
    ```
-5. **Test integrity (Mode: TDD only).** As of v2.7.0, the primary anti-tampering safeguard runs at Step 3.7a (content-hash check of Red's staged test manifest against Red's test files in HEAD). By the time Step 4 runs, that gate has already passed — so no additional diff is needed here. If the phase produces a Refactor commit in Step 5, re-run the content-hash check against HEAD after Refactor lands (Refactor is phase-scoped and must not touch test files the Red agent authored; re-hashing catches drift). If any hash drifts at Refactor time: REJECT, revert the refactor commit, and flag the Refactor agent for re-dispatch with the offending paths surfaced.
+5. **Test integrity (Mode: TDD only; non-TDD mode: no-op).** As of v2.7.0, the primary anti-tampering safeguard runs at Step 3.7a (content-hash check of Red's staged test manifest against Red's test files in HEAD). By the time Step 4 runs, that gate has already passed — so no additional diff is needed here. In non-TDD mode (`tdd: false`), there is no Red manifest, so this check is a no-op. If the phase produces a Refactor commit in Step 5, re-run the content-hash check against HEAD after Refactor lands (Refactor is phase-scoped and must not touch test files the Red agent authored; re-hashing catches drift). If any hash drifts at Refactor time: REJECT, revert the refactor commit, and flag the Refactor agent for re-dispatch with the offending paths surfaced.
 6. Parse verify report.
    - **Audit Mode returned PASS** — proceed to Refactor (Step 5).
    - **Audit Mode returned FAIL** with `Recommend: Full mode re-verify` — re-dispatch as Mode: Full, treat that result as authoritative.

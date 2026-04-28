@@ -11,6 +11,16 @@ Generate an exhaustive implementation plan from an approved spec. The plan is so
 
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
+### TDD Preference Resolution
+
+Read the `tdd` key from `.spec-flow.yaml` (valid values: `auto`, `true`, `false`; default `auto`).
+
+- **`auto`** (default): Prompt the user before generating the plan: "Do you want to use TDD (test-first, Red/Build/Verify/Refactor) or Implement (straight code, Write-Tests/Verify/Refactor/QA) for this piece?" Record their answer in the plan front-matter as `tdd: true` or `tdd: false`.
+- **`true`**: Generate all phases as TDD track (default behavior). Record `tdd: true` in plan front-matter.
+- **`false`**: Generate all phases with non-TDD structure (`[Implement]` → `[Write-Tests]` → `[Verify]` → `[Refactor]` (optional) → `[QA]`). Record `tdd: false` in plan front-matter.
+
+This preference is piece-level: the plan front-matter captures the decision, and the execute skill reads it to orchestrate correctly. Per-phase track overrides remain possible (a phase can always use `[Implement]` even when TDD is true).
+
 ## Prerequisites
 
 - Piece must have status `specced` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
@@ -66,6 +76,13 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    - **[QA]**: ACs to review against, diff baseline
 
    Pick the track that matches reality. Don't force TDD onto a YAML file; don't skip TDD for a business rule.
+
+   **Non-TDD mode override.** If the plan front-matter declares `tdd: false`:
+   - Generate ALL phases with non-TDD structure: `[Implement]` → `[Write-Tests]` → `[Verify]` → `[Refactor]` (optional) → `[QA]`.
+   - No `[TDD-Red]`, no `[QA-Red]`, no `[Build]` markers.
+   - `[Implement]`: same structure as Implement track (exact file paths, signatures, patterns).
+   - `[Write-Tests]`: write tests for what was implemented. No "fail first" requirement. No theater-pattern review. No SHA-256 manifest. Just write tests that verify the implementation is correct, with reasonable coverage of the phase's ACs.
+   - Update the Overview section to state: "Non-TDD mode: all phases use Implement track + Write-Tests; AC Coverage Matrix is not required; QA and Final Review remain intact."
 
 2a. **Phase-sizing check (FR-11; v3.1.1+ filter rules).** After defining each phase's or sub-phase's `[Implement]` (or `[Build]`) block, count the **behavioral-prose lines** inside it — the actionable bullets and ordered-list items that prescribe what the implementer agent does. If the count exceeds 150 for any single phase or sub-phase, emit a warning:
 
@@ -202,7 +219,8 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 ### Phase 4: Finalize
 
 1. User approves → continue
-2. Update manifest on main: piece status → `planned`
+2. Ensure the plan's front-matter includes `tdd: true` or `tdd: false` recording the mode decision for this piece (set during TDD Preference Resolution above; if missing, infer from phase structure: any `[TDD-Red]` → `true`, all `[Implement]` → `false`).
+3. Update manifest on main: piece status → `planned`
    ```bash
    git checkout main
    # update manifest.yaml status for this piece in its PRD-local manifest

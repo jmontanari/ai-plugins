@@ -10,32 +10,39 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 
 ## Red-Build-Verify-Refactor Cycle
 
-### RED — Write Failing Test
+### RED — Write Failing Test (TDD mode only)
 - One behavior per test ("and" in test name → split it)
 - Clear name describing behavior, not implementation
 - Arrange-Act-Assert structure
 - Must fail for the right reason: feature is missing, not typo/setup error
 - Agent reports the failure message; orchestrator validates it
 
-### BUILD — Minimal Code
+### BUILD — Minimal Code (TDD mode only)
 - Simplest possible code to pass the test
 - No optional parameters not required by the test
 - No multiple strategies when one is needed
 - No infrastructure before behavior is needed
 - If test won't go green in 2 attempts → escalate to human
 
-### VERIFY — Confirm Correctness
+### VERIFY — Confirm Correctness (TDD mode only)
 - Run full test suite, confirm all pass
 - Check AC coverage: does each spec AC have a corresponding passing test?
 - Detect over-engineering: did the implementer add code beyond what the mode's oracle requires?
 - Detect test tampering: were test files modified since the Red step?
 
-### REFACTOR — Clean Up
+### REFACTOR — Clean Up (TDD mode only)
 - Remove duplication, improve names, extract helpers
 - Tests stay green throughout (run after every change)
 - No new behavior added
 - No changing what code does — only how it's organized
 - Scope: current phase files only — do not reorganize other phases
+
+### WRITE-TESTS (Non-TDD mode only)
+- Write tests for code that was just implemented (no "fail first" requirement)
+- No theater-pattern review, no SHA-256 manifest
+- Aim for reasonable coverage of the phase's ACs
+- Stage tests via `git add` (do NOT commit) so Verify can run them
+- If tests don't pass, fix them within the same turn
 
 ## Agent-Specific Safeguards
 
@@ -59,8 +66,11 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 
 | Agent-step | Commits produced | What's in the commit |
 |---|---|---|
-| Red | 0 (stages only) | Authored tests are `git add`-ed with literal paths; NOT committed. A `## Staged test manifest` with SHA-256 per path is emitted for the orchestrator to snapshot. |
+| Red | 0 (stages only; TDD mode only) | Authored tests are `git add`-ed with literal paths; NOT committed. A `## Staged test manifest` with SHA-256 per path is emitted for the orchestrator to snapshot. |
 | Build (Mode: TDD) | 1 (unified) | Red's staged tests + Build's production code, committed together. File list must equal (Red manifest paths ∪ Build reported paths). |
+| Implement (Mode: Implement) | 1 | Implementation code only (no prior staging). |
+| Write-Tests (Non-TDD mode only) | 0 (stages only) | Authored tests are `git add`-ed with literal paths; NOT committed. No SHA-256 manifest in non-TDD mode. |
+| Refactor (if run) | 1 | All cleanups that preserve behavior. |
 | Build (Mode: Implement) | 1 | Build's authored files only (no prior staging). |
 | Refactor (if run) | 1 | All cleanups that preserve behavior. |
 
@@ -131,6 +141,12 @@ Examples are Python/pytest because it's the reference stack — adapt the syntax
 11. **Redundant cluster** — 3+ tests asserting the same invariant with permuted inputs that don't exercise different branches. One test would cover it; the extras are inflation.
 
 **AC-binding check (applied by `qa-tdd-red` alongside the catalog):** for each test, answer "If I implemented [the AC] incorrectly in some specific way, would this test catch it?" If the answer is "no" or "I can't tell," the test fails AC binding — regardless of whether it matched any catalog pattern.
+
+## TDD Is Opt-In
+
+The Three Laws govern TDD discipline when TDD mode is selected. TDD is **not mandatory** — the plan skill can generate phases using the Implement track (config, infra, scaffolding, glue code), and a piece can use non-TDD mode entirely (`tdd: false` in the plan front-matter). The Non-TDD mode skips Red, QA-Red, and the AC Coverage Matrix gate, but retains Phase QA and Final Review for quality assurance.
+
+TDD is the default for behavior-bearing code. Non-TDD is the default for configuration, infrastructure, and glue. The plan skill picks the right track for each phase.
 
 ## First Action
 

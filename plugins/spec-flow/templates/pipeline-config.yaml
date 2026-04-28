@@ -16,6 +16,12 @@ layout_version: 3
 #   never   — never run Refactor (useful for repetitive-pattern tracks like adapters)
 refactor: auto
 
+# tdd: controls TDD enforcement for behavior-bearing phases
+#   auto     — ask the user at plan time which track to use (default)
+#   true     — always use TDD track (same as auto with "yes" answer)
+#   false    — skip TDD phases; all phases use Implement track + Write-Tests
+tdd: auto
+
 # qa_iter2: DEPRECATED in 3.1.0 — see plugins/spec-flow/reference/qa-iteration-loop.md
 # The orchestrator no longer reads this key. Iter-until-clean is now the default
 # for all QA gates; the 3-iter circuit breaker handles escalation. The key is

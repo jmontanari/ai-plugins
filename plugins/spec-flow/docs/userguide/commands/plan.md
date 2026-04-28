@@ -50,6 +50,19 @@ Using the spec, the exploration findings, and the plan template:
 6. **Consider Phase Groups** — for pieces with ≥2 disjoint work units (e.g., N adapters), decompose into a group with parallel `[P]`-marked sub-phases.
 7. **Consider Phase 0 Scaffold** — if multiple phases append to the same shared coordination file, pre-append stubs in a single Scaffold phase first.
 
+
+### Choosing TDD vs. Implement
+
+When `/spec-flow:plan` runs, it checks the `tdd` key in `.spec-flow.yaml`:
+
+- **`auto` (default):** The user is asked whether to use TDD for this piece. The answer is recorded in the plan front-matter (`tdd: true` or `tdd: false`).
+- **`true`:** All phases default to TDD track.
+- **`false`:** All phases use Implement track + Write-Tests (non-TDD mode). No `[TDD-Red]`, `[QA-Red]`, or `[Build]`. Tests are written after implementation.
+
+Per-phase overrides are always possible: a phase can use `[Implement]` even when TDD is `true`, and a non-TDD piece (where all phases are `[Implement]`) can still mark individual phases with `[Refactor]` if cleanup is needed.
+
+See [TDD loop concepts](../concepts/tdd-loop.md#non-tdd-mode--the-piece-level-toggle) for the full comparison.
+
 ### Phase 3: QA loop
 
 1. **qa-plan agent review** (Opus, adversarial):

@@ -62,8 +62,9 @@ Attached to all subsequent agent prompts as `## Pre-flight snapshot` and `## Orc
 
 ### Step 2 — TDD-Red (TDD mode only)
 
-- Dispatches **tdd-red** agent with the phase's `[TDD-Red]` tasks + spec ACs + pre-flight snapshot.
-- Agent writes failing tests and commits.
+- Skipped entirely when the plan's front-matter declares `tdd: false` (non-TDD mode).
+- In TDD mode: dispatches **tdd-red** agent with the phase's `[TDD-Red]` tasks + spec ACs + pre-flight snapshot.
+- Agent writes failing tests and stages them (does NOT commit — v2.7.0+).
 - Orchestrator runs the test suite — expects failures for the *right reasons* (feature missing, not setup broken).
 - Captures the verbatim failing output as `phase_N_oracle_block` — Step 3's oracle.
 - Post-commit contamination check: reconciles the committed file list against the agent's `## Tests Written` paths to catch concurrent agent work sweeping in.
@@ -77,13 +78,13 @@ Attached to all subsequent agent prompts as `## Pre-flight snapshot` and `## Orc
   - TDD mode: full test suite must be green.
   - Implement mode: the plan's `[Verify]` command must pass with expected output.
 - **Circuit breaker:** 2 attempts max; then escalate.
-- **AC Coverage Matrix gate:** Build must return a complete matrix mapping each phase AC to a test file:line or verify assertion. A vague or incomplete matrix forces the next step into Full mode.
+- **AC Coverage Matrix gate:** In TDD mode, Build must return a complete matrix mapping each phase AC to a test file:line. A vague or incomplete matrix forces the next step into Full mode. In non-TDD mode (`tdd: false`), this gate is skipped — the matrix is not required, and Verify defaults to Full mode.
 
 ### Step 4 — Verify
 
 - Dispatches **verify** agent in **Audit mode** (fast, ~3 min) if Build reported clean oracle + no deviations + clean matrix.
 - Otherwise **Full mode** (~10 min) — re-runs the full oracle.
-- **Test-integrity check (TDD mode):** runs `git diff $phase_N_start_sha..HEAD -- tests/` and rejects the phase if tests were modified since Red.
+- **Test-integrity check (TDD mode only):** runs `git diff $phase_N_start_sha..HEAD -- tests/` and rejects the phase if tests were modified since Red. In non-TDD mode, this check is a no-op (no Red manifest exists).
 
 ### Step 5 — Refactor (often skipped)
 
@@ -178,6 +179,7 @@ Total: ~45 min of pipeline time. You signed off at every user-gate (spec, plan, 
 
 ## Common execute-time issues
 
+- **Non-TDD mode, Verify stays in Full mode:** Without an AC Coverage Matrix, Verify cannot use the fast Audit mode. This is expected and correct — the Full mode is the right default when the matrix is absent.
 - **Oracle won't turn green after 2 attempts** — escalated. Usually means the plan is ambiguous about what the code should actually do. Revise the plan, or add a missing acceptance criterion to the spec, and retry.
 - **Test-integrity check fails** — the implementer modified test files. Rejected as cheating. Re-dispatch the Build with a stricter reminder; if it happens twice, escalate to check what's going on.
 - **AC Coverage Matrix forces Full Verify** — happens when Build reports `NOT COVERED` without a reason. Build agent gets re-dispatched with the matrix requirements spelled out; if it still fails, escalate.
@@ -185,7 +187,8 @@ Total: ~45 min of pipeline time. You signed off at every user-gate (spec, plan, 
 
 ## Where to go next
 
-- [TDD loop concepts](../concepts/tdd-loop.md) — the per-phase cycle in detail.
+- [TDD loop concepts](../concepts/tdd-loop.md) — the per-phase cycle in detail, including non-TDD mode.
+- [TDD vs Implement choosing](../concepts/tdd-loop.md#non-tdd-mode--the-piece-level-toggle) — when to use each mode.
 - [QA loop concepts](../concepts/qa-loop.md) — how fix-and-re-review works.
 - [Orchestrator model](../concepts/orchestrator-model.md) — the skill-vs-agent separation.
 - [Pipeline concepts](../concepts/pipeline.md) — where execute sits in the full chain.

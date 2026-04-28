@@ -112,6 +112,34 @@ After Build completes, the implementer must return an **AC Coverage Matrix** —
 
 A clean matrix — every AC row filled, specific file:line references, no bare `NOT COVERED` — unlocks Verify's fast Audit mode. A vague or incomplete matrix forces Full re-verification.
 
+
+## Non-TDD mode — the piece-level toggle
+
+Non-TDD mode is a piece-level decision, declared in the plan's front-matter as `tdd: false`. It is not per-phase: when a piece uses non-TDD mode, ALL phases in that piece use the Implement track with an added `[Write-Tests]` step.
+
+**Why choose non-TDD mode:**
+- The work is largely glue/wiring/config where unit-level TDD adds ceremony without value.
+- Rapid prototyping or exploratory work where the specification may change.
+- Legacy code modification where TDD discipline is impractical.
+- Team policy preference (not all teams use TDD).
+
+**What changes in non-TDD mode:**
+- `[TDD-Red]` is absent from all phases.
+- `[QA-Red]` (theater-pattern gate) does not run.
+- `[Build]` is replaced by `[Implement]` + `[Write-Tests]` in every phase.
+- No AC Coverage Matrix is required.
+- Verify defaults to Full mode (since Audit mode is unlocked by a clean AC matrix, which is absent).
+
+**What stays the same:**
+- Phase QA (`qa-phase`) runs on every phase.
+- Final Review (5-agent board) runs after all phases.
+- Reflection (Step 4.5) runs normally.
+- Circuit breakers, escape hatches, and escalation rules are identical.
+- The `implementer` agent still runs, but in `Mode: Implement`.
+- The `refactor` agent still runs when the phase has a `[Refactor]` checkbox.
+
+Non-TDD mode is a valid, complete choice. It is not a "reduced" version of TDD -- it is a different strategy with different trade-offs. The pipeline remains rigorous: every phase still gets adversarial QA review and the final piece still gets a 5-agent review board.
+
 ## Where to go next
 
 - [QA loop](./qa-loop.md) — how must-fix findings get resolved at every boundary.
