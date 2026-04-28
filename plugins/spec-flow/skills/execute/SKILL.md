@@ -139,6 +139,8 @@ Scope validation before dispatching any sub-phases in a group: parse each sub-ph
 
 ## Pre-Loop: Build Task List
 
+> **Platform note:** `TaskCreate`, `TaskUpdate`, and `TaskList` are Claude Code MCP tools. In Copilot CLI they are unavailable — use the built-in `sql` tool instead: `INSERT INTO todos (id, title, status) VALUES (...)` to create, `UPDATE todos SET status = '...' WHERE id = '...'` to update, `SELECT * FROM todos` to list.
+
 Before the Per-Phase Loop dispatches anything, build a complete harness task list mirroring plan.md's structure. Using the unit list the Phase Scheduler resolved above, call `TaskCreate` once per dispatch unit, in plan order, all marked `pending`. A "dispatch unit" is:
 
 - Each `### Phase <N>` (flat phase) → one task.
