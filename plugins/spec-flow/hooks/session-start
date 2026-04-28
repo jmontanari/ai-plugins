@@ -77,7 +77,7 @@ fi
 
 plugin_root_escaped=$(escape_for_json "$PLUGIN_ROOT")
 
-session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'status' skill to see current pipeline state and recommended next action.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nPlugin root: ${plugin_root_escaped}\nWhen skill instructions reference \\\${CLAUDE_PLUGIN_ROOT}, resolve it to: ${plugin_root_escaped}\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}${layout_warning_escaped}\n</IMPORTANT>"
+session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'status' skill to see current pipeline state and recommended next action.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nPlugin root: ${plugin_root_escaped}\nWhen skill instructions reference \${CLAUDE_PLUGIN_ROOT}, resolve it to: ${plugin_root_escaped}\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}${layout_warning_escaped}\n</IMPORTANT>"
 
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   printf '{\n  "additional_context": "%s"\n}\n' "$session_context"

@@ -2,6 +2,12 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.3.1] — 2026-04-28
+
+### Fixed
+
+- **`session-start` hook invalid JSON.** `session_context` contained `\${CLAUDE_PLUGIN_ROOT}` (a `\$` escape sequence that is invalid in JSON), causing Copilot CLI to silently discard the entire `additionalContext` payload — doctrine, charter content, and the "invoke status" reminder were never injected. Fix reduces `\\\$` to `\$` in the source so bash emits `${CLAUDE_PLUGIN_ROOT}` (no leading backslash) in the string value. Affects both Copilot CLI (`additionalContext`) and Claude Code (`hookSpecificOutput.additionalContext`) output branches.
+
 ## [3.2.0] — 2026-04-27
 
 ### Added
