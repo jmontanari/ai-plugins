@@ -12,46 +12,66 @@ Reference: `plugins/spec-flow/reference/integration-capability-check.md`
 
 ---
 
-## Task Naming Conventions
+## Issue Hierarchy
 
-Spec tasks created when a spec is authored:
-```
-[spec] {piece-slug} — Write specification
+Define how spec-flow pipeline concepts map to your tracker's issue types.
+Replace the values with the exact issue type names your project uses.
+
+```yaml
+# Issue type mappings (fill in your tracker's exact type names)
+piece_issue_type: Epic          # Issue type created per piece by the spec skill
+phase_issue_type: Task          # Issue type created per phase by the plan skill
+parent_issue_type: ~            # Optional: parent type the piece issue links to (e.g. Initiative, Capability)
+                                # Set to ~ to disable parent linking
 ```
 
-Plan tasks created when a spec is signed off:
 ```
-[plan] {piece-slug} — Write implementation plan
+{parent_issue_type}  (per PRD — create manually; record key as parent_key: in prd.md)
+  └─ {piece_issue_type}: {piece-slug} — {piece description}    ← spec skill creates
+       └─ {phase_issue_type}: [phase] {piece-slug}/1 — {phase-1-name}   ← plan skill creates
+       └─ {phase_issue_type}: [phase] {piece-slug}/2 — {phase-2-name}
+       └─ {phase_issue_type}: [phase] {piece-slug}/N — ...
 ```
 
-Phase tasks created when a plan is signed off (one per phase):
+**Key fields written by skills:**
+- `parent_key:` in `prd.md` → parent issue the piece issue links to
+- `epic_key:` in `spec.md` → the piece issue key (written by spec skill)
+- `jira_task:` per phase in `plan.md` → the phase issue key (written by plan skill)
+
+---
+
+## Naming Conventions
+
+Piece issue (one per piece, created by spec skill at brainstorm start):
+```
+{piece-slug} — {piece description from manifest}
+```
+
+Phase issues (one per phase, created by plan skill at sign-off):
 ```
 [phase] {piece-slug}/{phase-number} — {phase-name}
 ```
 
-> Customize the formats above. Use `{piece-slug}`, `{phase-number}`, `{phase-name}`,
-> `{prd-slug}` as substitution tokens. Keep them ≤ 80 characters.
+> Customize the formats above. Supported tokens: `{piece-slug}`, `{phase-number}`,
+> `{phase-name}`, `{prd-slug}`. Keep names ≤ 80 characters.
 
 ---
 
 ## Status Transition Rules
 
-Define which issue tracker statuses to use at each pipeline event.
+Define which statuses to use at each pipeline event.
 Replace the values with the exact status names from your project.
 
-| Event | Target Status |
-|-------|--------------|
-| Task created | `To Do` |
-| Spec authoring starts | `In Progress` |
-| Spec signed off (write-plan task) | `To Do` |
-| Plan authoring starts | `In Progress` |
-| Phase execute starts | `In Progress` |
-| Phase QA passes | `In Review` |
-| Final Review Board passes | `Done` |
+| Event | Issue | Target Status |
+|-------|-------|--------------|
+| Piece issue created | piece | `To Do` |
+| Phase issue created | phase | `To Do` |
+| Phase execute starts | phase | `In Progress` |
+| Phase QA passes | phase | `In Review` |
+| Final Review Board passes | phase | `Done` |
 
-> **Important:** Skills will NOT transition tasks to `Done` on behalf of the team
-> unless the Final Review Board explicitly passes. Agents may only move tasks to
-> `In Progress` or `In Review` mid-flight — never to `Done` without a passing gate.
+> **Important:** Skills will NOT transition issues to `Done` unless the Final Review Board
+> explicitly passes. Agents may only move phase issues to `In Progress` or `In Review`.
 
 ---
 
@@ -64,34 +84,14 @@ Issue key injection format (inserted as commit message prefix):
 
 Example: `[PROJ-42] feat(auth): add token refresh endpoint`
 
-> Set `commit_tag_format` in `.spec-flow.yaml` to override. The token `{issue_key}`
-> is replaced with the phase task's issue key (e.g., `PROJ-42`).
-
----
-
-## Issue Hierarchy
-
-Describe how spec-flow-created tasks should fit into your project's issue hierarchy:
-
-```
-Epic (per piece — optional, create manually before running spec)
-  └─ Story: Write Spec   (created by spec skill at start)
-  └─ Story: Write Plan   (created by spec skill at sign-off)
-  └─ Task: Phase 1 — {phase-name}   (created by plan skill at sign-off)
-  └─ Task: Phase 2 — {phase-name}
-  └─ Task: Phase N — ...
-```
-
-> If your project uses Epics, create the Epic manually and record its key in
-> plan.md front-matter (`epic_key: PROJ-10`) — the plan skill will link tasks
-> to it if the MCP tool supports parent assignment.
+> Set `commit_tag_format` in `.spec-flow.yaml` to override.
 
 ---
 
 ## Additional Notes
 
 <!-- Add any project-specific integration notes here, e.g.:
-- Which board or sprint to assign tasks to
+- Which board or sprint to assign issues to
 - Required labels or components
 - Priority defaults
 - Assignee rules

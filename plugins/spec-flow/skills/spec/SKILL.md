@@ -31,11 +31,16 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 ### Phase 2: Brainstorm
 
-**Integration — create spec task (if `integration_cfg != null` and `auto_create_tasks: true`):**
+**Integration — create piece issue (if `integration_cfg != null` and `auto_create_tasks: true`):**
 Run the capability check from `plugins/spec-flow/reference/integration-capability-check.md`
-for operation `create_task`. If the tool is available, create an issue using the task naming
-convention in `integration_cfg` (default: `[spec] {piece-slug} — Write specification`).
-Record the returned issue key as `spec_issue_key`. On tool unavailable → emit warning → skip.
+for operation `create_piece_issue`. If the tool is available:
+- Read `parent_key:` from `<docs_root>/prds/<prd-slug>/prd.md` front-matter. If present,
+  use it as the parent when creating the piece issue (links to the parent in the hierarchy).
+- Create an issue of type `integration_cfg.piece_issue_type` using the piece naming convention
+  from `integration_cfg` (default: `{piece-slug} — {piece description from manifest}`).
+- Record the returned issue key as `epic_key` in orchestrator state AND write it to
+  spec.md front-matter as `epic_key: <key>` so plan and execute skills can find it.
+On tool unavailable → emit warning → skip.
 
 Socratic dialogue with the user, one question at a time:
 
@@ -107,10 +112,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    git commit -m "chore: prune backlog items addressed by <prd-slug>/<piece-slug>"
    ```
    If no items were marked or no PRD-local backlog existed, skip this step.
-5. **Integration — transition spec task + create plan task (if `integration_cfg != null` and `auto_transition: true`):**
-   - Run capability check for `transition_task`. If available and `spec_issue_key` was recorded, transition the spec task to the "spec signed off" target status from `integration_cfg` (default: `Done`).
-   - Run capability check for `create_task`. If available and `auto_create_tasks: true`, create a new issue for the plan stage using the naming convention from `integration_cfg` (default: `[plan] {piece-slug} — Write implementation plan`). Record the key as `plan_issue_key`.
-   - On any tool unavailable → emit warning → skip that sub-step only.
+5. **Integration — no additional Jira items at spec sign-off.** The Epic was created at Phase 2 start and represents the entire piece. Phase Tasks are created by the plan skill at sign-off. No action needed here.
 
 ## NEEDS CLARIFICATION Lifecycle
 
