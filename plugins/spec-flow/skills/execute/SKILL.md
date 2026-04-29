@@ -11,6 +11,11 @@ Execute an approved plan phase by phase using dedicated agents for each step. Ea
 
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
+**Integration config load.** If `integrations.issue_tracker.enabled: true`, read
+`<docs_root>/charter/<charter_file>.md` (default `charter/integrations.md`) for transition
+rules and commit format. Store as `integration_cfg`. If disabled or absent, set
+`integration_cfg = null` and skip all integration steps in this skill.
+
 ## Prerequisites
 
 - Piece must have status `planned` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
@@ -233,6 +238,15 @@ git rev-parse HEAD
 ```
 
 On resume mid-phase (phase not yet marked complete in plan.md), recover the SHA the same way: `git rev-parse HEAD`. Under the v2.7.0 unified-commit model, the phase produces at most two work-commits before Step 7 — the implementer's unified commit (Red's staged tests + Build's production code) and the optional Refactor commit. If the phase is resumed AFTER the implementer's commit lands, `git rev-parse HEAD` will return that commit, not the pre-Red SHA — and that's fine, because the post-commit integrity and reconciliation gates have already run. The `phase_N_start_sha` used for diff-baseline calculations (Verify inputs, QA surface map, Step 6b hook sweep) is always computed from the resume-time HEAD minus the commits produced by this phase's already-completed steps, inferred from plan.md's checked boxes.
+
+**Integration — transition phase task to In Progress (if `integration_cfg != null` and `auto_transition: true`):**
+Read the `jira_task:` field immediately following this phase's heading in plan.md. If present,
+run the capability check (`plugins/spec-flow/reference/integration-capability-check.md`) for
+operations `get_transitions` and `transition_task`. If available, transition the task to the
+"phase execute starts" status from `integration_cfg` (default: `In Progress`).
+Store the issue key as `phase_issue_key` — it will be prepended to commit messages per
+`commit_tag_format` from `integration_cfg` (default: `[{issue_key}]`).
+On tool unavailable → emit warning → skip. `phase_issue_key` remains null; commit messages are unaffected.
 
 ### Step 1a: Detect Phase Mode
 
@@ -609,7 +623,14 @@ After each QA iteration (regardless of whether must-fix findings remain), scan t
 
 **Step 4.5 (end-of-piece reflection)** reads the accumulated backlog file and prompts the user to classify each `[Deferred QA finding]` entry as one of: **incorporated** (resolved within this piece), **deferred** (move to active backlog as a future piece candidate), or **obsolete** (no longer applies).
 
-4. When QA returns must-fix=None, proceed to **Step 7**.
+4. When QA returns must-fix=None:
+
+   **Integration — transition phase task to In Review (if `integration_cfg != null` and `auto_transition: true`):**
+   Run the capability check for operation `transition_task`. If available and `phase_issue_key`
+   is set, transition the task to the "phase QA passes" status from `integration_cfg`
+   (default: `In Review`). On tool unavailable → emit warning → skip.
+
+   Proceed to **Step 7**.
 
 ### Step 6b: Phase Hook Sanity Check
 
@@ -635,6 +656,9 @@ Every intermediate commit in the phase already ran hooks (the implementer's unif
 Update plan.md: mark all phase checkboxes [x]. Commit:
 ```bash
 git add docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
+# If phase_issue_key is set, prepend the commit_tag_format to the message:
+#   git commit -m "[PROJ-42] progress: Phase N complete"
+# Otherwise:
 git commit -m "progress: Phase N complete"
 ```
 
@@ -914,6 +938,12 @@ git commit -m "learnings: <prd-slug>/<piece-slug>"
 ```
 
 ### Step 6: Merge
+
+**Integration — transition all phase tasks to Done (if `integration_cfg != null` and `auto_transition: true`):**
+Before merging, run the capability check for operation `transition_task`. If available,
+iterate over all `jira_task:` keys from plan.md for this piece and transition each task to
+the "Final Review Board passes" status from `integration_cfg` (default: `Done`).
+On tool unavailable → emit warning → skip (do NOT block the merge).
 
 ```bash
 git checkout main

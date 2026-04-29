@@ -117,6 +117,20 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
 
    Drift is surfaced passively per piece with the changed file(s) listed; the user is pointed at `/spec-flow:status --resolve <piece>` or at re-running the relevant skill.
 
+   **Integration — issue status (if `integrations.issue_tracker.enabled: true` in `.spec-flow.yaml`):**
+   For each piece with status `in-progress` or `planned` that has at least one `jira_task:` in its plan.md:
+   - Run the capability check from `plugins/spec-flow/reference/integration-capability-check.md`
+     for operation `get_task`. If the tool is available, fetch the current status for each
+     `jira_task:` key found. Append the issue key and live status to the piece line:
+     ```
+       ● token-refresh       in-progress   spec ✓   plan ✓   execute ✓
+           Branch:   execute/auth-token-refresh
+           Phase:    3 of 5 (Refactor)
+           Issues:   PROJ-42 [In Progress], PROJ-43 [In Review]
+     ```
+   - On tool unavailable → skip silently (do NOT emit warnings during status display).
+   - Only emit the `Issues:` line when at least one key is found in plan.md.
+
 8. **Recommend next action:**
    - No PRDs discovered → pre-v3 fallback message (see step 1).
    - All PRDs present, no active piece anywhere → "Run `/spec-flow:spec <prd-slug>/<piece-slug>` on the next `open` piece."

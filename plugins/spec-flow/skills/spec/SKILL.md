@@ -27,8 +27,15 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 5. Scan for binding rules across namespaces: `<docs_root>/charter/non-negotiables.md` (NN-C), `<docs_root>/prds/<prd-slug>/prd.md` for `NN-P-xxx` entries in the Non-Negotiables (Product) section, `<docs_root>/charter/coding-rules.md` (CR), and any `NN-xxx` entries in `CLAUDE.md`. Pre-charter projects with unprefixed `NN-xxx` in the PRD still work — treat them as legacy and mention in Phase 2 that retrofitting would reclassify them.
 6. Read `<docs_root>/prds/<prd-slug>/backlog.md` if it exists. This is the PRD-local backlog — it accumulates end-of-piece reflection findings from prior pieces in this PRD (future opportunities deferred to later pieces of the same PRD). For each item recorded, semantic-match against this piece's name (from manifest) and the user's brainstorm prompt; surface the ~5 most-relevant items as candidate considerations during Phase 2 brainstorm. Track user responses in orchestrator state for Phase 5 prune (statuses: `incorporated` — addressed by this piece's spec; `deferred` — still relevant but not in this piece's scope; `obsolete` — no longer applies). If the file does not exist (first piece on a new PRD), skip silently. If `reflection: off` is set but the file exists from a previous run, still read it — stale findings from past reflections may still be useful brainstorm context. (Process-retro items live in the global `<docs_root>/improvement-backlog.md`; that file is touched only by the reflection-process-retro agent and is out of scope for this skill.)
 7. **Charter-drift check.** If the target piece's `spec.md` already exists and carries a `charter_snapshot:` front-matter (i.e., this is an update/amend re-run, not a greenfield first-run), execute the charter-drift procedure specified in `plugins/spec-flow/reference/charter-drift-check.md`: compare the spec's `charter_snapshot:` values against the `last_updated:` values captured in step 3, and on any drift dispatch `qa-spec` with `Input Mode: Focused charter re-review` per that reference. On `clean`: auto-advance the snapshot and continue. On `must-fix`: halt the skill and surface findings — no escape hatch. Skip this step on greenfield runs (no spec yet, nothing to drift).
+8. **Integration config load.** If `integrations.issue_tracker.enabled: true` in `.spec-flow.yaml`, read `<docs_root>/charter/<charter_file>.md` (default `charter/integrations.md`) for task naming and status transition rules. If the file is absent, proceed with built-in defaults (see `plugins/spec-flow/reference/integration-capability-check.md`). Store the resolved config as `integration_cfg` for use in later steps. If integration is disabled or the key is absent, set `integration_cfg = null` and skip all integration steps below.
 
 ### Phase 2: Brainstorm
+
+**Integration — create spec task (if `integration_cfg != null` and `auto_create_tasks: true`):**
+Run the capability check from `plugins/spec-flow/reference/integration-capability-check.md`
+for operation `create_task`. If the tool is available, create an issue using the task naming
+convention in `integration_cfg` (default: `[spec] {piece-slug} — Write specification`).
+Record the returned issue key as `spec_issue_key`. On tool unavailable → emit warning → skip.
 
 Socratic dialogue with the user, one question at a time:
 
@@ -100,6 +107,10 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    git commit -m "chore: prune backlog items addressed by <prd-slug>/<piece-slug>"
    ```
    If no items were marked or no PRD-local backlog existed, skip this step.
+5. **Integration — transition spec task + create plan task (if `integration_cfg != null` and `auto_transition: true`):**
+   - Run capability check for `transition_task`. If available and `spec_issue_key` was recorded, transition the spec task to the "spec signed off" target status from `integration_cfg` (default: `Done`).
+   - Run capability check for `create_task`. If available and `auto_create_tasks: true`, create a new issue for the plan stage using the naming convention from `integration_cfg` (default: `[plan] {piece-slug} — Write implementation plan`). Record the key as `plan_issue_key`.
+   - On any tool unavailable → emit warning → skip that sub-step only.
 
 ## NEEDS CLARIFICATION Lifecycle
 

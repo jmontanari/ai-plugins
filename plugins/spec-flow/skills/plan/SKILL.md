@@ -11,6 +11,18 @@ Generate an exhaustive implementation plan from an approved spec. The plan is so
 
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
+**Integration config load.** If `integrations.issue_tracker.enabled: true`, read
+`<docs_root>/charter/<charter_file>.md` (default `charter/integrations.md`) for task
+naming and transition rules. Store as `integration_cfg`. If integration is disabled or the
+key is absent, set `integration_cfg = null` and skip all integration steps below.
+
+**Integration — transition plan task to In Progress (if `integration_cfg != null` and `auto_transition: true`):**
+Read `plan_issue_key` from spec.md front-matter (written by the spec skill at sign-off).
+If present, run the capability check (`plugins/spec-flow/reference/integration-capability-check.md`)
+for operation `transition_task`. If available, transition the plan task to the "plan authoring
+starts" status from `integration_cfg` (default: `In Progress`).
+On tool unavailable → emit warning → skip.
+
 ### TDD Preference Resolution
 
 Read the `tdd` key from `.spec-flow.yaml` (valid values: `auto`, `true`, `false`; default `auto`).
@@ -220,7 +232,21 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 1. User approves → continue
 2. Ensure the plan's front-matter includes `tdd: true` or `tdd: false` recording the mode decision for this piece (set during TDD Preference Resolution above; if missing, infer from phase structure: any `[TDD-Red]` → `true`, all `[Implement]` → `false`).
-3. Update manifest on main: piece status → `planned`
+3. **Integration — create per-phase tasks (if `integration_cfg != null` and `auto_create_tasks: true`):**
+   Run the capability check for operation `create_task`. If available:
+   - For each resolved phase (flat phase or sub-phase) in the plan, create an issue using the
+     phase task naming convention from `integration_cfg`
+     (default: `[phase] {piece-slug}/{phase-number} — {phase-name}`).
+   - Record each returned issue key inline in plan.md as a `jira_task:` field immediately
+     after the phase heading. Example:
+     ```
+     ### Phase 1: Auth Token Model
+     jira_task: PROJ-42
+     ```
+   - If the charter file declares an `epic_key:` and the MCP tool supports parent assignment,
+     link each phase task to that epic.
+   On tool unavailable → emit warning → skip task creation.
+4. Update manifest on main: piece status → `planned`
    ```bash
    git checkout main
    # update manifest.yaml status for this piece in its PRD-local manifest
@@ -228,7 +254,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    git commit -m "manifest: mark <prd-slug>/<piece-slug> as planned"
    git checkout spec/<prd-slug>-<piece-slug>
    ```
-3. Commit plan on worktree branch:
+5. Commit plan on worktree branch:
    ```bash
    git add <docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md
    git commit -m "plan: add <prd-slug>/<piece-slug> implementation plan"

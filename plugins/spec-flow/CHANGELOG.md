@@ -2,6 +2,28 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.4.0] — 2026-04-29
+
+### Added
+
+- **Optional MCP-only issue tracker integration.** Adds flag-driven, zero-breaking-change integration with external issue trackers (Jira, Linear, GitHub Issues, Azure DevOps, or any custom provider) using MCP tools exclusively — no hardcoded API calls.
+
+  **Config:** Add `integrations.issue_tracker.enabled: true` to `.spec-flow.yaml`. All other keys are optional with sensible defaults. See the commented schema block in the updated `templates/pipeline-config.yaml`.
+
+  **MCP capability check:** Before every integration step, skills verify that the required MCP tools are available. Missing tools emit a named `⚠️ INTEGRATION WARNING` and skip the step — the pipeline never fails because of integration unavailability. See `plugins/spec-flow/reference/integration-capability-check.md` for the full algorithm and per-provider default tool names.
+
+  **Skill integration points:**
+  - `spec`: creates a "Write Spec" task before brainstorm (if `auto_create_tasks: true`); at sign-off transitions the spec task to Done and creates a "Write Plan" task.
+  - `plan`: transitions the plan task to In Progress at authoring start; at sign-off creates per-phase tasks and records their keys as `jira_task:` inline in plan.md.
+  - `execute`: at each phase start reads `jira_task:` from plan.md, transitions the task to In Progress, and injects the issue key into commit messages via `commit_tag_format`; after phase QA passes, transitions to In Review; after Final Review Board passes, transitions all phase tasks to Done before merge.
+  - `status`: in drill-in and default views, fetches live issue status for in-progress pieces that have `jira_task:` keys in plan.md and displays them as `Issues: PROJ-42 [In Progress]`.
+
+  **New files:**
+  - `plugins/spec-flow/reference/integration-capability-check.md` — MCP check pattern, provider defaults, graceful-degradation modes.
+  - `plugins/spec-flow/templates/charter/integrations.md` — fillable integration rules template (task naming, status transitions, commit format, issue hierarchy).
+
+  **Zero breaking changes:** absent or disabled `integrations:` block = identical behavior to v3.3.x.
+
 ## [3.3.1] — 2026-04-28
 
 ### Fixed

@@ -48,3 +48,38 @@ reflection: auto
 charter:
   required: false
   doctrine_load: [non-negotiables, architecture]
+
+# integrations: optional connections to external tools (new in v3.3.0)
+#
+# All integration steps are MCP-only — no hardcoded API calls. Skills check
+# whether the declared MCP tools are available before any integration step.
+# If a required tool is missing, a ⚠️ INTEGRATION WARNING is emitted and the
+# step is skipped gracefully. The rest of the pipeline continues unaffected.
+#
+# integrations:
+#   issue_tracker:
+#     enabled: false                     # master kill switch; default false
+#     provider: jira                     # jira | linear | github-issues | azure-devops | custom
+#
+#     # Provider-specific config
+#     jira:
+#       project_key: PROJ
+#       base_url: https://team.atlassian.net
+#
+#     # Behavior flags
+#     auto_create_tasks: true            # create tasks on spec/plan events
+#     auto_transition: true             # transition tasks on phase/QA events
+#     commit_tag_format: "[{issue_key}]" # prefix injected into commit messages
+#
+#     # MCP tool map: override defaults with explicit tool names.
+#     # null = use provider default (see reference/integration-capability-check.md).
+#     mcp_tools:
+#       create_issue: ~
+#       transition_issue: ~
+#       get_issue: ~
+#       get_transitions: ~
+#
+#     # Integration rules file (base name only — resolves to <docs_root>/charter/<name>.md)
+#     # Teams fill this in; skills read it; it defines task naming, status transition
+#     # rules, commit message format, and issue hierarchy.
+#     charter_file: integrations         # → charter/integrations.md
