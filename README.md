@@ -109,7 +109,7 @@ Once spec-flow is installed, these skills are available on either host via the s
 | `/spec-flow:plan` | Turn an approved spec into an exhaustive phase-by-phase implementation plan. | [guide](./plugins/spec-flow/docs/userguide/commands/plan.md) |
 | `/spec-flow:execute` | Orchestrate implementation of an approved plan phase-by-phase via subagents. | [guide](./plugins/spec-flow/docs/userguide/commands/execute.md) |
 
-New to spec-flow? Start with **[the user guide](./plugins/spec-flow/docs/userguide/README.md)** for the pipeline narrative, concepts, and per-command walkthroughs.
+New to spec-flow? Start with **[the user guide](./plugins/spec-flow/docs/userguide/README.md)** for the pipeline narrative, concepts, and per-command walkthroughs. Want to see what files the pipeline creates? **[Project layout and artifacts](./plugins/spec-flow/docs/userguide/concepts/project-layout.md)** has the full annotated directory tree and file examples.
 
 **Known limitations on Copilot CLI:**
 

@@ -63,6 +63,28 @@ Every skill is a thin orchestrator. Every agent is a narrow executor. Templates 
 
 ---
 
+## Documentation
+
+The user guide covers the full pipeline with per-command walkthroughs, concept deep-dives, and concrete file examples:
+
+| Page | What it covers |
+|---|---|
+| **[User guide overview](./docs/userguide/README.md)** | Index of all pages + quickstart |
+| [Project layout](./docs/userguide/concepts/project-layout.md) | Full directory tree after running the pipeline; annotated examples of every file type (charter, PRD, manifest, spec, plan, learnings) |
+| [Pipeline concepts](./docs/userguide/concepts/pipeline.md) | Why `charter → prd → spec → plan → execute` is five stages and not one |
+| [Charter system](./docs/userguide/concepts/charter-system.md) | NN-C / NN-P / CR namespaces; how citations flow through specs and plans |
+| [TDD loop](./docs/userguide/concepts/tdd-loop.md) | Red / Build / Verify / Refactor enforced by the orchestrator |
+| [QA loop](./docs/userguide/concepts/qa-loop.md) | Iterative fix-and-re-review; circuit-breaker behavior |
+| [Orchestrator model](./docs/userguide/concepts/orchestrator-model.md) | Why skills orchestrate and agents implement; context isolation |
+| [/charter command](./docs/userguide/commands/charter.md) | Bootstrap, update, or retrofit — full walkthrough |
+| [/prd command](./docs/userguide/commands/prd.md) | Import PRD, decompose into pieces, multi-PRD layout |
+| [/spec command](./docs/userguide/commands/spec.md) | Author a spec for one piece |
+| [/plan command](./docs/userguide/commands/plan.md) | Turn a spec into an implementation plan |
+| [/execute command](./docs/userguide/commands/execute.md) | Run the plan phase-by-phase via subagents |
+| [/status command](./docs/userguide/commands/status.md) | Pipeline dashboard |
+
+---
+
 ## Multi-PRD support (v3.0.0+)
 
 Spec-flow v3.0.0 lifts the single-PRD-per-project assumption. A repo can host multiple PRDs in parallel under a singular `docs/charter/`, each with its own pieces, specs, plans, manifest, and lifecycle state. The charter remains one per project — it captures project-wide architectural constraints that apply across every PRD.
