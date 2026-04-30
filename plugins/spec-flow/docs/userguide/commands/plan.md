@@ -4,7 +4,7 @@ Turn an approved spec into an exhaustive phase-by-phase implementation plan. The
 
 ## What it does
 
-Produces `docs/specs/<piece-name>/plan.md` — a file-level plan with:
+Produces `docs/prds/<prd-slug>/specs/<piece-name>/plan.md` — a file-level plan with:
 
 - Phases ordered by dependency
 - For each phase: file paths, function/class signatures, test file locations, the verification command
@@ -87,12 +87,26 @@ See [TDD loop concepts](../concepts/tdd-loop.md#non-tdd-mode--the-piece-level-to
 
 ## What you get
 
-`docs/specs/<piece-name>/plan.md` with this shape:
+`docs/prds/<prd-slug>/specs/<piece-name>/plan.md` with this shape:
 
 ```markdown
+---
+slug: <piece-name>
+prd: docs/prds/<prd-slug>/prd.md
+spec: docs/prds/<prd-slug>/specs/<piece-name>/spec.md
+tdd: true
+created: <date>
+approved: <date>
+branch: spec/<prd-slug>-<piece-name>
+charter_snapshot:
+  non-negotiables: <date>
+  architecture: <date>
+  coding-rules: <date>
+---
+
 # Plan: <piece-name>
 
-**Spec:** docs/specs/<piece-name>/spec.md
+**Spec:** docs/prds/<prd-slug>/specs/<piece-name>/spec.md
 **Status:** draft
 
 charter_snapshot:
@@ -172,7 +186,7 @@ Phases 3 and 4 are marked `[P]` — disjoint file scopes (`csv_writer.py` vs `js
 
 qa-plan flags two issues in iteration 1: Phase 2's Refactor scope was vague, and CR-011 wasn't allocated to any phase. fix-doc resolves both. Iteration 2 clears. You sign off.
 
-Plan commits as `plan: add PI-104-data-export implementation plan` on the worktree branch. Manifest on master shows `PI-104-data-export: status: planned`.
+Plan commits as `plan: add PI-104-data-export implementation plan` on the worktree branch. Manifest on master shows `PI-104-data-export: status: planned` and the `plan:` field now points to `docs/prds/my-product/specs/PI-104-data-export/plan.md`.
 
 ## Where to go next
 

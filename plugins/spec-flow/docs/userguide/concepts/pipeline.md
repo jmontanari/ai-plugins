@@ -28,11 +28,11 @@ By the time `execute` runs, the implementer agent isn't designing anything. It's
 
 Each stage produces a concrete file you can read and sign off on. No artifact is AI-ephemeral — every one lives in `docs/` on disk and survives the session.
 
-- **Charter** → `docs/charter/{architecture,non-negotiables,tools,processes,flows,coding-rules}.md`. Six files, hand-curated. Every downstream artifact inherits from them.
-- **PRD + manifest** → `docs/prd/prd.md` + `docs/prd/manifest.yaml`. The PRD captures intent; the manifest enumerates *pieces* — independently-shippable units of work — with status and dependencies.
-- **Spec** → `docs/specs/<piece-name>/spec.md`. Detailed requirements for one piece: acceptance criteria, functional requirements, non-negotiables cited by ID.
-- **Plan** → `docs/specs/<piece-name>/plan.md`. File-level implementation plan with Red/Build/Verify/Refactor phases, ordered by dependency.
-- **Executed code** → committed to a worktree branch `spec/<piece-name>`, merged to `master` only after the 5-agent final review board clears the diff.
+- **Charter** → `docs/charter/{architecture,non-negotiables,tools,processes,flows,coding-rules}.md`. Six files, hand-curated, shared across every PRD. Every downstream artifact inherits from them.
+- **PRD + manifest** → `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml`. A project can have one or more PRDs — each gets its own slug and directory. The PRD captures intent; the manifest enumerates *pieces* — independently-shippable units of work — with status, dependencies, and pointers to their spec and plan once those exist.
+- **Spec** → `docs/prds/<prd-slug>/specs/<piece-name>/spec.md`. Detailed requirements for one piece: acceptance criteria, functional requirements, non-negotiables cited by ID.
+- **Plan** → `docs/prds/<prd-slug>/specs/<piece-name>/plan.md`. File-level implementation plan with Red/Build/Verify/Refactor phases, ordered by dependency.
+- **Executed code** → committed to a worktree branch `spec/<prd-slug>-<piece-name>`, merged to `master` only after the 5-agent final review board clears the diff.
 
 ## Reviewers at every boundary
 

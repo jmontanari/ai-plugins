@@ -148,7 +148,7 @@ Every loop has a circuit breaker. No loop is unbounded.
 
 - Production code committed to the worktree branch, phase-by-phase.
 - A clean git history showing each phase's progression.
-- A `docs/specs/<piece-name>/learnings.md` file if the pipeline surfaced interesting findings (smoketest records, in-phase bug fixes, design pivots).
+- A `docs/prds/<prd-slug>/specs/<piece-name>/learnings.md` file if the pipeline surfaced interesting findings (smoketest records, in-phase bug fixes, design pivots).
 - Manifest flipped to `status: done`.
 - Piece merged to master with full review-board sign-off.
 

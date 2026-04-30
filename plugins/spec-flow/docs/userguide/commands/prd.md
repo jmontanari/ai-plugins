@@ -1,19 +1,22 @@
 # /spec-flow:prd
 
-Import or normalize a Product Requirements Document, then decompose it into implementable *pieces* tracked in a manifest.
+Import or normalize a Product Requirements Document, then decompose it into implementable *pieces* tracked in a manifest. A single project can host one or more PRDs — each lives in its own directory under `docs/prds/`.
 
 ## What it does
 
-Produces two artifacts:
+Produces two artifacts per PRD, placed under `docs/prds/<prd-slug>/`:
 
-- `docs/prd/prd.md` — the normalized PRD with stable section IDs (`G-x` for goals, `FR-x` for functional requirements, `NFR-x` for non-functional requirements, `SC-x` for success criteria, `NN-P-x` for product non-negotiables).
-- `docs/prd/manifest.yaml` — an enumeration of *pieces* (work units). Each piece maps to one or more PRD sections, declares its dependencies, and carries a status.
+- `docs/prds/<prd-slug>/prd.md` — the normalized PRD with stable section IDs (`G-x` for goals, `FR-x` for functional requirements, `NFR-x` for non-functional requirements, `SC-x` for success criteria, `NN-P-x` for product non-negotiables). Includes YAML front-matter declaring the slug, status, and version.
+- `docs/prds/<prd-slug>/manifest.yaml` — an enumeration of *pieces* (work units). Each piece maps to one or more PRD sections, declares its dependencies, carries a status, and points directly to its spec and plan files once they exist.
+
+The `<prd-slug>` is a short, lowercase, hyphenated identifier you choose (e.g. `ddf-creator`, `platform-v2`, `shared`). It becomes part of every path, branch name, and worktree root for pieces in that PRD.
 
 A piece is a unit of work that can be specced and shipped independently. Pieces are the things you'll later run `/spec-flow:spec` against.
 
 ## When to run it
 
-- **After `/spec-flow:charter`** on a fresh project.
+- **After `/spec-flow:charter`** on a fresh project — to import or author the first PRD.
+- **When adding a new PRD** — a new product domain, a major release, or a distinct capability area that belongs in a separate manifest. Each gets its own slug and directory.
 - **When the PRD amends** — add a new section, revise goals, add a new success criterion. The skill supports incremental updates, not just first-time import.
 - **When you need to re-decompose** — pieces have turned out to be wrong and need re-slicing.
 
@@ -39,11 +42,19 @@ A piece is a unit of work that can be specced and shipped independently. Pieces 
 
 ## What you get
 
-**`docs/prd/prd.md`** — structured, ID'd, ready to be cited by every downstream artifact. Example shape:
+**`docs/prds/<prd-slug>/prd.md`** — structured, ID'd, ready to be cited by every downstream artifact. Includes YAML front-matter and stable-ID requirement sections. Example shape:
 
 ```markdown
+---
+slug: ddf-creator
+status: active
+version: 3
+---
+
+# DDF Creator System
+
 ## Goals
-- **G-1:** ... (user-facing goal)
+- **G-1:** ...
 - **G-2:** ...
 
 ## Functional Requirements
@@ -62,41 +73,58 @@ A piece is a unit of work that can be specced and shipped independently. Pieces 
 - **NN-P-003:** dog-food before recommend — don't ship an install path you haven't personally run
 ```
 
-**`docs/prd/manifest.yaml`** — the piece enumeration. Example:
+**`docs/prds/<prd-slug>/manifest.yaml`** — the piece enumeration. Example:
 
 ```yaml
 schema_version: 1
-prd_source: "docs/prd/prd.md"
+generated: 2026-04-27
+last_updated: 2026-04-27
+prd_source: "docs/prds/ddf-creator/prd.md"
 
 pieces:
-  - name: PI-001-marketplace-version-sync
-    description: Fix marketplace.json spec-flow version drift
-    prd_sections: [FR-001, NN-C-001]
-    dependencies: []
-    status: done
+  - name: pipeline-infra
+    slug: pipeline-infra
+    description: Core pipeline infrastructure shared by all protocols
+    prd_sections: [FR-011, FR-012, FR-013, NFR-001, SC-006]
+    depends_on: []
+    status: planned
+    spec: docs/prds/ddf-creator/specs/pipeline-infra/spec.md
+    plan: docs/prds/ddf-creator/specs/pipeline-infra/plan.md
 
-  - name: PI-002-version-sync-ci
-    description: CI job enforcing NN-C-001 across all plugins
-    prd_sections: [FR-001, NFR-003, NN-C-001]
-    dependencies: [PI-001-marketplace-version-sync]
+  - name: snmp-create-p1
+    slug: snmp-create-p1
+    description: Single SNMP device at 100% on all 9 scoring dimensions
+    prd_sections: [FR-001, FR-005, FR-006, SC-001, SC-002]
+    depends_on: [pipeline-infra]
     status: open
 
 coverage:
-  total_prd_sections: 15
-  covered_sections: 8
-  uncovered_sections: [G-3, SC-002, NN-P-003, ...]
-  notes: |
-    Uncovered-but-intentional: SC-001/SC-002 are measurement goals, not
-    implementable pieces. NN-P-003 is a process rule.
+  total_prd_sections: 24
+  covered_sections: 24
+  uncovered_sections: []
+  percentage: 100
 ```
+
+Note that `spec:` and `plan:` fields are added to a piece entry by the skill when those artifacts are created — they are not present for `open` pieces.
 
 ## Handoff
 
-Next: pick an `open` piece and run `/spec-flow:spec <piece-name>` — or run `/spec-flow:status` and let it tell you which piece to start with.
+Next: pick an `open` piece and run `/spec-flow:spec <prd-slug>/<piece-name>` — or run `/spec-flow:status` and let it tell you which piece to start with.
+
+## Multiple PRDs in one project
+
+A project can have more than one PRD. Each lives in its own `docs/prds/<prd-slug>/` directory with its own manifest, its own pieces, and its own lifecycle state. The charter at `docs/charter/` is shared — it applies to every PRD in the repo.
+
+Common reasons to add a second PRD:
+- A new major product area with distinct goals and success criteria (not just more pieces on the same capability).
+- A major version boundary where v2 requirements are truly independent of v1.
+- A contractually or organizationally separate deliverable.
+
+Run `/spec-flow:prd` a second time and supply a new slug when prompted. The skill creates `docs/prds/<new-slug>/` alongside the existing one — nothing in the existing PRD changes.
 
 ## Worked example
 
-You import a draft PRD with four goals, nine functional requirements, and three success criteria. After brainstorming decomposition:
+You import a draft PRD with four goals, nine functional requirements, and three success criteria. After brainstorming decomposition with slug `my-product`:
 
 ```
 G-1  (user authentication)    → split into PI-101, PI-102, PI-103
@@ -113,7 +141,7 @@ SC-002 (p99 export < 5s)       → PI-104's acceptance criteria reference it
 SC-003 (zero logging gaps)     → PI-105
 ```
 
-Manifest ends up with 5 pieces, clear dependencies, clean coverage notes. Every FR is either mapped to a piece or explicitly called out as intentionally uncovered.
+Manifest ends up with 5 pieces at `docs/prds/my-product/manifest.yaml`, clear dependencies, clean coverage notes. Every FR is either mapped to a piece or explicitly called out as intentionally uncovered.
 
 ## Common decomposition choices
 

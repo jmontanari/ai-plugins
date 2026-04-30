@@ -24,13 +24,13 @@ Run it *before* charter, before PRD, before spec, before anything. It's designed
 ## The flow
 
 1. Scans `docs/charter/` — does it exist? Is it complete?
-2. Scans `docs/prd/prd.md` and `docs/prd/manifest.yaml` — does the PRD exist? How many pieces does it enumerate?
-3. For each piece in the manifest, checks:
-   - Manifest status (`open` / `specced` / `planned` / `implementing` / `done` / `superseded`)
+2. Scans `docs/prds/` — how many PRD directories exist? For each, reads `prd.md` and `manifest.yaml`.
+3. For each piece in each manifest, checks:
+   - Manifest status (`open` / `specced` / `planned` / `in-progress` / `done` / `superseded`)
    - Whether a spec / plan / learnings file exists on disk
-   - Whether a worktree branch `spec/<piece-name>` exists
+   - Whether a worktree branch `spec/<prd-slug>-<piece-slug>` exists
    - Whether the piece's declared dependencies are `done`
-4. Produces a table and a "next action" recommendation.
+4. Produces a table per PRD and a "next action" recommendation.
 
 ## Loops
 
@@ -38,22 +38,28 @@ None. This command has no QA loop, no brainstorming, no iteration. It queries an
 
 ## What you get
 
-A dashboard printed to the session. Example output shape:
+A dashboard printed to the session. Example output shape for a project with two active PRDs:
 
 ```
 Charter: present (docs/charter/, 6 files)
-PRD:     present (docs/prd/prd.md, 7 pieces)
+PRDs:    2 active (docs/prds/)
 
-Pieces:
-  PI-001-marketplace-version-sync         done
-  PI-002-version-sync-ci                  open         (blocked by: none)
-  PI-003-charter-dogfood-lessons          open         (blocked by: PI-002)
-  PI-004-second-plugin-pilot              open         (blocked by: none)
-  PI-005-copilot-cli-parity-map           superseded
-  PI-006-copilot-mirror-ci                superseded
-  PI-007-copilot-coship                   done
+  ddf-creator  (docs/prds/ddf-creator/prd.md, 14 pieces)
+    pipeline-infra        planned      (blocked by: none)
+    snmp-create-p1        open         (blocked by: pipeline-infra)
+    snmp-create-p2        open         (blocked by: snmp-create-p1)
+    gw-rampup             open         (blocked by: snmp-create-p2)
+    ... (10 more)
 
-Next action: run /spec-flow:spec PI-002 or /spec-flow:spec PI-004
+  shared  (docs/prds/shared/prd.md, 7 pieces)
+    PI-001-marketplace-version-sync    done
+    PI-002-version-sync-ci             done
+    PI-007-copilot-coship              done
+    PI-008-multi-prd-v3.0.0            done
+    PI-011-branch-fix                  in-progress  (worktree: worktrees/spec/shared-pi-011-branch-fix/)
+    ... (2 more)
+
+Next action: resume /spec-flow:execute shared/PI-011-branch-fix — or run /spec-flow:spec ddf-creator/snmp-create-p1
 ```
 
 No files are written or modified.
@@ -74,16 +80,16 @@ You haven't touched the project in two weeks. You run `/spec-flow:status`:
 
 ```
 Charter: present
-PRD:     present (12 pieces)
+PRDs:    1 active (docs/prds/)
 
-Pieces in flight:
-  PI-012-user-export    implementing    (worktree: worktrees/PI-012-user-export/)
-                        plan.md present, 4 of 7 phases complete per checkboxes
+  my-product  (12 pieces)
+    PI-012-user-export    in-progress    (worktree: worktrees/spec/my-product-PI-012-user-export/)
+                          plan.md present, 4 of 7 phases complete per checkboxes
 
-Next action: resume /spec-flow:execute on PI-012
+Next action: resume /spec-flow:execute my-product/PI-012-user-export
 ```
 
-You know exactly where you left off. `cd worktrees/PI-012-user-export/` and run `/spec-flow:execute` to pick up from phase 5.
+You know exactly where you left off. `cd worktrees/spec/my-product-PI-012-user-export/` and run `/spec-flow:execute` to pick up from phase 5.
 
 ## Where to go next
 

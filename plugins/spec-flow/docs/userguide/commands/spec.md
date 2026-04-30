@@ -1,6 +1,6 @@
 # /spec-flow:spec
 
-Author a detailed specification for one piece from the manifest. Runs a Socratic brainstorm, writes `docs/specs/<piece-name>/spec.md`, runs adversarial QA on it, and flips the piece's status to `specced`.
+Author a detailed specification for one piece from the manifest. Runs a Socratic brainstorm, writes `docs/prds/<prd-slug>/specs/<piece-name>/spec.md`, runs adversarial QA on it, and flips the piece's status to `specced`.
 
 ## What it does
 
@@ -13,7 +13,7 @@ Turns a piece entry in the manifest into a detailed spec with concrete **accepta
 
 ## Prerequisites
 
-- `docs/prd/manifest.yaml` exists (run `/spec-flow:prd` first).
+- `docs/prds/<prd-slug>/manifest.yaml` exists (run `/spec-flow:prd` first).
 - The piece's status is `open`.
 - All pieces the target piece depends on are `done`.
 
@@ -24,8 +24,8 @@ Turns a piece entry in the manifest into a detailed spec with concrete **accepta
    - Confirm the piece's scope matches what the manifest said.
    - Propose 2–3 approaches with trade-offs and a recommendation.
    - Resolve every `[NEEDS CLARIFICATION]` marker before writing.
-3. **Create worktree** — `git worktree add worktrees/<piece-name> -b spec/<piece-name>`. All subsequent work happens on this branch.
-4. **Write the spec** at `docs/specs/<piece-name>/spec.md` using the spec template.
+3. **Create worktree** — `git worktree add worktrees/spec/<prd-slug>-<piece-name> -b spec/<prd-slug>-<piece-name>`. All subsequent work happens on this branch.
+4. **Write the spec** at `docs/prds/<prd-slug>/specs/<piece-name>/spec.md` using the spec template.
 5. **qa-spec agent review** (Opus, adversarial):
    - Does the spec address every PRD section the manifest mapped to this piece?
    - Is every acceptance criterion testable?
@@ -44,9 +44,22 @@ Turns a piece entry in the manifest into a detailed spec with concrete **accepta
 
 ## What you get
 
-A spec document at `docs/specs/<piece-name>/spec.md` with this shape:
+A spec document at `docs/prds/<prd-slug>/specs/<piece-name>/spec.md` with this shape:
 
 ```markdown
+---
+slug: <piece-name>
+prd: docs/prds/<prd-slug>/prd.md
+status: planned
+created: <date>
+approved: <date>
+branch: spec/<prd-slug>-<piece-name>
+charter_snapshot:
+  non-negotiables: <date>
+  architecture: <date>
+  coding-rules: <date>
+---
+
 # Spec: <piece-name>
 
 **PRD Sections:** <list>
@@ -99,10 +112,10 @@ You pick option 1 as MVP, defer option 3 to a future piece. Brainstorm resolves 
 Spec is written with 9 acceptance criteria, 7 functional requirements, citations of NN-C-003 (auth tokens) and CR-011 (error response shape). qa-spec flags two vague honoring lines in iteration 1; fix-doc makes them concrete in iteration 2; iteration 2 clears. You sign off.
 
 ```
-docs/specs/PI-104-data-export/spec.md    (380 lines, status: draft → approved)
+docs/prds/my-product/specs/PI-104-data-export/spec.md    (380 lines, status: draft → approved)
 ```
 
-Manifest shows `PI-104-data-export: status: specced`. Worktree `worktrees/PI-104-data-export/` is ready for `/spec-flow:plan`.
+Manifest shows `PI-104-data-export: status: specced`. Worktree `worktrees/spec/my-product-PI-104-data-export/` is ready for `/spec-flow:plan`.
 
 ## Common brainstorm issues
 
