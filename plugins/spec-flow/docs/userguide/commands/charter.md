@@ -84,7 +84,7 @@ The charter is rarely large on day one. A greenfield project's charter might tot
 
 ## Handoff
 
-Next command: `/spec-flow:prd` to author or import the PRD.
+Next command: `/spec-flow:prd` to author or import a PRD. The project can have more than one — run `/spec-flow:prd` again for each additional PRD you need.
 
 ## Worked example (bootstrap)
 

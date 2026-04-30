@@ -296,7 +296,7 @@ claude plugin install spec-flow
 
 - **Manifest** (`docs/prds/<prd-slug>/manifest.yaml`, one per PRD) — the source of truth for what pieces exist within a PRD, what PRD sections each covers, and their statuses (`open` → `specced` → `planned` → `in-progress` → `merged`; `done` is the v2 backward-compatible alias of `merged`). Terminal statuses outside the happy path: `superseded`, `blocked`. PRD traceability is a first-class concept.
 - **Piece** — an independently implementable, testable unit of work that maps to specific PRD sections within a single PRD.
-- **Worktree** — each piece gets its own `spec/<prd-slug>-<piece-slug>` branch in a separate working directory at `worktrees/prd-<prd-slug>/piece-<piece-slug>/`. No cross-piece contamination. Merged via squash when done.
+- **Worktree** — each piece gets its own `spec/<prd-slug>-<piece-slug>` branch in a separate working directory at `<worktrees_root>/spec-<prd-slug>-<piece-slug>/`. No cross-piece contamination. Merged via squash when done.
 - **Non-negotiables (NN-xxx)** — constraints the PRD flags as binding (security, compliance, architecture). Every QA gate checks against them.
 - **Oracle of done** — the single objective check that proves a phase is complete. TDD mode: green tests. Implement mode: the plan's `[Verify]` command passes. The implementer agent refuses to report DONE without passing its oracle.
 - **Circuit breakers** — every retry loop caps at 2–3 attempts, then escalates to the human. The pipeline refuses to burn tokens on stuck problems.

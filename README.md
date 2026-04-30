@@ -104,7 +104,7 @@ Once spec-flow is installed, these skills are available on either host via the s
 |---|---|---|
 | `/spec-flow:status` | Pipeline dashboard — start here. Shows which pieces are in which stage and what to work on next. | [guide](./plugins/spec-flow/docs/userguide/commands/status.md) |
 | `/spec-flow:charter` | Bootstrap, update, or retrofit the project charter (six binding constraint files). | [guide](./plugins/spec-flow/docs/userguide/commands/charter.md) |
-| `/spec-flow:prd` | Import or normalize a PRD and decompose it into implementable pieces. | [guide](./plugins/spec-flow/docs/userguide/commands/prd.md) |
+| `/spec-flow:prd` | Import or normalize a PRD and decompose it into implementable pieces. Supports one or more PRDs per project. | [guide](./plugins/spec-flow/docs/userguide/commands/prd.md) |
 | `/spec-flow:spec` | Author a detailed specification for one piece from the manifest. | [guide](./plugins/spec-flow/docs/userguide/commands/spec.md) |
 | `/spec-flow:plan` | Turn an approved spec into an exhaustive phase-by-phase implementation plan. | [guide](./plugins/spec-flow/docs/userguide/commands/plan.md) |
 | `/spec-flow:execute` | Orchestrate implementation of an approved plan phase-by-phase via subagents. | [guide](./plugins/spec-flow/docs/userguide/commands/execute.md) |
