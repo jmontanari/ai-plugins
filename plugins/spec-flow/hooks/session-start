@@ -70,6 +70,32 @@ if [ -n "$charter_content" ]; then
   charter_section="\n\nProject Charter (binding — every spec, plan, and implementation must honor these):\n${charter_escaped}"
 fi
 
+# Detect active spec-flow worktrees and inject CWD requirement.
+worktree_context=""
+if command -v git >/dev/null 2>&1; then
+  in_worktree=""
+  in_branch=""
+  main_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        wt_path="${line#worktree }"
+        [ "$wt_path" = "$main_root" ] && wt_path="" || in_worktree="$wt_path"
+        ;;
+      branch\ refs/heads/*)
+        in_branch="${line#branch refs/heads/}"
+        if [ -n "$in_worktree" ] && echo "$in_branch" | grep -qE '^(spec|plan|execute)/'; then
+          wt_escaped=$(escape_for_json "$in_worktree")
+          br_escaped=$(escape_for_json "$in_branch")
+          worktree_context="${worktree_context}\n\n⚡ ACTIVE SPEC-FLOW WORKTREE:\n  Path:   ${wt_escaped}\n  Branch: ${br_escaped}\n  REQUIRED before any file operation: cd ${wt_escaped}\n  All reads and edits must resolve from this root — not the main repo."
+        fi
+        in_worktree=""
+        in_branch=""
+        ;;
+    esac
+  done < <(git worktree list --porcelain 2>/dev/null || true)
+fi
+
 layout_warning_escaped=""
 if [ -n "$layout_warning" ]; then
   layout_warning_escaped=$(escape_for_json "$layout_warning")
@@ -77,7 +103,12 @@ fi
 
 plugin_root_escaped=$(escape_for_json "$PLUGIN_ROOT")
 
-session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'status' skill to see current pipeline state and recommended next action.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nPlugin root: ${plugin_root_escaped}\nWhen skill instructions reference \${CLAUDE_PLUGIN_ROOT}, resolve it to: ${plugin_root_escaped}\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}${layout_warning_escaped}\n</IMPORTANT>"
+worktree_context_escaped=""
+if [ -n "$worktree_context" ]; then
+  worktree_context_escaped=$(escape_for_json "$worktree_context")
+fi
+
+session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'intake' skill to classify the work, set up the correct working directory, and load the appropriate context. The intake skill calls status internally — invoke intake, not status directly, when beginning any work session.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nPlugin root: ${plugin_root_escaped}\nWhen skill instructions reference \${CLAUDE_PLUGIN_ROOT}, resolve it to: ${plugin_root_escaped}${worktree_context_escaped}\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}${layout_warning_escaped}\n</IMPORTANT>"
 
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   printf '{\n  "additional_context": "%s"\n}\n' "$session_context"

@@ -2,6 +2,36 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.4.1] — 2026-04-30
+
+### Added
+
+- **`intake` skill — work intake and triage for spec-flow sessions.** A new skill that classifies incoming work at session start and routes it to the right pipeline stage, branch, and context layer before any file operations begin.
+
+  **Problem it solves:** Sessions that start with ambiguous requests ("fix this test", "update X") had no mechanism to determine whether the work belonged to the active piece, a different PRD, a hotfix, or pure exploration. This caused agents to operate from the wrong branch, skip charter constraints, or jump into execution without the correct spec/plan context loaded.
+
+  **Classification tree:** Intake walks a short decision tree (Q1–Q6, short-circuits at first clear signal) to determine one of five work types:
+
+  | type | Charter | Spec/plan context | Worktree CWD |
+  |---|---|---|---|
+  | `plan-scoped` | All NNs + CRs | Spec ACs + current phase | Required |
+  | `pipeline-entry` | All NNs + CRs | Being created | New (by target skill) |
+  | `hotfix` | All NNs + CRs | None | Main or hotfix branch |
+  | `charter` | All NNs + CRs | None | Main repo |
+  | `exploratory` | None | None | No constraint |
+
+  Charter NNs and CRs are loaded for every type except pure read-only exploration — they apply to all work in the repo, not just pipeline work.
+
+  **Auto-classification:** Unambiguous message signals (piece name, branch reference, spec path, "hotfix", "explore") skip the question tree entirely.
+
+  **Produces a `work_context` record** written to session state that subsequent turns can reference for consistent enforcement across a session.
+
+  **Branch strategy for standalone work:** Hotfix and regression tracks ask which branch to target (current, new hotfix off main, or existing) and whether to create a Jira ticket.
+
+- **`session-start` hook: active worktree detection.** The hook now runs `git worktree list --porcelain` at session start and injects an `⚡ ACTIVE SPEC-FLOW WORKTREE` block into the session context when a spec-flow branch (`spec|plan|execute/*`) is found. The injected block names the worktree path and branch, and states the required `cd` before any file operation. This surfaces the CWD requirement before the agent reads the first user message, closing the gap where agents continued operating from the main repo root despite an active worktree.
+
+- **`session-start` hook: IMPORTANT message updated.** The session-start instruction now reads "invoke the `intake` skill" in place of "invoke the `status` skill". The `intake` skill calls `status` internally, so status remains the first step — but intake is the correct entry point when work is about to begin.
+
 ## [3.4.0] — 2026-04-29
 
 ### Added
