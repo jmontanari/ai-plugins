@@ -2,6 +2,35 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.6.0] — 2026-04-30
+
+### Added
+- **`/spec-flow:defer` skill** — sole supported path for writing to backlog files. Records source piece, source phase, finding text, operator's rationale for non-blocking, and capture date. Invoked structured (from execute Step 6c after operator chooses defer) or manually (`/spec-flow:defer "<finding>" --rationale "<text>"`).
+- **`plan-amend` agent** — Sonnet agent dispatched by execute Step 6c when operator chooses to amend the plan. Emits a unified diff inserting suffix-named amendment phases (`phase_<N>_amend_<K>`).
+- **`spec-amend` agent** — Sonnet agent dispatched when a discovery implies the spec was wrong. Emits unified diffs adding FRs / ACs / NFRs within the piece's stated goals.
+- **`Step 6c: Discovery Triage`** in execute/SKILL.md — synchronous discovery triage at end-of-phase. Aggregates discoveries from per-phase QA gate, AC matrix `requires-amendment` rows, Build oracle escalations. Each discovery gets operator triage: amend / fork / defer.
+- **`Step 8: Final Review Triage`** in execute/SKILL.md — re-invokes Step 6c for end-of-piece Final Review must-fix findings. Amendment phases use `phase_final_amend_<K>` IDs.
+- **`Step G9c: Group Discovery Triage`** in execute/SKILL.md — discovery triage step in the Phase Group Loop, between Group Deep QA and the group progress commit. Aggregates sub-phase discoveries and routes through Step 6c.
+- **AC matrix `Reason:` field** for `NOT COVERED — deferred to ...` rows — required values: `does-not-block-goal`, `requires-amendment`, `requires-fork`. See `plugins/spec-flow/reference/ac-matrix-contract.md`.
+- **`.discovery-log.md`** per-piece artifact — committed to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.discovery-log.md`. Records every discovery and its triage outcome.
+- **`legacy_deferred_rows: true` opt-in flag** in plan front-matter — preserves pre-3.6.0 AC matrix behavior for one release. Deprecated; will be retired in v3.7.0.
+- **`depends_on:` precondition checks** in `/spec-flow:spec` and `/spec-flow:plan` — surface unmet dependencies at spec/plan time. Three options: pull-deps-in / fork / proceed (operator override).
+- **`plugins/spec-flow/reference/ac-matrix-contract.md`** — new reference doc factoring the AC matrix schema + parsing rules.
+- **`plugins/spec-flow/reference/depends-on-precondition.md`** — new reference doc factoring the depends_on resolution + triage rules. Cited by spec, plan, and execute skills.
+
+### Changed
+- **execute Step 4.5 (reflection)** — reflection agents now emit findings to the orchestrator instead of writing directly to backlog files. The orchestrator dispatches Step 6c triage on receipt.
+- **execute Step 6a** — Auto-write of `Deferred to reflection:` findings removed; those findings flow into Step 6c aggregation. Backlog writes go through `/spec-flow:defer` only after operator chooses defer.
+- **per-piece amendment budget** — 2 amendments per piece, with at most 1 being a spec amendment. Hitting the budget triggers the orchestrator escalation.
+
+### Removed
+- The reflection-step commit message pattern `reflection: <piece> — append findings to backlogs` no longer occurs (the reflection step itself produces no commits in v3.6.0+).
+
+### Migration notes for upgraders
+- **Existing backlog entries are grandfathered.** No automatic triage; they remain in `<docs_root>/prds/<prd-slug>/backlog.md` and `<docs_root>/improvement-backlog.md` as-is.
+- **Plans authored under v3.5.x continue to work.** Bare `NOT COVERED — deferred` rows are still accepted for one release if the plan sets `legacy_deferred_rows: true` in its front-matter. v3.7.0 will retire the flag.
+- **Behavioral change in QA + reflection.** Discoveries that previously flowed silently to backlog files now surface as triage prompts at end-of-phase.
+
 ## [3.5.0] — 2026-04-30
 
 ### Added

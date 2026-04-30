@@ -80,3 +80,38 @@ The following items were specced into `docs/prds/shared/specs/pi-009-hardening/s
   - Dependencies: Resolving the `--base main` hardcoding item above first would be prudent, so the first real PR opened via the `pr` strategy targets the correct base branch.
 
 ---
+
+### [Deferred via /spec-flow:defer] legacy_deferred_rows: true flag retirement — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** The plan.md front-matter flag `legacy_deferred_rows: true` was introduced as a one-release backward-compat shim, explicitly marked deprecated at introduction, and scheduled for retirement in v3.3.0. Four files now cite this milestone: plan.md (template), execute/SKILL.md, the AC matrix contract, and the CHANGELOG. Retirement requires: (1) removing the flag from plan.md template, (2) updating execute/SKILL.md to remove the legacy-opt-out branch, (3) removing the Reason:-field format check opt-out from the AC matrix contract. Priority: high.
+**Why this does not block pi-010-discovery's goals:** Will address in a future piece; does not block pi-010-discovery's completed goals.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] upstream agents missing Estimated absorption size field — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** qa-phase.md, implementer.md, and the AC matrix contract do not instruct upstream agents to emit the `Estimated absorption size:` field that Step 6c requires for auto-mode threshold evaluation. When the field is absent, Step 6c cannot compute the absorption ratio and falls back to operator-required mode even for small amendments. Adding this field to the three agent templates would unlock auto-mode for the majority of per-phase discoveries without changing the protocol. Priority: high.
+**Why this does not block pi-010-discovery's goals:** Will address in a future piece; does not block pi-010-discovery's completed goals.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] review-board agents not emitting Step 8 triage markers — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** The five end-of-piece reviewer agents (blind, edge-case, spec-compliance, prd-alignment, architecture) do not emit structured triage markers (requires-amendment, requires-fork, does-not-block-goal-deferred, qa-deferred-to-reflection). Their output is free-form prose. Step 8's per-finding routing depends on the orchestrator parsing these markers from reviewers' output; absent structured markers the orchestrator must do semantic interpretation of free-form prose, which is fragile. Adding a structured finding block (e.g., `## Triage-eligible discoveries` section) to the reviewer agent templates would make Step 8 routing deterministic. Priority: medium.
+**Why this does not block pi-010-discovery's goals:** Will address in a future piece; does not block pi-010-discovery's completed goals.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] --triage-existing-backlog mode for defer skill — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** The defer skill in its current form only writes new entries — it cannot retroactively triage entries that were written by the old auto-append path (pre-v3.2.0) into the proper operator-rationale format. A `--triage-existing-backlog` mode would allow migrating legacy entries. This was explicitly placed Out of Scope in pi-010-discovery's spec. Priority: low.
+**Why this does not block pi-010-discovery's goals:** Explicitly Out of Scope for this piece; will address in a future piece if demand warrants.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] spec-amend full-flow for PRD-impacting discoveries — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** The spec-amend agent is bounded to additions and clarifications within the piece's existing goals — it cannot change the Goal section or In Scope/Out of Scope boundaries. Discoveries that surface a PRD-level gap (a missing requirement never in any piece's scope) currently have no supported amendment path. A guided escalation path (spec-amend emits a PRD change request that the operator can route to a follow-up prd-amendment piece) would close this gap. Priority: low.
+**Why this does not block pi-010-discovery's goals:** Will address in a future piece; does not block pi-010-discovery's completed goals.
+**Captured:** 2026-04-30

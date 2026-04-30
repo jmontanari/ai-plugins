@@ -24,13 +24,14 @@ The plugin ships five skills, a pool of specialized agents, reusable templates, 
 
 ```
 plugins/spec-flow/
-├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute
+├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute, /defer
 │   ├── status/      # Pipeline dashboard + next-action recommendation + charter divergence resolver
 │   ├── charter/     # Bootstrap/update/retrofit charter — project-wide binding constraints (v2.0.0)
 │   ├── prd/         # Import/normalize PRD, decompose into pieces, update manifest
 │   ├── spec/        # Author a spec for one piece (Socratic brainstorm + QA)
 │   ├── plan/        # Turn spec into exhaustive implementation plan + QA
-│   └── execute/     # Orchestrate implementation phase-by-phase with subagents
+│   ├── execute/     # Orchestrate implementation phase-by-phase with subagents
+│   └── defer/       # Record a non-blocking finding to a backlog file with provenance (v3.2.0)
 │
 ├── agents/          # Subagent templates dispatched by the skills above
 │   ├── tdd-red.md           # Writes failing tests (TDD mode only)
@@ -45,6 +46,8 @@ plugins/spec-flow/
 │   ├── qa-prd-review.md     # End-of-pipeline: did we actually fulfill the PRD?
 │   ├── fix-code.md          # Targeted fixes after QA findings
 │   ├── fix-doc.md           # Same, for spec/plan/charter documents
+│   ├── plan-amend.md        # Amends the plan in response to a discovery (v3.2.0)
+│   ├── spec-amend.md        # Amends the spec in response to a discovery (v3.2.0)
 │   ├── review-board-blind.md            # Final Review — blind reviewer (diff-only)
 │   ├── review-board-edge-case.md        # Final Review — edge-case hunter
 │   ├── review-board-spec-compliance.md  # Final Review — spec compliance
@@ -194,8 +197,29 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 | **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml` with numbered FR/NFR/NN-P/SC and a piece list | Human (during brainstorm) | — |
 | **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
 | **plan** | Approved spec + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
-| **execute** | Approved plan | Working code on `spec/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **execute** | Approved plan | Working code on `spec/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. v3.2.0+ adds synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) — discoveries route to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (2 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + 5-agent final review | `implementer` (Sonnet, Mode: TDD or Implement) |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
+
+### Synchronous discovery triage (v3.2.0+)
+
+The execution that finds the work also fixes it. Discoveries surfaced during a phase — a missing AC, an architectural assumption that turned out wrong, an unanticipated dependency — get triaged at end-of-phase rather than silently deferred to a backlog where they decay.
+
+`/spec-flow:execute` runs the triage at two points:
+
+- **Step 6c: Discovery Triage** — fires at the end of each phase, synchronously, before the next phase dispatches. Each discovery picks one route:
+  - **plan-amend** — the plan was incomplete; insert suffix-named amendment phases via the `plan-amend` agent.
+  - **spec-amend** — the spec was wrong within the piece's stated goals; rewrite affected sections via the `spec-amend` agent (max 1 per piece).
+  - **fork** — the discovery exceeds the piece's goals; spawn a new piece in the manifest.
+  - **defer** — the discovery does not block the piece's goals; record to a backlog via `/spec-flow:defer` with provenance.
+- **Step 8: Final Review Triage** — applies the same Step 6c routing to findings surfaced by the 5-agent final review at end-of-piece, before merge.
+
+**Per-piece amendment budget.** A piece may take at most **2 amendments total** (combined plan-amend + spec-amend), with **at most 1 spec-amend**. Hitting the budget forces fork-or-defer for any further discovery — the piece is either done as scoped or the work belongs in another piece. The budget is the load-bearing safeguard against a piece amending itself indefinitely.
+
+**Per-piece artifact.** Every amend / fork / defer decision lands a row in `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.discovery-log.md` with provenance (phase, AC ID, route, rationale). The AC matrix grows a `Reason:` field with values `does-not-block-goal | requires-amendment | requires-fork` so the route is auditable from the matrix alone.
+
+**Precondition checks.** `/spec-flow:spec` and `/spec-flow:plan` consult `depends_on:` in the manifest at brainstorm time — if a dependency is absent or in the wrong state, the skill offers three triage options (re-plan, fork, defer) before authoring proceeds. Discovery triage is therefore not just an end-of-phase concept — it threads through spec and plan time as well.
+
+See `plugins/spec-flow/reference/ac-matrix-contract.md` and `plugins/spec-flow/reference/depends-on-precondition.md` for the load-bearing references.
 
 ---
 
@@ -312,7 +336,7 @@ Edit if your project uses different layouts (e.g., `docs_root: repo/docs`) or wa
 
 The `phase_groups` key controls the v1.4.0 Phase Scheduler. In `auto` (default), plans that use Phase Group headings (`## Phase Group <letter>:`) dispatch their Sub-Phases concurrently; plans using only flat phases (`### Phase <N>`) run serially as before. Set to `off` to disable the scheduler entirely (treats groups as flat serial phases) — useful for rollback if you hit scheduler bugs in a new release. Set to `always` to have the orchestrator warn when a plan has only flat phases in a piece that looks parallelizable — catches over-flat plans during doctrine adoption.
 
-The `reflection` key (new in v1.5.0) controls Step 4.5 of Final Review. In `auto` (default), two read-only Sonnet reflection agents fire after Human Sign-Off and before Capture Learnings: a process retro examining session metrics + escalation log + cumulative diff to identify what worked / what didn't in the orchestration flow, and a future-opportunities agent examining the spec/plan/diff/manifest to surface candidate future pieces. Their findings get appended to `<docs_root>/improvement-backlog.md` (committed) and feed Step 5's `learnings.md` synthesis. Set to `off` to skip Step 4.5 entirely (preserves pre-v1.5 behavior — `learnings.md` authored without reflection-agent input).
+The `reflection` key (new in v1.5.0) controls Step 4.5 of Final Review. In `auto` (default), two read-only Sonnet reflection agents fire after Human Sign-Off and before Capture Learnings: a process retro examining session metrics + escalation log + cumulative diff to identify what worked / what didn't in the orchestration flow, and a future-opportunities agent examining the spec/plan/diff/manifest to surface candidate future pieces. As of v3.2.0, findings are emitted to the orchestrator as structured reports; the orchestrator routes each finding through Step 6c discovery triage (amend / fork / defer). Only the operator-chosen `defer` resolution writes to a backlog file — via `/spec-flow:defer` — producing one `chore(<piece-slug>): defer ...` commit per deferred finding. Step 5's `learnings.md` synthesis consumes the same reflection outputs and is unchanged. Set to `off` to skip Step 4.5 entirely (preserves pre-v1.5 behavior — `learnings.md` authored without reflection-agent input).
 
 ### Recommended project-level setup
 
@@ -368,10 +392,12 @@ Each piece ends with a two-agent reflection stage (Step 4.5 in execute) before t
 - **Process retro** (Sonnet, read-only) examines session metrics, per-phase escalation log, and the cumulative diff to identify orchestration patterns worth keeping or changing for future pieces. Output: `must-improve` / `worked-well` / `metrics` sections.
 - **Future opportunities** (Sonnet, read-only) examines the spec, plan, cumulative diff, current improvement backlog, and manifest to surface candidate future pieces (deferred ACs, hinted features, tech debt accrued, dependencies unlocked, cross-piece patterns). Every item must reference a concrete artifact — no speculation.
 
-Findings get routed to one of two backlogs (v3.0.0+):
+**v3.2.0 routing (synchronous triage, not auto-write).** As of v3.2.0, reflection agent findings are emitted as structured reports to the orchestrator. The orchestrator routes each finding through Step 6c discovery triage — the operator chooses amend, fork, or defer per finding. Only the `defer` choice writes to a backlog file, via `/spec-flow:defer`, with one `chore(<piece-slug>): defer ...` commit per deferred finding. There is no automatic backlog-write commit at the end of the reflection step.
 
-- **Future-opportunities findings** (capability-scoped) append to `docs/prds/<prd-slug>/backlog.md` (PRD-local). The `spec` skill reads this file at brainstorm start (Phase 1, step 6) and surfaces ~5 most-relevant items as candidate considerations for new pieces *within the same PRD*. Items the user marks `incorporated` or `obsolete` during brainstorm get pruned after spec sign-off (Phase 5, step 4); `deferred` items stay for future surface-up.
-- **Process-retro findings** (cross-PRD, pipeline-level) append to `docs/improvement-backlog.md` (global). Spec-flow's own retros consume this; per-piece brainstorms do not.
+Backlog routing by target (v3.0.0+) — applies to defer resolutions:
+
+- **Future-opportunities findings** (capability-scoped) route to `docs/prds/<prd-slug>/backlog.md` (PRD-local) when deferred. The `spec` skill reads this file at brainstorm start (Phase 1, step 6) and surfaces ~5 most-relevant items as candidate considerations for new pieces *within the same PRD*. Items the user marks `incorporated` or `obsolete` during brainstorm get pruned after spec sign-off (Phase 5, step 4); `deferred` items stay for future surface-up.
+- **Process-retro findings** (cross-PRD, pipeline-level) route to `docs/improvement-backlog.md` (global) when deferred. Spec-flow's own retros consume this; per-piece brainstorms do not.
 
 The improvement backlog is intentionally pruneable working state, not an immutable log. Manually delete entries when they're addressed or no longer relevant.
 
@@ -442,6 +468,7 @@ Once installed, spec-flow exposes the same skills on either host:
 | `/spec-flow:spec` | Author a detailed specification for one piece. |
 | `/spec-flow:plan` | Generate an exhaustive phase-by-phase implementation plan from an approved spec. |
 | `/spec-flow:execute` | Orchestrate implementation phase-by-phase via subagents. |
+| `/spec-flow:defer` | Record a non-blocking discovery to a backlog file with provenance (v3.2.0+). Sole supported path for writing to `<docs_root>/prds/<prd-slug>/backlog.md` or `<docs_root>/improvement-backlog.md`. |
 
 **Dual-path details that make this work:**
 

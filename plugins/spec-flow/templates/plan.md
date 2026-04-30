@@ -6,6 +6,7 @@ charter_snapshot:
   processes: {{date}}
   flows: {{date}}
   coding-rules: {{date}}
+legacy_deferred_rows: false  # OPT-IN: set to true to preserve pre-3.2.0 AC matrix behavior (silent acceptance of bare deferral rows). Deprecated — to be retired in v3.3.0.
 ---
 
 <!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->

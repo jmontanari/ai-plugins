@@ -220,3 +220,40 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 - Refactor skips: 5/5 phases (100% auto-skipped; correct for doc-as-code with no behavioral refactoring surface).
 
 ---
+
+## Recent findings
+
+### [Deferred via /spec-flow:defer] Phase 8 scope too dense — split at behavioral boundary not LOC — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-process-retro`)
+**Finding (verbatim):** Phase 8 bundled multiple behaviors into a single Implement phase; the fix required multiple retry iterations. Regression pattern: split at behavioral subsection boundary, not LOC count. Future plans should cap each Implement phase at one behavioral region.
+**Why this does not block pi-010-discovery's goals:** Process improvement for future pieces; does not affect pi-010-discovery's shipped artifacts.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] Phase 9 bundled three behavioral regions — should be three phases — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-process-retro`)
+**Finding (verbatim):** Phase 9 contained three distinct behavioral areas (AC matrix routing, deferred-finding surface-to-6c, and Build oracle escalations) that should have been three sequential flat phases. The plan skill should flag phases where [Implement] covers more than one AC cluster.
+**Why this does not block pi-010-discovery's goals:** Process improvement for future pieces; does not affect pi-010-discovery's shipped artifacts.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] Step 6c not dog-food validated during this piece — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-process-retro`)
+**Finding (verbatim):** This piece implemented Step 6c (discovery triage) but never actually exercised the flow during its own implementation — no discoveries surfaced during phases 1-13 that required operator triage. The execute skill should include a note that the first piece using a new triage mechanism should explicitly produce one test-case discovery to validate the flow end-to-end.
+**Why this does not block pi-010-discovery's goals:** Observation; the triage flow was validated through Final Review instead. Does not affect pi-010-discovery's shipped artifacts.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] Final Review iter-1 >9 must-fix — add pre-filter step — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-process-retro`)
+**Finding (verbatim):** Nine must-fix findings in Final Review iter-1 is unusually high. Suggestion: dispatch a lightweight Opus triage of the fix-diff after iter-1 before re-running all 5 reviewers, so that trivially incorrect fixes are caught before consuming 5 fresh reviewer dispatches.
+**Why this does not block pi-010-discovery's goals:** Process improvement for future pieces; does not affect pi-010-discovery's shipped artifacts.
+**Captured:** 2026-04-30
+
+### [Deferred via /spec-flow:defer] Phase Group B.2 schema violation missed by QA-lite — 2026-04-30
+
+**Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-process-retro`)
+**Finding (verbatim):** The QA-lite reviewer for sub-phase B.2 approved a schema that used inline agent context (violating the spec's isolation rule) — the violation was caught only in the full group-level QA. The fix: attach the sibling sub-phase's agent schema to QA-lite's prompt context so the narrower reviewer can also detect cross-contamination.
+**Why this does not block pi-010-discovery's goals:** Process improvement for future pieces; does not affect pi-010-discovery's shipped artifacts.
+**Captured:** 2026-04-30
