@@ -112,39 +112,6 @@ The `spec` skill reads the PRD-local backlog at brainstorm start to surface cand
 
 ---
 
-## Migrating from v1.x or v2.x
-
-v3.0.0 is a breaking layout change. Existing v1.x or v2.x projects (single PRD at `docs/prd/`, specs at `docs/specs/<piece>/`, single manifest at `docs/manifest.yaml`) upgrade with the dedicated migration skill:
-
-```text
-/spec-flow:migrate <prd-slug>
-```
-
-You supply the slug for the existing PRD (the one currently at `docs/prd/`); the migration moves it to `docs/prds/<prd-slug>/` and rewrites every internal reference. File history is preserved via `git mv` — verify post-migration with `git log --follow docs/prds/<prd-slug>/prd.md`.
-
-**Flags:**
-
-- `--inspect` — dry-run mode. Reports every planned move and detected stale internal reference without touching the working tree. Use this first.
-- `--force` — override safety checks (uncommitted changes, in-flight worktrees, charter absence). Off by default; the migration prefers to refuse rather than partially-apply.
-
-**What the migration does:**
-
-1. `git mv docs/prd/ docs/prds/<prd-slug>/` (with rename detection preserving history).
-2. `git mv docs/specs/ docs/prds/<prd-slug>/specs/` (each piece directory carries forward unchanged).
-3. Rewrites internal references in PRDs, specs, plans, and manifests from old paths to new.
-4. Sets `layout_version: 3` in `.spec-flow.yaml`.
-5. Writes `MIGRATION_NOTES.md` at the repo root listing every move and any stale reference the rewriter flagged for human review.
-
-**Pre-migration requirements:**
-
-- A committed charter at `docs/charter/`. Pre-charter (v0) projects must run `/spec-flow:charter` retrofit first.
-- A clean working tree (no uncommitted changes). Override with `--force` if you understand the risk.
-- No active in-flight worktrees on `spec/<piece>` branches that would collide with the new `spec/<prd-slug>-<piece-slug>` naming.
-
-See `plugins/spec-flow/skills/migrate/SKILL.md` for the full reference (every step, rollback procedure, and edge-case handling).
-
----
-
 ## The chain of events
 
 A piece of work flows through the pipeline linearly. Each stage has an output, a QA gate, and a status update in the manifest.
