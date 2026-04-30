@@ -68,4 +68,5 @@ Same pattern in `execute`: if a phase's tests won't turn green after 2 attempts,
 - [TDD loop](./tdd-loop.md) — the Red/Build/Verify/Refactor cycle executed inside each `execute` phase.
 - [QA loop](./qa-loop.md) — the iterative fix-and-re-review cycle that runs at every boundary.
 - [Charter system](./charter-system.md) — how the six charter files govern every downstream decision.
+- [Project layout](./project-layout.md) — the full directory tree with concrete file examples.
 - [Orchestrator model](./orchestrator-model.md) — why skills orchestrate and agents implement.

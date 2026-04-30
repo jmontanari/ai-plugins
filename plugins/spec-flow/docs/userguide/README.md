@@ -44,6 +44,7 @@ Read these once; every command page refers back to them.
 | [TDD loop](./concepts/tdd-loop.md) | Red / Build / Verify / Refactor — the Three Laws, how the implementer, tdd-red, verify, and refactor agents orchestrate around them. |
 | [QA loop](./concepts/qa-loop.md) | Iterative fix-and-re-review cycles. How must-fix findings get resolved, and what the 3-iteration circuit breaker does. |
 | [Charter system](./concepts/charter-system.md) | NN-C, NN-P, CR entries and why every spec cites them by ID. How charter governance prevents architectural drift. |
+| [Project layout](./concepts/project-layout.md) | The full directory tree after running the pipeline end-to-end. What's actually in each file, with concrete examples. |
 | [Orchestrator model](./concepts/orchestrator-model.md) | Why skills orchestrate but don't implement. How subagent context isolation prevents brainstorming leaks into code. |
 
 ### Commands — per-skill drill-down
@@ -72,6 +73,7 @@ Each stage narrows ambiguity and passes the result to the next stage. Reviewers 
 ## Where to start reading
 
 - **You've never seen spec-flow before:** read [concepts/pipeline.md](./concepts/pipeline.md) first, then [concepts/orchestrator-model.md](./concepts/orchestrator-model.md), then skim the command pages in pipeline order.
+- **You want to know what files spec-flow creates:** [concepts/project-layout.md](./concepts/project-layout.md) — full directory tree with annotated examples.
 - **You just installed it and have a PRD:** go to [commands/prd.md](./commands/prd.md).
 - **You're mid-pipeline and resuming:** run `/spec-flow:status` and read [commands/status.md](./commands/status.md).
 - **You want to understand the TDD cycle:** [concepts/tdd-loop.md](./concepts/tdd-loop.md).
