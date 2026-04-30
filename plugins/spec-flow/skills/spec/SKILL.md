@@ -93,14 +93,17 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 ### Phase 5: Finalize
 
 1. User approves → continue. User requests changes → make them → back to QA loop.
-2. Update `docs/prds/<prd-slug>/manifest.yaml` on main: piece status → `specced`
+2. Update `docs/prds/<prd-slug>/manifest.yaml` on the spec branch (the current
+   working branch — no checkout needed):
    ```bash
-   git checkout main
    # update docs/prds/<prd-slug>/manifest.yaml status for this piece
    git add docs/prds/<prd-slug>/manifest.yaml
    git commit -m "manifest: mark <prd-slug>/<piece-slug> as specced"
-   git checkout spec/<prd-slug>-<piece-slug>
    ```
+   > **Branch ownership:** The manifest update stays on the spec branch
+   > (`spec/<prd-slug>-<piece-slug>`). Main's manifest advances when this branch
+   > is merged or a PR is opened. For PR-based repos, the human merges the spec branch
+   > to main as part of the normal review workflow.
 3. Commit spec on worktree branch:
    ```bash
    git add docs/prds/<prd-slug>/specs/<piece-slug>/spec.md

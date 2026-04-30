@@ -16,6 +16,13 @@ layout_version: 3
 #   never   — never run Refactor (useful for repetitive-pattern tracks like adapters)
 refactor: auto
 
+# merge_strategy: controls how execute Step 6 lands the piece on main
+#   squash_local — git merge --squash to local main, then push (default; suits
+#                  self-contained repos with direct main write access)
+#   pr           — display gh pr create command for the human to run; halt
+#                  (suits PR-based repos where main is protected; no gh CLI dep added)
+merge_strategy: squash_local
+
 # tdd: controls TDD enforcement for behavior-bearing phases
 #   auto     — ask the user at plan time which track to use (default)
 #   true     — always use TDD track (same as auto with "yes" answer)

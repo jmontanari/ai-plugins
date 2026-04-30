@@ -20,11 +20,42 @@ Argument parsing order: check for `--resolve` first (if present, jump to the Div
 
 Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag enables the citation-drift deep scan defined below.
 
-**Order:** PRD discovery → all-PRDs default view → drill-in mode → archive filter → drift surfacing.
+**Order:** Worktree scan → PRD discovery → archive filter → per-PRD parse (with worktree overrides for in-progress pieces) → drift surfacing → all-PRDs default view → drill-in mode.
 
 0. **Load config:** Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
-1. **PRD discovery (FR-007):** Scan `<docs_root>/prds/` for subdirectories containing `prd.md`. Each `<docs_root>/prds/<prd-slug>/prd.md` is one PRD. Read its YAML front-matter: `slug:`, `status:` (one of `drafting | active | shipped | archived`), `version:`.
+1. **Worktree scan (AC-7 / AC-8):** Run `git worktree list --porcelain` to discover
+   all active worktrees. For each worktree whose branch matches any of these patterns
+   (per v3 naming conventions in `plugins/spec-flow/reference/v3-path-conventions.md`):
+   - `execute/<prd-slug>-<piece-slug>`
+   - `spec/<prd-slug>-<piece-slug>`
+   - `plan/<prd-slug>-<piece-slug>`
+
+   For each matching worktree:
+   - Derive the manifest path within that worktree:
+     `<worktree_path>/docs/prds/<prd-slug>/manifest.yaml`.
+   - Read the fields `id:`, `name:`, `status:`, and `depends_on:` from that manifest.
+     If the manifest exceeds 10 KB (`wc -c` output > 10240), use targeted extraction
+     instead of a full read:
+     ```bash
+     grep -E '^\s{0,4}(id|name|status|depends_on):' \
+         <worktree_path>/docs/prds/<prd-slug>/manifest.yaml
+     ```
+   - **Active-worktree guard:** If the manifest status is `merged` but the worktree is
+     still present in `git worktree list` output, treat the piece as `in-progress` (not
+     `merged`). A live worktree with `merged` status means Step 5.5 ran but the merge or
+     PR landing has not yet completed.
+   - Record: `<prd-slug>/<piece-slug>` → `{status, worktree_path, branch}`. This data
+     is **authoritative** for that piece — it supersedes any main-branch manifest entry
+     for the same piece during this status run.
+   - For `execute/` branches only: also read `plan.md` from the worktree
+     (`<worktree_path>/docs/prds/<prd-slug>/specs/<piece-slug>/plan.md`) and count
+     `[x]` vs `[ ]` checkboxes to determine the current phase number and name.
+
+   Store all worktree-sourced piece data in memory as `worktree_overrides` keyed by
+   `<prd-slug>/<piece-slug>`.
+
+2. **PRD discovery (FR-007):** Scan `<docs_root>/prds/` for subdirectories containing `prd.md`. Each `<docs_root>/prds/<prd-slug>/prd.md` is one PRD. Read its YAML front-matter: `slug:`, `status:` (one of `drafting | active | shipped | archived`), `version:`.
 
    **Pre-v3 fallback:** If the scan of `<docs_root>/prds/` finds no `prd.md` files (directory missing, empty, or no subdirectory contains a `prd.md`), print exactly one line and stop:
 
@@ -32,15 +63,26 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
 
    Do not walk legacy `<docs_root>/prd/` or `<docs_root>/specs/` paths — v1.x/v2.x runtime coexistence is out of scope. The user must run `/spec-flow:migrate` to advance.
 
-1a. **Read charter state:** Check `<docs_root>/charter/` directory. If present, read each file's `last_updated:` front-matter into memory for the drift comparison in step 4. If absent, note charter is missing (only surface if `charter.required: true` in config).
+2a. **Read charter state:** Check `<docs_root>/charter/` directory. If present, read each file's `last_updated:` front-matter into memory for the drift comparison in step 5. If absent, note charter is missing (only surface if `charter.required: true` in config).
 
-2. **Archive filter (FR-020 / AC-8):** Partition the discovered PRDs into `active-set` (lifecycle state ≠ `archived`) and `archived-set` (lifecycle state == `archived`).
+3. **Archive filter (FR-020 / AC-8):** Partition the discovered PRDs into `active-set` (lifecycle state ≠ `archived`) and `archived-set` (lifecycle state == `archived`).
 
    - Default invocation: present only the `active-set`.
    - `--include-archived` / `-a`: present both sets (archived PRDs are grouped in a separate "Archived" section of the dashboard).
    - Archive state is determined solely by the `prd.md` front-matter `status:` value — there is no `docs/archive/` directory (per FR-020, archival is in-place).
 
-3. **Per-PRD parse (default all-PRDs view — FR-007):** For each PRD in the presentation set, read its manifest at `<docs_root>/prds/<prd-slug>/manifest.yaml`. Extract the pieces list and aggregate piece counts by status. Use the piece-status state machine vocabulary verbatim:
+4. **Per-PRD parse (default all-PRDs view — FR-007):** For each PRD in the presentation set, read its manifest at `<docs_root>/prds/<prd-slug>/manifest.yaml`. Extract the pieces list and aggregate piece counts by status.
+
+   > **Worktree override:** Before reading the main-branch manifest for a piece, check
+   > `worktree_overrides` (populated in Step 1). If an entry exists for
+   > `<prd-slug>/<piece-slug>`, use its `status`, `phase`, and `worktree_path` data instead
+   > of the main-branch manifest value for that piece. The main-branch manifest is still read
+   > for all other pieces with no active worktree.
+   >
+   > **Large manifest:** If `wc -c <manifest_path>` > 10240 bytes, use the targeted
+   > extraction pattern from Step 1 rather than reading the full file.
+
+   Use the piece-status state machine vocabulary verbatim:
 
    | Status | Meaning |
    |--------|---------|
@@ -53,13 +95,11 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    | `superseded` | Abandoned and replaced. |
    | `blocked` | External dependency or unresolved decision halts progress. |
 
-4. **Drift surfacing per active PRD (FR-008 passive):** For each non-archived PRD, iterate its pieces whose status is `specced`, `planned`, or `in-progress`. For each such piece, read its `charter_snapshot:` front-matter from `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (and `plan.md` if present). Compare every snapshot date against the current `<docs_root>/charter/<file>.md` `last_updated:` value loaded in step 1a. If any current `last_updated:` is newer than the corresponding snapshot, flag the piece as **diverged** and record which file(s) changed.
+5. **Drift surfacing per active PRD (FR-008 passive):** For each non-archived PRD, iterate its pieces whose status is `specced`, `planned`, or `in-progress`. For each such piece, read its `charter_snapshot:` front-matter from `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (and `plan.md` if present). Compare every snapshot date against the current `<docs_root>/charter/<file>.md` `last_updated:` value loaded in step 2a. If any current `last_updated:` is newer than the corresponding snapshot, flag the piece as **diverged** and record which file(s) changed.
 
    Status surfaces drift only — it does NOT dispatch the drift-mode `qa-spec` agent. Active resolution (FR-009) is the job of `spec`, `plan`, `execute`, and `prd --update` during their Phase-1 context load. When this skill surfaces drift, it points the user at `/spec-flow:spec <piece>` / `/spec-flow:plan <piece>` / `/spec-flow:execute <piece>` (each of which triggers resolution) or at `/spec-flow:status --resolve <piece>` for the walk-through flow documented below.
 
    Pieces with no `charter_snapshot:` front-matter (pre-charter pieces) are skipped silently.
-
-5. **Check worktrees:** Run `git worktree list` to identify active worktrees. Match against the v3 branch/path convention `{{worktree_root}}/` (see `plugins/spec-flow/reference/v3-path-conventions.md`) with branches `{spec,plan,execute}/<prd-slug>-<piece-slug>` so the correct PRD grouping is displayed alongside each piece.
 
 6. **Present status — all-PRDs default view:** Group output by PRD. For each PRD in the `active-set` (and the `archived-set` if `--include-archived`):
 
@@ -132,7 +172,7 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    - Only emit the `Issues:` line when at least one key is found in plan.md.
 
 8. **Recommend next action:**
-   - No PRDs discovered → pre-v3 fallback message (see step 1).
+   - No PRDs discovered → pre-v3 fallback message (see step 2).
    - All PRDs present, no active piece anywhere → "Run `/spec-flow:spec <prd-slug>/<piece-slug>` on the next `open` piece."
    - Spec exists, no plan → "Run `/spec-flow:plan <prd-slug>/<piece-slug>`."
    - Plan exists, not started → "Run `/spec-flow:execute <prd-slug>/<piece-slug>`."

@@ -183,3 +183,40 @@ The current pipeline can complete a piece end-to-end with documented prerequisit
 None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Plan amendment is the load-bearing new mechanism; sub-phase absorption is a scoped extension to existing plan/execute.
 
 ---
+
+## shared/pi-011-branch-fix — 2026-04-30
+
+### Process retro for shared/pi-011-branch-fix
+
+#### must-improve
+
+- **Final Review circuit-breaker of 3 iterations is the wrong limit for non-TDD, no-test-harness pieces:** This piece ran 6 Final Review iterations before clean — double the informal circuit-breaker. Each of iterations 2–5 introduced *new* must-fix items rather than re-raising prior ones; fixing one edge in the rejection/rework path exposed an adjacent unchecked edge. The 3-iter limit was calibrated for TDD pieces where per-phase QA already stress-tested most paths. For doc-as-code / non-TDD pieces where Final Review is the *only* adversarial gate, the practical limit should be higher (suggest 6), but more importantly the orchestrator should detect the "each fix opens a new finding" cascade pattern and pause for operator triage rather than silently iterating. Recommended fix: add a cascade-detection heuristic — if Final Review iter N returns ≥1 must-fix item that references a code section first modified in iter N−1's fix, treat this as a scope-explosion signal and offer operator triage before dispatching iter N+1.
+
+- **Edge-case reviewer was doing the work that per-phase QA should have caught:** The edge-case reviewer found 6 of 9 total must-fix items across iterations 2–5 (Edges A–F), all of them in rejection/rework flow logic that was authored in Phase 2. Per-phase QA for Phase 2 ran one iteration with a single fix-code dispatch and was marked clean — but it missed every multi-branch edge case. The root cause: Phase 2's per-phase QA was the only adversarial gate on the most complex logic in the piece, and it used structural grep as its primary Verify mechanism (Full mode, but grep-based). Recommended fix: for any phase whose diff introduces multi-branch control-flow (if/elif chains, rejection paths, rework re-entry) in a bash/shell/doc-as-code context, mandate that per-phase QA explicitly includes an edge-case walkthrough as part of the phase AC matrix, not just at Final Review.
+
+- **Review board composition imbalance for doc-as-code pieces:** The blind reviewer found 0 must-fix items across all 6 iterations; spec-compliance found 1; edge-case found 6. For doc-as-code pieces (skill prose that encodes bash-level logic), "blind code smell detection" adds negligible value because prose style and naming are irrelevant. Recommended fix: for pieces where all diffs are SKILL.md / doc-as-code files, the Final Review board should substitute the blind reviewer's slot with a second edge-case reviewer pass (or a dedicated "bash-path-coverage" reviewer). This is a plan.md-level annotation: `review_board_variant: doc-as-code` to signal the substitution.
+
+- **Specs for non-TDD doc-as-code pieces must enumerate every execution branch as an explicit AC:** The cascade of Final Review edge findings (A–F) maps to execution branches that existed in the plan's prose description but were never stated as testable ACs. Spec-compliance reviewer found only 1 must-fix because the ACs were all technically satisfied — the missing cases were branches *implied* by the logic but not written as ACs. Recommended fix: the `qa-spec` agent must apply a "branch enumeration" check for non-TDD doc-as-code pieces — every conditional in the proposed logic ("if merge strategy is X", "if rejection occurs", "if existing code is present") must have a corresponding AC entry. This is separate from functional ACs and should be in a dedicated "branch coverage" section of the spec.
+
+- **`git checkout main` inside a worktree is a silent failure and should be a linted error:** The root defect this piece fixed — direct-main writes during pipeline execution — persisted across multiple prior pieces because `git checkout main` in a worktree produces no error and appears to succeed while leaving the worktree on the wrong branch. There is no equivalent of a lint gate today. Recommended fix: add a pre-phase shell snippet to the execute Pre-Loop that validates `git -C $worktree rev-parse --abbrev-ref HEAD` equals the expected feature branch; if it returns `main`, abort with a clear error. This should also be a static check in the `spec-flow:execute` Pre-Loop preamble, not just in the skill prose.
+
+#### worked-well
+
+- **No circuit-breaker hits and no escalations across all 5 phases:** Despite the Final Review cascade, every phase completed on first attempt without BLOCKED reports, contamination events, or scope violations. The plan's phase decomposition (especially isolating Phase Group A as parallel sub-phases for spec/plan SKILL.md updates) was well-scoped and clean at the boundary level.
+
+- **Phase Group A (parallel spec + plan sub-phases) produced zero staging conflicts:** Unlike the pi-009 Phase Group A staging-area race, this piece's Phase Group A had genuinely disjoint file scope (spec/SKILL.md vs plan/SKILL.md) and ran to completion without reconciliation overhead. The scope-disjointness upfront check is working as intended.
+
+- **Iter-1 Final Review surfaced 5 must-fix groups in a single pass before any fixes diverged:** Having 5 distinct must-fix groups identified atomically in iter-1 (before any sequential fix dispatches) meant the fix-code agent could address them in a single batch. This is the correct usage pattern — the damage from non-atomic discovery in iter-1 would have been worse if each group had been found separately.
+
+- **All Refactor skips were correctly predicted by the auto predicate:** No refactor-ish defects appeared in QA across any phase. For doc-as-code pieces with no structural refactoring surface, the `refactor: auto` skip predicate is reliably accurate and should remain the default.
+
+#### metrics
+
+- Final Review iterations: 6 (outlier; baseline 1–2 for Implement-only pieces; previous high was pi-009 at ~3).
+- Must-fix items by reviewer: edge-case=6, spec-compliance=1, blind=0, architecture=0, prd-alignment=2 (iter-1 only, counted in groups A+E) — edge-case reviewer contributed 67% of total findings.
+- Per-phase QA iterations: Phase 2=1+fix-code, Phases 1/3/4/Group A=0 (skipped, structural-only or clean) — 80% skip rate; appropriate given structural diff scope, but Phase 2's single pass proved insufficient for multi-branch logic.
+- Escalations / circuit-breaker hits: 0 (expected; consistent with prior Implement-only pieces).
+- Cumulative diff: 11 files, ~1074 insertions / ~26 deletions — large insertion count for a correctness-only piece signals doc-as-code verbosity, not scope creep.
+- Refactor skips: 5/5 phases (100% auto-skipped; correct for doc-as-code with no behavioral refactoring surface).
+
+---

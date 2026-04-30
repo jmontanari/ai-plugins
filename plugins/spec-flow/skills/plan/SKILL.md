@@ -243,14 +243,14 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
      jira_task: ITE-42
      ```
    On tool unavailable → emit warning → skip.
-4. Update manifest on main: piece status → `planned`
+4. Update manifest on the spec branch (the current working branch — no checkout needed):
    ```bash
-   git checkout main
    # update manifest.yaml status for this piece in its PRD-local manifest
    git add <docs_root>/prds/<prd-slug>/manifest.yaml
    git commit -m "manifest: mark <prd-slug>/<piece-slug> as planned"
-   git checkout spec/<prd-slug>-<piece-slug>
    ```
+   > **Branch ownership:** The manifest update stays on `spec/<prd-slug>-<piece-slug>`.
+   > Main's manifest advances when this branch is merged or a PR is opened.
 5. Commit plan on worktree branch:
    ```bash
    git add <docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md

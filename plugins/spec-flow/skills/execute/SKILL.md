@@ -43,17 +43,15 @@ You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git gr
 
 ## Pre-Loop: Mark Piece as In-Progress
 
-Before the first phase runs (and only on a fresh start, not a resume), update the PRD's manifest on `main` to mark this piece's status as `in-progress` (per the spec's piece-status state machine). Skip if it's already `in-progress` (resumed session).
+Before the first phase runs (and only on a fresh start, not a resume), update the PRD's manifest **on the execute branch** to mark this piece's status as `in-progress` (per the spec's piece-status state machine). Skip if it's already `in-progress` (resumed session). The execute branch is already the active working branch — no checkout is needed.
 
 ```bash
-git checkout main
 # update docs/prds/<prd-slug>/manifest.yaml: set this piece's status to "in-progress"
 git add docs/prds/<prd-slug>/manifest.yaml
 git commit -m "manifest: mark <prd-slug>/<piece-slug> as in-progress"
-git checkout execute/<prd-slug>-<piece-slug>
 ```
 
-This makes `status` report an accurate picture — a piece is `in-progress` while execute is in progress, and flips to `merged` (or the `done` alias) after the final merge.
+This commit lives on the execute branch. Main's manifest retains `planned` until the branch is merged (via squash or PR), at which point main receives the correct terminal state in one step. The `status` skill discovers the correct `in-progress` state by scanning active execute-branch worktrees (see Status skill, AC-7).
 
 ## Phase 1: Load Context + Charter Drift + Dependency Preconditions
 
@@ -825,6 +823,20 @@ Triggered automatically when the last phase's QA passes.
 ### Step 1: Iteration 1 — Full Review (5 Parallel Agents)
 
 Get the full worktree diff:
+
+Before dispatching the review board, record that final review is in progress by
+updating `plan.md` on the execute branch:
+
+```bash
+# Update the **Status:** field in plan.md:
+#   **Status:** <current-value>   →   **Status:** final-review-pending
+git add docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
+git commit -m "plan: <prd-slug>/<piece-slug> final-review-pending"
+```
+
+This lets a human inspect `plan.md` and know the piece is in final review without
+counting phase checkboxes.
+
 ```bash
 git diff main..HEAD
 ```
@@ -870,6 +882,37 @@ Present to user:
 - Summary of what was built (phases, files, test counts)
 - Final review results (clean or deferred items)
 - Request approval to merge
+
+**If human APPROVES:** proceed to Step 4.5.
+
+**If human REJECTS (requests rework):**
+1. Ask the human which phase(s) need rework.
+2. Reset the execute branch to before the targeted phase ran. Use `phase_N_start_sha`
+   captured in orchestrator state (Per-Phase Loop Step 1 for Phase N):
+   ```bash
+   git reset --hard $phase_N_start_sha
+   ```
+   This cleanly removes Phase N's implementation commits, all later-phase commits, and all
+   Final Review commits (fix-code iterations, final-review-pending marker, learnings, etc.).
+   If multiple phases need rework, reset to the earliest one's start SHA.
+   Phase N's implementation code is now gone — TDD-Red can run cleanly.
+
+   **If `phase_N_start_sha` is not in memory (session restarted during Final Review):**
+   recover it from git log — it equals the `progress: Phase (N-1) complete` commit SHA
+   (or the oldest commit on the execute branch for Phase 1):
+   ```bash
+   # For Phase N > 1: match the PREVIOUS phase's progress marker, print its own SHA
+   PREV=$((N - 1))
+   git log --oneline | awk "/progress: Phase ${PREV} complete/{print \$1; exit}"
+
+   # For Phase 1: the execute branch diverges from main at its merge-base
+   git merge-base origin/main HEAD
+   ```
+
+3. plan.md is already in the pre-Phase N state after the reset (checkboxes un-ticked by the
+   revert). No separate un-ticking commit is needed.
+4. Re-enter the Per-Phase Loop at Phase N. Provide the Final Review board's must-fix findings
+   as additional context to the Red/Implement agent for the rework.
 
 ### Step 4.5: Reflection
 
@@ -937,6 +980,18 @@ git add docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md
 git commit -m "learnings: <prd-slug>/<piece-slug>"
 ```
 
+### Step 5.5: Update Manifest to Merged
+
+Commit the terminal manifest state to the execute branch. Applies to **both** `merge_strategy`
+values: for `squash_local` the squash carry it to main; for `pr` the PR merge carries it.
+(AC-3: execute branch manifest shows `merged` before the merge is signalled.)
+
+```bash
+# update docs/prds/<prd-slug>/manifest.yaml: set status to "merged"
+git add docs/prds/<prd-slug>/manifest.yaml
+git commit -m "manifest: mark <prd-slug>/<piece-slug> as merged"
+```
+
 ### Step 6: Merge
 
 **Integration — transition all phase tasks to Done (if `integration_cfg != null` and `auto_transition: true`):**
@@ -945,6 +1000,11 @@ iterate over all `jira_task:` keys from plan.md for this piece and transition ea
 the "Final Review Board passes" status from `integration_cfg` (default: `Done`).
 On tool unavailable → emit warning → skip (do NOT block the merge).
 
+Read `merge_strategy` from `.spec-flow.yaml` (valid values: `squash_local`, `pr`;
+default: `squash_local` when the key is absent, unset, or unrecognized — per NN-C-003
+backward compatibility). Branch on the value:
+
+**If `merge_strategy: squash_local` (default):**
 ```bash
 git checkout main
 git merge --squash execute/<prd-slug>-<piece-slug>
@@ -952,12 +1012,28 @@ git commit -m "execute/<prd-slug>-<piece-slug>: <summary of what was built>"
 git worktree remove {{worktree_root}}
 git branch -d execute/<prd-slug>-<piece-slug>
 ```
+If Step 6 fails for any reason (conflicts, hook rejection, empty commit, etc.): revert the
+Step 5.5 manifest commit on the execute branch before escalating to human, so the branch
+does not carry a stale `merged` status:
+```bash
+git checkout execute/<prd-slug>-<piece-slug>
+git revert HEAD --no-edit   # reverts the Step 5.5 "merged" commit
+```
+After escalation, if the human resolves the issue and retries, **re-run Step 5.5 first**
+(re-commit the `merged` manifest status) before retrying Step 6.
 
-If merge conflicts: escalate to human.
-
-### Step 7: Update Manifest
-
-Update `docs/prds/<prd-slug>/manifest.yaml` on main: piece status → `merged` (or the `done` alias), update coverage section. Commit.
+**If `merge_strategy: pr`:**
+Display the following command for the human to copy-paste and run manually:
+```
+gh pr create --base main --head execute/<prd-slug>-<piece-slug>
+```
+Print: "PR-based merge required. Run the command above to open a pull request.
+The execute branch already carries `status: merged` in the manifest (Step 5.5).
+When the PR is reviewed and merged, main receives the correct terminal state automatically.
+After the PR merges, run these cleanup commands:
+  git worktree remove {{worktree_root}}
+  git branch -d execute/<prd-slug>-<piece-slug>"
+**Halt.** Do NOT execute the `gh` command — no `gh` CLI dependency is introduced.
 
 ## Escalation Rules
 

@@ -2,6 +2,36 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.5.0] — 2026-04-30
+
+### Added
+- `merge_strategy` config key in `.spec-flow.yaml` (`squash_local` | `pr`). When set
+  to `pr`, execute Step 6 displays a `gh pr create` command for the human to run and
+  halts — no local squash-merge. Supports PR-based repos where `main` is protected.
+  Default is `squash_local` for full backward compatibility.
+
+### Changed
+- **Execute Pre-Loop:** manifest `in-progress` update now commits on the execute
+  branch (branch-ownership model). No more `git checkout main` before the first phase
+  or after Final Review Step 5.
+- **Execute Step 5.5 (new):** manifest `merged` update is committed on the execute
+  branch before Step 6 merge/PR, so the branch carries its terminal manifest state
+  to main rather than requiring a post-merge commit on main.
+- **Execute Final Review Step 1:** `plan.md **Status:**` is updated to
+  `final-review-pending` on the execute branch when the review board is dispatched.
+- **Spec skill Phase 5:** manifest `specced` update stays on the spec branch (no
+  `git checkout main`). A note explains that main's manifest advances when the spec
+  branch is merged.
+- **Plan skill Phase 4:** same fix as spec skill — manifest `planned` update stays
+  on the spec branch.
+- **Status skill:** worktree scan (`git worktree list`) is now Step 1 (was Step 5),
+  running before PRD discovery. Worktree-sourced manifest data is authoritative for
+  in-progress pieces. Manifests > 10 KB use targeted field extraction.
+
+### Removed
+- Execute Step 7 (separate manifest `merged` update on main after squash-merge) is
+  superseded by the new Step 5.5.
+
 ## [3.4.1] — 2026-04-30
 
 ### Added

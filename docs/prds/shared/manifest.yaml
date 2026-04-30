@@ -95,6 +95,28 @@ pieces:
       Two intentional deferrals: (a) FR-005 branch-design ambiguity (spec lists 3 branches per piece vs v2 single-branch reality preserved in code) — captured in learnings.md as v3.1.0 spec-amendment candidate; (b) AC-15/AC-18 dog-food run + release commit — procedure documented in plugins/spec-flow/docs/release-v3.0.0.md, executed at human-driven release time per NN-P-003 framing.
       Reflection findings persisted to docs/specs/PI-008-multi-prd-v3.0.0/learnings.md (8 process-retro items, 6 future-opportunities). High-severity process-retro items (skip-predicate calibration, mid-piece Opus pass for ≥6-phase pieces, deferred-finding tracking) should migrate to global docs/improvement-backlog.md at release time.
 
+  - name: pi-011-branch-fix
+    description: |
+      v3.x — Branch integrity: eliminate all direct-main writes during pipeline execution.
+      Fixes the root cause behind the status-friction problem log (session b4f2fafa).
+      The execute, spec, and plan skills contain `git checkout main` patterns that silently
+      fail inside git worktrees (main is already checked out in the parent) and create
+      manifest.yaml divergence between main and the feature branch, causing squash-merge
+      conflicts in PR-based repos.
+
+      Fixes: (1) execute Pre-Loop writes manifest in-progress on the execute branch, not
+      main; (2) execute Final Review writes manifest merged on the execute branch before
+      merge/PR; (3) execute writes plan.md Status: final-review-pending on the execute
+      branch; (4) adds merge_strategy: squash_local | pr config key so PR-based repos can
+      describe their topology; (5) spec and plan skills remove the git checkout main
+      manifest-update step — feature branches carry their own manifest state; (6) status
+      skill is reordered to run git worktree list first and read each execute-branch
+      worktree's manifest as authoritative for in-progress pieces; (7) status uses targeted
+      field extraction for manifests > 10KB.
+    prd_sections: [FR-004, NN-P-002]
+    dependencies: []
+    status: merged
+
   - name: pi-010-discovery
     description: |
       v3.2.0 — Synchronous discovery triage. Eliminates silent backlog deferrals by making the execution that finds new work also fix it. Today the pipeline writes deferred QA findings, "NOT COVERED — deferred" AC matrix rows, and reflection-future-opportunities findings to backlog files at end-of-piece, surfacing them only at the next piece's spec brainstorm. Operators have no signal that prerequisite work is undone until much later. This piece restructures discovery → resolution as a synchronous flow with operator triage at discovery time.
