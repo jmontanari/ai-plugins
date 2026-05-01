@@ -133,9 +133,10 @@ pieces:
       skills/status/SKILL.md, CHANGELOG.md, plugin.json.
     prd_sections: [FR-004, FR-005]
     dependencies: [pi-011-branch-fix]
-    status: in-progress
+    status: merged
+    merged_at: 2026-05-01
 
-
+  - name: pi-010-discovery
     description: |
       v3.2.0 — Synchronous discovery triage. Eliminates silent backlog deferrals by making the execution that finds new work also fix it. Today the pipeline writes deferred QA findings, "NOT COVERED — deferred" AC matrix rows, and reflection-future-opportunities findings to backlog files at end-of-piece, surfacing them only at the next piece's spec brainstorm. Operators have no signal that prerequisite work is undone until much later. This piece restructures discovery → resolution as a synchronous flow with operator triage at discovery time.
 
