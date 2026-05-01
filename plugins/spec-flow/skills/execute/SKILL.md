@@ -20,7 +20,7 @@ rules and commit format. Store as `integration_cfg`. If disabled or absent, set
 
 - Piece must have status `planned` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
 - `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` must exist and be approved
-- Must be on the worktree branch `execute/<prd-slug>-<piece-slug>` at `{{worktree_root}}/` (resolves to `worktrees/prd-<prd-slug>/piece-<piece-slug>/` at dispatch time — see `plugins/spec-flow/reference/v3-path-conventions.md`). Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
+- Must be on the worktree branch `piece/<prd-slug>-<piece-slug>` at `{{worktree_root}}/` (resolves to `worktrees/prd-<prd-slug>/piece-<piece-slug>/` at dispatch time — see `plugins/spec-flow/reference/v3-path-conventions.md`). This branch and worktree are created by the spec skill and persist through plan and execute. Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
 - All manifest dependencies for this piece must have `status: merged` or `status: done` (per the spec's piece-status state machine). The `depends_on:` precondition in Phase 1 (below) enforces this before any phase dispatch. The `--ignore-deps` flag (FR-021) bypasses this precondition only; it does NOT bypass per-phase QA or end-of-piece review-board (NN-P-002).
 
 ## API encapsulation — this skill is the sole entrypoint for internal agents
@@ -43,7 +43,7 @@ You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git gr
 
 ## Pre-Loop: Mark Piece as In-Progress
 
-Before the first phase runs (and only on a fresh start, not a resume), update the PRD's manifest **on the execute branch** to mark this piece's status as `in-progress` (per the spec's piece-status state machine). Skip if it's already `in-progress` (resumed session). The execute branch is already the active working branch — no checkout is needed.
+Before the first phase runs (and only on a fresh start, not a resume), update the PRD's manifest **on the piece branch** to mark this piece's status as `in-progress` (per the spec's piece-status state machine). Skip if it's already `in-progress` (resumed session). The piece branch is already the active working branch — no checkout is needed.
 
 ```bash
 # update docs/prds/<prd-slug>/manifest.yaml: set this piece's status to "in-progress"
@@ -51,7 +51,7 @@ git add docs/prds/<prd-slug>/manifest.yaml
 git commit -m "manifest: mark <prd-slug>/<piece-slug> as in-progress"
 ```
 
-This commit lives on the execute branch. Main's manifest retains `planned` until the branch is merged (via squash or PR), at which point main receives the correct terminal state in one step. The `status` skill discovers the correct `in-progress` state by scanning active execute-branch worktrees (see Status skill, AC-7).
+This commit lives on the piece branch. Main's manifest retains `planned` until the branch is merged (via squash or PR), at which point main receives the correct terminal state in one step. The `status` skill discovers the correct `in-progress` state by scanning active piece-branch worktrees (see Status skill, AC-7).
 
 ## Phase 1: Load Context + Charter Drift + Dependency Preconditions
 
@@ -68,7 +68,7 @@ All paths below resolve against `plugins/spec-flow/reference/v3-path-conventions
 - Manifest: `docs/prds/<prd-slug>/manifest.yaml`
 - Spec / plan: `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` and `plan.md`
 - Worktree: `{{worktree_root}}/` (resolves to `worktrees/prd-<prd-slug>/piece-<piece-slug>/` — see `plugins/spec-flow/reference/v3-path-conventions.md`)
-- Branch: `execute/<prd-slug>-<piece-slug>`
+- Branch: `piece/<prd-slug>-<piece-slug>`
 - Reflection targets (cited for Step 4.5 routing): process-retro findings route to `docs/improvement-backlog.md` (global); future-opportunities findings route to `docs/prds/<prd-slug>/backlog.md` (PRD-local). As of v3.2.0 (pi-010-discovery), reflection agents emit structured findings to the orchestrator — they do NOT write to these paths directly. The orchestrator routes each finding through Step 6c, and only the operator-chosen defer resolution writes to the target path via `/spec-flow:defer`.
 
 Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
@@ -1080,7 +1080,7 @@ Triggered automatically when the last phase's QA passes.
 Get the full worktree diff:
 
 Before dispatching the review board, record that final review is in progress by
-updating `plan.md` on the execute branch:
+updating `plan.md` on the piece branch:
 
 ```bash
 # Update the **Status:** field in plan.md:
@@ -1162,7 +1162,7 @@ Present to user:
 
 **If human REJECTS (requests rework):**
 1. Ask the human which phase(s) need rework.
-2. Reset the execute branch to before the targeted phase ran. Use `phase_N_start_sha`
+2. Reset the piece branch to before the targeted phase ran. Use `phase_N_start_sha`
    captured in orchestrator state (Per-Phase Loop Step 1 for Phase N):
    ```bash
    git reset --hard $phase_N_start_sha
@@ -1174,13 +1174,13 @@ Present to user:
 
    **If `phase_N_start_sha` is not in memory (session restarted during Final Review):**
    recover it from git log — it equals the `progress: Phase (N-1) complete` commit SHA
-   (or the oldest commit on the execute branch for Phase 1):
+   (or the oldest commit on the piece branch for Phase 1):
    ```bash
    # For Phase N > 1: match the PREVIOUS phase's progress marker, print its own SHA
    PREV=$((N - 1))
    git log --oneline | awk "/progress: Phase ${PREV} complete/{print \$1; exit}"
 
-   # For Phase 1: the execute branch diverges from main at its merge-base
+   # For Phase 1: the piece branch diverges from main at its merge-base
    git merge-base origin/main HEAD
    ```
 
@@ -1267,17 +1267,29 @@ git add docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md
 git commit -m "learnings: <prd-slug>/<piece-slug>"
 ```
 
-### Step 5.5: Update Manifest to Merged
+### Step 5.5: Update Manifest to Merged (mandatory gate — do not push or open a PR before this)
 
-Commit the terminal manifest state to the execute branch. Applies to **both** `merge_strategy`
-values: for `squash_local` the squash carry it to main; for `pr` the PR merge carries it.
-(AC-3: execute branch manifest shows `merged` before the merge is signalled.)
+Commit the terminal manifest state to the piece branch. This step is mandatory for
+**both** `merge_strategy` values: for `squash_local` the squash carries it to main;
+for `pr` the PR merge carries it. The piece branch must show `status: merged` before
+any push or PR is opened — if the branch reaches main with `status: in-progress`, the
+next `status` scan will show the piece as stale-active with no worktree.
 
 ```bash
-# update docs/prds/<prd-slug>/manifest.yaml: set status to "merged"
+# update docs/prds/<prd-slug>/manifest.yaml:
+#   status: merged
+#   merged_at: <YYYY-MM-DD>   ← today's date
 git add docs/prds/<prd-slug>/manifest.yaml
-git commit -m "manifest: mark <prd-slug>/<piece-slug> as merged"
+git commit -m "chore(manifest): mark <prd-slug>/<piece-slug> as merged"
 ```
+
+**Failure path:** If Step 6 subsequently fails (conflicts, hook rejection, empty commit),
+revert this commit on the piece branch so it doesn't carry a stale `merged` status:
+```bash
+git revert HEAD --no-edit   # reverts the Step 5.5 manifest commit
+```
+After escalation, if the human resolves the issue and retries, **re-run Step 5.5 first**
+(re-commit `status: merged` + `merged_at`) before retrying Step 6.
 
 ### Step 6: Merge
 
@@ -1294,32 +1306,26 @@ backward compatibility). Branch on the value:
 **If `merge_strategy: squash_local` (default):**
 ```bash
 git checkout main
-git merge --squash execute/<prd-slug>-<piece-slug>
-git commit -m "execute/<prd-slug>-<piece-slug>: <summary of what was built>"
+git merge --squash piece/<prd-slug>-<piece-slug>
+git commit -m "piece/<prd-slug>-<piece-slug>: <summary of what was built>"
 git worktree remove {{worktree_root}}
-git branch -d execute/<prd-slug>-<piece-slug>
+git branch -d piece/<prd-slug>-<piece-slug>
 ```
 If Step 6 fails for any reason (conflicts, hook rejection, empty commit, etc.): revert the
-Step 5.5 manifest commit on the execute branch before escalating to human, so the branch
-does not carry a stale `merged` status:
-```bash
-git checkout execute/<prd-slug>-<piece-slug>
-git revert HEAD --no-edit   # reverts the Step 5.5 "merged" commit
-```
-After escalation, if the human resolves the issue and retries, **re-run Step 5.5 first**
-(re-commit the `merged` manifest status) before retrying Step 6.
+Step 5.5 manifest commit on the piece branch before escalating to human, so the branch
+does not carry a stale `merged` status (see Step 5.5 failure path above).
 
 **If `merge_strategy: pr`:**
 Display the following command for the human to copy-paste and run manually:
 ```
-gh pr create --base main --head execute/<prd-slug>-<piece-slug>
+gh pr create --base main --head piece/<prd-slug>-<piece-slug>
 ```
 Print: "PR-based merge required. Run the command above to open a pull request.
-The execute branch already carries `status: merged` in the manifest (Step 5.5).
+The piece branch already carries `status: merged` + `merged_at` in the manifest (Step 5.5).
 When the PR is reviewed and merged, main receives the correct terminal state automatically.
 After the PR merges, run these cleanup commands:
   git worktree remove {{worktree_root}}
-  git branch -d execute/<prd-slug>-<piece-slug>"
+  git branch -d piece/<prd-slug>-<piece-slug>"
 **Halt.** Do NOT execute the `gh` command — no `gh` CLI dependency is introduced.
 
 ## Escalation Rules

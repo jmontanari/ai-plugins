@@ -61,7 +61,7 @@ Socratic dialogue with the user, one question at a time:
 2. **Validate slugs before any branch or worktree creation.** Run both `<prd-slug>` and `<piece-slug>` through the rules in `plugins/spec-flow/reference/slug-validator.md` (max 20 chars, charset `[a-z0-9-]`, no leading/trailing `-`, total branch length ≤ 50 chars). On any violation, refuse with the exact error contract from that reference doc — name which slug is offending, its actual value, the current length or offending character, and the limit. There is no silent truncation, no auto-fix; the user must edit `docs/prds/<prd-slug>/manifest.yaml` (or rename the PRD) and re-run.
 3. Create worktree (before writing, so all work lives on the feature branch). Worktree path and branch name follow `plugins/spec-flow/reference/v3-path-conventions.md`:
    ```bash
-   git worktree add {{worktree_root}} -b spec/<prd-slug>-<piece-slug>
+   git worktree add {{worktree_root}} -b piece/<prd-slug>-<piece-slug>
    ```
 4. Write `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` in the worktree directory. Read the dependency-triage choice recorded by Phase 1 step 6a from orchestrator state and branch as follows (per FR-6 of pi-010-discovery and the `## Dependency Triage` section format in `plugins/spec-flow/reference/depends-on-precondition.md`):
    - **No unmet deps recorded** (every dep was already `merged`/`done` at the time of step 6a, or the piece had no `depends_on:` entries): write spec.md normally with no `## Dependency Triage` section. The section is required only when at least one dep was unmet at the moment of authoring.
@@ -100,17 +100,17 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 ### Phase 5: Finalize
 
 1. User approves → continue. User requests changes → make them → back to QA loop.
-2. Update `docs/prds/<prd-slug>/manifest.yaml` on the spec branch (the current
+2. Update `docs/prds/<prd-slug>/manifest.yaml` on the piece branch (the current
    working branch — no checkout needed):
    ```bash
    # update docs/prds/<prd-slug>/manifest.yaml status for this piece
    git add docs/prds/<prd-slug>/manifest.yaml
    git commit -m "manifest: mark <prd-slug>/<piece-slug> as specced"
    ```
-   > **Branch ownership:** The manifest update stays on the spec branch
-   > (`spec/<prd-slug>-<piece-slug>`). Main's manifest advances when this branch
-   > is merged or a PR is opened. For PR-based repos, the human merges the spec branch
-   > to main as part of the normal review workflow.
+   > **Branch ownership:** The manifest update stays on the piece branch
+   > (`piece/<prd-slug>-<piece-slug>`). Main's manifest advances when this branch
+   > is merged or a PR is opened after execute completes. For PR-based repos, the
+   > human merges the piece branch to main as part of the normal review workflow.
 3. Commit spec on worktree branch:
    ```bash
    git add docs/prds/<prd-slug>/specs/<piece-slug>/spec.md

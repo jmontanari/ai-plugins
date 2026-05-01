@@ -2,7 +2,24 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
-## [3.6.0] — 2026-04-30
+## [3.7.0] — 2026-05-01
+
+### Changed
+
+- **Branch model: 3-verb-prefix branches → single `piece/<slug>` branch** (#pi-012). The `spec/<slug>`, `plan/<slug>`, and `execute/<slug>` per-phase branches are replaced by a single `piece/<prd-slug>-<piece-slug>` branch that persists for the full pipeline lifetime of a piece. The spec skill creates the branch and worktree once; plan and execute inherit both. One PR per piece, opened after execute completes. The `migrate/` branch convention is unchanged.
+- **execute Step 5.5**: Now writes `merged_at: <YYYY-MM-DD>` alongside `status: merged` in the manifest. Commit message changed to `chore(manifest): mark <piece> as merged`. Step 5.5 is now explicitly marked as a mandatory gate — the piece branch must not be pushed or a PR opened before this commit is made.
+- **status skill Step 1**: Worktree scan primary pattern updated to `piece/<slug>`. Legacy verb-prefixed branches (`spec/`, `plan/`, `execute/`) remain detected for backward compatibility and are shown with a `(legacy)` annotation.
+- **status skill Step 4**: Added stale-in-progress guard — when a piece shows `in-progress` in the manifest but no active worktree is found, it is displayed as `⚠ stale-in-progress` with a remediation hint (`set status: merged, merged_at: <date>`). Passive surface only (NN-C-005).
+- **status skill Step 7 drill-in**: Simplified display from three separate branch-presence columns (spec ✓/—, plan ✓/—, execute ✓/—) to a single `Branch: piece/<slug> (stage: …)` line.
+- **slug-validator**: Updated branch format docs, worked examples (`spec/auth-tokref` → `piece/auth-tokref`, 17 chars), worst-case calc (`piece/<20>-<20>` = 47 chars), and Where Invoked list (plan and execute no longer create branches).
+- **v3-path-conventions**: Branch row updated from `<verb>/<prd-slug>-<piece-slug>` to `piece/<prd-slug>-<piece-slug>` with a note that all pipeline stages share the branch.
+
+### Migration notes for upgraders
+
+- **Existing pieces mid-pipeline** (on a legacy verb-prefixed branch) continue to work — the status skill detects them with backward-compat pattern matching. To migrate, run `git branch -m spec/<slug> piece/<slug>` (or `plan/`, `execute/`) inside the worktree. New pieces automatically use `piece/<slug>`.
+- **Step 5.5 now writes `merged_at:`** — projects that parse the manifest YAML for `status: merged` are unaffected. Projects that compare manifest fields may need to handle the new `merged_at` field.
+
+
 
 ### Added
 - **`/spec-flow:defer` skill** — sole supported path for writing to backlog files. Records source piece, source phase, finding text, operator's rationale for non-blocking, and capture date. Invoked structured (from execute Step 6c after operator chooses defer) or manually (`/spec-flow:defer "<finding>" --rationale "<text>"`).

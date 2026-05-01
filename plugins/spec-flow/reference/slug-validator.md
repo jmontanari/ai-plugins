@@ -15,15 +15,18 @@ A slug that violates any of these rules is rejected. The skill that attempted to
 
 ## Branch length budget
 
-Branches that operate on a piece are formatted `<verb>/<prd-slug>-<piece-slug>` where `<verb>` is one of `spec`, `plan`, `execute`, or `migrate`. The total branch length (including the verb, the `/`, the prd-slug, the `-`, and the piece-slug) must remain ≤ 50 characters.
+Branches that operate on a piece use the fixed prefix `piece` for all pipeline stages, or
+`migrate` for the migrate skill: `piece/<prd-slug>-<piece-slug>` and
+`migrate/<prd-slug>-<piece-slug>`. The total branch length (including the prefix, the `/`,
+the prd-slug, the `-`, and the piece-slug) must remain ≤ 50 characters.
 
 Worked example — passing:
 
 ```
 prd-slug:    auth     (4 chars)
 piece-slug:  tokref   (6 chars)
-verb:        spec
-branch:      spec/auth-tokref     (16 chars ≤ 50)
+prefix:      piece
+branch:      piece/auth-tokref     (17 chars ≤ 50)
 ```
 
 Worked example — refused:
@@ -34,13 +37,13 @@ piece-slug:  tokref                       (6 chars)
 REFUSED — prd-slug "user-authentication-service" is 27 characters; limit is 20. Shorten to ≤ 20.
 ```
 
-The 20-char per-slug rule is the primary defense; the 50-char total branch length is a secondary defense for unusual verb/slug combinations and is checked independently. With both slugs at the 20-char maximum and the longest verb (`migrate`, 7 chars), the worst-case branch is `migrate/<20>-<20>` = 49 characters, just inside the 50-char budget.
+The 20-char per-slug rule is the primary defense; the 50-char total branch length is a secondary defense and is checked independently. With both slugs at the 20-char maximum, the worst-case branch is `migrate/<20>-<20>` = 49 characters, just inside the 50-char budget. `piece/<20>-<20>` = 47 characters.
 
 ## Branch path-separator rule
 
-Per NFR-006: branches contain **exactly one** `/` separator — the one between the verb and the slug body. Slugs themselves must not contain `/`. The charset rule (`[a-z0-9-]`) already excludes `/`, but this rule is stated explicitly for clarity and so callers know they can split a branch name on `/` and recover `[verb, "<prd-slug>-<piece-slug>"]` without ambiguity.
+Per NFR-006: branches contain **exactly one** `/` separator — the one between the prefix (`piece` or `migrate`) and the slug body. Slugs themselves must not contain `/`. The charset rule (`[a-z0-9-]`) already excludes `/`, but this rule is stated explicitly for clarity and so callers know they can split a branch name on `/` and recover `[prefix, "<prd-slug>-<piece-slug>"]` without ambiguity.
 
-A branch like `spec/auth/tokref` (two `/` separators) is a structural error and must be refused at construction time, not produced and then later parsed-incorrectly downstream.
+A branch like `piece/auth/tokref` (two `/` separators) is a structural error and must be refused at construction time, not produced and then later parsed-incorrectly downstream.
 
 ## Refusal contract
 
@@ -65,9 +68,9 @@ ERROR: piece-slug "user-authentication-service" is 27 characters; limit is 20.
 Five skills enforce this validator. Each invokes it before creating a branch or worktree:
 
 - `/spec-flow:prd` — when assigning the PRD slug at PRD creation or import time.
-- `/spec-flow:spec` — before creating the `spec/<prd-slug>-<piece-slug>` branch and the piece worktree.
-- `/spec-flow:plan` — before creating the `plan/<prd-slug>-<piece-slug>` branch.
-- `/spec-flow:execute` — before creating the `execute/<prd-slug>-<piece-slug>` branch.
+- `/spec-flow:spec` — before creating the `piece/<prd-slug>-<piece-slug>` branch and the piece worktree.
+- `/spec-flow:plan` — slug validation only (no branch or worktree creation; the `piece/` branch and worktree are inherited from the spec skill).
+- `/spec-flow:execute` — slug validation only (no branch or worktree creation; inherits from spec).
 - `/spec-flow:migrate` — before producing v3 paths and any branch that operates on the migrated layout.
 
 ## See also

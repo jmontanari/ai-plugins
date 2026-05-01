@@ -38,12 +38,14 @@ A PRD is archived in place by setting `status: archived` in its `prd.md` front-m
 | Global backlog | `docs/improvement-backlog.md` |
 | Charter | `docs/charter/` (unchanged) |
 | Worktree | `worktrees/prd-<prd-slug>/piece-<piece-slug>/` |
-| Branch | `<verb>/<prd-slug>-<piece-slug>` (verb ∈ `{spec, plan, execute, migrate}`) |
+| Branch | `piece/<prd-slug>-<piece-slug>` — one branch for all pipeline stages |
+| Branch (migrate) | `migrate/<prd-slug>-<piece-slug>` — migrate skill only |
 
 Notes:
 
 - The PRD folder name is the PRD slug verbatim. The piece folder name is the piece slug verbatim.
 - The worktree path encodes both slugs with the `prd-` and `piece-` prefixes for human legibility (so `ls worktrees/` shows the PRD grouping at the top level).
+- All three pipeline stages (spec, plan, execute) operate on a single `piece/<prd-slug>-<piece-slug>` branch for the piece's lifetime. The branch is created once by the spec skill and persists through plan and execute. One PR per piece, opened after execute completes. The `migrate` skill retains its own `migrate/<prd-slug>-<piece-slug>` branch convention.
 - The branch name uses the joined slug pair without prefixes, separated by `-`. See `slug-validator.md` for the 50-char branch length budget and the path-separator rule.
 
 ## Layout version detection

@@ -117,7 +117,25 @@ pieces:
     dependencies: []
     status: merged
 
-  - name: pi-010-discovery
+  - name: pi-012-single-branch
+    description: |
+      v3.7.0 — Collapse 3-branch-per-piece model into a single piece/<prd-slug>-<piece-slug>
+      branch. The spec skill creates the branch and worktree once; plan and execute inherit
+      both. One PR per piece after execute completes. Eliminates worktree teardown/recreation
+      between pipeline stages and the 30-branch overhead per 10-piece PRD.
+
+      Also: execute Step 5.5 hardened to write merged_at: <date> and carry a mandatory-gate
+      warning; status skill gains a stale-in-progress guard for pieces showing in-progress
+      with no active worktree (branch merged without Step 5.5).
+
+      Files changed: reference/v3-path-conventions.md, reference/slug-validator.md,
+      skills/spec/SKILL.md, skills/plan/SKILL.md, skills/execute/SKILL.md,
+      skills/status/SKILL.md, CHANGELOG.md, plugin.json.
+    prd_sections: [FR-004, FR-005]
+    dependencies: [pi-011-branch-fix]
+    status: in-progress
+
+
     description: |
       v3.2.0 — Synchronous discovery triage. Eliminates silent backlog deferrals by making the execution that finds new work also fix it. Today the pipeline writes deferred QA findings, "NOT COVERED — deferred" AC matrix rows, and reflection-future-opportunities findings to backlog files at end-of-piece, surfacing them only at the next piece's spec brainstorm. Operators have no signal that prerequisite work is undone until much later. This piece restructures discovery → resolution as a synchronous flow with operator triage at discovery time.
 

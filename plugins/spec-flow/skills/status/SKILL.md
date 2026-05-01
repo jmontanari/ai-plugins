@@ -25,8 +25,12 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
 0. **Load config:** Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
 1. **Worktree scan (AC-7 / AC-8):** Run `git worktree list --porcelain` to discover
-   all active worktrees. For each worktree whose branch matches any of these patterns
+   all active worktrees. For each worktree whose branch matches the primary pattern
    (per v3 naming conventions in `plugins/spec-flow/reference/v3-path-conventions.md`):
+   - `piece/<prd-slug>-<piece-slug>`
+
+   **Backward compatibility:** also match legacy verb-prefixed branches from pre-pi-012
+   worktrees that have not yet been migrated:
    - `execute/<prd-slug>-<piece-slug>`
    - `spec/<prd-slug>-<piece-slug>`
    - `plan/<prd-slug>-<piece-slug>`
@@ -48,9 +52,10 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    - Record: `<prd-slug>/<piece-slug>` → `{status, worktree_path, branch}`. This data
      is **authoritative** for that piece — it supersedes any main-branch manifest entry
      for the same piece during this status run.
-   - For `execute/` branches only: also read `plan.md` from the worktree
+   - For piece-branch worktrees (all patterns above): also read `plan.md` from the worktree
      (`<worktree_path>/docs/prds/<prd-slug>/specs/<piece-slug>/plan.md`) and count
-     `[x]` vs `[ ]` checkboxes to determine the current phase number and name.
+     `[x]` vs `[ ]` checkboxes to determine the current phase number and name. Report
+     the current pipeline stage (spec, plan, or execute) by checking which docs are present.
 
    Store all worktree-sourced piece data in memory as `worktree_overrides` keyed by
    `<prd-slug>/<piece-slug>`.
@@ -95,6 +100,29 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    | `superseded` | Abandoned and replaced. |
    | `blocked` | External dependency or unresolved decision halts progress. |
 
+   **Stale-in-progress guard:** After applying `worktree_overrides`, for each piece whose
+   resolved status is `in-progress` but which has **no entry** in `worktree_overrides`
+   (i.e., no active worktree was found for this piece in Step 1), flag the piece as
+   `stale-in-progress` for display purposes. This means the manifest was written with
+   `status: in-progress` but the piece branch no longer has an active worktree — typically
+   caused by skipping Step 5.5 before merging the piece branch.
+
+   In the **default all-PRDs view** (Step 6), count stale-in-progress separately:
+   ```
+   Pieces: 5 total — 2 merged, 1 in-progress, 1 ⚠ stale-in-progress, 1 open
+   ```
+
+   In **drill-in mode** (Step 7), display the piece with a remediation hint:
+   ```
+     ⚠ oauth-provider    stale-in-progress
+         No active worktree — branch may have merged without Step 5.5.
+         → Confirm: git worktree list
+         → If merged: edit manifest.yaml — set status: merged, merged_at: <YYYY-MM-DD>
+   ```
+
+   This is a passive surface (NN-C-005). The user is informed; the fix is a manual
+   manifest edit. Do not block, error, or prevent other pieces from displaying.
+
 5. **Drift surfacing per active PRD (FR-008 passive):** For each non-archived PRD, iterate its pieces whose status is `specced`, `planned`, or `in-progress`. For each such piece, read its `charter_snapshot:` front-matter from `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (and `plan.md` if present). Compare every snapshot date against the current `<docs_root>/charter/<file>.md` `last_updated:` value loaded in step 2a. If any current `last_updated:` is newer than the corresponding snapshot, flag the piece as **diverged** and record which file(s) changed.
 
    Status surfaces drift only — it does NOT dispatch the drift-mode `qa-spec` agent. Active resolution (FR-009) is the job of `spec`, `plan`, `execute`, and `prd --update` during their Phase-1 context load. When this skill surfaces drift, it points the user at `/spec-flow:spec <piece>` / `/spec-flow:plan <piece>` / `/spec-flow:execute <piece>` (each of which triggers resolution) or at `/spec-flow:status --resolve <piece>` for the walk-through flow documented below.
@@ -127,33 +155,36 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
 
 7. **Present status — drill-in mode (FR-007 / AC-9):** When invoked as `/spec-flow:status <prd-slug>`, narrow output to the named PRD only. Resolve it against `<docs_root>/prds/<prd-slug>/prd.md`. If the PRD folder does not exist, print: ``PRD \`<prd-slug>\` not found under `docs/prds/`. Available PRDs: <list of discovered slugs>.`` The named PRD is shown regardless of its archive state (drill-in bypasses the default archive filter).
 
-   Display every piece individually with spec/plan/execute branch presence and drift flags:
+   Display every piece individually with its pipeline stage and drift flags:
 
    ```
    PRD: auth (active, v1)
    Manifest: docs/prds/auth/manifest.yaml
    Pieces: 5
 
-     ● token-refresh       in-progress   spec ✓   plan ✓   execute ✓   ⚠ drift: non-negotiables
+     ● token-refresh       in-progress   ⚠ drift: non-negotiables
          Worktree: {{worktree_root}}/
-         Branch:   execute/auth-token-refresh
-         Phase:    3 of 5 (Refactor)
+         Branch:   piece/auth-token-refresh  (stage: execute, Phase 3 of 5)
 
-     ○ login-flow          merged        spec ✓   plan ✓   execute ✓
-         Branch:   execute/auth-login-flow (merged to main)
+     ○ login-flow          merged
+         Branch:   piece/auth-login-flow (merged to main)
 
-     ○ oauth-provider      planned       spec ✓   plan ✓   execute —
-         Branch:   plan/auth-oauth-provider
+     ○ oauth-provider      planned
+         Branch:   piece/auth-oauth-provider  (stage: plan complete)
 
-     ○ session-store       specced       spec ✓   plan —   execute —
-         Branch:   spec/auth-session-store
+     ○ session-store       specced
+         Branch:   piece/auth-session-store  (stage: spec complete)
 
-     ○ mfa-enrollment      open          spec —   plan —   execute —
+     ○ mfa-enrollment      open
 
    Next up: oauth-provider (planned, ready to run /spec-flow:execute auth/oauth-provider)
    ```
 
-   "Branch presence" means: scan `git branch --list` for `{spec,plan,execute}/<prd-slug>-<piece-slug>`; mark `✓` if the branch exists, `—` if it does not. A merged piece's execute branch will typically be gone post-merge — that is expected and does not warrant a warning.
+   "Branch presence" means: scan `git branch --list` for `piece/<prd-slug>-<piece-slug>`;
+   mark the branch line present if found, `—` if not. Also check legacy verb-prefixed
+   branches (`spec/`, `plan/`, `execute/`) for backward compatibility — display them with
+   a `(legacy)` annotation if found. A merged piece's branch will typically be deleted
+   post-merge — that is expected and does not warrant a warning.
 
    Drift is surfaced passively per piece with the changed file(s) listed; the user is pointed at `/spec-flow:status --resolve <piece>` or at re-running the relevant skill.
 

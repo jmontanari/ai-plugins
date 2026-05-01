@@ -33,7 +33,7 @@ This preference is piece-level: the plan front-matter captures the decision, and
 
 - Piece must have status `specced` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
 - `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` must exist and be approved
-- Must be on the worktree branch `spec/<prd-slug>-<piece-slug>` (created by spec skill via `{{worktree_root}}/`)
+- Must be on the worktree branch `piece/<prd-slug>-<piece-slug>` (created by spec skill via `{{worktree_root}}/`)
 
 ## Workflow
 
@@ -209,7 +209,7 @@ Write the plan to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md`. Popu
 - **Operator chose `(2) fork`:** halt the skill immediately with the exact refusal string `Refused — fork chosen; plan the prerequisite piece <ref> first.` (substituting each unmet dep's `<ref>` if more than one is unmet, one refusal line per dep). Write NO plan.md, create NO commits, do not advance to Phase 3. The operator's next action is to switch to the prerequisite piece and run `/spec-flow:plan` on it.
 - **Operator chose `(3) proceed --ignore-deps`:** write plan.md and append a `## Dependency Triage` section with one bullet per unmet dep rendered as ``- `<ref>` (status: `<status>` at <YYYY-MM-DD>) — Operator override; deps remain unmet at plan time.`` Recall that `(3) proceed` is refused for structural-failure statuses (`superseded`, `blocked`) at step 1a — if execution reaches this branch, every unmet dep is in a transient-status class.
 
-**Worktree/branch naming** (per FR-004 / FR-005): the plan skill operates on the worktree at `{{worktree_root}}/` on branch `spec/<prd-slug>-<piece-slug>` (created by the spec skill). Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
+**Worktree/branch naming** (per FR-004 / FR-005): the plan skill operates on the worktree at `{{worktree_root}}/` on branch `piece/<prd-slug>-<piece-slug>` (created by the spec skill). Slug validity for both `<prd-slug>` and `<piece-slug>` is enforced by `plugins/spec-flow/reference/slug-validator.md` before any worktree or branch is created — cite, don't restate.
 
 ### Phase 3: QA Loop
 
@@ -254,13 +254,13 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
      jira_task: ITE-42
      ```
    On tool unavailable → emit warning → skip.
-4. Update manifest on the spec branch (the current working branch — no checkout needed):
+4. Update manifest on the piece branch (the current working branch — no checkout needed):
    ```bash
    # update manifest.yaml status for this piece in its PRD-local manifest
    git add <docs_root>/prds/<prd-slug>/manifest.yaml
    git commit -m "manifest: mark <prd-slug>/<piece-slug> as planned"
    ```
-   > **Branch ownership:** The manifest update stays on `spec/<prd-slug>-<piece-slug>`.
+   > **Branch ownership:** The manifest update stays on `piece/<prd-slug>-<piece-slug>`.
    > Main's manifest advances when this branch is merged or a PR is opened.
 5. Commit plan on worktree branch:
    ```bash
