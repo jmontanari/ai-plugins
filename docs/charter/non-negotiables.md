@@ -62,11 +62,11 @@ last_updated: 2026-04-21
 - **Rationale:** Fresh context is how spec-flow prevents scope creep and lets reruns be cheap. If an agent starts assuming conversation history, the discipline collapses.
 - **How QA verifies:** Agent templates must not contain phrases like "as we discussed," "you already know," "from the brainstorm above," "per my previous response." Skill dispatch code must interpolate every needed input block into the agent prompt, not rely on implicit memory.
 
-### NN-C-009: Always bump plugin version on changes — per-semver scope, three places to update
+### NN-C-009: Always bump plugin version on changes — per-semver scope, all version-bearing files
 - **Type:** Rule
-- **Statement:** Every commit (or coherent commit series) that modifies the content of a plugin (any file under `plugins/<plugin>/`) must bump that plugin's version per SemVer. No silent updates. No "small tweak, skip the bump" — the bump is how users know something changed when they `claude plugin update`.
+- **Statement:** Every commit (or coherent commit series) that modifies the content of a plugin (any file under `plugins/<plugin>/`) must bump that plugin's version per SemVer in **all version-bearing files for that plugin**. No silent updates. No "small tweak, skip the bump" — the bump is how users know something changed when they `claude plugin update`.
 - **Scope:** Any change under `plugins/<plugin>/` affecting behavior, public surface, or documentation. Pure repo-level changes outside `plugins/*/` (root `README.md`, `docs/`, `.gitignore`) do NOT require a plugin bump — they affect the marketplace repo, not any individual plugin.
-- **Rationale:** Version numbers are the user's signal that something changed. Unbumped changes are invisible upgrades — users don't know to read the CHANGELOG, don't know to retest, don't know to investigate new behavior. This rule protects the upgrade-awareness contract.
+- **Rationale:** Version numbers are the user's signal that something changed. Unbumped changes are invisible upgrades — users don't know to read the CHANGELOG, don't know to retest, don't know to investigate new behavior. This rule protects the upgrade-awareness contract. Plugins that co-ship for multiple hosts (e.g., Claude Code + Copilot CLI) have more than one plugin descriptor — all must match.
 
 - **Semver scope guidance — pick exactly one tier per change:**
 
@@ -78,18 +78,22 @@ last_updated: 2026-04-21
 
   When uncertain, go up one tier. Semver violations cost users more than conservative bumps do.
 
-- **Three places to update for every bump:**
+- **All version-bearing files to update for every bump (generic rule):**
 
-  1. **`plugins/<plugin>/.claude-plugin/plugin.json`** — set `"version": "<new-version>"`
-  2. **`.claude-plugin/marketplace.json`** at repo root — find the plugin's entry in the `plugins` array and update its `"version"` field to match. (This is also enforced by NN-C-001 for sync; NN-C-009 is the rule that you MUST bump, NN-C-001 is the rule that the two places MUST match.)
-  3. **`plugins/<plugin>/CHANGELOG.md`** — prepend a new `## [<new-version>] — YYYY-MM-DD` section at the top (below the `# Changelog` title line), following Keep a Changelog groupings (Added / Changed / Deprecated / Removed / Fixed / Security / Migration / Notes for upgraders). At minimum one non-empty grouping; a bump with nothing to document violates this rule — if there's nothing to document, the change didn't warrant a bump in the first place.
+  1. **`plugins/<plugin>/.claude-plugin/plugin.json`** — set `"version": "<new-version>"` (Claude Code host descriptor)
+  2. **All additional host plugin descriptors** — any `plugins/<plugin>/plugin.json` or equivalent co-shipped for other hosts (e.g., Copilot CLI) must also be bumped to the same version. Check `plugins/<plugin>/docs/releasing.md` for the authoritative per-plugin list.
+  3. **`.claude-plugin/marketplace.json`** at repo root — find the plugin's entry in the `plugins` array and update its `"version"` field to match. (This is also enforced by NN-C-001 for sync; NN-C-009 is the rule that you MUST bump, NN-C-001 is the rule that the two places MUST match.)
+  4. **`plugins/<plugin>/CHANGELOG.md`** — prepend a new `## [<new-version>] — YYYY-MM-DD` section at the top (below the `# Changelog` title line), following Keep a Changelog groupings (Added / Changed / Deprecated / Removed / Fixed / Security / Migration / Notes for upgraders). At minimum one non-empty grouping; a bump with nothing to document violates this rule — if there's nothing to document, the change didn't warrant a bump in the first place.
+
+  Each plugin maintains a `plugins/<plugin>/docs/releasing.md` that lists the exact file paths for that plugin. Always consult it before cutting a release.
 
 - **How QA verifies:**
   1. `git diff <base>..HEAD -- plugins/<plugin>/.claude-plugin/plugin.json` shows a `-  "version":` / `+  "version":` diff hunk touching the version field.
-  2. `git diff <base>..HEAD -- .claude-plugin/marketplace.json` shows a matching version bump for that plugin's entry.
-  3. `git diff <base>..HEAD -- plugins/<plugin>/CHANGELOG.md` shows an added `## [<new-version>]` section at the top with at least one Added/Changed/Fixed/etc. bullet.
-  4. The new CHANGELOG version string matches the new `plugin.json` version string exactly.
+  2. All additional host descriptors listed in `plugins/<plugin>/docs/releasing.md` show matching version bumps.
+  3. `git diff <base>..HEAD -- .claude-plugin/marketplace.json` shows a matching version bump for that plugin's entry.
+  4. `git diff <base>..HEAD -- plugins/<plugin>/CHANGELOG.md` shows an added `## [<new-version>]` section at the top with at least one Added/Changed/Fixed/etc. bullet.
+  5. All version strings across all descriptors and CHANGELOG match exactly.
 
-  Absence of any of the three, or mismatch between them, is must-fix — either bump and document properly, or revert the plugin changes entirely.
+  Absence of any file's bump, or mismatch between them, is must-fix — either bump and document properly, or revert the plugin changes entirely.
 
-- **Exception:** Version-bump commits that are themselves the "I'm releasing X.Y.Z" commit are allowed to be a single coherent commit that touches all three places (plugin.json + marketplace.json + CHANGELOG) as its primary purpose. The rule is about the end-state of any branch merging to main, not about per-commit granularity within a feature branch.
+- **Exception:** Version-bump commits that are themselves the "I'm releasing X.Y.Z" commit are allowed to be a single coherent commit that touches all version-bearing files as its primary purpose. The rule is about the end-state of any branch merging to main, not about per-commit granularity within a feature branch.
