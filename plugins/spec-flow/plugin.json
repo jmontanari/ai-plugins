@@ -1,1 +1,20 @@
-.claude-plugin/plugin.json
+{
+  "name": "spec-flow",
+  "description": "PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability",
+  "version": "3.6.0",
+  "author": {
+    "name": "Joe"
+  },
+  "license": "MIT",
+  "keywords": [
+    "tdd",
+    "pipeline",
+    "prd",
+    "qa",
+    "agents",
+    "code-review"
+  ],
+  "agents": "agents/",
+  "skills": "skills/",
+  "hooks": "hooks/hooks.json"
+}
