@@ -2,6 +2,14 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.1] — 2026-05-01
+
+### Fixed
+
+- **plan skill:** `integrations.md` is now read during Phase 1 charter exploration whenever it exists. Any phase touching external services, APIs, SDKs, or third-party libraries must follow the principles defined there (naming conventions, hierarchy rules, status transitions, notes) — treated as non-negotiables for that scope. Previously the file was only loaded for issue-tracker config (Step 0 enabled gate); its broader design principles were silently skipped during plan authoring.
+- **charter non-negotiables (NN-C-009):** updated "three places" rule to "all version-bearing files"; plugins that co-ship for multiple hosts must bump all host descriptors. Added pointer to `plugins/<plugin>/docs/releasing.md`.
+- **spec-flow releasing.md (new):** authoritative 4-file checklist (`plugin.json`, `.claude-plugin/plugin.json`, `marketplace.json`, `CHANGELOG.md`) with quick-verify shell snippet and instructions for adding future version-bearing files.
+
 ## [3.7.0] — 2026-05-01
 
 ### Changed
