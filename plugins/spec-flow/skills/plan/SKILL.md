@@ -59,7 +59,8 @@ Gather:
 - Test framework patterns used in the project
 - Import conventions and module structure
 - Architecture constraints visible in the code
-- **Charter files** at `<docs_root>/charter/` if present (architecture, non-negotiables, tools, processes, flows, coding-rules). Record each file's `last_updated` date for the plan's `charter_snapshot:` front-matter. Charter content is exploration priors, same as code — it influences phase decomposition and the per-phase "Charter constraints honored" slots.
+- **Charter files** at `<docs_root>/charter/` if present (architecture, non-negotiables, tools, processes, flows, coding-rules, **integrations**). Record each file's `last_updated` date for the plan's `charter_snapshot:` front-matter. Charter content is exploration priors, same as code — it influences phase decomposition and the per-phase "Charter constraints honored" slots.
+  - **If `integrations.md` exists:** read it fully before authoring any phase that touches external services, APIs, SDKs, or third-party libraries. The naming conventions, status transition rules, hierarchy rules, and any additional notes sections define how integrations must be set up and managed. Every phase that creates, configures, or calls an external integration must be consistent with the principles in this file — treat it the same as non-negotiables for that scope.
 - **Spec's `### Non-Negotiables Honored` and `### Coding Rules Honored` sections** — these enumerate the NN-C/NN-P/CR entries the piece claims it honors. The plan allocates each entry to the specific phase(s) that implement it via the per-phase "Charter constraints honored in this phase" slot.
 
 ### Phase 2: Generate Plan
