@@ -14,7 +14,7 @@
     "agents",
     "code-review"
   ],
-  "agents": {},
-  "skills": {},
-  "hooks": {}
+  "agents": "./agents/",
+  "skills": "./skills/",
+  "hooks": "./.claude-plugin/hooks.json"
 }
