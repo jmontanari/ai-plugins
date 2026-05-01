@@ -2,6 +2,15 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.2] — 2026-05-01
+
+### Fixed
+
+- **plan skill — per-file exit criteria in `[Implement]` blocks:** when a phase modifies multiple files of the same class (e.g., N playbooks each requiring FQCN + when guard + assert), the plan must enumerate per-file exit criteria rather than a class-level description. A class-level description alone causes the implementer to apply the constraint to the first file and skip it on the rest.
+- **plan skill — wrapper/consumer test suites in `[Verify]` blocks:** when the modified component is consumed by a wrapper or sibling with its own test suite (e.g., an Ansible role consumed by a wrapper role with its own molecule suite), the `[Verify]` block must name ALL suites that must pass — not just the suite of the directly modified component. Failure to do so lets phases pass Verify while wrapper-role tests remain broken.
+- **spec skill — codebase conventions section:** Phase 2 brainstorm now includes step 3a: scan 2-3 peer components to identify empirical conventions that differ from generic framework docs, confirm with user, and document in a `### Codebase Conventions` section. Prevents spec-compliance reviewers from flagging valid project-idiomatic patterns (e.g., galaxy_info wrapper in meta/main.yml used by 50+ peer roles) as violations.
+- **execute skill — technology behavior preamble for fix-code dispatches:** per-phase QA loop (Step 6) and Final Review fix loop (Step 3) now inject a `## Platform behavior` block from the spec's `## Technology Notes` / `### Behavior Notes` section before the findings list in every fix-code prompt. Prevents regression cascades where the fix agent introduces new bugs on well-known platform idioms (e.g., Ansible: set_fact always returns ok; notify requires a task that reports changed; always: runs before rescue).
+
 ## [3.7.1] — 2026-05-01
 
 ### Fixed

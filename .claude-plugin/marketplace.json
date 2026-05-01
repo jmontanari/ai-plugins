@@ -12,7 +12,7 @@
       "name": "spec-flow",
       "source": "./plugins/spec-flow",
       "description": "PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability",
-      "version": "3.7.1",
+      "version": "3.7.2",
       "author": {
         "name": "Joe"
       }

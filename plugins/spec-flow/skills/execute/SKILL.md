@@ -569,6 +569,7 @@ Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 
 
 3. **QA Loop (iterations 2+, focused):** If iteration M-1 returned must-fix findings:
    - Read fix template: `${CLAUDE_PLUGIN_ROOT}/agents/fix-code.md`
+   - **Compose fix-code context.** Before dispatching, check whether the spec includes a `## Technology Notes` or `### Behavior Notes` section documenting platform-specific idioms (e.g., for Ansible: "set_fact always returns ok — notify requires a task that reports changed; always: blocks run before rescue"). If such a section exists, prepend it verbatim as a `## Platform behavior` block at the top of the fix-code prompt — before the findings list. This prevents the fix agent from burning iterations on regressions caused by well-known platform idioms it would otherwise have to infer from context. If no such section exists in the spec but the stack is identifiable (from file extensions, tool names in plan, or charter tools.md), inject a one-line reminder of the most common gotcha for that stack.
    - Dispatch fix agent (Sonnet) with prior findings + plan context. The fix agent does NOT commit; it ends its report with a `## Diff of changes` section containing its `git diff`.
    - Extract that diff string from the fix agent's report and hold it in orchestrator state as `iter_M_fix_diff`.
    - Commit the fix diff so HEAD advances and the next QA iteration reviews a real commit boundary rather than a dirty worktree:
@@ -1118,6 +1119,7 @@ Record each reviewer's must-fix list separately in orchestrator state — iterat
 ### Step 3: Fix Loop (iterations 2+, focused)
 
 If must-fix findings exist:
+- **Compose fix-code context.** Apply the same technology behavior preamble rule as the per-phase QA loop: if the spec includes a `## Technology Notes` or `### Behavior Notes` section, prepend it as a `## Platform behavior` block at the top of the fix-code prompt before the findings list. Final Review fix dispatches are especially prone to regression cascades when platform idioms are unknown — a preamble here pays for itself if more than one fix iteration fires.
 - Dispatch fix agent (Sonnet, `agents/fix-code.md`) with all must-fix findings. The fix agent does NOT commit; it ends its report with `## Diff of changes` containing its `git diff`.
 - Extract that diff string and hold it in orchestrator state as `review_iter_M_fix_diff`.
 - Commit the fix so HEAD advances for the next review cycle:

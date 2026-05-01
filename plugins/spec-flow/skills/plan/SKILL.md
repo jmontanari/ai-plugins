@@ -83,8 +83,8 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    - **[QA]**: ACs to review against, diff baseline
 
    **Implement track** (for config, infra, scaffolding, glue/wiring, docs-as-code, fixtures, migrations — where unit-level TDD is ceremony without payoff):
-   - **[Implement]**: Exact file paths, signatures/structure, pattern pointers, architecture constraints the phase must honor
-   - **[Verify]**: The verification command the plan author chooses (lint, type check, build, smoke run, integration test) and its expected output. For YAML/JSON validation in [Verify] blocks, default to LLM-agent-step framing per the plan template. External parsers (yq, jq, language interpreters) are not preconditions of this pipeline.
+   - **[Implement]**: Exact file paths, signatures/structure, pattern pointers, architecture constraints the phase must honor. **When the phase modifies multiple files of the same class** (e.g., three playbooks that each require FQCN, a `when` guard, and a validation assert), list explicit per-file exit criteria — name each file and state what "done" means for it. A class-level description alone is insufficient; the implementer will finish the first file correctly and skip the constraint on the second.
+   - **[Verify]**: The verification command the plan author chooses (lint, type check, build, smoke run, integration test) and its expected output. For YAML/JSON validation in [Verify] blocks, default to LLM-agent-step framing per the plan template. External parsers (yq, jq, language interpreters) are not preconditions of this pipeline. **When the modified component is consumed by a wrapper or sibling component that has its own test suite** (e.g., an Ansible role consumed by a wrapper role with its own molecule suite), the `[Verify]` block must name ALL test suites that must pass — including those in wrapper/consumer components — not just the test suite of the directly modified component.
    - **[Refactor]** (optional): Include only if cleanup is plausibly needed
    - **[QA]**: ACs to review against, diff baseline
 
