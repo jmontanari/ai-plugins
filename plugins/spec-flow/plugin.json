@@ -16,5 +16,5 @@
   ],
   "agents": "agents/",
   "skills": "skills/",
-  "hooks": "hooks/hooks.json"
+  "hooks": "hooks/copilot-hooks.json"
 }
