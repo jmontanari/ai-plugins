@@ -14,7 +14,7 @@
     "agents",
     "code-review"
   ],
-  "agents": "agents/",
-  "skills": "skills/",
-  "hooks": "hooks/hooks.json"
+  "agents": {},
+  "skills": {},
+  "hooks": {}
 }
