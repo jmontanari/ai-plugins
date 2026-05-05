@@ -2,6 +2,42 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.9] — 2026-05-04
+
+### Added
+
+- **prd skill — Create mode:** New Socratic interview mode for building a PRD from scratch. Eight structured steps: problem statement elicitation, persona identification, user story elicitation (with ACs and failure modes per story), success metrics, non-goals, constraints and assumptions, risk areas, open questions. Triggered via interactive mode prompt when no existing doc or artifacts are found.
+
+- **prd skill — Interactive mode prompt:** Replaces flag-based mode selection. When invoked without a clear existing-PRD context, skill now asks: "(a) Import — existing doc, (b) Create — idea only, (c) Update — existing pipeline PRD". Auto-detect still routes directly to Update when `prd.md` already exists, and to Import when a file path is supplied.
+
+- **prd skill — Enrichment pass (Step 2b):** After structure extraction from import, skill scans normalized PRD for missing required sections and asks targeted gap-fill questions before brainstorm begins. Only fires for sections that are actually empty — does not re-ask well-populated content.
+
+- **prd skill — FR quality floor (Step 3):** Each FR must be falsifiable, user-anchored (≥1 user story), and metric-linked before entering the manifest. Failing FRs flagged `[NEEDS EXPANSION]` block brainstorm until resolved.
+
+- **prd skill — Expanded brainstorm protocol (Steps 4a–4k):** Replaces 4-bullet/1-question brainstorm with structured elicitation: persona coverage, per-FR user story check, edge case elicitation, risk identification, conditional flow capture, metric ownership, non-goal elicitation, piece identification, granularity check, dependency ordering, adversarial close.
+
+- **prd skill — qa-prd gate (Step 5):** Opus-grade PRD completeness agent dispatched after brainstorm, before manifest creation. Must-fix findings block manifest. 3-iteration circuit breaker with fix-doc dispatch between iterations. Replaces the deleted "No QA Gate on Import/Update" statement.
+
+- **prd skill — Update mode impact assessment:** After any PRD amendment, scans existing piece specs that mapped to changed sections and surfaces them for re-review. Offers to dispatch `qa-spec` focused re-review for affected pieces.
+
+- **prd skill — Legacy mode pause:** When legacy layout detected, now pauses for explicit yes/no response before continuing. If declined, writes `legacy_mode: true` to `.spec-flow.yaml` and `[LEGACY-MODE: true]` to manifest front-matter.
+
+- **`agents/qa-prd.md`:** New adversarial PRD completeness agent. 12 review criteria: problem statement quality, persona quality, user story coverage (≥1 per FR), AC testability, failure mode coverage, FR falsifiability, SC-FR linkage, non-goal coverage, priority tiers, piece granularity, and `[NEEDS EXPANSION]`/`[NEEDS LINKAGE]` marker checks. Read-only, Opus model.
+
+### Changed
+
+- **`templates/prd.md`:** Major overhaul. Added mandatory sections: `## Problem Statement`, `## Personas`, user story + AC blocks per FR with failure mode field, `## Edge Cases & Failure Modes` table, `## Priority Tiers` table, `## Assumptions`, `## Open Questions`. Structured FR/NFR blocks now include Priority and Linked metrics fields.
+
+- **prd skill — Normalization order:** Structure extraction (Step 2a) now runs WITHOUT stripping. Cleanup/strip pass (Step 8) moved to after brainstorm. Prevents stripping substantive persona/user story content before brainstorm can reason about it.
+
+- **prd skill — Strip instruction:** "Strip persona theater" replaced with discriminating guidance: preserve substantive persona content (behavioral constraints, differing usage contexts) into `## Personas`; strip only vacuous one-liner bios, process checklists, and meeting notes.
+
+- **`agents/qa-prd-review.md`:** Added Criterion 6 — PRD retrospective quality (under-specification signal): checks whether specs introduced essential requirements not in the PRD, whether implemented ACs satisfy stated persona needs, whether non-goals were violated, and whether success metrics are actually measurable by what was built. Frontmatter updated to describe two-axis review.
+
+### Removed
+
+- **prd skill — "No QA Gate on Import/Update" section:** Deleted. The qa-prd gate (Step 5) replaces this explicit abdication of quality assurance.
+
 ## [3.7.8] — 2026-05-04
 
 ### Changed
