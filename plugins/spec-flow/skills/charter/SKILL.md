@@ -40,7 +40,13 @@ Read the following if present, as priors for Socratic questions:
 - Existing `docs/architecture/` or `docs/adr/`
 - Recent `git log --oneline -n 50`
 
-Synthesize into a signal summary (internal — not yet shown to user).
+**Repo topology scan** — go beyond config files and look at what actually exists:
+- Run `git ls-tree -r --name-only HEAD 2>/dev/null | head -150` (or glob the working tree) to map the directory structure. Identify: top-level folders (these often map to layers or components), dominant file extensions (primary language), test folder locations, and any unusual layouts.
+- **Sample source files:** read 3–5 representative source files from the most-central or largest directories. Note: how errors are surfaced (exceptions, error returns, result types, status codes), how dependencies are wired (imports, injection, global state, service locator), and any dominant structural pattern (MVC, hexagonal, flat-module, script-per-task, etc.).
+- **Test structure:** identify test files and folders. Note whether tests colocate with source or live in a dedicated `tests/` root, what kinds exist (unit, integration, e2e), and what patterns are used (fixtures, mocks, test builders, etc.).
+- **Coding conventions observed:** from the source sample, note naming conventions (snake_case vs camelCase, file naming), module organization, and any patterns that appear in multiple places — these likely need to be codified in `coding-rules.md` rather than left implicit.
+
+Synthesize all of the above into a signal summary (internal — not yet shown to user).
 
 ### Phase 1.2: Prompt user for additional sources
 
@@ -60,12 +66,15 @@ For each source:
 
 ### Phase 1.3: Confirm combined signal summary
 
-Present the union of auto-detected + user-supplied signals:
+Present the union of auto-detected + user-supplied signals, including observed patterns from source:
 
 > "Here's what I've gathered:
-> - [language] [version] / [framework] / [test runner] / [CI]
-> - [detected architecture patterns]
-> - [external references the user provided]
+> - **Tools:** [language] [version] / [framework] / [test runner] / [CI]
+> - **Repo structure:** [top-level folders → inferred layers or components]
+> - **Observed patterns:** [dominant coding idiom — e.g., "error returns via Result type", "constructor injection", "flat module layout per feature"]
+> - **Test setup:** [test location + observed kinds — unit/integration/e2e]
+> - **Conventions noticed:** [naming, module organization patterns seen in source]
+> - **External references:** [user-provided sources]
 >
 > Does this look right? Anything to add or correct?"
 
@@ -76,7 +85,13 @@ Only proceed to Phase 2 after user confirms.
 Authoritative order (earlier files seed context for later ones):
 
 1. `tools.md` — language/runtime, framework(s), test runner + coverage, linter + formatter, package manager, CI platform, approved/banned libraries
-2. `architecture.md` — top-level layers, dependency direction, component ownership, boundaries
+2. `architecture.md` — structured exploration of each of the following; use signals and source-scan findings as priors, confirm with the user only where genuinely unclear:
+   - **Layers & components:** What are the top-level layers (e.g., API, domain, infra, persistence) and how do they map to directories? Can each component be understood and changed independently? If not, where do the coupling problems live?
+   - **Dependency direction:** What can import what? Is there a strict direction (e.g., domain must never import infra)? Are there known violations today that the charter should flag?
+   - **Component ownership:** Who owns what data? Are there shared-data antipatterns (multiple components writing the same store) worth calling out?
+   - **Data flow:** How does data enter, transform, and exit the system? What are the key states or transformation stages?
+   - **Error & failure handling:** How do errors propagate (exceptions, error returns, result types, status codes)? Is there an established convention or is it inconsistent? The charter should pick one and codify it.
+   - If the source scan revealed a pattern already in use, propose it: "I see the codebase uses [X] — should `architecture.md` codify that as the enforced pattern?"
 3. `flows.md` — request flow, auth flow, data-write path, other critical end-to-end flows
 4. `coding-rules.md` — numbered `CR-xxx` entries, each tagged `Type: Rule` (inline) or `Type: Reference` (external Source)
 5. `processes.md` — branching model, review policy, release cadence, CI gates, incident response
@@ -87,6 +102,21 @@ Rules:
 - Use detection signals + user-supplied sources as priors. Don't ask questions whose answers were already captured.
 - Any unresolved answer becomes a `[NEEDS CLARIFICATION]` marker in the draft. QA treats these as must-fix.
 - For numbered entries, confirm `Type` explicitly: "Is this a **Rule** (inline body) or a **Reference** (link to external source)?"
+
+### Phase 2.5: Charter preview — confirm before writing
+
+Before writing any files, present a brief section-by-section summary of what each charter file will contain. Ask after presenting all sections: "Does this look right? Let me know per section if anything needs adjusting before I write." Accept corrections, then proceed to Phase 3 only after approval.
+
+This catches misalignments before they require a QA fix-doc round-trip — a correction here costs one message; a correction after Phase 3+QA costs an iteration.
+
+Suggested format:
+
+> **tools.md:** [language + version, framework, test runner, linter, CI — one line each]
+> **architecture.md:** [layers, dependency direction, key component boundaries — 3–5 bullets]
+> **flows.md:** [N flows to document — list their names]
+> **coding-rules.md:** [N CR entries planned — list titles only]
+> **processes.md:** [branching model, review policy, CI gates — key points]
+> **non-negotiables.md:** [N NN-C entries planned — list titles only]
 
 ### Phase 3: Write files
 

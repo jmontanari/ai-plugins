@@ -2,6 +2,16 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.5] — 2026-05-04
+
+### Changed
+
+- **charter skill — deeper repo understanding before Socratic dialogue:** applied brainstorm design principles to the bootstrap flow.
+  - **Phase 1.1 repo topology scan:** beyond config files, now runs `git ls-tree` to map directory structure, reads 3–5 representative source files to observe real coding patterns (error handling, dependency wiring, structural idiom), identifies test file locations and kinds, and notes naming/module conventions that appear in multiple places — so these can be codified in `coding-rules.md` rather than left implicit.
+  - **Phase 1.3 richer signal summary:** confirmation now includes observed architecture patterns, repo structure, test setup, and conventions noticed in source — not just detected tools. User confirms all of this before questions begin.
+  - **Phase 2 architecture.md expanded:** one-liner replaced with structured exploration areas — layers & components (with independence check), dependency direction (known violations?), component ownership (shared-data antipatterns?), data flow, error & failure handling convention. Source-scan findings are proposed as priors: "I see the codebase uses [X] — should `architecture.md` codify that?"
+  - **Phase 2.5 charter preview gate:** before writing any of the 6 charter files, present a section-by-section summary (tools, architecture, flows, rules, processes, non-negotiables) and get per-section approval. A correction here costs one message; a correction post-write costs a QA iteration.
+
 ## [3.7.4] — 2026-05-04
 
 ### Changed
