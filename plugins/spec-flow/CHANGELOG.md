@@ -2,6 +2,54 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.7] — 2026-05-04
+
+### Changed
+
+- **charter skill — comprehensive pre-Socratic intelligence and structured dialogue (Phase 1.1–2.5 rewrite):**
+
+  *Scan & signal quality (addresses C-3, H-1, H-3, H-4, L-2, L-3, L-4):*
+  - Preflight checks git HEAD is a development branch before scanning
+  - Excludes generated/vendored code (`vendor/`, `*_generated.*`, `*.pb.go`, `dist/`, `migrations/`, etc.) — prevents false architectural "conventions" from boilerplate
+  - Normalizes pattern threshold by repo tier (Small: 2+ files; Medium: 4+; Large: 8+; Very large: 15+)
+  - Assigns confidence tiers (HIGH/MEDIUM/LOW) to every observed pattern; only HIGH-confidence patterns drive "I saw X" proposals
+  - Adds git intentionality analysis for top patterns — distinguishes conventions adopted across many authors vs one engineer's habit
+  - Adds cross-module inconsistency detection (Step 3b) — surfaces where different modules use conflicting approaches
+  - Adds absence-of-pattern detection (Step 3c) — no logging framework, no auth enforcement, no API versioning are architectural signals
+  - Signal Summary quality gate before proceeding — every HIGH claim must cite ≥2 file paths; haiku follow-up dispatched if not
+
+  *Phase ordering fix (addresses M-1):*
+  - External sources (Phase 1.2) now asked BEFORE gap-fill (Phase 1.1.5) — external docs change which internal gaps matter
+
+  *Categorized external sources (Phase 1.2):*
+  - External source prompt broken into 6 charter-file categories: Non-negotiables (compliance/SLAs/audit), Architecture (ADRs/RFCs), Processes (runbooks/handbooks), Coding rules (style guides/checklists), Flows (sequence diagrams/API contracts), Tools (vendor/dependency policies)
+  - Each external source tagged by which charter file it informs; surfaced at the relevant Socratic section
+  - Explore+haiku agent dispatched per local/sibling source with category context
+
+  *Evidence-led "I saw X" validation (addresses C-1, C-2, M-4):*
+  - Scan-answered questions always include specific file paths + 1–3 line code excerpt + "Did your team intend this?"
+  - "I saw X" framing now explicitly required for ALL six charter files (was only architecture.md before)
+  - Pattern provenance tags required on every code-derived claim throughout Phase 2
+
+  *Signal Summary persistence (addresses M-3):*
+  - After Phase 1.3 confirmation, Signal Summary serialized to `<docs_root>/charter/.signal-summary.yaml` for session resume
+
+  *Structured Socratic dialogue (addresses C-2, H-2, M-2, user requests):*
+  - Full section checklist presented upfront (6 files × named sections = ~30 sections visible before first question)
+  - Question depth scales with repo tier (Small: 2–4Q/section; Medium: 4–6Q; Large: 6–8Q; Very large: 8–10Q)
+  - Per-section mini-confirmation before advancing to next section (catches misreads before they cascade)
+  - Session checkpoints every 15 questions
+  - NN capture flag throughout — "always/never/must/cannot/required/forbidden" language silently queued for Section F
+  - Section F (non-negotiables) surfaces all captured candidates + HIGH-confidence patterns (5+ files) as NN proposals before asking user to classify
+  - tools.md and architecture.md noted as interleaved — tool choices drive architecture decisions
+  - Full per-section question catalog for all 6 files (A1–F4)
+
+## [3.7.6] — 2026-05-04
+
+### Changed
+
+- **charter skill — repo scan scales with repo size:** Phase 1.1 Step 2 now uses a tiered sampling table keyed to source file count (small < 50: 3–5 files; medium 50–500: 8–15; large 500–2000: 20–30; very large 2000+: 30–50 across 10+ modules stratified by layer AND role). Phase 1.1.5 gap surfacing scales accordingly — small repos may have no gaps; large repos surface 5–10.
+
 ## [3.7.5] — 2026-05-04
 
 ### Changed

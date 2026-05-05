@@ -31,7 +31,13 @@ If retrofit signals detected (legacy layout or unprefixed NN-xxx) and piece 6 is
 
 ### Phase 1.1: Auto-detect signals
 
-Read the following if present, as priors for Socratic questions:
+**Preflight — verify HEAD is the development branch:**
+```bash
+git branch --show-current && git log --oneline -n 3
+```
+If HEAD appears to be a release tag or non-development branch, warn the user before proceeding.
+
+Read lightweight config signals first — these orient the scan agent:
 
 - `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`
 - Build manifests: `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `pom.xml`, `build.gradle`
@@ -40,83 +46,373 @@ Read the following if present, as priors for Socratic questions:
 - Existing `docs/architecture/` or `docs/adr/`
 - Recent `git log --oneline -n 50`
 
-**Repo topology scan** — go beyond config files and look at what actually exists:
-- Run `git ls-tree -r --name-only HEAD 2>/dev/null | head -150` (or glob the working tree) to map the directory structure. Identify: top-level folders (these often map to layers or components), dominant file extensions (primary language), test folder locations, and any unusual layouts.
-- **Sample source files:** read 3–5 representative source files from the most-central or largest directories. Note: how errors are surfaced (exceptions, error returns, result types, status codes), how dependencies are wired (imports, injection, global state, service locator), and any dominant structural pattern (MVC, hexagonal, flat-module, script-per-task, etc.).
-- **Test structure:** identify test files and folders. Note whether tests colocate with source or live in a dedicated `tests/` root, what kinds exist (unit, integration, e2e), and what patterns are used (fixtures, mocks, test builders, etc.).
-- **Coding conventions observed:** from the source sample, note naming conventions (snake_case vs camelCase, file naming), module organization, and any patterns that appear in multiple places — these likely need to be codified in `coding-rules.md` rather than left implicit.
+**Determine scan tier** before dispatching the agent:
+```bash
+git ls-tree -r --name-only HEAD | grep -E '\.(java|py|ts|go|rb|rs|kt|scala|cs|cpp|c)$' | wc -l
+```
 
-Synthesize all of the above into a signal summary (internal — not yet shown to user).
+| Tier | Source file count | Files to sample | Pattern threshold |
+|------|------------------|-----------------|-------------------|
+| Small | < 50 | 3–5 total | 2+ files |
+| Medium | 50–500 | 8–15 total | 4+ files |
+| Large | 500–2000 | 20–30 total | 8+ files |
+| Very large | 2000+ | 30–50 total | 15+ files (~10% of same-layer files) |
 
-### Phase 1.2: Prompt user for additional sources
+**Dispatch the scan agent:**
 
-Ask:
+```
+Agent({
+  description: "Charter repo scan — comprehensive pattern and architecture analysis",
+  agent_type: "explore",
+  prompt: """
+You are scanning a codebase to produce a structured Signal Summary for a project charter.
+Repo root: <absolute path>
+Source file count: <N>
+Scan tier: <small/medium/large/very-large>
+Pattern threshold (min files for a pattern to count): <threshold from table above>
 
-> "Any other places I should look? This can include:
-> - **Local paths** — folders or files in this repo I wouldn't auto-detect (e.g., `internal/handbook/`, `docs/rfcs/`, `.devcontainer/`)
-> - **External URLs** — team wikis, Notion pages, Confluence spaces, engineering handbooks, design docs, RFCs, style guides
-> - **Sibling repos** — shared convention repos (user provides local path to a cloned working copy)
+## Exclusions (DO NOT sample these — they are generated or vendored, not design choices)
+Exclude all files matching: vendor/, node_modules/, *_generated.*, *.pb.go, *.pb.py,
+dist/, build/, .git/, db/migrations/ (SQL only), __pycache__/, .cache/, *.min.js,
+any path listed in .gitignore as generated output.
+Treat test files as a SEPARATE stratum — patterns from tests do not populate production coding rules.
+
+## Step 1 — File type inventory
+Run:
+  git ls-tree -r --name-only HEAD 2>/dev/null | grep -v -E '(vendor/|node_modules/|dist/|build/|\.pb\.|_generated\.|__pycache__)' \
+    | grep -E '\\.[a-zA-Z0-9]+$' | sed 's/.*\\.//' | sort | uniq -c | sort -rn | head -30
+
+Categorize every extension into:
+- Source languages (.java, .py, .ts, .go, .rb, .rs, .kt, .scala, .cs, .cpp, .c, etc.)
+- Tests (files under test*/, *_test.*, *.spec.*, *.test.*)  [separate stratum]
+- Build/config (.gradle, .toml, .yaml, Makefile, Dockerfile)
+- Schema/data (.proto, .graphql, .sql, .json schemas, .avro, OpenAPI .yaml)
+- Infrastructure (Ansible roles, Terraform .tf, Helm charts)
+- Docs (.md, .rst, .adoc)
+
+Every populated bucket must have at least one sample in Step 2.
+
+## Step 2 — Cross-module, cross-role sampling at tier depth
+Sample at the depth specified for this tier. For multi-module repos (multiple pom.xml,
+build.gradle, package.json, go.mod, or a root settings.gradle/pnpm-workspace.yaml):
+sample from at least 2–3 distinct modules/subprojects. Do NOT anchor to the root module alone.
+
+Within each module, pick files representing DIFFERENT ROLES:
+- Java: controller/handler, service/use-case, repository/DAO, domain model, utility/helper
+- TypeScript: route handler, service class, data model, utility
+- Python: view/endpoint, service, model, ORM query layer
+- Go: handler, service, repository, model
+- Ansible: a role tasks/main.yml, a handler, a defaults/main.yml, a vars file
+- Terraform: a resource module, a variable definition, an output definition
+
+Also sample: at least one unit test AND one integration/e2e test (separate stratum);
+at least one file of each schema/data type found; one infra file per infra type.
+
+## Step 3 — Observe and record patterns per sampled file
+For each file read, note:
+- Error handling: exceptions, error returns, Result/Either types, status codes, log-and-swallow
+- Dependency wiring: constructor injection, service locator, global singletons, module-level imports
+- Structural idiom: MVC, hexagonal/ports-and-adapters, flat-module-per-feature, script-per-task, monolith
+- Naming conventions: snake_case vs camelCase, file naming, package/module naming, constant naming
+- Security patterns: where auth is enforced, input validation location, secret handling
+- Any pattern appearing in <threshold>+ files independently — HIGH confidence convention
+
+Assign a confidence tier to each observed pattern:
+- HIGH: appears in <threshold>+ files across multiple modules/authors
+- MEDIUM: appears in 2–(<threshold>-1) files, or multiple files in only one module
+- LOW: appears in 1 file or only in generated/early code
+
+## Step 3b — Cross-module inconsistency detection
+For each concern category (error handling, DI, naming, test patterns, auth enforcement):
+identify cases where DIFFERENT modules use DIFFERENT approaches. List each inconsistency
+with both variants and which modules exemplify each. Example:
+"auth module uses Result<T, Error> error returns; billing module uses unchecked exceptions"
+Inconsistencies are HIGH-value charter signals — they represent unresolved design decisions.
+
+## Step 3c — Absence-of-pattern detection
+For each of these concern categories, note if NO consistent pattern was found:
+error handling, logging framework, testing strategy, API versioning, auth enforcement,
+input validation, rate limiting, observability/tracing. Absence is a signal — it may
+mean the team uses a non-obvious approach or has an unaddressed gap.
+
+## Step 4 — Git intentionality analysis for HIGH-confidence patterns
+For the top 3–5 HIGH-confidence patterns found, run:
+  git log --follow --oneline -- <representative file exemplifying the pattern> | head -10
+to determine: when was this pattern introduced? By one author or many? How often has it
+been touched? A pattern introduced by one author 3 years ago and never modified is
+LOWER intentionality than one introduced across 12 commits from 8 authors over 2 years.
+Add an "intentionality" note to each HIGH-confidence pattern: "adopted widely across authors"
+or "introduced by one author, no subsequent modification."
+
+## Step 5 — Identify sampling gaps
+Note file types or modules found but not adequately sampled given the tier.
+Example: "Found 40 .proto files but only read 2" or "4 Maven modules — only sampled core and web."
+Scale gap list to tier: Small repos may have none; Very Large repos should list all meaningful gaps.
+
+## Output format — return this structure EXACTLY
+
+### Signal Summary
+
+**Scan metadata:**
+- Tier: [small/medium/large/very-large]
+- Source files counted: [N]
+- Files sampled: [N]
+- Pattern threshold used: [N files]
+
+**Detected tools:**
+- Language: [language + version if determinable]
+- Framework: [framework(s)]
+- Test runner: [runner + coverage tool]
+- Linter/formatter: [tools]
+- Build: [build tool]
+- CI: [CI platform]
+
+**Repo structure:**
+- Top-level folders: [list → inferred layers or components]
+- Module count: [N modules/subprojects]
+- Dominant structure: [e.g., "Maven multi-module", "flat Python package", "Go workspace"]
+
+**Files sampled:** [list each file path + role it represents]
+
+**Observed patterns — production code (with confidence tier and file evidence):**
+Each entry format: `[HIGH/MEDIUM/LOW] [Pattern description] — seen in: [file1], [file2], ... — Intentionality: [note from Step 4 if assessed]`
+- Error handling: [entries]
+- Dependency wiring: [entries]
+- Structural idiom: [entries]
+- Naming conventions: [entries]
+- Security patterns: [entries]
+- Unwritten conventions (≥threshold files): [entries or "none"]
+
+**Cross-module inconsistencies:**
+- [inconsistency 1: both variants, which modules]
+- [inconsistency 2] ... or "None detected"
+
+**Absent patterns (no consistent approach found):**
+- [category]: [absent or note]
+
+**Test setup (separate stratum):**
+- Location: [colocated / dedicated tests/ root]
+- Kinds observed: [unit / integration / e2e]
+- Patterns: [fixtures, mocks, builders, etc.]
+- Coverage tooling: [if present]
+
+**Schema/infra sampled:** [list types and one representative finding each]
+
+**Sampling gaps:**
+- [gap 1] ... or "None at this tier"
+  """,
+  model: "haiku"
+})
+```
+
+**Signal Summary quality gate:** Before proceeding, verify the returned summary meets the minimum bar:
+- Every "Observed patterns" entry cites ≥2 specific file paths (except LOWs which may cite 1)
+- Confidence tiers are assigned to every pattern claim
+- Cross-module inconsistencies section is populated (even if "None detected")
+- Absent patterns section is populated
+
+If any HIGH-confidence pattern claim lacks file evidence, dispatch a follow-up haiku agent to verify those specific files. Hold the verified Signal Summary in orchestrator state. Do NOT re-read individual files the agent already read.
+
+### Phase 1.2: External sources
+
+Ask before gap-filling — external sources change which internal gaps matter. Ask by charter-file category so the user knows exactly what kind of document is useful for each. One question per category; skip any the user answers 'none' to.
+
+> "Before I identify what the scan missed, do you have external documents for any of these categories?
 >
-> Paste paths/links, or say 'none'."
+> **Non-negotiables** — compliance docs, security policies, SLAs, legal requirements, audit frameworks (SOC2, HIPAA, PCI), regulatory constraints. These directly seed NN-C candidates.
+>
+> **Architecture** — ADRs (architecture decision records), RFCs, system diagrams, prior design docs, tech-debt registers. These confirm or override what the code scan inferred.
+>
+> **Processes** — team handbooks, runbooks, release procedures, on-call docs, incident post-mortems, change-management policies. These drive `processes.md` content the code can't reveal.
+>
+> **Coding rules** — existing style guides, code review checklists, linting/formatting configs the team has agreed on but not fully enforced in tooling, security coding standards.
+>
+> **Flows** — sequence diagrams, API contracts, integration specs, data flow diagrams, swimlane docs.
+>
+> **Tools** — approved vendor lists, dependency policies, internal tooling docs, approved cloud services lists.
+>
+> For each category: paste paths (local files) or URLs, or say 'none'."
 
-For each source:
-- **Local paths:** read with `Read`/`Glob`/`Grep`. Fold content into signal summary.
-- **External URLs:** attempt `WebFetch`. On success, summarize into signals. On failure (auth-walled, offline, rate-limited), record as pending reference and inform user: *"Couldn't fetch `<url>`; treating as unverified reference. You'll need to summarize what it binds us to during Socratic."*
-- **Sibling repos:** treat provided local path as a local-path source.
+For each provided source, route by type:
+- **Local paths or sibling repos:** dispatch an explore+haiku agent pointing at the provided paths, passing the existing Signal Summary AND the category context (e.g., "this is a compliance doc — extract NN candidates"). Merge returned findings before Phase 1.1.5, tagged by the charter file they inform.
+- **External URLs:** attempt `WebFetch`. On success, summarize into signals tagged by category. On failure (auth-walled, offline, rate-limited), record as pending reference: *"Couldn't fetch `<url>`; treating as unverified reference. Summarize what it binds us to during Socratic."*
+
+Track which charter files each external source informs — this is used in Phase 2 to surface the source at the relevant section ("Your compliance doc said X — should this be an NN-C?").
+
+### Phase 1.1.5: Targeted gap-fill
+
+Now that both the internal scan AND external sources are loaded, present the gap list with full context. This is a focused ask — not an open-ended "anything else?"
+
+Scale the number of gaps surfaced to repo size (Small: 0–2; Medium: 2–4; Large: 4–7; Very Large: 7–10).
+
+Present:
+> "I've scanned your repo and loaded [N] external sources. Here's what I've covered:
+> - **[Language/type]:** [file1 (role)], [file2 (role)], ...
+> - **Tests:** [test files sampled]
+> - **Schema/infra:** [types sampled + key finding per type]
+>
+> Gaps — areas I couldn't cover fully given your repo size:
+> - [e.g., "3 Maven modules (`api`, `core`, `infra`) — only sampled `core`. Specific files in `api` or `infra` that show your design choices?"]
+> - [e.g., "40 `.proto` files — only read 2. Any that define core service contracts?"]
+>
+> I also found these **cross-module inconsistencies** where I need your guidance before asking questions:
+> - [e.g., "`auth` uses Result<T,Error> returns; `billing` uses unchecked exceptions — which should be canonical?"]
+>
+> Paste specific file paths and any inconsistency decisions, or say 'continue'."
+
+If the user provides files, dispatch a second scan agent to read them and merge findings into the Signal Summary.
 
 ### Phase 1.3: Confirm combined signal summary
 
-Present the union of auto-detected + user-supplied signals, including observed patterns from source:
+Present the full Signal Summary to the user for confirmation — this is the last chance to correct misreadings before a long Socratic session begins on their basis:
 
-> "Here's what I've gathered:
-> - **Tools:** [language] [version] / [framework] / [test runner] / [CI]
-> - **Repo structure:** [top-level folders → inferred layers or components]
-> - **Observed patterns:** [dominant coding idiom — e.g., "error returns via Result type", "constructor injection", "flat module layout per feature"]
-> - **Test setup:** [test location + observed kinds — unit/integration/e2e]
-> - **Conventions noticed:** [naming, module organization patterns seen in source]
-> - **External references:** [user-provided sources]
+> "Here's my full picture before we start:
 >
-> Does this look right? Anything to add or correct?"
+> **Tools:** [language/framework/test runner/linter/CI]
+> **Repo structure:** [top-level folders → inferred layers; module count]
+> **Observed patterns (HIGH confidence — will drive 'I saw X' questions):**
+>   - [pattern] — seen in: [file1], [file2] — [intentionality note]
+>   ...
+> **Inconsistencies to resolve in dialogue:**
+>   - [inconsistency — both variants]
+> **Absent patterns (no approach found — will ask about during Socratic):**
+>   - [category]
+> **External references loaded:** [sources]
+>
+> Does this look right? Anything misread or missing? Corrections here prevent 20+ questions built on a wrong assumption."
 
 Only proceed to Phase 2 after user confirms.
 
-### Phase 2: Socratic by file, one question at a time
+### Signal Summary persistence
 
-Authoritative order (earlier files seed context for later ones):
+After Phase 1.3 confirmation, serialize the Signal Summary to a recoverable format. Offer:
+> "I'll save the confirmed Signal Summary so we can resume if this session is interrupted."
 
-1. `tools.md` — language/runtime, framework(s), test runner + coverage, linter + formatter, package manager, CI platform, approved/banned libraries
-2. `architecture.md` — structured exploration of each of the following; use signals and source-scan findings as priors, confirm with the user only where genuinely unclear:
-   - **Layers & components:** What are the top-level layers (e.g., API, domain, infra, persistence) and how do they map to directories? Can each component be understood and changed independently? If not, where do the coupling problems live?
-   - **Dependency direction:** What can import what? Is there a strict direction (e.g., domain must never import infra)? Are there known violations today that the charter should flag?
-   - **Component ownership:** Who owns what data? Are there shared-data antipatterns (multiple components writing the same store) worth calling out?
-   - **Data flow:** How does data enter, transform, and exit the system? What are the key states or transformation stages?
-   - **Error & failure handling:** How do errors propagate (exceptions, error returns, result types, status codes)? Is there an established convention or is it inconsistent? The charter should pick one and codify it.
-   - If the source scan revealed a pattern already in use, propose it: "I see the codebase uses [X] — should `architecture.md` codify that as the enforced pattern?"
-3. `flows.md` — request flow, auth flow, data-write path, other critical end-to-end flows
-4. `coding-rules.md` — numbered `CR-xxx` entries, each tagged `Type: Rule` (inline) or `Type: Reference` (external Source)
-5. `processes.md` — branching model, review policy, release cadence, CI gates, incident response
-6. `non-negotiables.md` — numbered `NN-C-xxx` entries, structured schema (Type, Scope, Rationale, How QA verifies)
+Write to `<docs_root>/charter/.signal-summary.yaml` (gitignored). If the session is interrupted and restarted, the user can instruct the skill to load this file instead of re-running the scan.
 
-Rules:
-- One question at a time. Multiple choice preferred.
-- Use detection signals + user-supplied sources as priors. Don't ask questions whose answers were already captured.
-- Any unresolved answer becomes a `[NEEDS CLARIFICATION]` marker in the draft. QA treats these as must-fix.
-- For numbered entries, confirm `Type` explicitly: "Is this a **Rule** (inline body) or a **Reference** (link to external source)?"
+### Phase 2: Socratic dialogue — section by section
+
+**Present the full section checklist upfront** before asking any questions:
+
+> "We'll work through these sections to build your 6 charter files. Each section builds on the last.
+> I'll mark each section complete as we finish it.
+>
+> [ ] **A. Tools & Runtime** (tools.md)
+>    A1. Language & runtime  A2. Frameworks & libraries  A3. Testing stack  A4. Build & CI  A5. Approved/banned
+>
+> [ ] **B. Architecture** (architecture.md) — interleaved with A where tools drive architecture choices
+>    B1. Layer structure  B2. Dependency rules  B3. Component & data ownership
+>    B4. Data flow  B5. Error & failure handling  B6. Security boundaries
+>
+> [ ] **C. Critical Flows** (flows.md)
+>    C1. Identify key flows  C2. Request/response  C3. Auth flow  C4. Data-write path
+>    C5. External integrations  C6. Error/failure flows
+>
+> [ ] **D. Coding Rules** (coding-rules.md)
+>    D1. Naming conventions  D2. File/module organization  D3. Error handling patterns
+>    D4. Testing patterns  D5. Security coding rules  D6. Performance & resource rules  D7. Documentation standards
+>
+> [ ] **E. Processes** (processes.md)
+>    E1. Branching model  E2. Review & approval  E3. CI gates  E4. Release cadence  E5. Incident response
+>
+> [ ] **F. Non-Negotiables** (non-negotiables.md)
+>    F1. Surface captured NN candidates  F2. Classify each (NN-C / NN-P / just CR)  F3. User-introduced NNs  F4. Confirm rationale & QA verification
+>
+> Ready to start with Section A? This will take a while — we're building the foundation everything else relies on."
+
+**Session rules — apply throughout Phase 2:**
+
+- **One question at a time.** Multiple-choice preferred. Never ask more than one question per message.
+- **Question depth scales with repo tier:**
+  | Tier | Questions per section |
+  |------|-----------------------|
+  | Small | 2–4 per section |
+  | Medium | 4–6 per section |
+  | Large | 6–8 per section |
+  | Very large | 8–10 per section |
+- **Scan-answered questions (HIGH confidence):** use evidence-led confirmation format instead of asking from scratch:
+  > "I found [pattern description] in `[file1]`, `[file2]`, and `[file3]`:
+  > ```
+  > [1–3 line code excerpt showing the pattern]
+  > ```
+  > Is this the intended convention, or was this one person's habit?"
+  Wait for explicit confirmation before treating it as settled.
+- **Pattern provenance:** every code-derived claim cites specific file paths. Never state "the codebase uses X" without naming at least 2 files.
+- **NN capture flag:** any user answer containing "always," "never," "must," "cannot," "required," "forbidden," or "every X must" → silently queue that statement for Section F review. Do not interrupt the current section — collect and surface later.
+- **Session checkpoints:** every 15 questions, pause: "We've covered a lot — want a break and continue later, or push through?" If continuing later, remind user the Signal Summary is saved at `<docs_root>/charter/.signal-summary.yaml`.
+- **Per-section mini-confirmation:** at the end of EACH section, before moving to the next: "Here's what I've captured for [section name]: [3–5 bullet summary]. Anything to correct before I move on?"
+- **Unresolved answers** → `[NEEDS CLARIFICATION]` marker in the draft. QA treats these as must-fix.
+
+**Section A — Tools & Runtime** (`tools.md`)
+
+*Note: treat Sections A and B as interleaved — tool choices (ORM, HTTP framework, event bus) are architectural decisions. If an A question surfaces an architecture implication, address it in A before continuing.*
+
+A1. Language & runtime: version, runtime targets, multi-language support
+A2. Frameworks & libraries: primary framework, any secondary frameworks, known banned libraries, approved-only policy vs allowlist
+A3. Testing stack: test runner, coverage tool and threshold, assertion library, mock framework, test data approach
+A4. Build & CI: build tool, CI platform, what checks gate merge (lint, type-check, test, coverage floor, security scan)
+A5. Approved/banned: any libraries known to be banned (security, licensing, deprecated), any explicitly approved-only whitelist
+
+**Section B — Architecture** (`architecture.md`)
+
+B1. Layer structure: what are the top-level layers? Do they map to directories? Can each layer be changed independently? Use HIGH-confidence structural idiom from scan as prior.
+B2. Dependency rules: what can import what? Is there a strict direction rule? Any known violations today the charter should flag?
+B3. Component & data ownership: who owns what data? Are there shared databases or stores? Any shared-data antipatterns to call out?
+B4. Data flow: how does data enter, transform, and exit? What are the key transformation stages? Where does validation happen?
+B5. Error & failure handling: how do errors propagate? Surface inconsistencies detected in scan: "I found [variant A] in module X and [variant B] in module Y — which should be canonical?" Pick one convention and codify it.
+B6. Security boundaries: where is auth enforced? What data is sensitive and how is it protected at rest/in transit? Where is input validated? Any security patterns seen in scan.
+
+**Section C — Critical Flows** (`flows.md`)
+
+C1. Identify key flows: what are the 3–6 most critical end-to-end flows in this system? (Request/response is one; auth is one; data-write is one; others?)
+C2–C6. For each identified flow: entry point, happy path steps, error path, external dependencies, how failures surface.
+
+**Section D — Coding Rules** (`coding-rules.md`)
+
+ALL D questions are evidence-led. For each rule area, present HIGH-confidence scan findings first ("I saw X in these files"), confirm or correct, THEN ask about anything not found in scan.
+
+D1. Naming conventions: file naming, class/function naming, constant naming, package/module naming — present scan findings with file evidence and excerpts.
+D2. File/module organization: where do new files go? How are modules structured? Present scan findings.
+D3. Error handling patterns: how are errors created, wrapped, propagated, logged? Reinforce the decision made in B5.
+D4. Testing patterns: what must be tested, what patterns to use (arrange/act/assert, given/when/then), what test data approaches are required.
+D5. Security coding rules: input validation requirements, secret handling, logging of sensitive data, any OWASP-relevant rules for this stack.
+D6. Performance & resource rules: any rules about N+1 queries, connection pooling, memory limits, async patterns (if applicable to stack).
+D7. Documentation standards: what must be documented? Docstring requirements, README requirements, API documentation approach.
+
+**Section E — Processes** (`processes.md`)
+
+E1. Branching model: trunk-based, git-flow, feature-branch — what's the policy?
+E2. Review & approval: how many reviewers required? Who can approve? What requires senior/lead review?
+E3. CI gates: which checks must pass before merge? Which are informational only?
+E4. Release cadence: how often are releases cut? Who cuts them? What's the release artifact (container, package, binary)?
+E5. Incident response: how are production incidents handled? On-call rotation? Runbooks?
+
+**Section F — Non-Negotiables** (`non-negotiables.md`)
+
+F1. **Surface all captured NN candidates:** Present every statement from the session that contained "always/never/must/cannot/required/forbidden" language, PLUS every HIGH-confidence pattern from scan (5+ files, multiple authors) as an NN candidate:
+> "During our conversation and from the code scan, I identified these as potential non-negotiables:
+> 1. [statement/pattern] — from your answer to B5 / from [file1], [file2], [file3]+
+> ...
+> For each: Is this (a) a hard non-negotiable [NN-C], (b) a product-specific non-negotiable [NN-P], (c) just a coding rule [CR], or (d) not actually a constraint?"
+
+F2. For each confirmed NN-C or NN-P: confirm the structured schema — Type, Scope, Rationale, and critically "How QA verifies this." The QA verification method must be concrete (e.g., "grep for direct DB access outside repository layer in CI" not just "QA checks it").
+F3. Any additional NNs the user wants to add that weren't captured by the session or scan.
+F4. Final confirmation: present all NNs with their full schema before closing the section.
 
 ### Phase 2.5: Charter preview — confirm before writing
 
-Before writing any files, present a brief section-by-section summary of what each charter file will contain. Ask after presenting all sections: "Does this look right? Let me know per section if anything needs adjusting before I write." Accept corrections, then proceed to Phase 3 only after approval.
+Before writing any files, present a section-by-section summary of what each charter file will contain. Ask after each section: "Does this look right? Correct anything before I write." Only write once all sections are approved.
 
-This catches misalignments before they require a QA fix-doc round-trip — a correction here costs one message; a correction after Phase 3+QA costs an iteration.
-
-Suggested format:
-
+Format:
 > **tools.md:** [language + version, framework, test runner, linter, CI — one line each]
-> **architecture.md:** [layers, dependency direction, key component boundaries — 3–5 bullets]
-> **flows.md:** [N flows to document — list their names]
-> **coding-rules.md:** [N CR entries planned — list titles only]
-> **processes.md:** [branching model, review policy, CI gates — key points]
-> **non-negotiables.md:** [N NN-C entries planned — list titles only]
+> **architecture.md:** [layers, dependency direction, key component boundaries, error convention — 4–6 bullets]
+> **flows.md:** [N flows to document — list their names and entry/exit points]
+> **coding-rules.md:** [N CR entries planned — list titles with evidence source: "scan-derived" or "user-introduced"]
+> **processes.md:** [branching model, review policy, CI gates — key decisions only]
+> **non-negotiables.md:** [N NN-C entries — list titles + QA verification method]
+
+A correction here costs one message; a correction post-write costs a QA iteration.
+
 
 ### Phase 3: Write files
 
