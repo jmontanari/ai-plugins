@@ -2,6 +2,38 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.8] — 2026-05-04
+
+### Changed
+
+- **spec skill — Phase 2 Brainstorm comprehensive hardening (11-finding attack-plan remediation):**
+
+  *Structural reordering (H-6, L-10):*
+  - Convention context scan moved before all questions — peer component conventions frame design rather than confirm it after the fact
+  - Approach selection (step 1b) moved before step 3 design exploration — all design questions are answered within a settled approach frame; step 5 is now confirmation, not decision
+
+  *New pre-step probes (C-1):*
+  - PRD assumption audit added before step 1 — explicitly probes dimensions the PRD silently omits (security/auth model, data sensitivity, backward compat, rate limiting, operational readiness); any TBD becomes a required open question for step 3
+
+  *Mandatory security and NFR coverage (C-2, H-4):*
+  - Security sub-block added to step 3 — five required sub-questions (trust boundaries, sensitive data inventory, input validation surface, auth/authz model, secrets handling); mandatory for any piece touching I/O, external calls, storage, or user input; explicit N/A confirmation required for pieces that don't
+  - NFR sub-block added to step 3 — four areas (latency budget, throughput ceiling, observability, operational readiness) scaled by piece complexity; "no requirement" must be explicitly confirmed, not silently absent
+
+  *Minimum information floor (C-3):*
+  - Floor check added after every step 3 sub-area (all 8) — if cumulative answer lacks a concrete example AND a failure mode, one targeted follow-up fires before advancing; capped at one per sub-area; explicit N/A accepted without pushback
+
+  *New design areas (M-7):*
+  - Migration & backward compatibility sub-area added to step 3 — conditional on pieces that modify existing interfaces; covers breaking vs additive change, compat strategy, data migration reversibility, rollback safety; explicit N/A confirmation when not triggered
+
+  *Bidirectional YAGNI (M-8):*
+  - YAGNI extended to agent-introduced scope — when the agent proposes an approach, it explicitly flags any scope it adds that the PRD didn't ask for; repeated in step 5 trade-off confirmation
+
+  *Active validation preview (H-5, L-11):*
+  - Step 7 restructured into three active passes: (1) FR→AC coverage check — explicit count, flags FRs with zero ACs and ACs with no test approach; (2) gap call-out — security/NFRs/migration/testing each explicitly summarized or confirmed N/A; (3) adversarial close — replaces "Does this look right?" with "Challenge me — name one scenario that would cause this spec to fail in production"
+
+  *Deferred item tracking (M-9):*
+  - Deferred scope close-out step added at end of Phase 2 — items marked deferred during step 2 and PRD assumption audit are presented with a "which future piece should own this?" prompt; written to spec.md under `## Explicitly Out of Scope / Deferred` and additively to the PRD-local backlog
+
 ## [3.7.7] — 2026-05-04
 
 ### Changed
