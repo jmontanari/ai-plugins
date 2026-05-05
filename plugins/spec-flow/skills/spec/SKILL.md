@@ -45,16 +45,26 @@ for operation `create_piece_issue`. If the tool is available:
   spec.md front-matter as `epic_key: <key>` so plan and execute skills can find it.
 On tool unavailable → emit warning → skip.
 
-Socratic dialogue with the user, one question at a time:
+Socratic dialogue with the user, one question at a time. **Prefer multiple-choice questions** when possible — they're faster to answer than open-ended. Ask one question per message; if a topic needs more exploration, break it into sequential messages.
+
+**Before the first question — scope check.** Assess whether the piece as described covers multiple independent subsystems (e.g., "vault integration, CI pipeline changes, and a new CLI command" is three pieces). If so, flag immediately: don't spend questions refining details of work that needs to be decomposed first. Propose the decomposition, let the user confirm the sub-piece ordering, and brainstorm only the first sub-piece.
+
+**YAGNI throughout.** Remove anything the mapped PRD sections don't ask for. If a brainstorm question surfaces a feature not in the piece's PRD sections, name it out-of-scope before discussing it. Don't add behavior the user didn't request.
 
 1. Confirm the piece scope: "This piece covers [PRD sections]. Does that match your intent?"
 1a. **Identify charter constraints this piece touches.** From the charter files loaded in Phase 1 step 3, enumerate which `NN-C-xxx` entries, `NN-P-xxx` entries, and `CR-xxx` entries are in scope for this piece. Ask the user to confirm the list (e.g., "This piece touches NN-C-003, NN-P-001, CR-007 and CR-012. Miss anything?"). Record the confirmed list — it becomes the `### Non-Negotiables Honored` and `### Coding Rules Honored` sections of spec.md in Phase 3.
 2. **Surface backlog items.** If Phase 1 step 6 loaded items from `<docs_root>/prds/<prd-slug>/backlog.md`, present the top ~5 most-relevant to the user with their concrete references and ask "for each, is this `incorporated` in this piece's spec, `deferred` to a later piece, or `obsolete`?" Record each response in orchestrator state keyed by backlog item — Phase 5 step 4 reads this state to prune `incorporated` and `obsolete` entries from the file. If no items were surfaced (file did not exist, or no relevant matches), skip this step.
-3. Explore purpose and boundaries
+3. **Explore purpose, boundaries, and design.** For each of the following areas, ask the user about it if the PRD and prior answers haven't made it clear. Scale each question to its complexity — a brief confirmation if obvious, a deeper question if genuinely unclear:
+   - **Architecture & components:** What are the key components and how do they relate? Can each component be understood and tested independently? Can you change a component's internals without breaking its consumers? If not, the boundaries need work.
+   - **Data flow:** How does data enter, transform, and exit the system? What are the states data passes through?
+   - **Error handling:** What can go wrong? How should failures surface (exception, error return, log, retry)? What's the failure posture for each external dependency?
+   - **Testing approach:** What kinds of tests will validate this piece (unit, integration, e2e)? What would a "done" test suite cover?
+   - **Isolation & modularity:** Are units small enough to have one clear purpose and well-defined interfaces? Flag when something is trying to do too much — a unit with unclear boundaries is a signal to split.
 3a. **Identify and document codebase conventions.** If the piece touches a component type that exists elsewhere in the codebase (e.g., roles, modules, services, playbooks, handlers), scan 2-3 peer components to identify empirical conventions that differ from generic framework documentation (e.g., file structure, metadata wrappers, naming patterns, shared config idioms). Ask the user to confirm: "I see all existing roles use [X pattern] — should this spec require that too?" Document confirmed conventions in a `### Codebase Conventions` section of the spec. This prevents spec-compliance reviewers from flagging idiomatic local patterns as violations and prevents implementers from following generic docs over project norms.
 4. PRD compliance check: if the manifest maps requirements the user hasn't mentioned, ask about them
 5. Propose 2-3 approaches with trade-offs and your recommendation
 6. Resolve all open questions — no `[NEEDS CLARIFICATION]` markers may survive
+7. **Design preview — section by section.** Before writing the full spec.md, present the design to the user as a structured summary covering: goal, key components, data flow, error handling, testing approach, and any architecture constraints. Ask after each section: "Does this look right?" Be ready to revise before proceeding. Only write the spec once the design summary is approved — catching a misunderstanding here is far cheaper than a QA iteration on the written spec.
 
 ### Phase 3: Create Worktree and Write Spec
 

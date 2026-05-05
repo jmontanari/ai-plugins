@@ -2,6 +2,17 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.3] — 2026-05-04
+
+### Changed
+
+- **spec skill — Phase 2 brainstorm:** incorporated 5 ideas from superpowers/brainstorming skill:
+  - **Scope decomposition check** (pre-question): assess whether the piece covers multiple independent subsystems before starting questions; flag and decompose first if so.
+  - **YAGNI throughout:** call out any feature that isn't in the mapped PRD sections as out-of-scope before discussing it.
+  - **Multiple-choice questions preferred:** faster to answer than open-ended; one question per message.
+  - **Richer Q3 (purpose/boundaries → design exploration):** vague "explore purpose and boundaries" replaced with structured areas — architecture & components, data flow, error handling, testing approach, isolation & modularity — each scaled to its complexity.
+  - **Section-by-section design preview gate (step 7):** before writing spec.md, present the design as a structured summary covering goal, components, data flow, error handling, testing, constraints. Approve per section before committing to the full write. Catching misunderstandings here costs one message; catching them post-write costs a QA iteration.
+
 ## [3.7.2] — 2026-05-01
 
 ### Fixed
