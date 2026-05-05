@@ -2,6 +2,12 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [3.7.4] — 2026-05-04
+
+### Changed
+
+- Version bump.
+
 ## [3.7.3] — 2026-05-04
 
 ### Changed
