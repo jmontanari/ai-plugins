@@ -470,7 +470,61 @@ git add <docs_root>/charter/processes.md && git commit -m "charter: add processe
 git add <docs_root>/charter/non-negotiables.md && git commit -m "charter: add non-negotiables"
 ```
 
-### Phase 7: Doctrine wiring reminder
+### Phase 7: Publish charter skills
+
+After the per-file commits in Phase 6, generate a project-level skill for each charter domain so any compatible tool enforces constraints without the spec-flow plugin.
+
+**Skill directory:** `.github/skills/charter-<domain>/SKILL.md` (create `.github/skills/` if absent).
+
+**For each charter file in `<docs_root>/charter/`:**
+
+1. Read the file's front-matter for a `skill_description:` field. If present, use it as the skill's `description:`. If absent, use the domain default below.
+
+2. Write `.github/skills/charter-<domain>/SKILL.md`:
+
+```
+---
+name: charter-<domain>
+description: <description>
+---
+
+<full content of docs/charter/<domain>.md>
+```
+
+**Domain defaults** (used when `skill_description:` is absent):
+
+| Domain | Default description |
+|--------|---------------------|
+| `non-negotiables` | Binding project non-negotiables — must be loaded for all non-exploratory work. Invoke whenever the user is about to write, change, or review any code, configuration, spec, plan, or PRD in this project. |
+| `processes` | Project process rules — governs how all work ships. Invoke for any task that will result in a commit, PR, review, or deployment in this project. |
+| `coding-rules` | Project coding standards — invoke for any code-bearing task including refactoring, new features, bug fixes, and test writing. |
+| `architecture` | Project architecture constraints — invoke for design, spec, plan, or implementation work that touches module boundaries, dependencies, or system structure. |
+| `flows` | Project pipeline and workflow rules — invoke for any task involving the spec-flow pipeline (PRD, spec, plan, execute) or workflow design. |
+| `tools` | Approved tools, frameworks, and libraries — invoke when selecting tools, adding dependencies, or choosing frameworks for this project. |
+| `integrations` | spec-flow ↔ external integrations (Jira, CI) — invoke during pipeline work: PRD authoring, spec, plan, and execute phases. |
+
+3. Stage and commit in one batch:
+
+```bash
+git add .github/skills/charter-*/
+git commit -m "chore(spec-flow): publish charter skills"
+```
+
+4. Bump `layout_version` to `4` in `.spec-flow.yaml`:
+   - If `layout_version:` key exists, replace its value with `4`.
+   - If absent, insert `layout_version: 4` after `worktrees_root:` (or at end of file).
+
+5. Stage and commit the config change:
+
+```bash
+git add .spec-flow.yaml
+git commit -m "chore(spec-flow): bump layout_version to 4"
+```
+
+Inform the user:
+> "Charter skills published to `.github/skills/charter-*/`. Any tool that scans that directory will now auto-enforce charter constraints. Run `/reload-plugins` to activate them in this session."
+
+### Phase 8: Doctrine wiring reminder
 
 Since v2.0.0 piece 2, the SessionStart hook auto-loads charter files listed in `.spec-flow.yaml`'s `charter.doctrine_load` (default `[non-negotiables, architecture]`). Users need to run `/reload-plugins` (or start a new session) to pick up newly-authored charter into agent doctrine context.
 
@@ -528,6 +582,17 @@ Human reviews diffs. On approval, commit each touched file separately:
 ```bash
 git add <docs_root>/charter/<file>.md && git commit -m "charter: update <file> — <brief summary>"
 ```
+
+### Phase U5.5 — Sync charter skills
+
+After each per-file commit in Phase U5, if `.github/skills/charter-<domain>/SKILL.md` exists for the touched domain, re-publish it (same process as Phase 7: re-read source, overwrite skill file, stage, commit).
+
+```bash
+git add .github/skills/charter-<domain>/
+git commit -m "chore(spec-flow): sync charter skill for <domain>"
+```
+
+If the `.github/skills/charter-<domain>/` directory does not exist yet (v3 project not yet migrated to v4), skip silently — do not auto-create on update.
 
 ### Phase U6 — Divergence awareness
 

@@ -2,6 +2,30 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [4.0.0] — 2026-05-06
+
+### Added
+
+- **Charter skills (v4.0.0):** Each `docs/charter/*.md` domain is now published as a project-level skill in `.github/skills/charter-<domain>/SKILL.md`. Any tool that scans `.github/skills/` (Copilot CLI, VS Code Copilot, etc.) will auto-invoke the relevant charter constraints — no plugin required on the consuming side.
+
+- **Intake tier-based loading (v4.0.0):** `intake` skill Step 5b now implements a charter tier matrix. Tier 1 (non-negotiables, processes, coding-rules) loads for all non-exploratory work. Tier 2 (architecture, flows, tools, integrations) loads for pipeline work (PRD/spec/plan/execute) and infrastructure/tooling tasks. Exploratory work loads nothing.
+
+- **Charter skill publish phase (charter skill Phase 7):** After committing charter files, the charter skill now generates `.github/skills/charter-<domain>/SKILL.md` for each domain, using either the file's `skill_description:` frontmatter or a built-in default description. Committed in one batch: `chore(spec-flow): publish charter skills`.
+
+- **Charter skill sync phase (charter skill Phase U5.5):** The update workflow now re-publishes touched charter domains as updated skills after each per-file commit, keeping `.github/skills/charter-*/SKILL.md` in sync.
+
+- **Self-aware migration (migrate skill v4.0.0):** `spec-flow:migrate` now detects v3+charter+no-skills state automatically and offers a v4 migration path: generates `.github/skills/charter-*/SKILL.md` from existing charter files, bumps `layout_version: 4`, and commits. No `--v4` flag needed.
+
+### Changed
+
+- **`layout_version` semantics:** `layout_version: 4` signals charter skills are published. Hook and intake branch on this value: v4 loads charter via `.github/skills/charter-*/SKILL.md`; v3 falls back to `doctrine_load`.
+
+- **Session-start hook:** On v4 projects, the hook scans `.github/skills/charter-*/SKILL.md` and injects all found charter skills into session context. On v3 projects, existing `doctrine_load` behavior is preserved. On v3+charter+no-skills, a non-blocking migration notice is emitted.
+
+### Deprecated
+
+- **`charter.doctrine_load`** in `.spec-flow.yaml` — honored as fallback on v3 projects; silently ignored on v4.
+
 ## [3.7.9] — 2026-05-04
 
 ### Added

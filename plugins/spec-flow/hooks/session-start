@@ -35,7 +35,29 @@ fi
 
 charter_content=""
 charter_dir="${docs_root}/charter"
-if [ -d "$charter_dir" ]; then
+
+# Detect layout_version
+current_layout=$(grep -E '^layout_version:' "$CONFIG_FILE" 2>/dev/null \
+  | sed -E 's/^layout_version:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]+$//' \
+  | tr -d "\"'" | head -n1 || true)
+current_layout="${current_layout:-3}"
+
+if [ "$current_layout" = "4" ]; then
+  # v4: load all charter skills from .github/skills/charter-*/SKILL.md
+  skills_dir=".github/skills"
+  if [ -d "$skills_dir" ]; then
+    for skill_file in "${skills_dir}"/charter-*/SKILL.md; do
+      [ -f "$skill_file" ] || continue
+      domain=$(basename "$(dirname "$skill_file")")
+      charter_content+=$'\n\n--- skill/'"${domain}"$' ---\n'"$(cat "$skill_file")"
+    done
+  fi
+elif [ -d "$charter_dir" ]; then
+  # v3: check if charter exists but skills aren't published — emit migration notice
+  if ! ls .github/skills/charter-*/SKILL.md >/dev/null 2>&1; then
+    charter_content+=$'\n\n💡 Charter skills not yet published. Run `/spec-flow:migrate` to publish charter constraints as project-level skills (enables enforcement in all tools).'
+  fi
+  # v3 fallback: load via doctrine_load list
   doctrine_line=$(grep -E '^[[:space:]]+doctrine_load:' "$CONFIG_FILE" 2>/dev/null | head -n1 || true)
   doctrine_list=""
   if [ -n "$doctrine_line" ]; then
