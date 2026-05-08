@@ -1,6 +1,6 @@
 # Charter drift check (Phase-1 procedure)
 
-This document specifies the charter-drift check that every spec-flow skill touching a piece runs as part of its Phase-1 setup. The check compares the piece spec's `charter_snapshot:` values against the current `last_updated:` values in `docs/charter/*.md`. When any charter file has advanced past the snapshot, the skill dispatches `qa-spec` in `Input Mode: Focused charter re-review` and either auto-advances the snapshot (clean) or halts the skill (must-fix). There is no escape hatch.
+This document specifies the charter-drift check that every spec-flow skill touching a piece runs as part of its Phase-1 setup. The check compares the piece spec's `charter_snapshot:` values against the current charter dates — v4 projects (`.claude/skills/charter-*/SKILL.md`) use `git log` last-commit dates; v3 projects (`docs/charter/*.md`) use `last_updated:` front-matter. When any charter domain has advanced past the snapshot, the skill dispatches `qa-spec` in `Input Mode: Focused charter re-review` and either auto-advances the snapshot (clean) or halts the skill (must-fix). There is no escape hatch.
 
 ## When to run
 
@@ -17,7 +17,9 @@ Every skill that touches a piece runs this in Phase 1:
 
 The 7-step algorithm (verbatim from spec.md lines 305-313):
 
-1. Load `docs/charter/*.md` front-matter `last_updated:` values into `charter_now`.
+1. Detect charter location and load current dates into `charter_now`:
+   - **v4** (`.claude/skills/charter-non-negotiables/SKILL.md` exists): for each charter domain, run `git log -1 --format=%ci .claude/skills/charter-<domain>/SKILL.md` and store the date as `charter_now[<domain>]`.
+   - **v3** (`<docs_root>/charter/` exists): load each `docs/charter/*.md` front-matter `last_updated:` value into `charter_now[<filename>]`.
 2. Load piece spec's `charter_snapshot:` values into `snapshot`.
 3. For each charter file where `charter_now[file] > snapshot[file]`: mark drifted.
 4. If any drifted: dispatch `qa-spec` with `Input Mode: Focused charter re-review`, passing the full self-contained input bundle from FR-009 (full spec body, drifted charter file bodies, snapshot values, manifest entry, PRD's NN-P section, spec's NN/CR honoring blocks).
@@ -31,7 +33,8 @@ No new agent file is needed: `qa-spec` gains a third `Input Mode` alongside `Ful
 
 The 7-step algorithm above assumes `charter_now[file]` and `snapshot[file]` both exist for every charter file. In practice they may not. Handle these states explicitly:
 
-- **Charter file missing `last_updated:` front-matter.** Refuse the drift check — print `charter file <name> has no last_updated: front-matter; drift cannot be detected. Add the field (or run /spec-flow:charter retrofit) and re-run.` Do not silently treat the missing date as "infinitely old" or "infinitely new."
+- **v3: Charter file missing `last_updated:` front-matter.** Refuse the drift check — print `charter file <name> has no last_updated: front-matter; drift cannot be detected. Add the field (or run /spec-flow:charter retrofit) and re-run.` Do not silently treat the missing date as "infinitely old" or "infinitely new."
+- **v4: Charter skill has no git history** (file exists but `git log` returns empty — e.g., staged but never committed). Refuse the drift check — print `charter skill <domain> has no commit history; drift cannot be detected. Commit the charter file and re-run.`
 - **Spec has no `charter_snapshot:` block at all (legacy pre-charter piece).** Skip the drift check silently and emit a one-line note in the caller's output: `drift check skipped — spec predates charter_snapshot.` This is consistent with `/spec-flow:status`'s passive surfacing rule.
 - **New charter file (in `charter_now`, not in `snapshot`).** Mark drifted. The piece's spec must be re-reviewed against the new file in case it added a new NN-C/NN-P/CR entry.
 - **Removed/renamed charter file (in `snapshot`, not in `charter_now`).** Mark drifted. The piece's spec may cite an entry that no longer exists; re-review surfaces orphaned citations.

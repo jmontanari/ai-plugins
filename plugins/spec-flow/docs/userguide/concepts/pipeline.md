@@ -32,7 +32,7 @@ Each stage produces a concrete file you can read and sign off on. No artifact is
 - **PRD + manifest** → `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml`. A project can have one or more PRDs — each gets its own slug and directory. The PRD captures intent; the manifest enumerates *pieces* — independently-shippable units of work — with status, dependencies, and pointers to their spec and plan once those exist.
 - **Spec** → `docs/prds/<prd-slug>/specs/<piece-name>/spec.md`. Detailed requirements for one piece: acceptance criteria, functional requirements, non-negotiables cited by ID.
 - **Plan** → `docs/prds/<prd-slug>/specs/<piece-name>/plan.md`. File-level implementation plan with Red/Build/Verify/Refactor phases, ordered by dependency.
-- **Executed code** → committed to a worktree branch `spec/<prd-slug>-<piece-name>`, merged to `master` only after the 5-agent final review board clears the diff.
+- **Executed code** → committed to a worktree branch `spec/<prd-slug>-<piece-name>`, merged to `master` only after the 6-agent final review board clears the diff.
 
 ## Reviewers at every boundary
 
@@ -43,7 +43,7 @@ Every artifact passes through an adversarial reviewer before you see the sign-of
 - **qa-spec** reviews each spec before plan authoring
 - **qa-plan** reviews each plan before execute begins
 - **qa-phase** reviews each executed phase before the next starts
-- **review-board** (5 reviewers in parallel: blind, edge-case, spec-compliance, prd-alignment, architecture) reviews the cumulative merge diff before the piece lands
+- **review-board** (6 reviewers in parallel: blind, edge-case, spec-compliance, prd-alignment, architecture, security) reviews the cumulative merge diff before the piece lands
 
 Reviewers have no context from the conversation that produced the artifact. They see only the artifact, the binding context (PRD, charter, spec), and the review criteria. This is deliberate — fresh context means the reviewer finds problems rather than confirming the hunches that shaped the artifact.
 

@@ -4,7 +4,8 @@ docs_root: docs
 worktrees_root: worktrees
 
 # layout_version: docs/ layout schema version
-#   3       — enables multi-PRD docs/prds/<prd-slug>/ layout (v3.0.0+)
+#   4       — enables v4 charter layout (.claude/skills/charter-*/) + multi-PRD docs/prds/<prd-slug>/ layout
+#   3       — enables multi-PRD docs/prds/<prd-slug>/ layout with legacy docs/charter/ (v3.0.0+)
 #   1, 2    — legacy single-PRD layouts (docs/prd/, docs/specs/<piece>/)
 #   absent  — treated as legacy; SessionStart hook emits a yellow warning prompting `/spec-flow:migrate`
 layout_version: 3
@@ -47,7 +48,8 @@ phase_groups: auto
 reflection: auto
 
 # charter: configures the charter stage (new in v2.0.0)
-#   required      — if true, prd/spec/plan skills fail fast when docs/charter/ is missing (piece 3 enforces)
+#   required      — if true, prd/spec/plan skills fail fast when no charter files are found
+#                   (v4: .claude/skills/charter-*/SKILL.md; v3: docs/charter/)
 #                   default: false for backward compat; new projects default to true after running /spec-flow:charter
 #   doctrine_load — list of charter files (by base name) to auto-load into session context via the SessionStart hook
 #                   default: [non-negotiables, architecture]

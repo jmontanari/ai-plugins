@@ -1,5 +1,6 @@
 ---
-last_updated: {{date}}
+name: charter-processes
+description: "{{description}}"
 ---
 
 # Processes

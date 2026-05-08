@@ -1,6 +1,11 @@
 ---
 name: migrate
-description: Use when migrating an existing spec-flow project from v1.x or v2.x layout to v3.0.0 multi-PRD layout. Performs git-mv-based history-preserving moves of docs/prd/ → docs/prds/<slug>/, docs/specs/ → docs/prds/<slug>/specs/, injects v3 front-matter, updates .spec-flow.yaml to layout_version: 3, and writes MIGRATION_NOTES.md. Supports --inspect (dry-run) and --force (override safety checks). Refuses on missing charter, dirty tree, or sibling worktrees by default.
+description: >-
+  Use when migrating an existing spec-flow project from v1.x or v2.x layout to v3.0.0 multi-PRD
+  layout. Performs git-mv-based history-preserving moves of docs/prd/ to docs/prds/<slug>/,
+  docs/specs/ to docs/prds/<slug>/specs/, injects v3 front-matter, updates .spec-flow.yaml to
+  layout_version 3, and writes MIGRATION_NOTES.md. Supports --inspect (dry-run) and --force
+  (override safety checks). Refuses on missing charter, dirty tree, or sibling worktrees by default.
 ---
 
 # Migrate — v1.x / v2.x → v3.0.0 Multi-PRD Layout
@@ -71,7 +76,10 @@ None of these refusals are overrideable by `--force` — they signal a tree stat
 | `docs/prd.md` exists, no `docs/manifest.yaml` | **v0** (pre-charter) |
 | `docs/prd.md` + `docs/manifest.yaml` | **v1** |
 | `docs/prd/prd.md` + `docs/prd/manifest.yaml` | **v2** |
-| `docs/prds/` exists | **v3** |
+| `docs/prds/` exists AND no `.claude/skills/charter-*/SKILL.md` AND no `.github/skills/charter-*/SKILL.md` | **v3** |
+| `docs/prds/` exists AND charter skills present (canonical `.claude/skills/charter-*/SKILL.md` OR legacy `.github/skills/charter-*/SKILL.md`) | **v4** |
+
+For v4 projects whose charter currently lives at `.github/skills/charter-*/SKILL.md`: the canonical Claude Code path is `.claude/skills/charter-*/SKILL.md`. The session-start hook reads either, but new authoring should target `.claude/skills/`. To rename the existing files, run `git mv .github/skills/charter-* .claude/skills/` and commit; no other artifacts change.
 
 (If `docs_root` in `.spec-flow.yaml` is set to something other than `docs`, substitute it in every path above and below.)
 
@@ -79,12 +87,38 @@ Refusal contract:
 
 - **v0 detected:** exit non-zero with message:
   > Pre-charter project detected — please run `/spec-flow:charter` retrofit mode first to seed a charter and a manifest.
-- **v3 detected:** exit non-zero with message:
-  > Already on v3.0.0 layout — no migration needed.
-- **Neither v1 nor v2 detected** (e.g. no PRD at all): exit non-zero with message:
+- **v4 detected:** exit non-zero with message:
+  > Already on v4.0.0 layout — charter skills are published. No migration needed.
+- **v3 detected (with charter, no skills):** continue — offer v3→v4 migration (see Step 1c).
+- **v3 detected (no charter):** exit non-zero with message:
+  > v3 layout detected but no charter found. Run `/spec-flow:charter` to create charter files before migrating to v4.
+- **Neither v1 nor v2 nor v3 detected:** exit non-zero with message:
   > No spec-flow PRD detected at expected paths — run `/spec-flow:prd` first or check that you are at the project root.
 
-Set `src_version` to `v1` or `v2`; carry forward.
+Set `src_version` to `v1`, `v2`, `v3`, or `v4`; carry forward.
+
+### 1c. v3 → v4 migration plan
+
+If `src_version` is `v3`, present this migration plan and prompt for confirmation before proceeding:
+
+```
+Migrate v3 → v4 (charter skills publishing):
+
+Changes:
+  1. Generate .claude/skills/charter-<domain>/SKILL.md for each docs/charter/*.md file
+  2. Bump layout_version: 3 → 4 in .spec-flow.yaml
+  3. Commit both changes
+
+This enables charter constraints to be enforced by any tool that reads .claude/skills/,
+not just the spec-flow plugin.
+
+Proceed? [y/N]
+```
+
+On `N` or Enter: exit 0 (no changes made).
+On `y`: continue to Step 5v4.
+
+For v1/v2 source layouts, skip Step 1c entirely and continue to Step 2 as before.
 
 ---
 
@@ -353,6 +387,61 @@ Commit message scope follows CR-004 (conventional-commits, `spec-flow` scope). D
 On success, print:
 
 > Migration complete. Review `MIGRATION_NOTES.md` and run `git log --follow docs/prds/<slug>/prd.md` to verify history is preserved.
+
+---
+
+## Step 5v4: Execute v3 → v4 migration
+
+**Only reached from Step 1c when `src_version` is `v3` and user confirmed.**
+
+### Safety checks (same as v1/v2)
+
+Run Step 3b (dirty working tree) and Step 3c (sibling worktrees) before making any changes.
+
+### Generate charter skills
+
+For each `.md` file in `<docs_root>/charter/`:
+
+1. Read the file's front-matter for a `skill_description:` field. If present, use it as the skill `description:`. If absent, use the domain default from the charter skill's Phase 7 table.
+
+2. Let `domain` = the file's basename without `.md` extension.
+
+3. Create `.claude/skills/charter-<domain>/SKILL.md`:
+
+```
+---
+name: charter-<domain>
+description: <description>
+---
+
+<full content of docs/charter/<domain>.md>
+```
+
+4. Create `.claude/skills/` directory if it doesn't exist.
+
+### Bump layout_version
+
+Update `.spec-flow.yaml`:
+- If `layout_version:` key exists with value `3`, replace with `layout_version: 4`.
+- If absent, insert `layout_version: 4` after `worktrees_root:` (or at end of file).
+
+### Commit
+
+```bash
+git add .claude/skills/charter-*/
+git add .spec-flow.yaml
+git commit -m "chore(spec-flow): migrate to v4 — publish charter skills"
+```
+
+### Success message
+
+```
+Migration complete. Charter skills published to .claude/skills/charter-*/.
+
+Next steps:
+  - Run /reload-plugins (or start a new session) to activate charter skills.
+  - Any tool reading .claude/skills/ will now enforce charter constraints automatically.
+```
 
 ---
 

@@ -1,15 +1,26 @@
 ---
 name: charter
-description: Use when bootstrapping a new spec-flow project's architectural foundation — producing binding project-wide constraints (architecture, non-negotiables, tools, processes, flows, coding rules) via Socratic dialogue. Also handles updating charter files later (update mode) and migrating existing pre-charter projects (retrofit mode). Use whenever the user mentions "set up the charter", "define architecture rules", "establish non-negotiables", "onboard project foundation", or runs `/spec-flow:charter` directly. Runs before `prd` in the pipeline — charter binds every subsequent PRD, spec, plan, and implementation.
+description: Use when bootstrapping a new spec-flow project's architectural foundation — producing binding project-wide constraints (architecture, non-negotiables, tools, processes, flows, coding rules, integrations) via Socratic dialogue. Also handles updating charter files later (update mode) and migrating existing pre-charter projects (retrofit mode). Use whenever the user mentions "set up the charter", "define architecture rules", "establish non-negotiables", "onboard project foundation", or runs `/spec-flow:charter` directly. Runs before `prd` in the pipeline — charter binds every subsequent PRD, spec, plan, and implementation.
 ---
 
 # Charter — Project-Wide Binding Constraints
 
-Produce a codified, binding set of project-wide constraints in `docs/charter/` via Socratic dialogue. Charter content is referenced by every downstream skill (`prd`, `spec`, `plan`, `execute`) and binds every implementation.
+Produce a codified, binding set of project-wide constraints as project-level skills via Socratic dialogue. Charter skills are the single source of truth — no separate `docs/charter/` directory. Charter content is referenced by every downstream skill (`prd`, `spec`, `plan`, `execute`) and binds every implementation.
+
+**Canonical location:** `.claude/skills/charter-<domain>/SKILL.md` (Claude Code idiomatic). For cross-tool projects that also use GitHub Copilot, `.github/skills/charter-<domain>/SKILL.md` is supported as a back-compat read path by the session-start hook and the downstream skills — write to `.claude/skills/` for new projects unless the project explicitly chose Copilot conventions.
+
+Charter skills use a **two-tier loading model** to balance coverage against context cost:
+
+| Tier | Mechanism | Default domains |
+|---|---|---|
+| **Always-on doctrine** | `doctrine_load` in `.spec-flow.yaml` — injected by session-start hook | `non-negotiables`, `architecture` |
+| **On-demand** | Description-triggered invocation by the host | `tools`, `flows`, `processes`, `coding-rules`, `integrations` |
+
+The session-start hook (v4) reads `doctrine_load` and injects only those charter skills at startup. On-demand skills must have project-specific, trigger-accurate descriptions so the host invokes them when relevant.
 
 ## Step 0: Load Config
 
-Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` for all paths below. If the file is missing, default to `docs`.
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` for docs-rooted paths below. Charter skill files live under `.claude/skills/charter-*/` regardless of `docs_root`. If the file is missing, default to `docs`.
 
 Charter-specific config keys (added in piece 2 — safe defaults if absent):
 - `charter.required` — default `false` in piece 1; piece 2 changes default to `true`
@@ -19,13 +30,13 @@ Charter-specific config keys (added in piece 2 — safe defaults if absent):
 
 Detected from current state:
 
-- **Bootstrap mode** — `docs/charter/` does not exist. Full Socratic flow → write six files → QA → sign-off.
-- **Update mode** (v2.0.0 piece 5) — `docs/charter/` exists and no legacy signals. User wants to change a charter file.
-- **Retrofit mode** (piece 6) — legacy `docs/prd.md` or unprefixed `NN-xxx` detected in existing PRD. Reclassify + migrate. Not implemented until piece 6.
+- **Bootstrap mode** — No `.claude/skills/charter-*/SKILL.md` files exist. Full Socratic flow → write seven files → QA → sign-off.
+- **Update mode** (v2.0.0 piece 5) — `.claude/skills/charter-*/SKILL.md` files exist and no legacy signals. User wants to change a charter file.
+- **Retrofit mode** (piece 6) — legacy `docs/charter/` exists, legacy `docs/prd.md` or `<docs_root>/manifest.yaml` exists at the flat path, or unprefixed `NN-xxx` is detected in the existing PRD. Reclassify + migrate. Not implemented until piece 6.
 
 Explicit mode flags (optional): `/spec-flow:charter --update`, `/spec-flow:charter --retrofit`. Without flags, mode is auto-detected.
 
-If retrofit signals detected (legacy layout or unprefixed NN-xxx) and piece 6 isn't shipped yet, respond: `"Retrofit mode lands in v2.0.0 piece 6. To update existing charter files in the meantime, run /spec-flow:charter --update."`
+If retrofit signals detected (legacy layout including `docs/charter/`, or unprefixed NN-xxx) and piece 6 isn't shipped yet, respond: `"Retrofit mode lands in v2.0.0 piece 6. To update existing charter files in the meantime, run /spec-flow:charter --update."`
 
 ## Bootstrap Mode Workflow
 
@@ -288,13 +299,13 @@ Only proceed to Phase 2 after user confirms.
 After Phase 1.3 confirmation, serialize the Signal Summary to a recoverable format. Offer:
 > "I'll save the confirmed Signal Summary so we can resume if this session is interrupted."
 
-Write to `<docs_root>/charter/.signal-summary.yaml` (gitignored). If the session is interrupted and restarted, the user can instruct the skill to load this file instead of re-running the scan.
+Write to `.claude/skills/.charter-signal-summary.yaml` (gitignored, add to `.gitignore` if absent). If the session is interrupted and restarted, the user can instruct the skill to load this file instead of re-running the scan.
 
 ### Phase 2: Socratic dialogue — section by section
 
 **Present the full section checklist upfront** before asking any questions:
 
-> "We'll work through these sections to build your 6 charter files. Each section builds on the last.
+> "We'll work through these sections to build your 7 charter files. Each section builds on the last.
 > I'll mark each section complete as we finish it.
 >
 > [ ] **A. Tools & Runtime** (tools.md)
@@ -318,6 +329,9 @@ Write to `<docs_root>/charter/.signal-summary.yaml` (gitignored). If the session
 > [ ] **F. Non-Negotiables** (non-negotiables.md)
 >    F1. Surface captured NN candidates  F2. Classify each (NN-C / NN-P / just CR)  F3. User-introduced NNs  F4. Confirm rationale & QA verification
 >
+> [ ] **G. Integrations** (integrations.md)
+>    G1. What external services/MCPs does this project integrate with?  G2. Per-integration: prerequisites, which skills use it, graceful degradation
+>
 > Ready to start with Section A? This will take a while — we're building the foundation everything else relies on."
 
 **Session rules — apply throughout Phase 2:**
@@ -339,7 +353,7 @@ Write to `<docs_root>/charter/.signal-summary.yaml` (gitignored). If the session
   Wait for explicit confirmation before treating it as settled.
 - **Pattern provenance:** every code-derived claim cites specific file paths. Never state "the codebase uses X" without naming at least 2 files.
 - **NN capture flag:** any user answer containing "always," "never," "must," "cannot," "required," "forbidden," or "every X must" → silently queue that statement for Section F review. Do not interrupt the current section — collect and surface later.
-- **Session checkpoints:** every 15 questions, pause: "We've covered a lot — want a break and continue later, or push through?" If continuing later, remind user the Signal Summary is saved at `<docs_root>/charter/.signal-summary.yaml`.
+- **Session checkpoints:** every 15 questions, pause: "We've covered a lot — want a break and continue later, or push through?" If continuing later, remind user the Signal Summary is saved at `.claude/skills/.charter-signal-summary.yaml`.
 - **Per-section mini-confirmation:** at the end of EACH section, before moving to the next: "Here's what I've captured for [section name]: [3–5 bullet summary]. Anything to correct before I move on?"
 - **Unresolved answers** → `[NEEDS CLARIFICATION]` marker in the draft. QA treats these as must-fix.
 
@@ -399,6 +413,133 @@ F2. For each confirmed NN-C or NN-P: confirm the structured schema — Type, Sco
 F3. Any additional NNs the user wants to add that weren't captured by the session or scan.
 F4. Final confirmation: present all NNs with their full schema before closing the section.
 
+**Section G — Integrations** (`integrations.md`)
+
+G1. What external service integrations exist or are planned? (MCP servers, CI systems, external APIs, webhooks) List each.
+G2. For each identified integration: What does it enable? What are the prerequisites to use it (tools to install, credentials to configure)? Which skills invoke it? What happens if it's absent (graceful degradation)?
+G3. Confirm: does the integration handle its own credentials, or does the plugin need to document credential setup? (Answer should always be "integration handles it" per architecture.md — flag if different.)
+
+**G — Jira sub-flow (run when Jira is identified in G1):**
+
+Ask these questions in sequence — one at a time — to gather everything needed to populate the `.spec-flow.yaml` `integrations.issue_tracker` block and the `integrations.md` charter file:
+
+> **G-J1.** What is your Jira instance URL?
+> (e.g. `https://yourorg.atlassian.net` — this becomes `base_url` in `.spec-flow.yaml`)
+
+> **G-J2.** What Jira project key should spec-flow create issues in?
+> (e.g. `EIT`, `PROJ` — this becomes `project_key`)
+
+> **G-J3.** What issue type should be created for each **piece** (the top-level work item per PRD piece)?
+> Common choices: `Epic`, `Story`, `Feature` — default is `Epic`.
+
+> **G-J4.** What issue type should be created for each **phase** inside a piece?
+> Common choices: `Task`, `Sub-task`, `Story` — default is `Task`.
+
+> **G-J5.** Is there a parent issue type above the piece level (e.g. a Capability, Initiative, or Theme)?
+> If yes: what is the type name, and should spec-flow link piece issues to an existing parent issue?
+> If no: skip.
+
+> **G-J6.** Should spec-flow **automatically create** Jira issues when spec and plan skills run?
+> (yes → `auto_create_tasks: true`; no → tasks are created manually)
+
+> **G-J7.** Should spec-flow **automatically transition** Jira issues as phases progress through execute?
+> (yes → `auto_transition: true`; no → transitions are done manually in Jira)
+
+> **G-J8.** **Issue naming formats** — spec-flow uses these defaults for issue titles. The issue type labels (`{piece_issue_type}`, `{phase_issue_type}`) come from your answers to G-J3 and G-J4. Confirm or override the title format:
+>
+> | Issue | Default title format |
+> |-------|----------------------|
+> | `{piece_issue_type}` (one per piece) | `{piece-slug} — {piece description from manifest}` |
+> | `{phase_issue_type}` (one per phase) | `[phase] {piece-slug}/{phase-number} — {phase-name}` |
+>
+> Do these match your team's conventions, or do you need a different format?
+> (If overriding, provide a template using the same `{tokens}`. Stored as `naming.piece_issue` and `naming.phase_issue`; omit if defaults are accepted.)
+
+> **G-J9.** **Status transition rules** — at each pipeline event, spec-flow transitions the relevant issue type. Confirm that these status names match your Jira project's workflow, or rename any that don't:
+>
+> | Event | Issue | Default target status |
+> |-------|-------|-----------------------|
+> | Issue created | `{piece_issue_type}` or `{phase_issue_type}` | `To Do` |
+> | Phase execute starts | `{phase_issue_type}` | `In Progress` |
+> | Phase QA passes | `{phase_issue_type}` | `In Review` |
+> | Final Review Board passes | `{phase_issue_type}` | `Done` |
+> | Non-active tasks after creation | `{phase_issue_type}` | `Backlog` |
+>
+> Only agents running execute may move issues to `In Progress` or `In Review`. Only the Final Review Board pass triggers `Done`.
+> (Stored under `status_map` — omit any entry that matches the default.)
+
+> **G-J10.** **Effort tracking** — how does your team track effort on Tasks in Jira?
+> - **Story points** — abstract point estimate set on the ticket at creation
+> - **Time tracking** — original estimate in hours or days (Jira's built-in time tracking fields)
+> - **Both** — story points for planning velocity, time tracking for actuals
+> - **Neither** — skip effort tracking entirely
+
+**If story points (or both) — field discovery:**
+
+Run before asking the formula question:
+```
+Use: io-sooperset-mcp-atlassian-jira_search_fields(keyword="story point")
+```
+Present results to the user:
+> "I found these story-point-related fields in your Jira instance:
+> - `customfield_XXXXX` — "Story Points" (type: number)
+> - `customfield_YYYYY` — "Story point estimate" (type: number)
+>
+> Which field should spec-flow write when setting story points on Tasks?"
+
+If the tool is unavailable or returns no matches, ask the user to provide the field ID manually (check Jira → Project settings → Fields). Store as `story_points_field`.
+
+> **G-J10a.** **Story point formula** — spec-flow estimates story points as `fib_ceil(phase_days × multiplier)`: multiply the day estimate by the multiplier, then round up to the next Fibonacci number (1, 2, 3, 5, 8, 13, 21 …). 1 story point ~= 1 human work day.
+>
+> Example: 6 days → 6 × 0.5 = 3.0 → **3 pts**. Example: 7 days → 7 × 0.5 = 3.5 → **5 pts**.
+>
+> The default multiplier is `0.5`. Does this fit your team's velocity, or should we adjust it?
+> (Store as `story_points_multiplier` — default `0.5`)
+
+**If time tracking (or both):**
+
+> **G-J10b.** What unit does your team use for original estimates?
+> - **Hours** — stored as `Xh` (e.g. `6h`)
+> - **Days** — stored as `Xd` (e.g. `3d`)
+>
+> spec-flow will set `timetracking.originalEstimate` on each Task at creation, derived from the same day estimate used for story points. Store as `time_tracking_unit: hours|days`.
+
+After all G-J questions are answered, confirm the full Jira block before writing:
+> "Here's what I'll write to `.spec-flow.yaml` under `integrations.issue_tracker`:
+> ```yaml
+> integrations:
+>   issue_tracker:
+>     enabled: true
+>     provider: jira
+>     project_key: <answer>
+>     base_url: <answer>
+>     auto_create_tasks: <answer>
+>     auto_transition: <answer>
+>     piece_issue_type: <answer>
+>     phase_issue_type: <answer>
+>     parent_issue_type: <answer or null>
+>     # story points (omit block if neither/time-only)
+>     story_points_field: <discovered field ID or null>
+>     story_points_multiplier: <answer or 0.5>
+>     # time tracking (omit block if neither/points-only)
+>     time_tracking: <true|false>
+>     time_tracking_unit: <hours|days|null>
+>     # naming (omit entries that match defaults)
+>     naming:
+>       piece_issue: "<override or omit>"
+>       phase_issue: "<override or omit>"
+>     # status names for this project's Jira workflow
+>     status_map:
+>       todo: <answer or "To Do">
+>       in_progress: <answer or "In Progress">
+>       in_review: <answer or "In Review">
+>       done: <answer or "Done">
+>       backlog: <answer or "Backlog">
+> ```
+> Does this look right before I write?"
+
+Per-section mini-confirmation before moving on.
+
 ### Phase 2.5: Charter preview — confirm before writing
 
 Before writing any files, present a section-by-section summary of what each charter file will contain. Ask after each section: "Does this look right? Correct anything before I write." Only write once all sections are approved.
@@ -410,21 +551,60 @@ Format:
 > **coding-rules.md:** [N CR entries planned — list titles with evidence source: "scan-derived" or "user-introduced"]
 > **processes.md:** [branching model, review policy, CI gates — key decisions only]
 > **non-negotiables.md:** [N NN-C entries — list titles + QA verification method]
+> **integrations.md:** [N integrations — list names, required MCPs, and for Jira: project_key, base_url, issue type mapping, auto flags]
 
 A correction here costs one message; a correction post-write costs a QA iteration.
 
 
 ### Phase 3: Write files
 
-Load templates from `${CLAUDE_PLUGIN_ROOT}/templates/charter/`. Populate placeholders from Socratic answers. Write to `<docs_root>/charter/` (default `docs/charter/`). Each file gets front-matter:
+#### Prerequisite: skill-creator must be installed
+
+Charter skills live on disk and are host-invoked by description. A bad description means a charter domain is never consulted. `skill-creator` provides the description optimization loop that makes descriptions reliable — without it, descriptions are guesswork.
+
+Before writing any charter skill file, verify `skill-creator` is available:
+
+```bash
+# Check for skill-creator across both Claude Code and Copilot plugin trees.
+ls ~/.claude/plugins/marketplaces/*/plugins/skill-creator/skills/skill-creator/SKILL.md 2>/dev/null \
+  || ls ~/.claude/plugins/*/skill-creator/skills/skill-creator/SKILL.md 2>/dev/null \
+  || ls ~/.copilot/installed-plugins/*/skill-creator/skills/skill-creator/SKILL.md 2>/dev/null \
+  || ls ~/.copilot/installed-plugins/*/*/skill-creator/skills/skill-creator/SKILL.md 2>/dev/null
+```
+
+**If skill-creator is not found:** Stop and tell the user:
+
+> ⚠️ `skill-creator` plugin is required before writing charter skills. Charter skill descriptions must be optimized for accurate host invocation — generic descriptions result in skills that never trigger.
+> Install skill-creator, then return to Phase 3.
+
+Do not proceed past this gate until the check passes.
+
+---
+
+Load templates from `${CLAUDE_PLUGIN_ROOT}/templates/charter/`. Populate placeholders from Socratic answers.
+
+**Write directly to `.claude/skills/charter-<domain>/SKILL.md`** (create `.claude/skills/charter-<domain>/` if absent). These ARE the authoritative charter files — there is no separate `docs/charter/` directory in the v4 model.
+
+Each skill file uses standard skill frontmatter — NO `last_updated:` field (use `git log` for history):
 
 ```yaml
 ---
-last_updated: YYYY-MM-DD   # today's date in ISO format
+name: charter-<domain>
+description: "<optimized — see description step below>"
 ---
 ```
 
-Charter files live on `main` (not a worktree — charter is project-global, not piece-scoped).
+**Description step — invoke skill-creator:**
+Generic domain-template descriptions are not acceptable. Charter skills cover different domains and serve different audiences; each needs a description that reliably triggers when a contributor is about to do work governed by that domain.
+
+For each domain:
+1. Draft a project-specific description from the Socratic answers: what rules does this domain contain, and what work would a contributor be doing when those rules matter?
+2. Invoke `/skill-creator` and ask it to run the description optimization flow on the draft.
+3. Use the optimized description as the `description:` field. **Always wrap the value in double quotes** — descriptions contain colons which break unquoted YAML scalars.
+
+The 7 domains: `architecture`, `tools`, `flows`, `coding-rules`, `processes`, `non-negotiables`, `integrations`.
+
+Charter skills live on `main` (not a worktree — charter is project-global, not piece-scoped).
 
 ### Phase 4: QA loop
 
@@ -432,7 +612,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 Read the agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-charter.md`.
 
-**Iteration 1 (full review):** Compose prompt with `Input Mode: Full` — interpolate all six charter files, detection signal summary, user-supplied source list. Dispatch:
+**Iteration 1 (full review):** Compose prompt with `Input Mode: Full` — interpolate all seven charter files, detection signal summary, user-supplied source list. Dispatch:
 
 ```
 Agent({
@@ -455,20 +635,51 @@ Agent({
 
 ### Phase 5: Human sign-off
 
-Present the six charter files to the user for review. User approves → continue. User requests changes → make them (back to Phase 2 or 3 scoped to the requested change) → back to Phase 4 QA.
+Present the seven charter files to the user for review. User approves → continue. User requests changes → make them (back to Phase 2 or 3 scoped to the requested change) → back to Phase 4 QA.
 
 ### Phase 6: Commit per file
 
 One commit per file so `git blame` is useful:
 
 ```bash
-git add <docs_root>/charter/architecture.md && git commit -m "charter: add architecture"
-git add <docs_root>/charter/tools.md && git commit -m "charter: add tools"
-git add <docs_root>/charter/flows.md && git commit -m "charter: add flows"
-git add <docs_root>/charter/coding-rules.md && git commit -m "charter: add coding-rules"
-git add <docs_root>/charter/processes.md && git commit -m "charter: add processes"
-git add <docs_root>/charter/non-negotiables.md && git commit -m "charter: add non-negotiables"
+git add .claude/skills/charter-architecture/SKILL.md && git commit -m "charter: add architecture"
+git add .claude/skills/charter-tools/SKILL.md && git commit -m "charter: add tools"
+git add .claude/skills/charter-flows/SKILL.md && git commit -m "charter: add flows"
+git add .claude/skills/charter-coding-rules/SKILL.md && git commit -m "charter: add coding-rules"
+git add .claude/skills/charter-processes/SKILL.md && git commit -m "charter: add processes"
+git add .claude/skills/charter-non-negotiables/SKILL.md && git commit -m "charter: add non-negotiables"
+git add .claude/skills/charter-integrations/SKILL.md && git commit -m "charter: add integrations"
 ```
+
+### Phase 6.5: Initialize project infrastructure
+
+After committing charter files, ensure the project infrastructure is ready for the pipeline.
+
+1. **Create docs directory structure:**
+   ```bash
+   mkdir -p <docs_root>/prds
+   ```
+   Where `<docs_root>` resolves from `.spec-flow.yaml` (default `docs`). This is the root the `prd` skill uses to store PRDs and manifests.
+
+2. **Create or update `.spec-flow.yaml`:**
+
+   - If `.spec-flow.yaml` does not exist: create it from `${CLAUDE_PLUGIN_ROOT}/templates/pipeline-config.yaml`, then apply the values below.
+   - If `.spec-flow.yaml` exists: update in place — preserve all other keys.
+
+   Required values to set:
+   ```yaml
+   layout_version: 4
+   docs_root: <docs_root>   # set if not already present
+   charter:
+     required: true
+     doctrine_load: [non-negotiables, architecture]
+   ```
+
+   ```bash
+   git add .spec-flow.yaml && git commit -m "config: set layout_version 4 and enable charter stage"
+   ```
+
+   If `.spec-flow.yaml` already has `layout_version: 4` and `charter.required: true`, skip the commit (no change).
 
 ### Phase 7: Doctrine wiring reminder
 
@@ -479,21 +690,24 @@ Inform the user after Phase 6:
 
 ## Update Mode Workflow (v2.0.0 piece 5)
 
-Triggered when `docs/charter/` exists and no legacy signals are detected. Purpose: edit one or more charter files with the same Socratic+QA rigor as bootstrap, but scoped to only the touched files.
+Triggered when `.claude/skills/charter-*/SKILL.md` files exist and no legacy signals are detected. Purpose: edit one or more charter files with the same Socratic+QA rigor as bootstrap, but scoped to only the touched files.
 
 ### Phase U1 — Ask which file(s) to edit
 
-Present the six files with their current `last_updated` dates:
+Present the seven files with their current `last committed` dates:
 
 ```
-docs/charter/
-  architecture.md        last_updated: 2026-02-15
-  non-negotiables.md     last_updated: 2026-03-20
-  tools.md               last_updated: 2026-02-15
-  processes.md           last_updated: 2026-02-15
-  flows.md               last_updated: 2026-02-15
-  coding-rules.md        last_updated: 2026-04-01
+.claude/skills/
+  charter-architecture/SKILL.md      last committed: 2026-02-15
+  charter-non-negotiables/SKILL.md   last committed: 2026-03-20
+  charter-tools/SKILL.md             last committed: 2026-02-15
+  charter-processes/SKILL.md         last committed: 2026-02-15
+  charter-flows/SKILL.md             last committed: 2026-02-15
+  charter-coding-rules/SKILL.md      last committed: 2026-04-01
+  charter-integrations/SKILL.md      last committed: 2026-04-10
 ```
+
+Read `last committed` from `git log -1 --format=%ci .claude/skills/charter-<domain>/SKILL.md`.
 
 Ask: "Which file(s) do you want to change? (comma-separated, or 'all')."
 
@@ -509,15 +723,15 @@ Default is **retire**. Retired entries get the tombstone format (strikethrough t
 
 **Add handling:** New NN-C or CR entries get the next sequential unused ID (continuing past retired IDs — never reuse).
 
-**Modify handling:** Keep the same ID, replace the body, bump `last_updated`.
+**Modify handling:** Keep the same ID and replace the body. Git history is the update record — do not add or maintain a `last_updated` field.
 
-### Phase U3 — Write and front-matter bump
+### Phase U3 — Write touched skills
 
-Write each touched file to `<docs_root>/charter/<name>.md`. Update `last_updated: YYYY-MM-DD` in front-matter to today's date.
+Write each touched file to `.claude/skills/charter-<domain>/SKILL.md`. No `last_updated` field — git history is the record.
 
 ### Phase U4 — QA on touched files only
 
-Dispatch `qa-charter` with `Input Mode: Full`, but pass only the touched files in the prompt (not all six). The agent's cross-file consistency checks still run — it will refer to non-touched files if the orchestrator attaches them as read-only context, but only findings on touched files are must-fix (non-touched-file drift is a different update run).
+Dispatch `qa-charter` with `Input Mode: Full`, but pass only the touched files in the prompt (not all seven). The agent's cross-file consistency checks still run — it will refer to non-touched files if the orchestrator attaches them as read-only context, but only findings on touched files are must-fix (non-touched-file drift is a different update run).
 
 Iteration loop is the same as bootstrap mode's Phase 4 (fix-doc diff, focused re-review, 3-iter circuit breaker).
 
@@ -526,12 +740,12 @@ Iteration loop is the same as bootstrap mode's Phase 4 (fix-doc diff, focused re
 Human reviews diffs. On approval, commit each touched file separately:
 
 ```bash
-git add <docs_root>/charter/<file>.md && git commit -m "charter: update <file> — <brief summary>"
+git add .claude/skills/charter-<domain>/SKILL.md && git commit -m "charter: update <domain> — <brief summary>"
 ```
 
 ### Phase U6 — Divergence awareness
 
-After commit, check the manifest for pieces at `specced`, `planned`, or `implementing` status. For any piece whose `charter_snapshot` on any touched file is older than the new `last_updated`, inform the user:
+After commit, check the manifest for pieces at `specced`, `planned`, or `implementing` status. For any piece whose `charter_snapshot` on any touched file is older than the newest touched charter skill commit date, inform the user:
 
 > "The following pieces are now diverged: [list]. Run `/spec-flow:status --resolve <piece-name>` to walk through divergence resolution options."
 
@@ -539,7 +753,7 @@ Do NOT automatically re-spec or re-plan — human decides per piece.
 
 ## Retrofit Mode Workflow (v2.0.0 piece 6)
 
-Triggered when retrofit signals are detected: legacy `<docs_root>/prd.md` at the flat path, unprefixed `NN-xxx` entries in PRD, or `<docs_root>/manifest.yaml` at the legacy path. Also invocable explicitly as `/spec-flow:charter --retrofit`.
+Triggered when retrofit signals are detected: legacy `docs/charter/`, legacy `<docs_root>/prd.md` at the flat path, unprefixed `NN-xxx` entries in PRD, or `<docs_root>/manifest.yaml` at the legacy path. Also invocable explicitly as `/spec-flow:charter --retrofit`.
 
 ### Entry confirmation
 
@@ -581,11 +795,11 @@ Socratic, one entry at a time. For each existing `NN-xxx` in the PRD:
 
 Record all user choices in an in-memory mapping table. No file changes yet.
 
-### Step 3 — Bootstrap Socratic for other five charter files
+### Step 3 — Bootstrap Socratic for other six charter files
 
-Run Phase 2 Socratic (from bootstrap mode above) for the five non-NN files: `architecture.md`, `tools.md`, `processes.md`, `flows.md`, `coding-rules.md`. Use detection signals (Phase 1.1) + any user-supplied sources (Phase 1.2) as priors.
+Run Phase 2 Socratic (from bootstrap mode above) for the six non-NN files: `architecture.md`, `tools.md`, `processes.md`, `flows.md`, `coding-rules.md`, `integrations.md`. Use detection signals (Phase 1.1) + any user-supplied sources (Phase 1.2) as priors.
 
-Additionally, promote the **C** classified NN entries into `<docs_root>/charter/non-negotiables.md` with new sequential `NN-C-001`... IDs. Keep the mapping in state:
+Additionally, promote the **C** classified NN entries into `.claude/skills/charter-non-negotiables/SKILL.md` with new sequential `NN-C-001`... IDs. Keep the mapping in state:
 
 ```
 old NN-003 → NN-C-001
@@ -598,10 +812,13 @@ Persist the mapping table to `<docs_root>/archive/pre-charter-migration-<date>/n
 
 Commit per charter file:
 ```bash
-git add <docs_root>/charter/architecture.md && git commit -m "charter: add architecture (retrofit)"
-git add <docs_root>/charter/tools.md && git commit -m "charter: add tools (retrofit)"
-# ... and so on
-git add <docs_root>/charter/non-negotiables.md && git commit -m "charter: add non-negotiables (from migrated NN-xxx)"
+git add .claude/skills/charter-architecture/SKILL.md && git commit -m "charter: add architecture (retrofit)"
+git add .claude/skills/charter-tools/SKILL.md && git commit -m "charter: add tools (retrofit)"
+git add .claude/skills/charter-flows/SKILL.md && git commit -m "charter: add flows (retrofit)"
+git add .claude/skills/charter-coding-rules/SKILL.md && git commit -m "charter: add coding-rules (retrofit)"
+git add .claude/skills/charter-processes/SKILL.md && git commit -m "charter: add processes (retrofit)"
+git add .claude/skills/charter-non-negotiables/SKILL.md && git commit -m "charter: add non-negotiables (from migrated NN-xxx)"
+git add .claude/skills/charter-integrations/SKILL.md && git commit -m "charter: add integrations (retrofit)"
 ```
 
 ### Step 4 — Layout migration via `git mv`
@@ -616,6 +833,8 @@ git mv <docs_root>/improvement-backlog.md <docs_root>/backlog/backlog.md   # if 
 
 (Per-piece artifacts at `<docs_root>/specs/<piece>/` already match the new layout — no moves needed.)
 
+If `docs/charter/` exists (v3 legacy), the charter retrofit step removes it — charter content was migrated to `.claude/skills/charter-*/SKILL.md` by the charter skill itself.
+
 Commit: `chore: migrate docs/ layout to charter structure (retrofit)`
 
 ### Step 5 — Rewrite PRD
@@ -624,7 +843,7 @@ Update `<docs_root>/prd/prd.md`:
 
 1. Drop the unprefixed `## Non-Negotiables` section.
 2. Add `## Non-Negotiables (Product)` section. Each NN-P classified entry gets renumbered per the mapping (NN-P-001, NN-P-002, ...) and converted to structured schema (Type / Statement / Scope / Rationale / How QA verifies).
-3. Add `**Charter:** docs/charter/ (NN-C namespace — project-wide binding rules; applies to every piece)` reference line near the top (matches `templates/prd.md`).
+3. Add `**Charter:** .claude/skills/charter-*/SKILL.md (NN-C namespace — project-wide binding rules; applies to every piece)` reference line near the top (matches `templates/prd.md`).
 4. Update any inline references in the PRD body text (e.g., "see NN-003" → "see NN-C-001").
 
 Commit: `prd: promote NN to namespaces, reference charter (retrofit)`

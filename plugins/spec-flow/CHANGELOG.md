@@ -2,6 +2,150 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
+## [4.4.0] — 2026-05-07
+
+### Changed
+
+- **Charter skills now canonical at `.claude/skills/charter-<domain>/SKILL.md`:** v4 charter skills moved from `.github/skills/` to `.claude/skills/` to match Claude Code's idiomatic project-skill convention. The session-start hook reads from either location (preferring `.claude/skills/`), so existing v4 projects with charter at `.github/skills/` continue to work unchanged. Downstream skills (`prd`, `spec`, `plan`, `execute`, `intake`, `migrate`, `charter`, `charter-drift-check`, `pipeline-config.yaml` template) now treat `.claude/skills/` as the canonical write path. The `migrate` skill's v4 detection accepts charter at either path; the `charter` skill writes new bootstrap/retrofit output to `.claude/skills/`. The `charter` skill's `skill-creator` prereq check now also looks at `~/.claude/plugins/marketplaces/` (Claude Code's plugin tree), not only `~/.copilot/installed-plugins/`. **Migration for existing `.github/skills/`-layout v4 projects:** `git mv .github/skills/charter-* .claude/skills/` and commit; no other artifacts change.
+
+
+
+### Added
+
+- **`review-board-security` — 6th Final Review agent (security audit):** New agent added to the end-of-piece Final Review board, expanding it from 5 to 6 parallel reviewers. The security agent performs an exhaustive SAST+semantic security audit grounded in:
+  - **CWE Top 25 (2024)** — all 25 entries prioritized by CVE frequency × exploitability weight, with highest-confidence automated checks (XSS/CWE-79, SQL Injection/CWE-89, OS Command Injection/CWE-78, Path Traversal/CWE-22, Hardcoded Credentials/CWE-798, SSRF/CWE-918, Code Injection/CWE-94 — which jumped 12 ranks in 2024 due to LLM/eval usage).
+  - **OWASP Top 10:2025** — full coverage including the two new 2025 categories: A03 (Software Supply Chain Failures) and A10 (Mishandling of Exceptional Conditions).
+  - **Chain-of-thought methodology** — agent is prompted to trace data flows step-by-step (source → transformation → sanitization check → sink) before emitting any finding. Research (arXiv:2311.16169) shows this improves F1 by +0.18 over direct prompting on real-world vulnerability datasets.
+  - **Two-axis output** — each finding carries both `severity` (critical/high/medium/low) and `confidence` (high/medium/low with `vuln` vs `audit` subcategory), matching Semgrep's finding schema. Only `critical`/`high` severity + `medium`/`high` confidence findings are `must-fix`; audit-subcategory findings surface as notes for human review.
+  - **Language-specific anti-patterns** — concrete patterns drawn from `semgrep/semgrep-rules` for Python, JavaScript/TypeScript, Go, Java, and Rust.
+  - **Prompt injection coverage** — flags user-controlled text passed unsanitized to LLM prompts and untrusted tool call results fed back without validation (CWE-94).
+  - **Supply chain checks** — unpinned dependencies without integrity hashes, secrets baked into build artifacts, permissive CORS/CSP defaults, over-permissioned plugin manifests.
+
+- **`execute` skill updated for 6-agent panel:** `Step 1` dispatch block now dispatches all six reviewers concurrently. `Step 2` triage and `Step 3` fix loop updated to collect from / re-dispatch all 6. `Step 8` Final Review Triage updated: trigger condition references all six reviewers; `source_agent` enum now includes `security`; re-entry condition references all six.
+
+- **Userguide docs updated:** `docs/userguide/commands/execute.md` and `docs/userguide/concepts/qa-loop.md` updated with the 6-agent table and corrected agent counts throughout.
+
+
+
+### Fixed
+
+- **`charter-integrations` now tracked in `charter_snapshot` — stops false-positive drift:** `spec/SKILL.md` Phase 1 step 3 was capturing only the 6 binding constraint domains (architecture, non-negotiables, tools, processes, flows, coding-rules), omitting `integrations`. `plan/SKILL.md` was already capturing all 7. Because `integrations` was in `charter_now` but absent from the spec's `snapshot`, the "new charter file" rule in `charter-drift-check.md` would fire on every plan/execute run and flag drift that wasn't real. Fix: spec now snapshots `integrations` too (omitted only when `charter-integrations` is absent/Jira not configured). `spec.md` template updated with `integrations: {{date}}` key. QA prompt updated from "all six" to "all seven".
+
+
+
+### Added
+
+- **Jira naming conventions and status transition rules in `charter-integrations/SKILL.md`:** Formal naming format for `{piece_issue_type}` (`{piece-slug} — {description}`) and `{phase_issue_type}` (`[phase] {piece-slug}/{N} — {phase-name}`), plus a status transition table specifying which pipeline event drives each issue to `To Do` / `In Progress` / `In Review` / `Done` / `Backlog`. Both use `{piece_issue_type}` / `{phase_issue_type}` tokens so they work for any configured issue type (not just Epic/Task).
+
+- **Effort tracking configuration (story points, time tracking, or both):** `charter/SKILL.md` Section G Jira sub-flow now branches on team's tracking method. Story points: auto-discovers the correct Jira custom field via `jira_search_fields`, stores `story_points_field` and `story_points_multiplier`. Time tracking: stores `time_tracking: true` and `time_tracking_unit: hours|days`. Both modes supported simultaneously. Story point formula updated to `fib_ceil(estimate × multiplier)` — rounds up to the next Fibonacci number after applying the multiplier.
+
+- **`naming` and `status_map` blocks in `.spec-flow.yaml`:** `naming.piece_issue` / `naming.phase_issue` allow per-project title format overrides (default `~` = use built-in format). `status_map` explicitly records the five Jira status names (`todo`, `in_progress`, `in_review`, `done`, `backlog`) so skills reference project-specific names rather than hardcoded strings.
+
+- **`charter/SKILL.md` G-J sub-flow expanded to 10 questions (G-J1–G-J10):** New G-J8 prompts for naming convention confirmation/override; new G-J9 presents the full status transition table for confirmation/correction. G-J10 (effort tracking) replaces the former G-J9. Charter preview block updated to include `naming`, `status_map`, `story_points_field`, `story_points_multiplier`, `time_tracking`, and `time_tracking_unit`.
+
+- **Task Creation Defaults and Status Transition Rules in `integration-capability-check.md`:** Reference now includes naming convention table and status transition table using `status_map.*` key references, so any skill reading the capability check has the full picture in one place.
+
+### Fixed
+
+- **Story point formula corrected to Fibonacci rounding:** All occurrences of `ceil(estimate × 0.5)` updated to `fib_ceil(estimate × 0.5)` — rounds up to the next Fibonacci number (1, 2, 3, 5, 8, 13, 21 …) rather than plain ceiling. Updated in `charter-integrations/SKILL.md`, `integration-capability-check.md`, and `charter/SKILL.md`.
+
+- **Hardcoded "Epic"/"Task" replaced with `{piece_issue_type}` / `{phase_issue_type}` tokens** throughout naming conventions, status transition tables, and charter sub-flow questions — ensures the rules apply correctly regardless of the configured issue type names.
+
+## [4.3.1] — 2026-05-07
+
+### Fixed
+
+- **`project_key` and `base_url` added to Jira integration config:** `.spec-flow.yaml` `integrations.issue_tracker` block now includes both `project_key: EIT` (required by `create_issue` MCP tool) and `base_url: https://se-ivan.atlassian.net` (used by skills to construct browsable issue links).
+
+- **`spec` and `plan` skills now pass `project_key` on issue creation and record `base_url`-derived links:** Both create-issue blocks pass `integration_cfg.project_key` to the MCP tool and write browsable `epic_url` / `jira_url` fields (constructed from `integration_cfg.base_url`) alongside the raw issue key in spec.md and plan.md front-matter.
+
+- **`integration-capability-check.md` documents both required Jira fields:** Reference now lists `project_key` and `base_url` as required Jira fields with clear descriptions of how each is used by the skills.
+
+## [4.3.0] — 2026-05-07
+
+### Added
+
+- **Jira integration enabled in `.spec-flow.yaml`:** Root config now includes the `integrations.issue_tracker` block with `provider: jira`, `auto_create_tasks: true`, `auto_transition: true`, and documented keys for issue type mapping and commit tag format. Set `enabled: true/false` to activate or deactivate without removing config.
+
+### Fixed
+
+- **`execute` skill v4 charter path for integration config:** Integration config load (Step 0) previously used the v3 path (`<docs_root>/charter/<charter_file>.md`) only. Now detects v4 (`.github/skills/charter-integrations/SKILL.md` exists) and falls back to v3, matching the pattern in `spec` and `plan`.
+
+- **`execute` skill operation name `transition_task` → `transition_issue`:** Three integration blocks (phase start, QA pass, Final Review / merge) referenced a non-existent operation name `transition_task`. Corrected to `transition_issue` per `plugins/spec-flow/reference/integration-capability-check.md`.
+
+- **`integration-capability-check.md` Jira tool names:** Default Jira MCP tool names had a spurious `-docker-` segment (e.g., `io-sooperset-mcp-atlassian-docker-jira_create_issue`). Corrected to `io-sooperset-mcp-atlassian-jira_create_issue` (and matching names for `transition_issue`, `get_issue`, `get_transitions`) to match the actual Atlassian MCP server tool surface.
+
+
+### Added
+
+- **Charter Phase 6.5 — project infrastructure init:** Charter skill bootstrap now creates the `<docs_root>/prds/` directory and writes (or updates) `.spec-flow.yaml` with `layout_version: 4` and `charter.required: true` after committing the seven charter skill files. New projects no longer need a manual `.spec-flow.yaml` edit to unlock the full pipeline.
+
+### Fixed
+
+- **`prd` skill v4 charter detection:** Step 0.5 now auto-detects charter location (`v4` → `.github/skills/charter-*/SKILL.md`; `v3` → `<docs_root>/charter/`; `none`). Previously, `prd` hard-checked `<docs_root>/charter/` and errored on v4 projects even when charters existed in `.github/skills/`. NN-C append and `git add` in Step 10 branch on the detected variant.
+
+- **`spec` skill v4 charter paths:** Phase 1 steps 3, 5, 7, 8 and Phase 4 step 2 now use `charter_variant` to read from `.github/skills/charter-*/SKILL.md` (v4) or `<docs_root>/charter/` (v3). `charter_snapshot` uses `git log` last-commit dates for v4 instead of `last_updated:` front-matter (v4 skills carry no such field).
+
+- **`plan` skill v4 charter paths:** Step 0 integration config, charter-drift check reference, Phase 1 charter file exploration, and `plan.md` `charter_snapshot` population all updated to detect and use the correct v4/v3 paths.
+
+- **`charter-drift-check.md` reference:** Algorithm step 1 now detects v4 vs v3 and loads charter dates accordingly (`git log` for v4, `last_updated:` for v3). Missing-field handling adds a v4-specific case for charter skills with no commit history.
+
+- **`pipeline-config.yaml` template:** Documents `layout_version: 4` and corrects the `charter.required` comment to show both v4 and v3 paths.
+
+
+
+### Fixed
+
+- **Charter skill frontmatter quoting:** The Phase 3 template for `description:` now wraps the value in double quotes and includes an explicit instruction to always quote. Descriptions containing colons (e.g. "se-plugins structural constraints: ...") previously broke YAML parsing, causing `charter-*` skills to fail to load with "Nested mappings are not allowed in compact mappings."
+
+## [4.1.0] — 2026-05-06
+
+### Added
+
+- **Two-tier charter loading model:** Charter skills now use a selective context model. `doctrine_load` in `.spec-flow.yaml` controls which domains are injected at session start (always-on, default: `non-negotiables` + `architecture`). All other charter domains are on-demand skills — triggered by description when relevant. Eliminates the ~6k token always-on overhead of bulk-loading all 7 charter skills.
+
+- **Integrations charter domain:** New `charter-integrations/SKILL.md` for external integration constraints (Jira MCP, CI systems, webhooks). Session-start hook and charter skill Phase 2 checklist and Section G questions support this domain.
+
+- **skill-creator description optimization in Phase 3:** Charter skill Phase 3 now includes a step to draft project-specific, trigger-accurate descriptions for each charter skill and optionally invoke `/skill-creator` for description optimization.
+
+### Fixed
+
+- **v4 hook bulk-load bug:** Session-start hook was loading all 7 charter skills on every session start regardless of `doctrine_load`. Now respects the `doctrine_load` list in v4, matching behavior with v3.
+
+- **Charter skill file frontmatter:** Removed stale `last_updated:` field from all charter skill files. Git history is the record. QA check updated accordingly.
+
+- **qa-charter agent:** Updated for 7 charter files (was 6); frontmatter check updated from `last_updated:` to `name:` + `description:` with project-specificity requirement.
+
+### Changed
+
+- **Charter single-source model (v4):** `docs/charter/` directory removed. `.github/skills/charter-*/SKILL.md` is the sole authoritative location. Charter skill writes directly there — no separate publish step.
+
+- **Charter skill descriptions:** All 7 charter skill descriptions replaced with project-specific, trigger-accurate text (se-plugins constraints, NN-C references, concrete invocation triggers).
+
+## [4.0.0] — 2026-05-06
+
+### Added
+
+- **Charter skills (v4.0.0):** Each `docs/charter/*.md` domain is now published as a project-level skill in `.github/skills/charter-<domain>/SKILL.md`. Any tool that scans `.github/skills/` (Copilot CLI, VS Code Copilot, etc.) will auto-invoke the relevant charter constraints — no plugin required on the consuming side.
+
+- **Intake tier-based loading (v4.0.0):** `intake` skill Step 5b now implements a charter tier matrix. Tier 1 (non-negotiables, processes, coding-rules) loads for all non-exploratory work. Tier 2 (architecture, flows, tools, integrations) loads for pipeline work (PRD/spec/plan/execute) and infrastructure/tooling tasks. Exploratory work loads nothing.
+
+- **Charter skill publish phase (charter skill Phase 7):** After committing charter files, the charter skill now generates `.github/skills/charter-<domain>/SKILL.md` for each domain, using either the file's `skill_description:` frontmatter or a built-in default description. Committed in one batch: `chore(spec-flow): publish charter skills`.
+
+- **Charter skill sync phase (charter skill Phase U5.5):** The update workflow now re-publishes touched charter domains as updated skills after each per-file commit, keeping `.github/skills/charter-*/SKILL.md` in sync.
+
+- **Self-aware migration (migrate skill v4.0.0):** `spec-flow:migrate` now detects v3+charter+no-skills state automatically and offers a v4 migration path: generates `.github/skills/charter-*/SKILL.md` from existing charter files, bumps `layout_version: 4`, and commits. No `--v4` flag needed.
+
+### Changed
+
+- **`layout_version` semantics:** `layout_version: 4` signals charter skills are published. Hook and intake branch on this value: v4 loads charter via `.github/skills/charter-*/SKILL.md`; v3 falls back to `doctrine_load`.
+
+- **Session-start hook:** On v4 projects, the hook scans `.github/skills/charter-*/SKILL.md` and injects all found charter skills into session context. On v3 projects, existing `doctrine_load` behavior is preserved. On v3+charter+no-skills, a non-blocking migration notice is emitted.
+
+### Deprecated
+
+- **`charter.doctrine_load`** in `.spec-flow.yaml` — honored as fallback on v3 projects; silently ignored on v4.
+
 ## [3.7.9] — 2026-05-04
 
 ### Added

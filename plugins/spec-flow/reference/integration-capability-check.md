@@ -57,6 +57,8 @@ and continue with the rest of the skill. Do NOT fail, do NOT retry.
 | `get_transitions` | execute (resolve valid next status before transitioning) | `get_transitions` |
 
 **Issue type mapping is project-defined in `charter/integrations.md`** via:
+- `project_key:` — **required for Jira** — the Jira project key where all issues are created (e.g. `EIT`, `PROJ`). Read from `integrations.issue_tracker.project_key` in `.spec-flow.yaml`. Passed as the `project_key` parameter to every `create_issue` call.
+- `base_url:` — **required for Jira** — base URL of the Jira instance (e.g. `https://se-ivan.atlassian.net`). Read from `integrations.issue_tracker.base_url` in `.spec-flow.yaml`. Used by skills to construct browsable issue links of the form `<base_url>/browse/<issue-key>` recorded in spec.md, plan.md, and surfaced in status output. NOT passed to MCP tools (the MCP server manages its own connection config).
 - `piece_issue_type:` — issue type for each piece (e.g. Epic, Story, Feature)
 - `phase_issue_type:` — issue type for each phase (e.g. Task, Sub-task, Story)
 - `parent_issue_type:` — optional parent above the piece (e.g. Capability, Initiative, Theme)
@@ -72,10 +74,10 @@ and continue with the rest of the skill. Do NOT fail, do NOT retry.
 
 ### jira (Atlassian MCP server)
 ```yaml
-create_issue:    io-sooperset-mcp-atlassian-docker-jira_create_issue
-transition_issue: io-sooperset-mcp-atlassian-docker-jira_transition_issue
-get_issue:       io-sooperset-mcp-atlassian-docker-jira_get_issue
-get_transitions: io-sooperset-mcp-atlassian-docker-jira_get_transitions
+create_issue:    io-sooperset-mcp-atlassian-jira_create_issue
+transition_issue: io-sooperset-mcp-atlassian-jira_transition_issue
+get_issue:       io-sooperset-mcp-atlassian-jira_get_issue
+get_transitions: io-sooperset-mcp-atlassian-jira_get_transitions
 ```
 
 ### linear
@@ -122,13 +124,46 @@ If the charter file is absent:
   `ℹ️ No charter/integrations.md found — using provider defaults for task naming and transitions.`
 - Then proceed with these built-in defaults (`piece_issue_type` = Epic, `phase_issue_type` = Task):
 
-| Event | Default action |
-|-------|----------------|
-| Spec Phase 2 starts | Create piece issue (type from `piece_issue_type`): `{piece-slug} — {description}`; link to `parent_key:` if set in prd.md |
-| Plan signed off | Create phase issues (type from `phase_issue_type`): `[phase] {piece-slug}/{N} — {phase-name}`; link to piece issue |
-| Phase execute starts | Transition phase issue → `In Progress` |
-| Phase QA passes | Transition phase issue → `In Review` |
-| Final Review passes | Transition all phase issues → `Done` |
+**Naming conventions** (using configured `piece_issue_type` / `phase_issue_type`):
+
+| Issue | Format |
+|-------|--------|
+| `{piece_issue_type}` (one per piece) | `{piece-slug} — {piece description from manifest}` |
+| `{phase_issue_type}` (one per phase) | `[phase] {piece-slug}/{phase-number} — {phase-name}` |
+
+**Status transitions** (status names from `integrations.issue_tracker.status_map`):
+
+| Event | Issue | Target Status |
+|-------|-------|--------------|
+| `{piece_issue_type}` created | `piece_issue_type` | `status_map.todo` |
+| `{phase_issue_type}` created | `phase_issue_type` | `status_map.todo` |
+| Phase execute starts | `phase_issue_type` | `status_map.in_progress` |
+| Phase QA passes | `phase_issue_type` | `status_map.in_review` |
+| Final Review Board passes | `phase_issue_type` | `status_map.done` |
+| Non-active tasks (post-creation) | `phase_issue_type` | `status_map.backlog` |
+
+> Agents may only move `{phase_issue_type}` issues to `in_progress` or `in_review` mid-flight.
+> Only the Final Review Board pass gates a `done` transition.
+
+---
+
+## Task Creation Defaults
+
+Applied when creating Tasks for a piece's phases (i.e. during `create_phase_issue`). **Not applied to piece-level issues (Epics).**
+
+**Story Points** (Task / `phase_issue_type` only):
+> Estimate the human effort to complete the phase in days, then apply: `fib_ceil(estimate × 0.5)` — multiply the day estimate by 0.5, then round up to the next Fibonacci number (1, 2, 3, 5, 8, 13, 21 …). 1 story point ~= 1 human work day.
+>
+> Example: a phase estimated at 6 days → 6 × 0.5 = 3.0 → next Fibonacci ≥ 3 = **3 points**.
+> Example: a phase estimated at 7 days → 7 × 0.5 = 3.5 → next Fibonacci ≥ 3.5 = **5 points**.
+>
+> If the phase has no explicit duration estimate in plan.md, derive from the number of implementation sub-steps or leave unset.
+
+**Assignee:**
+> Set to the current user performing the plan sign-off (i.e. the person running `/spec-flow:plan`).
+
+**Initial Status:**
+> All Tasks are created in `To Do`. After creation, move every Task that is **not** currently being executed to `Backlog`. Move a Task to `In Progress` only when its phase begins in execute.
 
 ---
 

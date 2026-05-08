@@ -6,6 +6,7 @@ charter_snapshot:
   processes: {{date}}
   flows: {{date}}
   coding-rules: {{date}}
+  integrations: {{date}}
 ---
 
 <!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->

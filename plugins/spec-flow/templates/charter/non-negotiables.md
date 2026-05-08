@@ -1,5 +1,6 @@
 ---
-last_updated: {{date}}
+name: charter-non-negotiables
+description: "{{description}}"
 ---
 
 # Non-Negotiables (Project)

@@ -132,13 +132,13 @@ Non-TDD mode is a piece-level decision, declared in the plan's front-matter as `
 
 **What stays the same:**
 - Phase QA (`qa-phase`) runs on every phase.
-- Final Review (5-agent board) runs after all phases.
+- Final Review (6-agent board) runs after all phases.
 - Reflection (Step 4.5) runs normally.
 - Circuit breakers, escape hatches, and escalation rules are identical.
 - The `implementer` agent still runs, but in `Mode: Implement`.
 - The `refactor` agent still runs when the phase has a `[Refactor]` checkbox.
 
-Non-TDD mode is a valid, complete choice. It is not a "reduced" version of TDD -- it is a different strategy with different trade-offs. The pipeline remains rigorous: every phase still gets adversarial QA review and the final piece still gets a 5-agent review board.
+Non-TDD mode is a valid, complete choice. It is not a "reduced" version of TDD -- it is a different strategy with different trade-offs. The pipeline remains rigorous: every phase still gets adversarial QA review and the final piece still gets a 6-agent review board.
 
 ## Where to go next
 

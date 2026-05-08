@@ -1,6 +1,15 @@
 ---
 name: spec
-description: Use when authoring a detailed specification for a piece from the spec-flow manifest — including when the user says "spec out X", "write a spec for Y", "let's design the next piece", or wants to start work on the next `open` piece. Brainstorms with the user one question at a time, creates a worktree on a feature branch, writes the spec, runs adversarial QA review, and gets human sign-off before advancing. Use whenever the pipeline is in a state where the next move is to spec a piece — even if the user doesn't explicitly say "spec".
+description: >-
+  Use when the user wants to brainstorm, design, or think through how a feature or piece of work
+  should behave — before writing code. This is the primary entry point for any "what should X do?"
+  conversation. Brainstorms requirements one question at a time, writes a spec with acceptance
+  criteria, runs adversarial QA review, and gets human sign-off before advancing. Trigger on
+  "brainstorm", "let's think through", "how should X work", "design this", "figure out the
+  requirements", "think through the design", "what do we need to build", "acceptance criteria for",
+  "design doc", "let's design the next piece", "spec out X", "write a spec for Y", or any time the
+  user wants to clarify behavior and constraints before planning or building. Also triggers whenever
+  the pipeline has an open piece ready to spec — even if the user doesn't say "spec" explicitly.
 ---
 
 # Spec — Author Spec for One Piece
@@ -24,13 +33,25 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 1. Read `docs/prds/<prd-slug>/manifest.yaml` — find the target piece (from user argument or next `open` piece). Resolve `<prd-slug>` from the user's argument or by scanning `docs/prds/*/manifest.yaml` for the next `open` piece across PRDs. Capture both `<prd-slug>` (owning PRD) and `<piece-slug>` (target piece) for use throughout the skill — every path below is parameterized on these two slugs.
 2. Read `docs/prds/<prd-slug>/prd.md` — extract the PRD sections mapped to this piece
-3. Read `<docs_root>/charter/` — load any charter files present (architecture.md, non-negotiables.md, tools.md, processes.md, flows.md, coding-rules.md). If the charter directory is absent, fall back to reading the legacy `<docs_root>/architecture/` folder. Capture each charter file's `last_updated:` front-matter value for the `charter_snapshot` front-matter written in Phase 3.
+3. Load charter constraints — auto-detect location:
+   - **v4** (`.claude/skills/charter-non-negotiables/SKILL.md` exists): Read each charter skill file present from `.claude/skills/charter-*/SKILL.md` (architecture, non-negotiables, tools, processes, flows, coding-rules, integrations). For `charter_snapshot`, capture last-commit dates via `git log -1 --format=%ci .claude/skills/charter-<domain>/SKILL.md` for each domain — v4 skills have no `last_updated:` front-matter; git history is the record. If `charter-integrations` is absent (Jira not configured), omit its key from the snapshot.
+   - **v3** (`<docs_root>/charter/` exists): Read charter files present (architecture.md, non-negotiables.md, tools.md, processes.md, flows.md, coding-rules.md, integrations.md). Capture each file's `last_updated:` front-matter value for `charter_snapshot`. If `integrations.md` is absent, omit its key.
+   - **Neither**: Fall back to reading the legacy `<docs_root>/architecture/` folder if present. No `charter_snapshot` applicable.
+
+   Record the detected variant (`v4`, `v3`, or `legacy`) as `charter_variant` for use throughout this skill.
 4. Scan `<docs_root>/prds/<prd-slug>/specs/*/learnings.md` — load learnings from previously completed pieces in this PRD
-5. Scan for binding rules across namespaces: `<docs_root>/charter/non-negotiables.md` (NN-C), `<docs_root>/prds/<prd-slug>/prd.md` for `NN-P-xxx` entries in the Non-Negotiables (Product) section, `<docs_root>/charter/coding-rules.md` (CR), and any `NN-xxx` entries in `CLAUDE.md`. Pre-charter projects with unprefixed `NN-xxx` in the PRD still work — treat them as legacy and mention in Phase 2 that retrofitting would reclassify them.
+5. Scan for binding rules across namespaces using paths from `charter_variant`:
+   - **NN-C**: v4 → `.claude/skills/charter-non-negotiables/SKILL.md`; v3 → `<docs_root>/charter/non-negotiables.md`; legacy/none → no project-level NNs yet
+   - **NN-P**: `<docs_root>/prds/<prd-slug>/prd.md` (Non-Negotiables (Product) section) — same for all variants
+   - **CR**: v4 → `.claude/skills/charter-coding-rules/SKILL.md`; v3 → `<docs_root>/charter/coding-rules.md`
+   - **Legacy NN-xxx**: any unprefixed `NN-xxx` in `CLAUDE.md` or the PRD — treat as legacy; mention in Phase 2 that retrofitting would reclassify them.
 6. Read `<docs_root>/prds/<prd-slug>/backlog.md` if it exists. This is the PRD-local backlog — it accumulates end-of-piece reflection findings from prior pieces in this PRD (future opportunities deferred to later pieces of the same PRD). For each item recorded, semantic-match against this piece's name (from manifest) and the user's brainstorm prompt; surface the ~5 most-relevant items as candidate considerations during Phase 2 brainstorm. Track user responses in orchestrator state for Phase 5 prune (statuses: `incorporated` — addressed by this piece's spec; `deferred` — still relevant but not in this piece's scope; `obsolete` — no longer applies). If the file does not exist (first piece on a new PRD), skip silently. If `reflection: off` is set but the file exists from a previous run, still read it — stale findings from past reflections may still be useful brainstorm context. (Process-retro items live in the global `<docs_root>/improvement-backlog.md`; that file is touched only by the reflection-process-retro agent and is out of scope for this skill.)
 6a. **Dependency precondition check (FR-4 of pi-010-discovery, AC-5).** Run the resolution + status + triage logic specified in `plugins/spec-flow/reference/depends-on-precondition.md` against the target piece's `depends_on:` list, read from the manifest entry loaded in step 1 (`docs/prds/<prd-slug>/manifest.yaml`). For each ref, resolve per the reference doc's "Reference resolution" section (qualified `<dep-prd-slug>/<dep-piece-slug>` against `docs/prds/<dep-prd-slug>/manifest.yaml`; bare `<dep-piece-slug>` against the current PRD's manifest). On resolution failure, refuse with the exact resolution-failure refusal string from the reference doc — do NOT prompt for triage on a malformed/missing ref. On successful resolution, classify each dep's `status:` per the reference doc's "Status interpretation" section. If every resolved dep is `merged` or `done`, this step is a silent no-op (no prompt, no recorded state) and Phase 1 continues to step 7 (NN-C-005). If any resolved dep has a transient or structural-failure status, render the three-option triage prompt verbatim from the reference doc's "Triage options at spec/plan time" section (literal `(1) pull-deps-in`, `(2) fork`, `(3) proceed` markers; one bullet per unmet dep). Record the operator's choice and the per-dep status snapshot in orchestrator state keyed for Phase 3's spec.md authoring step to read. **Structural-failure statuses (`superseded`, `blocked`) refuse the `(3) proceed` option** — apply that rule symmetrically to the spec-time prompt per the reference doc.
-7. **Charter-drift check.** If the target piece's `spec.md` already exists and carries a `charter_snapshot:` front-matter (i.e., this is an update/amend re-run, not a greenfield first-run), execute the charter-drift procedure specified in `plugins/spec-flow/reference/charter-drift-check.md`: compare the spec's `charter_snapshot:` values against the `last_updated:` values captured in step 3, and on any drift dispatch `qa-spec` with `Input Mode: Focused charter re-review` per that reference. On `clean`: auto-advance the snapshot and continue. On `must-fix`: halt the skill and surface findings — no escape hatch. Skip this step on greenfield runs (no spec yet, nothing to drift).
-8. **Integration config load.** If `integrations.issue_tracker.enabled: true` in `.spec-flow.yaml`, read `<docs_root>/charter/<charter_file>.md` (default `charter/integrations.md`) for task naming and status transition rules. If the file is absent, proceed with built-in defaults (see `plugins/spec-flow/reference/integration-capability-check.md`). Store the resolved config as `integration_cfg` for use in later steps. If integration is disabled or the key is absent, set `integration_cfg = null` and skip all integration steps below.
+7. **Charter-drift check.** If the target piece's `spec.md` already exists and carries a `charter_snapshot:` front-matter (i.e., this is an update/amend re-run, not a greenfield first-run), execute the charter-drift procedure specified in `plugins/spec-flow/reference/charter-drift-check.md`: compare the spec's `charter_snapshot:` values against the current charter dates captured in step 3 (v4: `git log` last-commit date per domain; v3: `last_updated:` front-matter per file), and on any drift dispatch `qa-spec` with `Input Mode: Focused charter re-review` per that reference. On `clean`: auto-advance the snapshot and continue. On `must-fix`: halt the skill and surface findings — no escape hatch. Skip this step on greenfield runs (no spec yet, nothing to drift).
+8. **Integration config load.** If `integrations.issue_tracker.enabled: true` in `.spec-flow.yaml`, read the integrations charter file for task naming and status transition rules — path depends on `charter_variant`:
+   - v4: `.claude/skills/charter-integrations/SKILL.md`
+   - v3: `<docs_root>/charter/<charter_file>.md` (key `charter_file` from `.spec-flow.yaml`, default `integrations`)
+   If the file is absent, proceed with built-in defaults (see `plugins/spec-flow/reference/integration-capability-check.md`). Store the resolved config as `integration_cfg` for use in later steps. If integration is disabled or the key is absent, set `integration_cfg = null` and skip all integration steps below.
 
 ### Phase 2: Brainstorm
 
@@ -39,10 +60,12 @@ Run the capability check from `plugins/spec-flow/reference/integration-capabilit
 for operation `create_piece_issue`. If the tool is available:
 - Read `parent_key:` from `<docs_root>/prds/<prd-slug>/prd.md` front-matter. If present,
   use it as the parent when creating the piece issue (links to the parent in the hierarchy).
-- Create an issue of type `integration_cfg.piece_issue_type` using the piece naming convention
-  from `integration_cfg` (default: `{piece-slug} — {piece description from manifest}`).
+- Create an issue of type `integration_cfg.piece_issue_type` in project `integration_cfg.project_key`
+  using the piece naming convention from `integration_cfg`
+  (default: `{piece-slug} — {piece description from manifest}`).
 - Record the returned issue key as `epic_key` in orchestrator state AND write it to
-  spec.md front-matter as `epic_key: <key>` so plan and execute skills can find it.
+  spec.md front-matter as `epic_key: <key>` and `epic_url: <integration_cfg.base_url>/browse/<key>`
+  so plan, execute, and status skills can find and link to it.
 On tool unavailable → emit warning → skip.
 
 Socratic dialogue with the user, one question at a time. **Prefer multiple-choice questions** when possible — they're faster to answer than open-ended. Ask one question per message; if a topic needs more exploration, break it into sequential messages.
@@ -91,7 +114,7 @@ Socratic dialogue with the user, one question at a time. **Prefer multiple-choic
    - **Operator chose `(1) pull-deps-in`:** write spec.md and append a `## Dependency Triage` section using the format from the reference doc — one bullet per unmet dep, each rendered as ``- `<ref>` (status: `<status>` at <YYYY-MM-DD>) — Operator chose pull-deps-in; spec covers prerequisite behavior in §<section>.`` (or the Phase 0 variant per the reference doc's "Resolution values" list, depending on whether the absorption is documented in the spec body or deferred to plan-time Phase 0). The Goal / Scope / FR / AC sections of spec.md must be authored to also cover the dep's behavior — the unmet-dep entry should only be removed from `depends_on:` once the prerequisite is actually covered in this spec.
    - **Operator chose `(2) fork`:** halt the skill immediately with the exact refusal string `Refused — fork chosen; spec the prerequisite piece <ref> first.` (substituting each unmet dep's `<ref>` if more than one is unmet, one refusal line per dep). Write NO spec.md, create NO commits, do not advance to Phase 4. The operator's next action is to switch to the prerequisite piece and run `/spec-flow:spec` on it.
    - **Operator chose `(3) proceed --ignore-deps`:** write spec.md and append a `## Dependency Triage` section with one bullet per unmet dep rendered as ``- `<ref>` (status: `<status>` at <YYYY-MM-DD>) — Operator override; deps remain unmet at spec time.`` Recall that `(3) proceed` is refused for structural-failure statuses (`superseded`, `blocked`) at step 6a — if execution reaches this branch, every unmet dep is in a transient-status class.
-5. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/spec.md` as the structural guide. Populate the `charter_snapshot:` front-matter with each charter file's `last_updated` date captured in Phase 1 step 3. If a charter file is absent, omit its key from the snapshot block (do not write a blank/null value).
+5. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/spec.md` as the structural guide. Populate the `charter_snapshot:` front-matter with the charter dates captured in Phase 1 step 3: v4 → `git log` last-commit date per domain; v3 → `last_updated:` value per file. If a charter file or domain is absent, omit its key from the snapshot block (do not write a blank/null value).
 
 ### Phase 4: QA Loop
 
@@ -99,7 +122,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 1. Read the agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-spec.md`
 
-2. **Iteration 1 (full review):** Compose prompt with `Input Mode: Full`: interpolate the full spec, PRD sections, charter files (all six if present — architecture, non-negotiables (NN-C), tools, processes, flows, coding-rules (CR); else legacy `docs/architecture/`), manifest piece, and NN-P from the PRD's Non-Negotiables (Product) section. Dispatch:
+2. **Iteration 1 (full review):** Compose prompt with `Input Mode: Full`: interpolate the full spec, PRD sections, charter files (all seven if present — architecture, non-negotiables (NN-C), tools, processes, flows, coding-rules (CR), integrations; paths per `charter_variant` from Phase 1 step 3: v4 → `.claude/skills/charter-*/SKILL.md`, v3 → `<docs_root>/charter/`, legacy → `<docs_root>/architecture/`), manifest piece, and NN-P from the PRD's Non-Negotiables (Product) section. Dispatch:
    ```
    Agent({
      description: "Spec QA for <prd-slug>/<piece-slug> (iter 1, full)",

@@ -1,5 +1,6 @@
 ---
-last_updated: {{date}}
+name: charter-coding-rules
+description: "{{description}}"
 ---
 
 # Coding Rules

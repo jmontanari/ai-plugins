@@ -1,6 +1,16 @@
 ---
 name: prd
-description: Use when importing an existing PRD into the spec-flow pipeline, decomposing it into implementable pieces, onboarding a new project that already has requirements docs (BMad, speckit, a Notion export, or a plain `prd.md`), or reviewing PRD fulfillment after all pieces are complete. Also handles creating a PRD from scratch via structured interview, and updating the manifest when the PRD changes or the user wants to add/reprioritize pieces. Use whenever the user mentions "import my PRD", "create a PRD", "set up spec-flow", "onboard this project", or "validate we built everything the PRD asked for".
+description: >-
+  Use when the user has formal requirements to structure, import, or decompose — not for
+  brainstorming. Handles creating a PRD from scratch via structured interview when the user
+  already knows what they want to build at a high level, importing an existing requirements doc
+  (BMad, speckit, Notion export, plain prd.md), decomposing a PRD into implementable pieces for
+  the spec-flow pipeline, and reviewing PRD fulfillment after all pieces ship. Also updates the
+  manifest when the PRD changes or the user wants to reprioritize. Trigger on "create a PRD",
+  "import my PRD", "set up spec-flow", "onboard this project", "break this into pieces",
+  "write up requirements", "define the scope", "roadmap", "user stories",
+  "validate we built everything", or "I have a requirements doc". For open-ended brainstorming
+  about how something should work, use the spec skill instead.
 ---
 
 # PRD — Import, Create, Normalize, Decompose
@@ -15,9 +25,17 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 Read the `charter:` block from `.spec-flow.yaml` (added in v2.0.0). Two keys: `required` (default `false`) and `doctrine_load`.
 
-- If `charter.required: true` and `<docs_root>/charter/` does not exist → respond with: *"Charter is required for this project but `<docs_root>/charter/` is missing. Run `/spec-flow:charter` first to bootstrap the charter, then re-run `prd`."* Halt.
-- If `<docs_root>/charter/` exists → continue; charter content is available for PRD import (you can cite `NN-C-xxx` from `<docs_root>/charter/non-negotiables.md` when classifying PRD constraints).
-- If `<docs_root>/charter/` does not exist and `charter.required: false` → continue. Treat this as a pre-charter project; the PRD holds all non-negotiables as unprefixed `NN-xxx` (legacy) until the project chooses to retrofit.
+**Auto-detect charter location** (check in this order):
+1. **v4** — `.claude/skills/charter-non-negotiables/SKILL.md` exists → charter lives at `.claude/skills/charter-*/SKILL.md`
+2. **v3** — `<docs_root>/charter/` directory exists → charter lives at `<docs_root>/charter/`
+3. **none** — neither exists
+
+Record the detected variant as `charter_variant` (`v4`, `v3`, or `none`) for use in later steps.
+
+- If `charter.required: true` and `charter_variant == none` → respond with: *"Charter is required for this project but no charter files were found at `.claude/skills/charter-*/SKILL.md` or `<docs_root>/charter/`. Run `/spec-flow:charter` first to bootstrap the charter, then re-run `prd`."* Halt.
+- If `charter_variant == v4` → continue; cite `NN-C-xxx` entries from `.claude/skills/charter-non-negotiables/SKILL.md` when classifying PRD constraints.
+- If `charter_variant == v3` → continue; cite `NN-C-xxx` entries from `<docs_root>/charter/non-negotiables.md` when classifying PRD constraints.
+- If `charter_variant == none` and `charter.required: false` → continue. Treat this as a pre-charter project; the PRD holds all non-negotiables as unprefixed `NN-xxx` (legacy) until the project chooses to retrofit.
 
 **Legacy layout detection:** if `<docs_root>/prd.md` exists at the legacy flat path (v1.5.x and prior) rather than `<docs_root>/prd/prd.md`, present the retrofit offer: *"Detected legacy docs layout (pre-v2.0). Run `/spec-flow:charter --retrofit` to migrate to the new charter-aware layout — nine-step, commit-per-step, fully revertable."* Then pause:
 
@@ -97,8 +115,10 @@ Read the confirmed source PRD and reorganize its content into the template struc
 - Extract assumptions → `## Assumptions`
 - Extract open questions → `## Open Questions`
 - Extract constraints / non-negotiables:
-  - If charter exists (`<docs_root>/charter/non-negotiables.md`), classify each constraint:
-    - Project-wide (security, compliance, architecture, tooling) → propose adding to charter as `NN-C-xxx`. Ask the user to confirm; if accepted, append to `<docs_root>/charter/non-negotiables.md` with the next sequential NN-C ID.
+  - If `charter_variant` is `v4` or `v3`, classify each constraint:
+    - Project-wide (security, compliance, architecture, tooling) → propose adding to charter as `NN-C-xxx`. Ask the user to confirm; if accepted, append the new entry to the charter non-negotiables file:
+      - v4: `.claude/skills/charter-non-negotiables/SKILL.md`
+      - v3: `<docs_root>/charter/non-negotiables.md`
     - Product-specific (tied to this PRD) → number as `NN-P-001, NN-P-002, ...` in the `## Non-Negotiables (Product)` section of `prd.md`.
   - If charter does not exist (legacy pre-charter project) → number as unprefixed `NN-001, NN-002, ...` in the PRD's legacy `## Non-Negotiables` section. Retrofit (piece 6) will reclassify later.
 
@@ -212,7 +232,9 @@ This step exists ONLY for legacy import artifacts (BMad `_bmad-output/`, old han
 **Step 10: Commit**
 
 - v3 layout: `git add <docs_root>/prds/<prd-slug>/prd.md <docs_root>/prds/<prd-slug>/manifest.yaml <docs_root>/prds/<prd-slug>/backlog.md`
-- Also stage any `<docs_root>/charter/non-negotiables.md` updates if you appended NN-C entries in step 2a.
+- Also stage any charter non-negotiables updates if you appended NN-C entries in step 2a:
+  - v4: `git add .claude/skills/charter-non-negotiables/SKILL.md`
+  - v3: `git add <docs_root>/charter/non-negotiables.md`
 - Also stage `<docs_root>/archive/` only if step 9 actually moved scrap there.
 - `git commit -m "feat(<prd-slug>): import and normalize PRD, create manifest"`
 

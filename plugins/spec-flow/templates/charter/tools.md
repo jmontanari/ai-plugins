@@ -1,5 +1,6 @@
 ---
-last_updated: {{date}}
+name: charter-tools
+description: "{{description}}"
 ---
 
 # Tools
