@@ -4,7 +4,7 @@ docs_root: docs
 worktrees_root: worktrees
 
 # layout_version: docs/ layout schema version
-#   4       — enables v4 charter layout (.claude/skills/charter-*/) + multi-PRD docs/prds/<prd-slug>/ layout
+#   4       — enables v4 charter layout (.github/skills/charter-*/) + multi-PRD docs/prds/<prd-slug>/ layout
 #   3       — enables multi-PRD docs/prds/<prd-slug>/ layout with legacy docs/charter/ (v3.0.0+)
 #   1, 2    — legacy single-PRD layouts (docs/prd/, docs/specs/<piece>/)
 #   absent  — treated as legacy; SessionStart hook emits a yellow warning prompting `/spec-flow:migrate`
@@ -49,7 +49,7 @@ reflection: auto
 
 # charter: configures the charter stage (new in v2.0.0)
 #   required      — if true, prd/spec/plan skills fail fast when no charter files are found
-#                   (v4: .claude/skills/charter-*/SKILL.md; v3: docs/charter/)
+#                   (v4: .github/skills/charter-*/SKILL.md; v3: docs/charter/)
 #                   default: false for backward compat; new projects default to true after running /spec-flow:charter
 #   doctrine_load — list of charter files (by base name) to auto-load into session context via the SessionStart hook
 #                   default: [non-negotiables, architecture]
@@ -71,14 +71,36 @@ charter:
 #     provider: jira                     # jira | linear | github-issues | azure-devops | custom
 #
 #     # Provider-specific config
-#     jira:
-#       project_key: PROJ
-#       base_url: https://team.atlassian.net
+#     project_key: PROJ
+#     base_url: https://team.atlassian.net
 #
 #     # Behavior flags
 #     auto_create_tasks: true            # create tasks on spec/plan events
 #     auto_transition: true             # transition tasks on phase/QA events
 #     commit_tag_format: "[{issue_key}]" # prefix injected into commit messages
+#
+#     # Issue hierarchy — ordered parent-to-child chain of Jira issue types.
+#     # Each entry's parent is the entry above it.
+#     # managed: false  — exists before spec-flow; key recorded manually in the artifact.
+#     # managed_by: <skill> — created and key recorded by that skill.
+#     # artifact: which spec-flow file holds this level's key (prd | spec | plan).
+#     # key_field: field name written into that artifact's front-matter (standardized: jira_key).
+#     # naming: ~ uses built-in default title format for that level.
+#     hierarchy:
+#       - type: Epic          # top-level (e.g. Epic, Initiative, Theme)
+#         managed: false      # create manually; record key as jira_key: in prd.md
+#         artifact: prd
+#         key_field: jira_key
+#       - type: Story         # per-piece (e.g. Story, Epic, Feature)
+#         managed_by: spec    # spec skill creates + records in spec.md[jira_key]
+#         artifact: spec
+#         key_field: jira_key
+#         naming: ~
+#       - type: SubTask       # per-phase (e.g. SubTask, Task)
+#         managed_by: plan    # plan skill creates one per phase + records in plan.md[jira_key]
+#         artifact: plan
+#         key_field: jira_key
+#         naming: ~
 #
 #     # MCP tool map: override defaults with explicit tool names.
 #     # null = use provider default (see reference/integration-capability-check.md).
@@ -88,7 +110,10 @@ charter:
 #       get_issue: ~
 #       get_transitions: ~
 #
-#     # Integration rules file (base name only — resolves to <docs_root>/charter/<name>.md)
-#     # Teams fill this in; skills read it; it defines task naming, status transition
-#     # rules, commit message format, and issue hierarchy.
-#     charter_file: integrations         # → charter/integrations.md
+#     # Status names for this project's Jira workflow
+#     status_map:
+#       todo: "To Do"
+#       in_progress: "In Progress"
+#       in_review: "In Review"
+#       done: "Done"
+#       backlog: "Backlog"

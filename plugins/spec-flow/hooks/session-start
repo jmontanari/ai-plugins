@@ -43,34 +43,27 @@ current_layout=$(grep -E '^layout_version:' "$CONFIG_FILE" 2>/dev/null \
 current_layout="${current_layout:-3}"
 
 if [ "$current_layout" = "4" ]; then
-  # v4: load only doctrine_load-listed charter skills.
-  # Prefer .claude/skills/charter-<domain>/SKILL.md (Claude Code idiomatic).
-  # Fall back to .github/skills/charter-<domain>/SKILL.md (Copilot / cross-tool projects).
+  # v4: load only doctrine_load-listed charter skills from .github/skills/charter-<domain>/SKILL.md.
   # Other charter domains are available as on-demand skills (description-triggered by the host).
   # If doctrine_load is absent or empty, nothing is injected — rely entirely on skill triggering.
+  skills_dir=".github/skills"
   doctrine_line=$(grep -E '^[[:space:]]+doctrine_load:' "$CONFIG_FILE" 2>/dev/null | head -n1 || true)
   doctrine_list=""
   if [ -n "$doctrine_line" ]; then
     doctrine_list=$(printf '%s' "$doctrine_line" | sed -E 's/.*\[([^]]*)\].*/\1/' | tr ',' '\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
   fi
-  if [ -n "$doctrine_list" ]; then
+  if [ -n "$doctrine_list" ] && [ -d "$skills_dir" ]; then
     while IFS= read -r name; do
       [ -z "$name" ] && continue
-      skill_file=""
-      if [ -f ".claude/skills/charter-${name}/SKILL.md" ]; then
-        skill_file=".claude/skills/charter-${name}/SKILL.md"
-      elif [ -f ".github/skills/charter-${name}/SKILL.md" ]; then
-        skill_file=".github/skills/charter-${name}/SKILL.md"
-      fi
-      if [ -n "$skill_file" ]; then
+      skill_file="${skills_dir}/charter-${name}/SKILL.md"
+      if [ -f "$skill_file" ]; then
         charter_content+=$'\n\n--- charter/'"${name}"$' ---\n'"$(cat "$skill_file")"
       fi
     done <<< "$doctrine_list"
   fi
 elif [ -d "$charter_dir" ]; then
-  # v3: check if charter exists but skills aren't published — emit migration notice.
-  # Skills may live under .claude/skills/ (Claude Code) or .github/skills/ (Copilot); check both.
-  if ! ls .claude/skills/charter-*/SKILL.md .github/skills/charter-*/SKILL.md >/dev/null 2>&1; then
+  # v3: check if charter exists but skills aren't published — emit migration notice
+  if ! ls .github/skills/charter-*/SKILL.md >/dev/null 2>&1; then
     charter_content+=$'\n\n💡 Charter skills not yet published. Run `/spec-flow:migrate` to publish charter constraints as project-level skills (enables enforcement in all tools).'
   fi
   # v3 fallback: load via doctrine_load list

@@ -1,6 +1,6 @@
 # Charter drift check (Phase-1 procedure)
 
-This document specifies the charter-drift check that every spec-flow skill touching a piece runs as part of its Phase-1 setup. The check compares the piece spec's `charter_snapshot:` values against the current charter dates — v4 projects (`.claude/skills/charter-*/SKILL.md`) use `git log` last-commit dates; v3 projects (`docs/charter/*.md`) use `last_updated:` front-matter. When any charter domain has advanced past the snapshot, the skill dispatches `qa-spec` in `Input Mode: Focused charter re-review` and either auto-advances the snapshot (clean) or halts the skill (must-fix). There is no escape hatch.
+This document specifies the charter-drift check that every spec-flow skill touching a piece runs as part of its Phase-1 setup. The check compares the piece spec's `charter_snapshot:` values against the current charter dates — v4 projects (`.github/skills/charter-*/SKILL.md`) use `git log` last-commit dates; v3 projects (`docs/charter/*.md`) use `last_updated:` front-matter. When any charter domain has advanced past the snapshot, the skill dispatches `qa-spec` in `Input Mode: Focused charter re-review` and either auto-advances the snapshot (clean) or halts the skill (must-fix). There is no escape hatch.
 
 ## When to run
 
@@ -18,7 +18,7 @@ Every skill that touches a piece runs this in Phase 1:
 The 7-step algorithm (verbatim from spec.md lines 305-313):
 
 1. Detect charter location and load current dates into `charter_now`:
-   - **v4** (`.claude/skills/charter-non-negotiables/SKILL.md` exists): for each charter domain, run `git log -1 --format=%ci .claude/skills/charter-<domain>/SKILL.md` and store the date as `charter_now[<domain>]`.
+   - **v4** (`.github/skills/charter-non-negotiables/SKILL.md` exists): for each charter domain, run `git log -1 --format=%ci .github/skills/charter-<domain>/SKILL.md` and store the date as `charter_now[<domain>]`.
    - **v3** (`<docs_root>/charter/` exists): load each `docs/charter/*.md` front-matter `last_updated:` value into `charter_now[<filename>]`.
 2. Load piece spec's `charter_snapshot:` values into `snapshot`.
 3. For each charter file where `charter_now[file] > snapshot[file]`: mark drifted.

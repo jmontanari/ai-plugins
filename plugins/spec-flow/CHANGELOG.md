@@ -2,13 +2,63 @@
 
 All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the plugin uses [Semantic Versioning](https://semver.org/).
 
-## [4.4.0] — 2026-05-07
+## [Unreleased]
+
+## [4.6.2] — 2026-05-14
+
+### Added
+- **`intake` Step 1b — pending Jira transitions**: at session start, intake now checks for pieces with `status: merged` whose Jira tasks are still `In Review` (left open after PR-based merges). When the Jira MCP is available and tasks are found, prompts the operator to mark them `Done`. Capped at 3 pieces per intake session; fully silent when MCP is unavailable.
+
+## [4.6.1] — 2026-05-14
+
+### Changed
+- Shortened `charter`, `execute`, and `defer` skill descriptions to keyword-focused summaries, eliminating Claude Code's skill listing truncation warning (was exceeding 1% context budget).
+
+## [4.6.0] — 2026-05-10
+
+### Added
+
+- **Fast mode** (`fast: true` in plan front-matter): skips per-phase QA agent dispatches (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`); replaces per-phase verify agent dispatch with a direct test-command shell invocation (exit-code check, 2-attempt circuit breaker); adds `verify` in new `Mode: Piece Full` as a 7th parallel member of the end-of-piece Final Review board. Reduces QA token cost by ~52% on a 10-phase piece (~$18.50 → ~$7) with acceptable risk tradeoff for non-security-critical work. See `skills/plan/SKILL.md` for usage guidance and when-to-use criteria.
+
+- **`verify` agent — `Mode: Piece Full`**: piece-scoped test quality review. Applies all 11 theater patterns across the full piece test surface (cross-phase patterns visible only at piece scope), AC binding check against all spec ACs, and over-engineering scan. Does not re-run the test suite (per-phase direct test runs already confirmed green). Dispatched only in fast mode as the 7th Final Review board member.
+
+- **`fast:` field in `templates/plan.md`**: new `fast: false` field in plan front-matter template with inline comments explaining when to use it.
+
+- **`fast:` field documented in `plan/SKILL.md`**: new "Fast Mode Preference" section after TDD Preference Resolution. Reads `fast:` from `.spec-flow.yaml`, explains appropriate use cases, and ensures `fast:` is present in finalized front-matter.
+
+## [4.5.0] — 2026-05-08
+
+### Added
+
+- **PRD branching strategy captured at PRD creation time:** `prd` skill brainstorm gains step **4l** — elicits three fields written to `manifest.yaml` front-matter: `feature_branch:` (accumulator branch all piece branches base off and merge into), `merge_target:` (where the accumulator merges when the full PRD ships; default `master`), and `pr_required:` (piece → accumulator merge requires PR; default `true`). These are read by downstream skills so the correct branching topology is enforced automatically — no per-session configuration or tribal knowledge required.
+
+- **`templates/manifest.yaml` updated with branching fields:** Default values `feature_branch: null`, `merge_target: master`, `pr_required: true` with explanatory comments. `null` feature_branch = work goes directly on the default branch (single-track PRD).
+
+- **`v3-path-conventions.md` — PRD branching model section:** Documents the two-tier branch topology (`merge_target → feature_branch → piece branches`), the three manifest fields, four invariants all skills must enforce (worktree base, no direct PRD commits to `merge_target:`, accumulator ships as one PR, non-PRD work goes to `merge_target:` directly).
 
 ### Changed
 
-- **Charter skills now canonical at `.claude/skills/charter-<domain>/SKILL.md`:** v4 charter skills moved from `.github/skills/` to `.claude/skills/` to match Claude Code's idiomatic project-skill convention. The session-start hook reads from either location (preferring `.claude/skills/`), so existing v4 projects with charter at `.github/skills/` continue to work unchanged. Downstream skills (`prd`, `spec`, `plan`, `execute`, `intake`, `migrate`, `charter`, `charter-drift-check`, `pipeline-config.yaml` template) now treat `.claude/skills/` as the canonical write path. The `migrate` skill's v4 detection accepts charter at either path; the `charter` skill writes new bootstrap/retrofit output to `.claude/skills/`. The `charter` skill's `skill-creator` prereq check now also looks at `~/.claude/plugins/marketplaces/` (Claude Code's plugin tree), not only `~/.copilot/installed-plugins/`. **Migration for existing `.github/skills/`-layout v4 projects:** `git mv .github/skills/charter-* .claude/skills/` and commit; no other artifacts change.
+- **`spec` skill worktree creation reads `feature_branch:` from manifest:** Phase 3 step 3 now reads `feature_branch:` before creating the worktree. If set, passes it as the base: `git worktree add {{worktree_root}} -b piece/... <feature_branch>`. Fails explicitly if the branch doesn't exist — no silent fallback to `master`. Phase 5 branch-ownership note updated to reference all three manifest fields.
 
 
+### Changed
+
+- **Jira hierarchy config refactor — `hierarchy:` replaces flat type fields:** The `integrations.issue_tracker` section of `.spec-flow.yaml` no longer uses `piece_issue_type`, `phase_issue_type`, or `parent_issue_type`. These are replaced by an ordered `hierarchy:` list where each entry declares its Jira issue type, which skill manages it (`managed_by:` / `managed: false`), which artifact stores its key (`artifact:`), and the key field name (`key_field: jira_key`). Parent relationship is positional — each entry's parent is the entry above it in the list. This makes the full parent-child chain self-describing and supports any depth (2-level through N-level hierarchies).
+
+- **`jira_key:` standardization — single field name at every hierarchy level:** All artifact front-matter fields that previously used inconsistent names are renamed to `jira_key:` (+ `jira_url:`):
+  - `prd.md` front-matter: `parent_key:` → `jira_key:`
+  - `spec.md` front-matter: `epic_key:` → `jira_key:`, `epic_url:` → `jira_url:`
+  - `plan.md` per-phase: `jira_task:` → `jira_key:`
+
+- **Parent enforcement in spec skill:** `spec` skill Phase 2 now traverses the hierarchy to find the parent level (entry above `managed_by: spec`), reads its key from the declared `artifact` + `key_field`, and **refuses to create the piece issue if the parent key is absent** from the parent artifact's front-matter. The key is passed as `additional_fields: {"parent": "<key>"}` to `create_issue`.
+
+- **Parent enforcement in plan skill:** `plan` skill create-phase-issue step now reads the parent key from `spec.md[jira_key]` and passes `additional_fields: {"parent": "<key>"}`.
+
+- **charter skill questionnaire updated:** G-J3–G-J9 questions and the YAML preview block now emit the `hierarchy:` list shape instead of the old flat `piece_issue_type`/`phase_issue_type`/`parent_issue_type` fields. G-J5 clarified that parent-level issues are `managed: false` (manually created; key recorded by humans).
+
+- **Reference docs and template updated:** `reference/jira-integration-config.md`, `reference/integration-capability-check.md`, and `templates/pipeline-config.yaml` all updated to document and demonstrate the new `hierarchy:` schema.
+
+## [4.4.0] — 2026-05-07
 
 ### Added
 

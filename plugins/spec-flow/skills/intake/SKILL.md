@@ -53,6 +53,29 @@ than forcing the user to type names from memory.
 
 ---
 
+## Step 1b: Pending Jira transitions
+
+After loading pipeline state, check for any piece that needs a `Done` transition from a
+prior PR-based merge. This step runs silently and non-blockingly — it never delays the main
+intake flow.
+
+1. From the status output, collect all pieces with manifest `status: merged` that have at
+   least one `jira_key:` field in their `spec.md` or `plan.md`.
+2. For each such piece, run the capability check for `get_issue` (Jira MCP tool).
+   - If available: query the Jira task. If the task's current status is `In Review` (or
+     equivalent — the `pr` path transitions to this status at PR open time), prompt:
+     > "🔔 **[prd/piece]** was merged. Jira [EIT-NNN] is still `In Review`. Mark as Done?"
+     Present choices: `["Yes — transition to Done", "Skip for now"]`
+     On "Yes": transition the task to `Done` via `transition_issue`, then continue.
+   - If unavailable: skip silently (do NOT block or warn).
+3. Process at most 3 pending pieces per intake session to keep startup fast. If more exist,
+   note the count and suggest running intake again after the first batch.
+
+**This step is a no-op when all merged pieces have Jira tasks already in `Done`, or when
+no `jira_key:` fields are found, or when the Jira tool is unavailable.**
+
+---
+
 ## Step 2: Attempt auto-classification
 
 Check the user's message for unambiguous signals before asking any questions.
@@ -234,7 +257,7 @@ layout_version="${layout_version:-3}"
 
 **Check for v3 migration notice** (non-blocking — emit once, do not block work):
 
-If `layout_version` is `3` AND `<docs_root>/charter/` exists AND no `.claude/skills/charter-*/SKILL.md` files are present, emit:
+If `layout_version` is `3` AND `<docs_root>/charter/` exists AND no `.github/skills/charter-*/SKILL.md` files are present, emit:
 
 > 💡 Charter skills not yet published. Run `/spec-flow:migrate` to publish charter constraints as project-level skills, enabling enforcement across all tools (editors, CI, etc.).
 
@@ -264,15 +287,15 @@ If `layout_version` is `3` AND `<docs_root>/charter/` exists AND no `.claude/ski
 | `exploratory` | none | (skip loading) |
 | vague/unclassified | Tier 1 | non-negotiables, processes, coding-rules |
 
-**v4 loading (`.claude/skills/charter-*/SKILL.md` present):**
+**v4 loading (`.github/skills/charter-*/SKILL.md` present):**
 
 Invoke each charter skill matching the tier matrix above. Skills are invoked by reading their SKILL.md file into context — they carry their own descriptions and will persist.
 
 ```
 Invoke:
-  .claude/skills/charter-non-negotiables/SKILL.md
-  .claude/skills/charter-processes/SKILL.md
-  .claude/skills/charter-coding-rules/SKILL.md
+  .github/skills/charter-non-negotiables/SKILL.md
+  .github/skills/charter-processes/SKILL.md
+  .github/skills/charter-coding-rules/SKILL.md
   [+ tier 2 domains if applicable]
 ```
 

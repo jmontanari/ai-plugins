@@ -1,11 +1,9 @@
 ---
 name: migrate
 description: >-
-  Use when migrating an existing spec-flow project from v1.x or v2.x layout to v3.0.0 multi-PRD
-  layout. Performs git-mv-based history-preserving moves of docs/prd/ to docs/prds/<slug>/,
-  docs/specs/ to docs/prds/<slug>/specs/, injects v3 front-matter, updates .spec-flow.yaml to
-  layout_version 3, and writes MIGRATION_NOTES.md. Supports --inspect (dry-run) and --force
-  (override safety checks). Refuses on missing charter, dirty tree, or sibling worktrees by default.
+  Migrate v1.x/v2.x spec-flow layout to v3.0.0 multi-PRD structure. git-mv history-preserving
+  moves, v3 front-matter injection, layout_version bump. Flags: --inspect (dry-run), --force.
+  Refuses on dirty tree or sibling worktrees.
 ---
 
 # Migrate — v1.x / v2.x → v3.0.0 Multi-PRD Layout
@@ -76,10 +74,8 @@ None of these refusals are overrideable by `--force` — they signal a tree stat
 | `docs/prd.md` exists, no `docs/manifest.yaml` | **v0** (pre-charter) |
 | `docs/prd.md` + `docs/manifest.yaml` | **v1** |
 | `docs/prd/prd.md` + `docs/prd/manifest.yaml` | **v2** |
-| `docs/prds/` exists AND no `.claude/skills/charter-*/SKILL.md` AND no `.github/skills/charter-*/SKILL.md` | **v3** |
-| `docs/prds/` exists AND charter skills present (canonical `.claude/skills/charter-*/SKILL.md` OR legacy `.github/skills/charter-*/SKILL.md`) | **v4** |
-
-For v4 projects whose charter currently lives at `.github/skills/charter-*/SKILL.md`: the canonical Claude Code path is `.claude/skills/charter-*/SKILL.md`. The session-start hook reads either, but new authoring should target `.claude/skills/`. To rename the existing files, run `git mv .github/skills/charter-* .claude/skills/` and commit; no other artifacts change.
+| `docs/prds/` exists AND no `.github/skills/charter-*/SKILL.md` | **v3** |
+| `docs/prds/` exists AND `.github/skills/charter-*/SKILL.md` present | **v4** |
 
 (If `docs_root` in `.spec-flow.yaml` is set to something other than `docs`, substitute it in every path above and below.)
 
@@ -105,11 +101,11 @@ If `src_version` is `v3`, present this migration plan and prompt for confirmatio
 Migrate v3 → v4 (charter skills publishing):
 
 Changes:
-  1. Generate .claude/skills/charter-<domain>/SKILL.md for each docs/charter/*.md file
+  1. Generate .github/skills/charter-<domain>/SKILL.md for each docs/charter/*.md file
   2. Bump layout_version: 3 → 4 in .spec-flow.yaml
   3. Commit both changes
 
-This enables charter constraints to be enforced by any tool that reads .claude/skills/,
+This enables charter constraints to be enforced by any tool that reads .github/skills/,
 not just the spec-flow plugin.
 
 Proceed? [y/N]
@@ -406,7 +402,7 @@ For each `.md` file in `<docs_root>/charter/`:
 
 2. Let `domain` = the file's basename without `.md` extension.
 
-3. Create `.claude/skills/charter-<domain>/SKILL.md`:
+3. Create `.github/skills/charter-<domain>/SKILL.md`:
 
 ```
 ---
@@ -417,7 +413,7 @@ description: <description>
 <full content of docs/charter/<domain>.md>
 ```
 
-4. Create `.claude/skills/` directory if it doesn't exist.
+4. Create `.github/skills/` directory if it doesn't exist.
 
 ### Bump layout_version
 
@@ -428,7 +424,7 @@ Update `.spec-flow.yaml`:
 ### Commit
 
 ```bash
-git add .claude/skills/charter-*/
+git add .github/skills/charter-*/
 git add .spec-flow.yaml
 git commit -m "chore(spec-flow): migrate to v4 — publish charter skills"
 ```
@@ -436,11 +432,11 @@ git commit -m "chore(spec-flow): migrate to v4 — publish charter skills"
 ### Success message
 
 ```
-Migration complete. Charter skills published to .claude/skills/charter-*/.
+Migration complete. Charter skills published to .github/skills/charter-*/.
 
 Next steps:
   - Run /reload-plugins (or start a new session) to activate charter skills.
-  - Any tool reading .claude/skills/ will now enforce charter constraints automatically.
+  - Any tool reading .github/skills/ will now enforce charter constraints automatically.
 ```
 
 ---

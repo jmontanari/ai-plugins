@@ -1,6 +1,9 @@
 ---
 name: defer
-description: Use when an operator (or the orchestrator's discovery-triage flow) needs to record a non-blocking finding to a backlog file with provenance. Sole supported path for writing to <docs_root>/prds/<prd-slug>/backlog.md or <docs_root>/improvement-backlog.md. Invoked structured (from execute/SKILL.md Step 6c after operator chooses defer) or manually (/spec-flow:defer "<finding>" --rationale "<text>"). Refuses if --rationale is missing.
+description: >-
+  Record a non-blocking finding to backlog.md with provenance. Sole write path for
+  improvement-backlog.md and prds/<slug>/backlog.md. Requires --rationale. Triggers: "defer",
+  "log to backlog", "record finding".
 ---
 
 # Defer — Record a Non-Blocking Finding to a Backlog with Provenance

@@ -1,11 +1,14 @@
 ---
 name: execute
-description: Use when a plan is approved and ready for implementation. Orchestrates each phase via a single implementer agent that runs in TDD mode or Implement mode based on the plan's track (config/infra/glue code uses Implement mode, behavior-bearing code uses TDD), runs QA gates between phases, and triggers a 6-agent final review before merging. The main window writes zero implementation code. Use this whenever the user wants to execute, implement, or run a spec-flow plan — regardless of whether the plan uses TDD or not.
+description: >-
+  Implement an approved plan phase-by-phase. Dispatches TDD or Implement track agents per phase,
+  QA gates between phases, final review board (6-7 agents) before merge. Main window writes zero
+  code. Triggers: "execute", "implement", "run the plan".
 ---
 
 # Execute — Orchestrate Plan Implementation
 
-Execute an approved plan phase by phase using dedicated agents for each step. Each phase runs in Mode: TDD or Mode: Implement based on the plan's chosen track, with QA gates at every boundary and a 6-agent final review before merge.
+Execute an approved plan phase by phase using dedicated agents for each step. Each phase runs in Mode: TDD or Mode: Implement based on the plan's chosen track, with QA gates at every boundary and a final review board (6 agents in standard mode; 7 in fast mode) before merge.
 
 ## Pre-flight: Model Check
 
@@ -33,7 +36,7 @@ If the active model name does **not** contain `sonnet` (case-insensitive):
 
 If the model already contains `sonnet` → proceed to Step 0 immediately with no prompt.
 
-**Why Sonnet.** Execute orchestrates multi-agent, multi-phase work: it builds task lists, manages QA gates, routes discoveries, tracks SHA-256 manifests, and dispatches up to 6 review-board agents in sequence. Opus adds latency and cost with no orchestration benefit (Opus is dispatched by sub-agents when deep review is warranted). Haiku or mini-class models lack the reasoning capacity to reliably evaluate agent reports, parse AC matrices, and route findings through the Step 6c discovery tree.
+**Why Sonnet.** Execute orchestrates multi-agent, multi-phase work: it builds task lists, manages QA gates, routes discoveries, tracks SHA-256 manifests, and dispatches up to 7 review-board agents in sequence (6 standard; 7 in fast mode). Opus adds latency and cost with no orchestration benefit (Opus is dispatched by sub-agents when deep review is warranted). Haiku or mini-class models lack the reasoning capacity to reliably evaluate agent reports, parse AC matrices, and route findings through the Step 6c discovery tree.
 
 ## Step 0: Load Config
 
@@ -42,7 +45,7 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 **Integration config load.** If `integrations.issue_tracker.enabled: true`, read the
 integrations charter file for transition rules and commit format — path depends on charter
 location:
-- **v4** (`.claude/skills/charter-integrations/SKILL.md` exists): read that file
+- **v4** (`.github/skills/charter-integrations/SKILL.md` exists): read that file
 - **v3**: `<docs_root>/charter/<charter_file>.md` (key `charter_file` from `.spec-flow.yaml`, default `charter/integrations.md`)
 
 If the file is absent, proceed with built-in defaults (see `plugins/spec-flow/reference/integration-capability-check.md`). Store as `integration_cfg`. If disabled or absent, set
@@ -270,7 +273,7 @@ git rev-parse HEAD
 On resume mid-phase (phase not yet marked complete in plan.md), recover the SHA the same way: `git rev-parse HEAD`. Under the v2.7.0 unified-commit model, the phase produces at most two work-commits before Step 7 — the implementer's unified commit (Red's staged tests + Build's production code) and the optional Refactor commit. If the phase is resumed AFTER the implementer's commit lands, `git rev-parse HEAD` will return that commit, not the pre-Red SHA — and that's fine, because the post-commit integrity and reconciliation gates have already run. The `phase_N_start_sha` used for diff-baseline calculations (Verify inputs, QA surface map, Step 6b hook sweep) is always computed from the resume-time HEAD minus the commits produced by this phase's already-completed steps, inferred from plan.md's checked boxes.
 
 **Integration — transition phase task to In Progress (if `integration_cfg != null` and `auto_transition: true`):**
-Read the `jira_task:` field immediately following this phase's heading in plan.md. If present,
+Read the `jira_key:` field immediately following this phase's heading in plan.md. If present,
 run the capability check (`plugins/spec-flow/reference/integration-capability-check.md`) for
 operations `get_transitions` and `transition_issue`. If available, transition the task to the
 "phase execute starts" status from `integration_cfg` (default: `In Progress`).
@@ -301,6 +304,8 @@ Before dispatching Red or Implement, the orchestrator collects facts the agents 
    - "extract ... if ... exceeds <N>" — evaluate using the LOC snapshot.
    - "if <file/symbol> exists, reuse; otherwise create ..." — evaluate using symbol presence.
    Resolve each into a bullet under `## Orchestrator pre-decisions`. Other conditional phrasings (runtime-state conditions, fuzzy natural-language conditionals) pass through unchanged — the orchestrator is not a general-purpose plan interpreter.
+
+7. **Fast mode flag** — check the plan's front-matter `fast:` field. If `fast: true`, record `orchestrator_fast_mode: true` in session state. Fast mode skips all per-phase inline QA agent dispatches (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`, Group Deep QA) and replaces per-phase verify agent dispatch with a direct test-command shell invocation. The end-of-piece Final Review board gains a 7th member (`verify Mode: Piece Full`) to compensate. Log once: `"Fast mode: ENABLED — inline QA skipped, end-of-piece board +1 (verify-piece-full)"`. If `fast:` is absent or `false`, record `orchestrator_fast_mode: false` and proceed normally.
 
 Compose two attachments for later steps:
 
@@ -349,7 +354,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
 
 ### Step 2.5: QA-TDD-Red — Reject Theater Tests
 
-*(Mode: TDD only. Skip this step when the plan uses non-TDD mode (`tdd: false` in plan front-matter). Runs between Red's commit and the implementer dispatch. Catches theater tests — tautology, mock-echo, assert-the-assignment, truthy-only, exception swallowing, no-assertion, name/body mismatch, implementation coupling, redundant clusters — before Build writes production code fit to weak assertions.)*
+*(Mode: TDD only. Skip this step when the plan uses non-TDD mode (`tdd: false` in plan front-matter). **Fast mode skip:** if `orchestrator_fast_mode: true`, skip this step entirely — `qa-tdd-red` is replaced by `verify Mode: Piece Full` at end-of-piece. Proceed directly to Step 3. Runs between Red's commit and the implementer dispatch. Catches theater tests — tautology, mock-echo, assert-the-assignment, truthy-only, exception swallowing, no-assertion, name/body mismatch, implementation coupling, redundant clusters — before Build writes production code fit to weak assertions.)*
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-tdd-red.md`
 2. Compose prompt with:
@@ -485,6 +490,17 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
 
 ### Step 4: Verify — Confirm Correctness
 
+**Fast mode — direct test execution (no agent dispatch):** if `orchestrator_fast_mode: true`, skip the verify agent dispatch entirely. Instead, run the project test command directly:
+
+```bash
+# Use the [Verify] command from the plan's current phase block, or fall back to CLAUDE.md test command
+<test command>
+```
+
+Check exit code. If `0`: log `"Phase N tests: GREEN"` and proceed to Step 5 (Refactor). If non-zero: surface the failure output, dispatch a `fix-code` agent scoped to the failing test paths, re-run the test command. Repeat up to 2 attempts. If still failing after 2 attempts: escalate to human. Do NOT dispatch a verify agent in fast mode.
+
+---
+
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/verify.md`
 2. **Pick the Verify input mode.** Inspect the Implement agent's report for three conditions:
    - **`## Oracle Outcome`** — does it say the oracle ran clean on first attempt (no retries)?
@@ -548,6 +564,10 @@ If skipped, proceed directly to Step 6. Otherwise:
    - If out-of-scope files modified: reject the refactor, revert.
 
 ### Step 6: Phase QA
+
+**Fast mode skip:** if `orchestrator_fast_mode: true`, skip Step 6 entirely. No `qa-phase` dispatch. No iter-until-clean loop. No Step 6a deferred-finding tracking. Proceed directly to Step 6b (hook sweep) then Step 6c if discoveries exist from other sources (e.g. implementer escalations).
+
+---
 
 **Opus QA dispatch decision (FR-8 — sharpened skip predicate):** before composing the iter-1 prompt, evaluate whether to dispatch Opus QA for this phase or skip Opus entirely. Skip Opus only when ALL three conditions hold for the phase diff:
 
@@ -960,7 +980,7 @@ Per-sub-phase internal flow — each sub-phase runs the same checks as the Per-P
 - Red step (Step 2) — stages tests (sub-phase-scoped), emits its own `phase_N_red_stage_manifest` keyed by sub-phase id
 - Build step (Step 3) with Step 3 item 7 AC matrix validation gate + item 8 post-commit integrity + reconciliation gates
 - Verify step (Step 4) with Audit/Full mode selection
-- QA-lite step — dispatch `qa-phase-lite.md`, Sonnet. Iter-until-clean per `plugins/spec-flow/reference/qa-iteration-loop.md` — full review on iter-1, focused re-review on iter-2+, 3-iter circuit breaker.
+- QA-lite step — **fast mode skip:** if `orchestrator_fast_mode: true`, skip the `qa-phase-lite` dispatch for this sub-phase. Proceed to the next sub-phase pipeline step. Otherwise: dispatch `qa-phase-lite.md`, Sonnet. Iter-until-clean per `plugins/spec-flow/reference/qa-iteration-loop.md` — full review on iter-1, focused re-review on iter-2+, 3-iter circuit breaker.
 - Sub-phase Progress is implicit (no separate progress commit per sub-phase — the group progress commit covers all)
 
 **Shared staging area safety (v2.7.0).** Parallel sub-phases share the same git index, but scope disjointness is enforced at Step G2 (pairwise literal-path check) and literal-path staging discipline in Rule 6 (tdd-red) + Rule 8 (implementer) means each sub-phase's `git add` + `git commit` references only its own paths. A sibling sub-phase's staged-but-uncommitted tests remain in the index but are NOT swept into another sub-phase's unified commit because the implementer commits by literal path. The orchestrator's Step 3.7b reconciliation (commit file list = sub-phase's Red manifest ∪ sub-phase's Build reported files) catches any cross-contamination.
@@ -991,6 +1011,10 @@ When dispatching the Refactor agent at group level:
 Validate post-Refactor: tests still green (run oracle once over the union), no files outside the union modified.
 
 ### Step G8: Group Deep QA (Opus)
+
+**Fast mode skip:** if `orchestrator_fast_mode: true`, skip Step G8 entirely. No Opus Group Deep QA dispatch. Proceed to Step G9 (hook sweep).
+
+---
 
 Dispatch the `qa-phase.md` agent at Opus tier. Compose the prompt using the existing Step 6 surface-map composition, but scoped to the group:
 
@@ -1108,7 +1132,7 @@ One review session handles the whole batch — no per-sub-phase interruptions.
 
 Triggered automatically when the last phase's QA passes.
 
-### Step 1: Iteration 1 — Full Review (6 Parallel Agents)
+### Step 1: Iteration 1 — Full Review (6 Parallel Agents; 7 in fast mode)
 
 Get the full worktree diff:
 
@@ -1140,9 +1164,21 @@ Agent({ description: "Architecture review (iter 1, full)", prompt: <review-board
 Agent({ description: "Security review (iter 1, full)", prompt: <review-board-security.md + Input Mode: Full + diff + spec (for trust boundary context)>, model: "opus" })
 ```
 
+**Fast mode — 7th board member:** if `orchestrator_fast_mode: true`, additionally dispatch concurrently:
+
+```
+Agent({
+  description: "Test quality review — Piece Full (fast mode compensation, iter 1)",
+  prompt: <verify.md + "Mode: Piece Full\n\n" + full piece diff (git diff main..HEAD) + all spec ACs (all phases, from spec.md) + "Tests verified per-phase — do NOT re-run the test suite.">,
+  model: "opus"
+})
+```
+
+This 7th agent compensates for the per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches that fast mode skips.
+
 ### Step 2: Triage
 
-Collect findings from all 6 agents. Deduplicate (same issue reported by multiple reviewers). Classify:
+Collect findings from all board agents (6 in standard mode; 7 in fast mode — the 7th is `verify-piece-full`). Deduplicate (same issue reported by multiple reviewers). Classify:
 - `must-fix` — blocks merge
 - `defer` — pre-existing issue, not introduced by this spec
 - `dismiss` — false positive or noise
@@ -1161,16 +1197,16 @@ If must-fix findings exist:
   git commit -m "fix: final-review iter M must-fix"
   ```
   Hooks run normally. If a hook fails, re-dispatch the fix agent with the hook output appended; don't bypass.
-- Re-dispatch ALL 6 reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff.
+- Re-dispatch ALL 6 standard reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. Note: the 7th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** 3 full review cycles maximum.
 - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
 ### Step 8: Final Review Triage
 
-**Trigger.** When Final Review's iter-loop (Steps 1–3) terminates with must-fix findings remaining (the iter-loop's circuit breaker fired or the operator has chosen to triage residual must-fix items rather than continue iterating), the orchestrator invokes Step 8 once before any merge action — i.e., before Step 4 (Human Sign-Off), Step 4.5 (Reflection), Step 5 (Capture Learnings), or Step 6 (Merge). Step 8 also fires when Final Review surfaces non-must-fix discoveries that nonetheless require triage (`requires-amendment`, `requires-fork`, `does-not-block-goal-deferred`, or `qa-deferred-to-reflection` markers from any of the six end-of-piece reviewers — blind, spec-compliance, architecture, edge-case, prd-alignment, security — even when the iter-loop returned must-fix=None overall). If Final Review returns clean across all six reviewers AND no triage-eligible discoveries surfaced, Step 8 is a no-op and execution proceeds to Step 4.
+**Trigger.** When Final Review's iter-loop (Steps 1–3) terminates with must-fix findings remaining (the iter-loop's circuit breaker fired or the operator has chosen to triage residual must-fix items rather than continue iterating), the orchestrator invokes Step 8 once before any merge action — i.e., before Step 4 (Human Sign-Off), Step 4.5 (Reflection), Step 5 (Capture Learnings), or Step 6 (Merge). Step 8 also fires when Final Review surfaces non-must-fix discoveries that nonetheless require triage (`requires-amendment`, `requires-fork`, `does-not-block-goal-deferred`, or `qa-deferred-to-reflection` markers from any of the end-of-piece reviewers — blind, spec-compliance, architecture, edge-case, prd-alignment, security, and in fast mode also verify-piece-full — even when the iter-loop returned must-fix=None overall). If Final Review returns clean across all board reviewers AND no triage-eligible discoveries surfaced, Step 8 is a no-op and execution proceeds to Step 4.
 
-**Per-finding routing.** For each must-fix finding (or triage-eligible discovery) emerging from Final Review, the orchestrator dispatches the Step 6c triage flow per FR-16a. Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, or `security` (matching the six end-of-piece reviewer roles).
+**Per-finding routing.** For each must-fix finding (or triage-eligible discovery) emerging from Final Review, the orchestrator dispatches the Step 6c triage flow per FR-16a. Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, `security`, or (in fast mode) `verify-piece-full` — matching the active end-of-piece reviewer roles.
 
 **Amendment phase IDs.** Amendment phases inserted via Step 8 use the suffix-form IDs `phase_final_amend_<K>` where `<K>` is the 1-indexed amendment counter for the Final Review triage event (`phase_final_amend_1`, `phase_final_amend_2`, etc.). The originating phase token is the literal string `final` since there is no specific upstream phase. This naming distinguishes Step 8-induced amendment phases from per-phase Step 6c-induced amendment phases (`phase_<N>_amend_<K>` with `<N>` a numeric phase ID per FR-13).
 
@@ -1178,7 +1214,7 @@ If must-fix findings exist:
 
 **Per-choice flow.**
 
-- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 (iter-1 full review across all six reviewers: blind, edge-case, spec-compliance, prd-alignment, architecture, security) on the new cumulative diff `git diff main..HEAD`. The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
+- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 (iter-1 full review across all board reviewers: blind, edge-case, spec-compliance, prd-alignment, architecture, security, and verify-piece-full in fast mode) on the new cumulative diff `git diff main..HEAD`. The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
 
 - **On `fork`:** a follow-up piece is written to `docs/prds/<prd-slug>/manifest.yaml` with `depends_on: [<current-piece-slug>]`, exactly as Step 6c's Fork dispatch specifies. The current piece **merges as-is** with the discovery deferred to the new piece — Step 8's fork choice does NOT re-open the piece and does NOT re-run Final Review. Execution proceeds to Step 4 (Human Sign-Off) once all Step 8 findings have been routed. The current piece's status remains `executing` (or whatever its pre-Step-8 status was); the operator's sign-off at Step 4 is on the merge-as-is artifact with the forked discovery noted.
 
@@ -1328,12 +1364,6 @@ After escalation, if the human resolves the issue and retries, **re-run Step 5.5
 
 ### Step 6: Merge
 
-**Integration — transition all phase tasks to Done (if `integration_cfg != null` and `auto_transition: true`):**
-Before merging, run the capability check for operation `transition_issue`. If available,
-iterate over all `jira_task:` keys from plan.md for this piece and transition each task to
-the "Final Review Board passes" status from `integration_cfg` (default: `Done`).
-On tool unavailable → emit warning → skip (do NOT block the merge).
-
 Read `merge_strategy` from `.spec-flow.yaml` (valid values: `squash_local`, `pr`;
 default: `squash_local` when the key is absent, unset, or unrecognized — per NN-C-003
 backward compatibility). Branch on the value:
@@ -1346,11 +1376,23 @@ git commit -m "piece/<prd-slug>-<piece-slug>: <summary of what was built>"
 git worktree remove {{worktree_root}}
 git branch -d piece/<prd-slug>-<piece-slug>
 ```
+**Integration — transition task to Done after squash commit (if `integration_cfg != null` and `auto_transition: true`):**
+After the squash commit succeeds, run the capability check for `transition_issue`. If available,
+iterate over all `jira_key:` fields from plan.md and transition each task to the "merge complete"
+status from `integration_cfg` (default: `Done`).
+On tool unavailable → emit warning → skip (do NOT block cleanup).
+
 If Step 6 fails for any reason (conflicts, hook rejection, empty commit, etc.): revert the
 Step 5.5 manifest commit on the piece branch before escalating to human, so the branch
 does not carry a stale `merged` status (see Step 5.5 failure path above).
 
 **If `merge_strategy: pr`:**
+**Integration — transition task to In Review before opening PR (if `integration_cfg != null` and `auto_transition: true`):**
+Before displaying the PR command, run the capability check for `transition_issue`. If available,
+iterate over all `jira_key:` fields from plan.md and transition each task to the "PR opened"
+status from `integration_cfg` (default: `In Review`).
+On tool unavailable → emit warning → skip (do NOT block the merge).
+
 Display the following command for the human to copy-paste and run manually:
 ```
 gh pr create --base main --head piece/<prd-slug>-<piece-slug>
@@ -1358,6 +1400,7 @@ gh pr create --base main --head piece/<prd-slug>-<piece-slug>
 Print: "PR-based merge required. Run the command above to open a pull request.
 The piece branch already carries `status: merged` + `merged_at` in the manifest (Step 5.5).
 When the PR is reviewed and merged, main receives the correct terminal state automatically.
+Jira task(s) are now In Review — run intake at the start of your next session to mark them Done once the PR merges.
 After the PR merges, run these cleanup commands:
   git worktree remove {{worktree_root}}
   git branch -d piece/<prd-slug>-<piece-slug>"

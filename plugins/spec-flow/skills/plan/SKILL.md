@@ -12,7 +12,7 @@ Generate an exhaustive implementation plan from an approved spec. The plan is so
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
 **Integration config load.** If `integrations.issue_tracker.enabled: true`, read the integrations charter file for task naming and transition rules — path depends on charter location:
-- v4 (`.claude/skills/charter-integrations/SKILL.md` exists): read that file
+- v4 (`.github/skills/charter-integrations/SKILL.md` exists): read that file
 - v3: `<docs_root>/charter/<charter_file>.md` (default `charter/integrations.md`)
 Store as `integration_cfg`. If integration is disabled or the key is absent, set `integration_cfg = null` and skip all integration steps below.
 
@@ -29,6 +29,19 @@ Read the `tdd` key from `.spec-flow.yaml` (valid values: `auto`, `true`, `false`
 
 This preference is piece-level: the plan front-matter captures the decision, and the execute skill reads it to orchestrate correctly. Per-phase track overrides remain possible (a phase can always use `[Implement]` even when TDD is true).
 
+### Fast Mode Preference
+
+Read the `fast` key from `.spec-flow.yaml` (valid values: `true`, `false`; default `false`).
+
+- **`false`** (default): Standard mode — per-phase QA agents run inline (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`, verify agent dispatch). Record `fast: false` in plan front-matter.
+- **`true`**: Fast mode — per-phase QA agents are skipped; a direct test-command shell invocation replaces the verify agent dispatch per phase; the end-of-piece Final Review board gains a 7th member (`verify Mode: Piece Full`) that compensates for all removed inline gates. Record `fast: true` in plan front-matter.
+
+**When to use fast mode (`fast: true`):** removes per-phase QA agent dispatches and consolidates all test-quality review at end-of-piece. Saves ~60% of QA token cost (~$18.50 → ~$7 on a 10-phase piece). Appropriate when: the work is config, infra, scaffolding, or moderate-complexity behavior; the piece is ≤12 phases; and the operator accepts that theater tests and AC gaps are caught at the end rather than phase-by-phase.
+
+**Not appropriate for:** security-critical features (auth, payments, cryptography), compliance work, or pieces with complex cross-phase behavioral dependencies where catching regressions early phase-by-phase is valuable.
+
+Record the decision in plan front-matter as `fast: true` or `fast: false`. If the project-level `.spec-flow.yaml` sets `fast: true`, apply it to this piece unless the plan author explicitly overrides to `false` in the front-matter.
+
 ## Prerequisites
 
 - Piece must have status `specced` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
@@ -43,7 +56,7 @@ This preference is piece-level: the plan front-matter captures the decision, and
 
 **1a. Dependency precondition check (FR-5 of pi-010-discovery, AC-9).** Run the resolution + status + triage logic specified in `plugins/spec-flow/reference/depends-on-precondition.md` against the target piece's `depends_on:` list, read from the piece's manifest entry at `docs/prds/<prd-slug>/manifest.yaml`. For each ref, resolve per the reference doc's "Reference resolution" section (qualified `<dep-prd-slug>/<dep-piece-slug>` against `docs/prds/<dep-prd-slug>/manifest.yaml`; bare `<dep-piece-slug>` against the current PRD's manifest). On resolution failure, refuse with the exact resolution-failure refusal string from the reference doc — do NOT prompt for triage on a malformed/missing ref. On successful resolution, classify each dep's `status:` per the reference doc's "Status interpretation" section. If every resolved dep is `merged` or `done`, this step is a silent no-op (no prompt, no recorded state) and Phase 1 continues to the charter-drift check below (NN-C-005). If any resolved dep has a transient or structural-failure status, render the three-option triage prompt verbatim from the reference doc's "Triage options at spec/plan time" section (literal `(1) pull-deps-in`, `(2) fork`, `(3) proceed` markers; one bullet per unmet dep). Record the operator's choice and the per-dep status snapshot in orchestrator state keyed for Phase 2's plan.md authoring step to read. **Structural-failure statuses (`superseded`, `blocked`) refuse the `(3) proceed` option** — apply that rule symmetrically to the plan-time prompt per the reference doc. The plan-time triage may produce a different choice than spec-time triage (e.g., spec was authored with `proceed --ignore-deps`, but at plan time the operator now wants to `pull-deps-in`); the plan-time choice is recorded independently of any spec-time choice.
 
-**Charter-drift check (always applies — runs after step 1a).** A piece reaching plan stage already has a spec carrying a `charter_snapshot:` front-matter. Before any other exploration, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live charter files (v4: `.claude/skills/charter-*/SKILL.md`; v3: `<docs_root>/charter/`). If drift is detected, halt Phase 1 and escalate per the reference doc — do not proceed with planning on stale charter constraints.
+**Charter-drift check (always applies — runs after step 1a).** A piece reaching plan stage already has a spec carrying a `charter_snapshot:` front-matter. Before any other exploration, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live charter files (v4: `.github/skills/charter-*/SKILL.md`; v3: `<docs_root>/charter/`). If drift is detected, halt Phase 1 and escalate per the reference doc — do not proceed with planning on stale charter constraints.
 
 Then extensively explore the codebase using ONLY read operations:
 - `Read` — examine source files, test files, existing patterns
@@ -60,7 +73,7 @@ Gather:
 - Import conventions and module structure
 - Architecture constraints visible in the code
 - **Charter files** — auto-detect location:
-  - **v4** (`.claude/skills/charter-non-negotiables/SKILL.md` exists): read each charter skill file present from `.claude/skills/charter-*/SKILL.md` (architecture, non-negotiables, tools, processes, flows, coding-rules, integrations). For `charter_snapshot`, capture last-commit date per domain via `git log -1 --format=%ci .claude/skills/charter-<domain>/SKILL.md` — v4 skills have no `last_updated:` front-matter.
+  - **v4** (`.github/skills/charter-non-negotiables/SKILL.md` exists): read each charter skill file present from `.github/skills/charter-*/SKILL.md` (architecture, non-negotiables, tools, processes, flows, coding-rules, integrations). For `charter_snapshot`, capture last-commit date per domain via `git log -1 --format=%ci .github/skills/charter-<domain>/SKILL.md` — v4 skills have no `last_updated:` front-matter.
   - **v3** (`<docs_root>/charter/` exists): read charter files present (architecture.md, non-negotiables.md, tools.md, processes.md, flows.md, coding-rules.md, integrations.md). Record each file's `last_updated` date for the plan's `charter_snapshot:` front-matter.
   Charter content is exploration priors, same as code — it influences phase decomposition and the per-phase "Charter constraints honored" slots.
   - **If `integrations.md` exists:** read it fully before authoring any phase that touches external services, APIs, SDKs, or third-party libraries. The naming conventions, status transition rules, hierarchy rules, and any additional notes sections define how integrations must be set up and managed. Every phase that creates, configures, or calls an external integration must be consistent with the principles in this file — treat it the same as non-negotiables for that scope.
@@ -242,27 +255,36 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 ### Phase 4: Finalize
 
 1. User approves → continue
-2. Ensure the plan's front-matter includes `tdd: true` or `tdd: false` recording the mode decision for this piece (set during TDD Preference Resolution above; if missing, infer from phase structure: any `[TDD-Red]` → `true`, all `[Implement]` → `false`).
+2. Ensure the plan's front-matter includes `tdd: true` or `tdd: false` recording the mode decision for this piece (set during TDD Preference Resolution above; if missing, infer from phase structure: any `[TDD-Red]` → `true`, all `[Implement]` → `false`). Also ensure `fast: true` or `fast: false` is present (default: `fast: false` if absent).
 3. **Integration — create per-phase issues (if `integration_cfg != null` and `auto_create_tasks: true`):**
    Run the capability check for operation `create_phase_issue`. If available:
-   - Read `epic_key:` from spec.md front-matter (written by the spec skill).
+   - From `integration_cfg.hierarchy`, find the entry with `managed_by: plan` → this is the phase level (`phase_level`).
+     Let `parent_level` = the entry immediately above it (the `managed_by: spec` entry).
+   - Read the parent key: from `parent_level`, resolve `artifact` (e.g. `spec`) and `key_field` (e.g. `jira_key`).
+     Read that field from spec.md front-matter. If absent → emit warning and skip issue creation.
    - For each resolved phase (flat phase or sub-phase) in the plan, create an issue of type
-     `integration_cfg.phase_issue_type` in project `integration_cfg.project_key` using the
-     phase naming convention from `integration_cfg`
+     `phase_level.type` in project `integration_cfg.project_key` using the naming convention
+     from `phase_level.naming` or the default
      (default: `[phase] {piece-slug}/{phase-number} — {phase-name}`).
-   - Apply Task Creation Defaults from `charter-integrations` (`.claude/skills/charter-integrations/SKILL.md`):
-     - **Story points:** estimate phase effort in days, set `ceil(days × 0.5)` as story points.
-     - **Assignee:** set to the current user (person running this plan skill).
+     Pass `additional_fields: {"parent": "<parent_key_value>"}` to link each phase issue
+     to the piece issue.
+   - Apply Task Creation Defaults from `charter-integrations` (`.github/skills/charter-integrations/SKILL.md`).
+     All Jira calls use MCP tools only (`jira_create_issue`, `jira_update_issue`, `jira_transition_issue`).
+     - **Story points:** estimate phase effort in days, compute `ceil(days × 0.5)` (rounded up to next Fibonacci number) per `charter-integrations`.
+       Read `story_points_field` from `phase_level` (the `managed_by: plan` hierarchy entry in `integration_cfg`).
+       If present, pass `additional_fields: {"<story_points_field>": <computed-value>}` on `jira_create_issue`.
+       If absent from config, skip silently.
+     - **Assignee:** call `jira_get_user_profile` with `user_identifier: "me"` once before the
+       issue creation loop — the MCP server resolves this to the authenticated user’s `accountId`.
+       Pass that `accountId` as `assignee` on every `jira_create_issue` call in the batch.
      - **Initial status:** create in `To Do`; after all phase issues are created, move every
        issue that is NOT phase 1 to `Backlog` (phase 1 stays `To Do` as the first to execute).
-   - If `epic_key` is present and the MCP tool supports parent assignment, link each phase
-     issue to the piece issue.
-   - Record each returned issue key inline in plan.md as a `jira_task:` field immediately
-     after the phase heading. Example:
+   - Record each returned issue key inline in plan.md as `<phase_level.key_field>:` (i.e. `jira_key:`)
+     immediately after the phase heading, plus a `jira_url:` line. Example:
      ```
      ### Phase 1: Auth Token Model
-     jira_task: ITE-42
-     jira_url: https://se-ivan.atlassian.net/browse/ITE-42
+     jira_key: EIT-42
+     jira_url: https://se-ivan.atlassian.net/browse/EIT-42
      ```
      Construct `jira_url` as `<integration_cfg.base_url>/browse/<issue-key>`.
    On tool unavailable → emit warning → skip.

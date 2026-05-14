@@ -76,3 +76,28 @@ Resolution failure mode: when the token is rendered outside an active piece work
 
 - [plugins/spec-flow/reference/slug-validator.md](slug-validator.md) — slug rules, branch length budget, refusal contract.
 - [plugins/spec-flow/reference/charter-drift-check.md](charter-drift-check.md) — Phase-1 charter-drift procedure run by every skill that touches a piece.
+
+## PRD branching model
+
+When a PRD's `manifest.yaml` declares `feature_branch:` (set during `prd` skill brainstorm step 4l), all piece work uses a **two-tier branch model**:
+
+```
+<merge_target>  (e.g., master)
+  └── <feature_branch>  (e.g., feature/ai-tools-creator)   ← accumulator; never commit PRD work directly to merge_target while this is set
+        ├── piece/<prd-slug>-<piece-a>   ← based off feature_branch, not master
+        ├── piece/<prd-slug>-<piece-b>
+        └── ...
+```
+
+| Manifest field | Purpose | Default |
+|---|---|---|
+| `feature_branch:` | Accumulator for piece merges; piece branches must base off this | `null` (direct-to-default-branch) |
+| `merge_target:` | Where `feature_branch:` merges when the full PRD ships | `master` |
+| `pr_required:` | Piece → accumulator merge requires PR | `true` |
+
+**Invariants all skills must enforce:**
+
+1. **Worktree creation** (`spec` Phase 3): piece branches are created from `feature_branch:` when set — never from `HEAD`/`master`. Fail explicitly if `feature_branch:` does not exist locally; do not silently fall back.
+2. **No direct-to-`merge_target:` commits**: while `feature_branch:` is set, PRD work (specs, plans, plugin source under the PRD, manifest updates) lives exclusively on `feature_branch:` and its child piece branches.
+3. **Accumulator ships as one PR**: `feature_branch:` → `merge_target:` is a single PR opened only after all pieces reach `merged` or `done` status.
+4. **Non-PRD work goes to `merge_target:` directly**: spec-flow plugin changes, global config (`.spec-flow.yaml`, charter files, `docs/improvement-backlog.md`) are *not* PRD work — they commit to `master` (or the default branch), never to the feature branch. If you make such a change while working in a feature-branch worktree, cherry-pick or apply it to `master` separately.

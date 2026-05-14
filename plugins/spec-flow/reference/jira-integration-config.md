@@ -8,40 +8,68 @@ Reference: `plugins/spec-flow/reference/integration-capability-check.md`
 
 ## Issue Hierarchy
 
-Define how spec-flow pipeline concepts map to your tracker's issue types.
-Replace the values with the exact issue type names your project uses.
+Define the full parent-to-child chain of Jira issue types as an ordered `hierarchy:` list in
+`.spec-flow.yaml`. Each entry's parent is the entry immediately above it in the list.
 
 ```yaml
-# Issue type mappings (fill in your tracker's exact type names)
-piece_issue_type: Epic          # Issue type created per piece by the spec skill
-phase_issue_type: Task          # Issue type created per phase by the plan skill
-parent_issue_type: ~            # Optional: parent type the piece issue links to (e.g. Initiative, Capability)
-                                # Set to ~ to disable parent linking
+# hierarchy: ordered parent-to-child chain of issue types.
+# managed: false  — exists before spec-flow; key recorded manually in the named artifact.
+# managed_by: <skill> — created and key recorded by that skill.
+# artifact: which spec-flow file holds this level's key (prd | spec | plan).
+# key_field: field name written into that artifact's front-matter (standardized: jira_key).
+# naming: override default title format; ~ uses built-in default.
+hierarchy:
+  - type: Epic              # or Initiative, Theme, Capability — whatever your top level is
+    managed: false          # create manually in Jira; record key in prd.md front-matter
+    artifact: prd
+    key_field: jira_key
+
+  - type: Story             # or Epic, Feature — the per-piece issue type
+    managed_by: spec        # spec skill creates this and writes jira_key to spec.md
+    artifact: spec
+    key_field: jira_key
+    naming: ~               # ~ = default: "{piece-slug} — {piece description from manifest}"
+
+  - type: SubTask           # or Task — the per-phase issue type
+    managed_by: plan        # plan skill creates one per phase and writes jira_key to plan.md
+    artifact: plan
+    key_field: jira_key
+    naming: ~               # ~ = default: "[phase] {piece-slug}/{phase-number} — {phase-name}"
 ```
 
+The resolved chain for the example above:
 ```
-{parent_issue_type}  (per PRD — create manually; record key as parent_key: in prd.md)
-  └─ {piece_issue_type}: {piece-slug} — {piece description}    ← spec skill creates
-       └─ {phase_issue_type}: [phase] {piece-slug}/1 — {phase-1-name}   ← plan skill creates
-       └─ {phase_issue_type}: [phase] {piece-slug}/2 — {phase-2-name}
-       └─ {phase_issue_type}: [phase] {piece-slug}/N — ...
+Epic    (managed: false — key at prd.md[jira_key])
+  └─ Story    (managed_by: spec — spec skill creates; key at spec.md[jira_key])
+       └─ SubTask  (managed_by: plan — plan creates one per phase; key at plan.md[jira_key])
 ```
 
-**Key fields written by skills:**
-- `parent_key:` in `prd.md` → parent issue the piece issue links to
-- `epic_key:` in `spec.md` → the piece issue key (written by spec skill)
-- `jira_task:` per phase in `plan.md` → the phase issue key (written by plan skill)
+**Parent enforcement rule:** when a `managed: false` entry sits above a `managed_by:` entry,
+the parent key is **required**. The managing skill reads the artifact and field from the entry
+above, checks that the key is present, and passes `additional_fields: {"parent": "<key>"}` to
+`create_issue`. If the key is absent, the skill refuses with a clear error — it does not
+silently create a parentless issue.
+
+**Key fields written by skills (standardized field name `jira_key`):**
+- `jira_key:` in `prd.md` → key of the manually-created top-level issue (was `parent_key:`)
+- `jira_key:` in `spec.md` → key of the piece issue created by the spec skill (was `epic_key:`)
+- `jira_url:` in `spec.md` → browse URL for the piece issue (was `epic_url:`)
+- `jira_key:` per phase in `plan.md` → key of the phase issue created by plan skill (was `jira_task:`)
+- `jira_url:` per phase in `plan.md` → browse URL for the phase issue
 
 ---
 
 ## Naming Conventions
 
-Piece issue (one per piece, created by spec skill at brainstorm start):
+Per-level naming overrides live in each hierarchy entry's `naming:` key. Set to `~` to use
+the built-in default for that level.
+
+Piece-level issue (created by spec skill — the `managed_by: spec` hierarchy entry):
 ```
 {piece-slug} — {piece description from manifest}
 ```
 
-Phase issues (one per phase, created by plan skill at sign-off):
+Phase-level issues (created by plan skill — the `managed_by: plan` hierarchy entry):
 ```
 [phase] {piece-slug}/{phase-number} — {phase-name}
 ```

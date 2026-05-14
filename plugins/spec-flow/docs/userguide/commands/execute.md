@@ -1,6 +1,6 @@
 # /spec-flow:execute
 
-Orchestrate implementation of an approved plan phase-by-phase. Each phase dispatches subagents (Red, Build, Verify, Refactor, QA), runs verification oracles, and advances only when gates pass. Ends with a 6-agent final review board and merge to master.
+Orchestrate implementation of an approved plan phase-by-phase. Each phase dispatches subagents (Red, Build, Verify, Refactor, QA), runs verification oracles, and advances only when gates pass. Ends with a final review board (6 agents in standard mode; 7 in fast mode) and merge to master.
 
 ## What it does
 
@@ -11,7 +11,7 @@ The heaviest skill in spec-flow. Walks the plan from Phase 1 to Phase N, for eac
 3. Runs Phase QA (Opus adversarial review)
 4. Advances to the next phase
 
-At the end of the last phase, runs the Final Review 6-agent board, produces a reflection, and merges the piece to master.
+At the end of the last phase, runs the Final Review board (6 agents; 7 in fast mode), produces a reflection, and merges the piece to master.
 
 ## When to run it
 
@@ -107,9 +107,9 @@ Orchestrator commits a progress marker with the phase's checkboxes marked `[x]`.
 
 After the final phase:
 
-### Final Review — 6-agent board
+### Final Review — board (6 agents; 7 in fast mode)
 
-Six reviewers dispatched **in parallel**, each with a specialized lens:
+Six reviewers dispatched **in parallel**, each with a specialized lens. In fast mode, a 7th reviewer (`verify Mode: Piece Full`) is added, compensating for the per-phase QA gates that fast mode skips:
 
 | Reviewer | Focus |
 |---|---|

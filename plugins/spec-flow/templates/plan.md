@@ -7,6 +7,11 @@ charter_snapshot:
   flows: {{date}}
   coding-rules: {{date}}
 legacy_deferred_rows: false  # OPT-IN: set to true to preserve pre-3.2.0 AC matrix behavior (silent acceptance of bare deferral rows). Deprecated — to be retired in v3.3.0.
+fast: false                  # true = fast mode: skips per-phase QA agents (qa-tdd-red, qa-phase, qa-phase-lite),
+                             # replaces per-phase verify agent with direct test-command shell run, adds
+                             # verify Mode: Piece Full as 7th board member at Final Review.
+                             # Use for: config/infra/scaffolding, moderate-complexity, non-security-critical work.
+                             # Do NOT use for: auth, payments, compliance, or pieces > 12 phases.
 ---
 
 <!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->

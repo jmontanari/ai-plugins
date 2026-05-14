@@ -26,14 +26,14 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 Read the `charter:` block from `.spec-flow.yaml` (added in v2.0.0). Two keys: `required` (default `false`) and `doctrine_load`.
 
 **Auto-detect charter location** (check in this order):
-1. **v4** — `.claude/skills/charter-non-negotiables/SKILL.md` exists → charter lives at `.claude/skills/charter-*/SKILL.md`
+1. **v4** — `.github/skills/charter-non-negotiables/SKILL.md` exists → charter lives at `.github/skills/charter-*/SKILL.md`
 2. **v3** — `<docs_root>/charter/` directory exists → charter lives at `<docs_root>/charter/`
 3. **none** — neither exists
 
 Record the detected variant as `charter_variant` (`v4`, `v3`, or `none`) for use in later steps.
 
-- If `charter.required: true` and `charter_variant == none` → respond with: *"Charter is required for this project but no charter files were found at `.claude/skills/charter-*/SKILL.md` or `<docs_root>/charter/`. Run `/spec-flow:charter` first to bootstrap the charter, then re-run `prd`."* Halt.
-- If `charter_variant == v4` → continue; cite `NN-C-xxx` entries from `.claude/skills/charter-non-negotiables/SKILL.md` when classifying PRD constraints.
+- If `charter.required: true` and `charter_variant == none` → respond with: *"Charter is required for this project but no charter files were found at `.github/skills/charter-*/SKILL.md` or `<docs_root>/charter/`. Run `/spec-flow:charter` first to bootstrap the charter, then re-run `prd`."* Halt.
+- If `charter_variant == v4` → continue; cite `NN-C-xxx` entries from `.github/skills/charter-non-negotiables/SKILL.md` when classifying PRD constraints.
 - If `charter_variant == v3` → continue; cite `NN-C-xxx` entries from `<docs_root>/charter/non-negotiables.md` when classifying PRD constraints.
 - If `charter_variant == none` and `charter.required: false` → continue. Treat this as a pre-charter project; the PRD holds all non-negotiables as unprefixed `NN-xxx` (legacy) until the project chooses to retrofit.
 
@@ -117,7 +117,7 @@ Read the confirmed source PRD and reorganize its content into the template struc
 - Extract constraints / non-negotiables:
   - If `charter_variant` is `v4` or `v3`, classify each constraint:
     - Project-wide (security, compliance, architecture, tooling) → propose adding to charter as `NN-C-xxx`. Ask the user to confirm; if accepted, append the new entry to the charter non-negotiables file:
-      - v4: `.claude/skills/charter-non-negotiables/SKILL.md`
+      - v4: `.github/skills/charter-non-negotiables/SKILL.md`
       - v3: `<docs_root>/charter/non-negotiables.md`
     - Product-specific (tied to this PRD) → number as `NN-P-001, NN-P-002, ...` in the `## Non-Negotiables (Product)` section of `prd.md`.
   - If charter does not exist (legacy pre-charter project) → number as unprefixed `NN-001, NN-002, ...` in the PRD's legacy `## Non-Negotiables` section. Retrofit (piece 6) will reclassify later.
@@ -177,6 +177,18 @@ Interactive, one question at a time, in the order below. Do not batch questions;
 
 **4k. Adversarial close:** "What would a skeptical stakeholder say is missing from this PRD? If one assumption here is wrong, which one would most invalidate the whole product?"
 
+**4l. Branching strategy:** "Will this PRD's pieces accumulate on a dedicated feature branch before merging, or develop directly on `master`?" Ask one follow-up at a time:
+   - If a feature branch: "What should it be named? (e.g., `feature/<prd-slug>`)"
+   - "Where does the feature branch ultimately merge when the full PRD ships? (default: `master` / `main` / `develop`)"
+   - "Should piece branches merge back via PR or direct push?" (default: PR)
+   
+   Capture all three answers as:
+   - `feature_branch`: accumulator branch name, or null for direct-to-master
+   - `merge_target`: destination when the PRD ships (default: `master`)
+   - `pr_required`: `true` for PR, `false` for direct push (default: `true`)
+   
+   These are written to `manifest.yaml` front-matter in Step 6 so all downstream skills (spec, plan, execute) enforce the correct branching topology automatically — no per-session configuration needed.
+
 End brainstorm only when all sub-steps above are confirmed. Ask: "Any other requirements, constraints, or concerns before we lock the breakdown?"
 
 **Step 5: qa-prd gate**
@@ -207,6 +219,12 @@ At `<docs_root>/prds/<prd-slug>/manifest.yaml` (v3 layout):
 - Calculate coverage section
 - For each piece, verify `prd_sections:` references real FR-xxx / NFR-xxx identifiers from the normalized PRD (no dangling references)
 - If `legacy_mode: true` (from Step 0.5), add `legacy_mode: true` to the manifest YAML front-matter
+- Write branching strategy from step 4l into the manifest front-matter:
+  ```yaml
+  feature_branch: <value or null>  # piece branches base off this and merge here after execute
+  merge_target: <value>            # feature_branch merges here when full PRD ships
+  pr_required: <true|false>        # piece branches merge via PR (not direct push)
+  ```
 
 **Step 7: Create backlog**
 
@@ -233,7 +251,7 @@ This step exists ONLY for legacy import artifacts (BMad `_bmad-output/`, old han
 
 - v3 layout: `git add <docs_root>/prds/<prd-slug>/prd.md <docs_root>/prds/<prd-slug>/manifest.yaml <docs_root>/prds/<prd-slug>/backlog.md`
 - Also stage any charter non-negotiables updates if you appended NN-C entries in step 2a:
-  - v4: `git add .claude/skills/charter-non-negotiables/SKILL.md`
+  - v4: `git add .github/skills/charter-non-negotiables/SKILL.md`
   - v3: `git add <docs_root>/charter/non-negotiables.md`
 - Also stage `<docs_root>/archive/` only if step 9 actually moved scrap there.
 - `git commit -m "feat(<prd-slug>): import and normalize PRD, create manifest"`

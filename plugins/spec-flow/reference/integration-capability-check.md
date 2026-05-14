@@ -50,23 +50,21 @@ and continue with the rest of the skill. Do NOT fail, do NOT retry.
 
 | Operation | Used by | Tools required |
 |-----------|---------|---------------|
-| `create_piece_issue` | spec (Phase 2 — creates piece issue, linked to parent if `parent_key:` set in prd.md) | `create_issue` |
-| `create_phase_issue` | plan (sign-off — creates per-phase issues linked to piece issue) | `create_issue` |
-| `transition_issue` | execute (phase start/QA/final review) | `transition_issue` |
-| `get_issue` | status (issue status display) | `get_issue` |
-| `get_transitions` | execute (resolve valid next status before transitioning) | `get_transitions` |
+| `create_piece_issue` | spec | `create_issue` |
+| `create_phase_issue` | plan | `create_issue` |
+| `transition_issue` | execute | `transition_issue` |
+| `get_issue` | status | `get_issue` |
+| `get_transitions` | execute | `get_transitions` |
 
-**Issue type mapping is project-defined in `charter/integrations.md`** via:
+**Issue hierarchy is defined in `hierarchy:` in `.spec-flow.yaml`** — see `plugins/spec-flow/reference/jira-integration-config.md` for the full schema. Skills resolve issue type, parent key location, and key recording field from that list rather than from flat config values.
+
+**Other config fields read by skills:**
 - `project_key:` — **required for Jira** — the Jira project key where all issues are created (e.g. `EIT`, `PROJ`). Read from `integrations.issue_tracker.project_key` in `.spec-flow.yaml`. Passed as the `project_key` parameter to every `create_issue` call.
-- `base_url:` — **required for Jira** — base URL of the Jira instance (e.g. `https://se-ivan.atlassian.net`). Read from `integrations.issue_tracker.base_url` in `.spec-flow.yaml`. Used by skills to construct browsable issue links of the form `<base_url>/browse/<issue-key>` recorded in spec.md, plan.md, and surfaced in status output. NOT passed to MCP tools (the MCP server manages its own connection config).
-- `piece_issue_type:` — issue type for each piece (e.g. Epic, Story, Feature)
-- `phase_issue_type:` — issue type for each phase (e.g. Task, Sub-task, Story)
-- `parent_issue_type:` — optional parent above the piece (e.g. Capability, Initiative, Theme)
+- `base_url:` — **required for Jira** — base URL of the Jira instance (e.g. `https://se-ivan.atlassian.net`). Read from `integrations.issue_tracker.base_url` in `.spec-flow.yaml`. Used to construct `jira_url` values of the form `<base_url>/browse/<issue-key>` recorded in prd.md, spec.md, and plan.md.
 
-**Key fields written by skills (provider-agnostic names):**
-- `parent_key:` in `prd.md` → parent issue the piece issue links to
-- `epic_key:` in `spec.md` → the piece issue key (written by spec skill regardless of actual type name)
-- `jira_task:` per phase in `plan.md` → the phase issue key (written by plan skill regardless of actual type name)
+**Standardized key fields written to artifacts:**
+- `jira_key:` — single field name used at every hierarchy level (prd.md, spec.md, plan.md per-phase)
+- `jira_url:` — browse URL, written alongside `jira_key:` in spec.md and plan.md per-phase
 
 ---
 
@@ -117,32 +115,33 @@ When `integrations.issue_tracker.charter_file` is set (default: `integrations`),
 - Task naming conventions
 - Status transition rules (which statuses to use at each pipeline event)
 - Commit message format
-- Issue hierarchy (epic / story / task)
+- Issue hierarchy (see `hierarchy:` in `.spec-flow.yaml`)
 
 If the charter file is absent:
 - If `auto_create_tasks: true` or `auto_transition: true` — emit a one-line note:
   `ℹ️ No charter/integrations.md found — using provider defaults for task naming and transitions.`
-- Then proceed with these built-in defaults (`piece_issue_type` = Epic, `phase_issue_type` = Task):
+- Then proceed with these built-in defaults, deriving issue types from the `hierarchy:` list
+  (`managed_by: spec` entry → piece issue type; `managed_by: plan` entry → phase issue type):
 
-**Naming conventions** (using configured `piece_issue_type` / `phase_issue_type`):
+**Naming conventions:**
 
 | Issue | Format |
 |-------|--------|
-| `{piece_issue_type}` (one per piece) | `{piece-slug} — {piece description from manifest}` |
-| `{phase_issue_type}` (one per phase) | `[phase] {piece-slug}/{phase-number} — {phase-name}` |
+| piece issue (`managed_by: spec`) | `{piece-slug} — {piece description from manifest}` |
+| phase issue (`managed_by: plan`) | `[phase] {piece-slug}/{phase-number} — {phase-name}` |
 
 **Status transitions** (status names from `integrations.issue_tracker.status_map`):
 
 | Event | Issue | Target Status |
 |-------|-------|--------------|
-| `{piece_issue_type}` created | `piece_issue_type` | `status_map.todo` |
-| `{phase_issue_type}` created | `phase_issue_type` | `status_map.todo` |
-| Phase execute starts | `phase_issue_type` | `status_map.in_progress` |
-| Phase QA passes | `phase_issue_type` | `status_map.in_review` |
-| Final Review Board passes | `phase_issue_type` | `status_map.done` |
-| Non-active tasks (post-creation) | `phase_issue_type` | `status_map.backlog` |
+| Piece issue created | piece (`managed_by: spec`) | `status_map.todo` |
+| Phase issue created | phase (`managed_by: plan`) | `status_map.todo` |
+| Phase execute starts | phase (`managed_by: plan`) | `status_map.in_progress` |
+| Phase QA passes | phase (`managed_by: plan`) | `status_map.in_review` |
+| Final Review Board passes | phase (`managed_by: plan`) | `status_map.done` |
+| Non-active tasks (post-creation) | phase (`managed_by: plan`) | `status_map.backlog` |
 
-> Agents may only move `{phase_issue_type}` issues to `in_progress` or `in_review` mid-flight.
+> Agents may only move phase issues (`managed_by: plan`) to `in_progress` or `in_review` mid-flight.
 > Only the Final Review Board pass gates a `done` transition.
 
 ---
@@ -151,19 +150,19 @@ If the charter file is absent:
 
 Applied when creating Tasks for a piece's phases (i.e. during `create_phase_issue`). **Not applied to piece-level issues (Epics).**
 
-**Story Points** (Task / `phase_issue_type` only):
-> Estimate the human effort to complete the phase in days, then apply: `fib_ceil(estimate × 0.5)` — multiply the day estimate by 0.5, then round up to the next Fibonacci number (1, 2, 3, 5, 8, 13, 21 …). 1 story point ~= 1 human work day.
+**Story Points** (phase issue (`managed_by: plan`) only — not on piece or top-level issues):
+> Estimate the human effort to complete the phase in days, then apply: `ceil(estimate × 0.5)` (i.e. half the raw estimate, rounded up to next Fibonacci number). 1 story point ~= 1 human work day.
 >
-> Example: a phase estimated at 6 days → 6 × 0.5 = 3.0 → next Fibonacci ≥ 3 = **3 points**.
-> Example: a phase estimated at 7 days → 7 × 0.5 = 3.5 → next Fibonacci ≥ 3.5 = **5 points**.
+> Example 1: a phase estimated at 6 days → `ceil(6 × 0.5)` = 3, which is a Fibonacci number → **3 points**.
+> Example 2: a phase estimated at 11 days → `ceil(11 × 0.5)` = ceil(5.5) = 6, which is not a Fibonacci number → round up to **8 points**.
 >
 > If the phase has no explicit duration estimate in plan.md, derive from the number of implementation sub-steps or leave unset.
 
 **Assignee:**
-> Set to the current user performing the plan sign-off (i.e. the person running `/spec-flow:plan`).
+> Set to the current user performing the tracking setup (i.e. the person running the spec/plan/manifest workflow).
 
 **Initial Status:**
-> All Tasks are created in `To Do`. After creation, move every Task that is **not** currently being executed to `Backlog`. Move a Task to `In Progress` only when its phase begins in execute.
+> Tasks are created in `To Do` by default. Move to `Backlog` for all tasks not actively being worked. Move to `In Progress` only the task currently under execute.
 
 ---
 
