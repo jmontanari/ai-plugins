@@ -51,6 +51,53 @@ location:
 If the file is absent, proceed with built-in defaults (see `plugins/spec-flow/reference/integration-capability-check.md`). Store as `integration_cfg`. If disabled or absent, set
 `integration_cfg = null` and skip all integration steps in this skill.
 
+### Capability Probe
+
+At Step 0 startup, run four independent capability probes. Each probe checks whether its tool is available and stores the result in orchestrator state. No probe depends on another's result (AC-12). When a tool is absent the variable is set to `false`; no warning or error is emitted (FR-8, NN-C-005).
+
+```
+goal_available        = (GoalCreate tool is present)
+push_notif_available  = (PushNotification tool is present)
+monitor_available     = (Monitor tool is present)
+background_available  = (background agent dispatch is supported by the host)
+```
+
+**GoalCreate block.** If `goal_available`, set a goal at execute startup. The goal runs autonomously through all phase loops, QA gates, Step 6c discovery triage, and Final Review fix-up. It stops at Step 4 (Human Sign-Off, NN-P-002), the merge gate (Step 5.5), or at any hard-stop condition.
+
+`resuming_session` is true when the piece's manifest already shows `status: in-progress` at the moment execute starts (meaning Pre-Loop already committed the manifest change in a prior session).
+
+```
+if goal_available AND NOT resuming_session:
+  invoke GoalCreate(
+    piece = <slug>,
+    completion = "Step 5 (Capture Learnings) committed on piece branch"
+  )
+  record goal_id in orchestrator state
+elif goal_available AND resuming_session:
+  emit one-line note: "Resumed session — GoalCreate skipped; prior goal may still be active"
+# else: skip silently (FR-8, NN-C-005)
+# If execute halts before completion (at Prerequisites, charter-drift checks, dependency preconditions,
+# plan validation failures, hook escalation, budget exhaustion, or any other hard stop before Step 5),
+# the goal may remain open as an orphan; the operator must cancel it manually or re-run execute after
+# resolving the gate failure.
+```
+
+**Monitor arming block.** If `monitor_available`, arm a monitor on `plan.md` for the active piece. Each `[ ] → [x]` checkbox transition emits a one-line notification; rapid writes within the same write session are debounced with a ≥1-second minimum between notifications.
+
+```
+if monitor_available AND NOT resuming_session:
+  arm monitor on docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
+  emit one-line notification per [ ] → [x] checkbox transition
+  debounce: ≥1 second between notifications for the same write session
+  record monitor_armed = true in orchestrator state
+elif monitor_available AND resuming_session:
+  emit one-line note: "Resumed session — Monitor arming skipped; prior Monitor may still be active"
+  record monitor_armed = true in orchestrator state  # prior session may have armed it; ensure teardown fires
+# else: skip silently (FR-8, NN-C-005)
+```
+
+Plan.md may receive multiple rapid checkbox writes within a single phase commit; debouncing prevents a notification flood while still emitting a timely event per distinct write session.
+
 ## Prerequisites
 
 - Piece must have status `planned` in manifest at `docs/prds/<prd-slug>/manifest.yaml`
@@ -633,6 +680,13 @@ Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 
 
    - **Re-dispatch:** QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings. The agent template's iter-2 rules hard-cap out-of-scope reads (return BLOCKED rather than fetching).
    - **Circuit breaker:** 3 iterations max, then escalate.
+
+   - **Action-required notification (hard stop — execute halts):**
+     ```
+     if push_notif_available:
+       send action-required notification: "Hard stop: QA circuit breaker fired in <phase> — <piece-slug> needs operator attention"
+     # else: skip silently
+     ```
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate — no point re-running QA.
 
 ### Step 6a: Deferred-finding tracking (FR-10)
@@ -766,7 +820,21 @@ Discovery in <phase> surfaced before any cumulative diff exists — auto-amend c
 
 where `<phase>` is the discovery's source phase ID. After emitting this message the orchestrator falls back to the operator-mode triage prompt for that discovery only; subsequent discoveries in the same triage event remain in auto-mode and are evaluated independently per the per-discovery rule (each subsequent discovery may have a non-zero cumulative diff if the first discovery's resolution committed work in between).
 
+**Action-required notification (hard stop — execute halts awaiting operator):**
+```
+if push_notif_available:
+  send action-required notification: "Hard stop: auto-mode cannot evaluate threshold in <phase> (no cumulative diff yet) — <piece-slug> needs operator attention"
+# else: skip silently
+```
+
 **Auto-amend if `ratio < 0.5`.** The orchestrator dispatches the amend flow (plan-amend by default; spec-amend only when the discovery's `(s) amend-spec` option would have been offered per the Triage prompt rules — i.e., the finding text names a missing FR/AC or contradiction in the spec) without operator prompting. The Amendment budget tracking gate still applies — auto-mode does NOT bypass the 2-total / 1-spec-max budget; if the budget is exhausted the auto-amend dispatch is refused exactly as in operator mode.
+
+**Informational notification (execute continues):**
+```
+if push_notif_available:
+  send informational notification: "Discovery resolved: <summary> — execute continues"
+# else: skip silently
+```
 
 **Otherwise (`ratio ≥ 0.5`) auto-mode escalates** with the verbatim message:
 
@@ -775,6 +843,13 @@ Discovery in <phase> would expand piece by <X>% — exceeding 50% auto-amend thr
 ```
 
 where `<phase>` is the discovery's source phase ID and `<X>` is `ratio × 100` rounded to one decimal place. After emitting this message the orchestrator falls back to the operator-mode triage prompt (the Triage prompt block above) for THAT discovery only; subsequent discoveries in the same triage event remain in auto-mode and are evaluated independently per the per-discovery rule above.
+
+**Action-required notification (hard stop — execute halts awaiting operator):**
+```
+if push_notif_available:
+  send action-required notification: "Hard stop: auto-mode cannot resolve discovery in <phase> (>50% expansion) — <piece-slug> needs operator attention"
+# else: skip silently
+```
 
 **Auto-mode never auto-forks or auto-defers.** Fork and defer always require operator triage, regardless of any threshold computation. The auto-mode default applies exclusively to the `amend` choice (and only when `ratio < 0.5`). When the operator-mode triage prompt fires under auto-mode (because of threshold escalation), the operator's choice can still be fork or defer — auto-mode does not constrain the operator's selection, only the auto-resolution path.
 
@@ -896,7 +971,13 @@ Amendment budget exhausted — piece scope was inadequate. Escalating: abandon a
 This is a y/n confirmation gated by NN-C-006 (operator confirmation required for destructive or piece-state-changing operations).
 
 - **On `y`:** the orchestrator continues execution with **no further amendments allowed**. Subsequent discoveries — whether in the current triage event, later phases, or Step 8's Final Review Triage — may only choose `fork` or `defer`. The `(a) amend` and `(s) amend-spec` options are no longer offered. Auto-mode under `--auto` falls back to the operator prompt (since auto-amend cannot dispatch) and the operator must choose fork or defer.
-- **On `n`:** the orchestrator halts execute. It sets the current piece's status to `blocked` in `docs/prds/<prd-slug>/manifest.yaml` with a notes-line citing budget exhaustion (the operator's `n` response constitutes the explicit confirmation NN-C-006 requires; this is therefore not a destructive operation without confirmation). It commits the manifest update on the current worktree branch:
+- **On `n`:** **Action-required notification (hard stop — execute halts):**
+  ```
+  if push_notif_available:
+    send action-required notification: "Hard stop: amendment budget exhausted — <piece-slug> halting, re-spec recommended"
+  # else: skip silently
+  ```
+  the orchestrator halts execute. It sets the current piece's status to `blocked` in `docs/prds/<prd-slug>/manifest.yaml` with a notes-line citing budget exhaustion (the operator's `n` response constitutes the explicit confirmation NN-C-006 requires; this is therefore not a destructive operation without confirmation). It commits the manifest update on the current worktree branch:
   ```bash
   git add docs/prds/<prd-slug>/manifest.yaml
   git commit -m "chore(<piece-slug>): block — amendment budget exhausted"
@@ -1176,6 +1257,22 @@ Agent({
 
 This 7th agent compensates for the per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches that fast mode skips.
 
+**Note on `background_available` probe:** the `background_available` variable set in the Capability Probe represents whether the host supports background agent dispatch (i.e., the Agent() call accepts a `background: true` parameter or equivalent). The implementer may look for an environment capability flag or attempt a probe call — the exact mechanism is host-specific. The prose below should describe the intent ("host supports background agent dispatch") rather than a host-specific API call.
+
+**if `background_available`:** After dispatching all review-board agents concurrently with `background: true`, arm a `TeammateIdle` handler. When the last background agent completes and `TeammateIdle` fires, collect all results and advance the orchestrator to Step 2 (Triage).
+
+**Note on `TeammateIdle` event name:** `TeammateIdle` is the Claude Code v2.1.139+ event that fires when the last concurrently-dispatched background agent completes. If the Claude Code host uses a different event name for this concept (e.g., `BackgroundAgentsComplete` or similar), substitute that name in the prose above. The semantics — "fires when last background agent finishes" — are canonical; the identifier is what to verify against the host's actual API.
+
+**10-minute timeout fallback (hard stop, AC-14).** If `TeammateIdle` has not fired within 10 minutes of the last review-board agent dispatch — for example because a background agent crashed or timed out and will never signal — treat as a hard stop. Before halting, collect any agent results that have ALREADY arrived and surface them to the operator (do not discard partial results — display what has been received so the operator has maximum context). Then:
+```
+if push_notif_available:
+  send action-required notification: "Hard stop: Final Review TeammateIdle timeout — <piece-slug> needs operator attention"
+# else: skip silently
+```
+Halt execute awaiting operator action. Do NOT auto-advance to Step 2 (Triage).
+
+**else (foreground host — `background_available` is false):** Agents were dispatched without `background: true` and returned their results directly (synchronously) to the orchestrator via the Agent() call. No TeammateIdle event will fire. Collect all results immediately as each Agent() call returns and advance the orchestrator to Step 2 (Triage) without waiting for any event.
+
 ### Step 2: Triage
 
 Collect findings from all board agents (6 in standard mode; 7 in fast mode — the 7th is `verify-piece-full`). Deduplicate (same issue reported by multiple reviewers). Classify:
@@ -1200,6 +1297,13 @@ If must-fix findings exist:
 - Re-dispatch ALL 6 standard reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. Note: the 7th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** 3 full review cycles maximum.
+
+- **Action-required notification (hard stop — execute halts):**
+  ```
+  if push_notif_available:
+    send action-required notification: "Hard stop: Final Review circuit breaker fired — <piece-slug> needs operator attention"
+  # else: skip silently
+  ```
 - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
 ### Step 8: Final Review Triage
@@ -1223,6 +1327,13 @@ If must-fix findings exist:
 **`.discovery-log.md` authoring.** Step 8's per-finding rows append to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.discovery-log.md` per the Step 6c Resolution-commit cell convention, with the `Phase` column set to the literal `final-review` token. The row append lands as part of the same commit as the resolution (amend-with-audit-trail, fork-with-audit-trail, or defer-with-audit-trail) per the Step 6c authoring rules.
 
 ### Step 4: Human Sign-Off
+
+**Action-required notification (human gate — NN-P-002):**
+```
+if push_notif_available:
+  send action-required notification: "<piece-slug> ready for human sign-off — operator review required (NN-P-002)"
+# else: skip silently
+```
 
 Present to user:
 - Summary of what was built (phases, files, test counts)
@@ -1346,6 +1457,14 @@ for `pr` the PR merge carries it. The piece branch must show `status: merged` be
 any push or PR is opened — if the branch reaches main with `status: in-progress`, the
 next `status` scan will show the piece as stale-active with no worktree.
 
+**Action-required notification (merge gate — execute halts):**
+```
+if push_notif_available:
+  send action-required notification: "<piece-slug> ready to merge — operator action required"
+# else: skip silently
+# execute halts here; no auto-merge
+```
+
 ```bash
 # update docs/prds/<prd-slug>/manifest.yaml:
 #   status: merged
@@ -1361,6 +1480,14 @@ git revert HEAD --no-edit   # reverts the Step 5.5 manifest commit
 ```
 After escalation, if the human resolves the issue and retries, **re-run Step 5.5 first**
 (re-commit `status: merged` + `merged_at`) before retrying Step 6.
+
+**Monitor teardown.** If `monitor_available` and Monitor was armed at Step 0, disarm it now:
+```
+if monitor_available AND monitor_armed:
+  disarm monitor on docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
+# else: skip silently
+```
+This prevents the Monitor from watching a path that no longer exists after the worktree is removed at Step 6.
 
 ### Step 6: Merge
 

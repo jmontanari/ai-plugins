@@ -257,3 +257,30 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **Finding (verbatim):** The QA-lite reviewer for sub-phase B.2 approved a schema that used inline agent context (violating the spec's isolation rule) — the violation was caught only in the full group-level QA. The fix: attach the sibling sub-phase's agent schema to QA-lite's prompt context so the narrower reviewer can also detect cross-contamination.
 **Why this does not block pi-010-discovery's goals:** Process improvement for future pieces; does not affect pi-010-discovery's shipped artifacts.
 **Captured:** 2026-04-30
+
+---
+
+### pi-013-goal-exec process retro — 2026-05-14
+
+#### must-improve
+
+- **Fix-code agents fix the stated branch but miss symmetric sibling branches:** All three Final Review iterations (7→1→1 must-fix) traced to the same failure mode — fix-code applied a state-variable assignment to the fresh-arm branch but not the resume branch (`monitor_armed`). Fix-code dispatch is finding-scoped, not invariant-scoped. Mitigation: add a reminder in the fix-code agent template to check all parallel/sibling branches whenever a state variable assignment is the fix. Alternatively, add an edge-case checklist item: "every state variable assigned in one branch is assigned (or explicitly absent-by-design) in all sibling branches."
+
+- **Dead capability-probe variables signal a broken plan→implement link:** `background_available` was defined in the Capability Probe and consumed downstream, but the plan had no explicit step to "confirm probe variable is guarded at every call site." The dead-variable failure was caught by Final Review rather than plan validation. For any capability-probe pattern, the consuming phase should explicitly require confirming that the probe variable is wired to a conditional guard with no unconditional call sites.
+
+- **FR-8 QA-skip predicate should carve out SKILL.md with conditional orchestration logic:** FR-8 ("prose/YAML additions, no new branching control flow") bypassed Opus QA for all 4 phases. However, SKILL.md prose that says "if X then do A, else do B" expresses conditional orchestration logic equivalent to branching control flow — and the 7 iter-1 must-fix findings all stemmed from incomplete branch handling in skill prose. Recommended carve-out: FR-8 applies only when the deliverable contains NO conditional orchestration statements (if/else/resume/arm/teardown). SKILL.md edits with guard blocks should trigger per-phase Opus QA regardless of deliverable type.
+
+#### worked-well
+
+- **Phase Group A parallel dispatch (A.1 + A.2) ran without staging conflicts:** SKILL.md TeammateIdle prose (A.1) and 12 agent file frontmatter additions (A.2) had genuinely disjoint scopes. No reconciliation overhead, no scope-disjointness violations, no serial fallback. The "large prose edit in one file + N uniform 1-line edits across N isolated files" pattern is a strong Phase Group candidate.
+
+- **Refactor auto-skip was correct for all 4 phases:** Prose-only and frontmatter-only deliverables presented zero refactor surface. No refactor-ish defects appeared in Final Review. The `refactor: auto` skip predicate is reliably accurate for doc-as-code pieces.
+
+#### metrics
+
+- Final Review iterations: 3 (circuit-breaker max; baseline 1 for prose-only pieces; all caused by single branch-symmetry failure thread).
+- Must-fix by reviewer: edge-case=6+1+1 across 3 iterations; blind=6 (iter 1); prd-alignment=2 (iter 1). Edge-case reviewer contributed most findings.
+- Per-phase QA skips: 4/4 phases (FR-8 predicate — correct per definition, but see must-improve above).
+- Escalations / circuit-breaker hits during phases: 0.
+- Cumulative diff: 20 files, 817 insertions(+), 4 deletions(-).
+- Refactor skips: 4/4 (100% auto-skipped; correct).

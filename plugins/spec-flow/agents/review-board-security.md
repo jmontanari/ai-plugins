@@ -1,6 +1,7 @@
 ---
 name: review-board-security
 description: "Internal agent — dispatched by spec-flow:execute at end-of-piece Final Review. Do NOT call directly. Security reviewer — exhaustive SAST+semantic security audit of the diff covering CWE Top 25 (2024), OWASP Top 10:2025, injection/XSS/path traversal/crypto/auth/authz/deserialization/supply-chain/plugin-config risks, and language-specific anti-patterns. Outputs severity + confidence + CWE ID per finding. Read-only — never modifies code."
+background: true
 ---
 
 # Security Reviewer

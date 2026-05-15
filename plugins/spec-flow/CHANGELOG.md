@@ -4,6 +4,15 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [4.7.0] — 2026-05-14
+
+### Added
+- **GoalCreate integration at execute Step 0**: when `GoalCreate` is available, execute sets a goal that runs autonomously through all phase loops, QA gates, discovery triage (Step 6c), and Final Review fix-up, stopping only at the merge gate (Step 5.5) or a hard-stop condition.
+- **Background dispatch for review-board agents**: all twelve review-board agent files (six `.md` + six `.agent.md`) carry `background: true` in YAML frontmatter. Execute Final Review Step 1 now arms a `TeammateIdle` handler to aggregate results; a 10-minute timeout fallback fires as a hard stop if TeammateIdle never arrives.
+- **PushNotification wiring**: informational notification at Step 6c auto-mode resolution (goal continues); action-required notifications at the merge gate (Step 5.5) and at each of the four hard-stop conditions (per-phase QA circuit breaker, amendment budget exhausted, auto-mode cannot resolve discovery, Final Review circuit breaker).
+- **Monitor for plan.md progress**: execute Step 0 arms a monitor on `plan.md` when `Monitor` is available; each `[ ] → [x]` checkbox transition emits a one-line notification, debounced at ≥1 second per write session.
+- **Backward-compatible capability detection**: four independent probes at Step 0 (`goal_available`, `push_notif_available`, `monitor_available`, `background_available`); each feature silently no-ops when the tool is absent (NN-C-005).
+
 ## [4.6.2] — 2026-05-14
 
 ### Added

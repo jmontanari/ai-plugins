@@ -188,6 +188,22 @@ pieces:
     dependencies: [PI-008-multi-prd-v3.0.0]
     status: done
 
+  - name: pi-013-goal-exec
+    slug: pi-013-goal-exec
+    description: |
+      v4.7.0 — Wire four Claude Code v2.1.139+ capabilities into the execute skill for
+      unattended full-piece runs: (1) GoalCreate at Step 0 sets a goal that runs through all
+      phases, QA gates, discovery triage, and Final Review fix-up, stopping at the merge gate;
+      (2) background:true on all six review-board agents enables TeammateIdle-based aggregation;
+      (3) PushNotification fires informational alerts at Step 6c and action-required alerts at
+      hard stops and the merge gate; (4) Monitor arms on plan.md at Step 0 and emits one-line
+      notifications per checkbox transition. All four features degrade silently when tools are
+      absent (NN-C-005). Minor version bump (NN-C-009).
+    prd_sections: [FR-004, G-2, NFR-003]
+    dependencies: [pi-010-discovery, pi-012-single-branch]
+    status: merged
+    merged_at: 2026-05-14
+
 coverage:
   total_prd_sections: 15
   covered_sections: 8

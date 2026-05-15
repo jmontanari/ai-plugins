@@ -115,3 +115,52 @@ The following items were specced into `docs/prds/shared/specs/pi-009-hardening/s
 **Finding (verbatim):** The spec-amend agent is bounded to additions and clarifications within the piece's existing goals — it cannot change the Goal section or In Scope/Out of Scope boundaries. Discoveries that surface a PRD-level gap (a missing requirement never in any piece's scope) currently have no supported amendment path. A guided escalation path (spec-amend emits a PRD change request that the operator can route to a follow-up prd-amendment piece) would close this gap. Priority: low.
 **Why this does not block pi-010-discovery's goals:** Will address in a future piece; does not block pi-010-discovery's completed goals.
 **Captured:** 2026-04-30
+
+---
+
+## pi-013-goal-exec future opportunities — 2026-05-14
+
+### [Deferred via /spec-flow:defer] GoalCreate orphan detection sweep at Step 0
+
+**Source:** `shared/pi-013-goal-exec` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** `resuming_session` is detected via manifest `status: in-progress`, but if execute crashes between GoalCreate (Step 0 Capability Probe) and the Pre-Loop manifest commit, the manifest stays `planned` on re-run and a second GoalCreate fires — creating a duplicate goal. A Step 0 orphan-detection sweep that queries for open GoalCreate entries matching the current piece slug (regardless of manifest state) would close this gap, reusing or closing the prior goal before creating a new one.
+**Priority:** medium
+**Dependencies:** none
+**Candidate piece:** spec amendment to execute Step 0 Capability Probe — add orphan-detection logic before GoalCreate invocation.
+**Captured:** 2026-05-14
+
+### [Deferred via /spec-flow:defer] Persist goal_id and monitor_id across sessions
+
+**Source:** `shared/pi-013-goal-exec` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** `goal_id` and `monitor_id` are held only in in-session orchestrator state. If the session crashes or context overflows, the resumed session cannot call GoalComplete or GoalCancel against the prior goal/monitor, leaving them as permanent orphans. Persisting these IDs to a git note on the worktree branch HEAD immediately after creation would make them durable and machine-readable for resume and teardown.
+**Priority:** medium
+**Dependencies:** GoalCreate orphan detection sweep (above)
+**Candidate piece:** spec amendment to execute Capability Probe and Step 5.5 teardown — add git-note persistence for goal_id and monitor_id.
+**Captured:** 2026-05-14
+
+### [Deferred via /spec-flow:defer] Step 4 fallback terminal output when push_notif_available=false
+
+**Source:** `shared/pi-013-goal-exec` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** The Step 4 human-gate PushNotification block silently skips when `push_notif_available=false`. While terminal output is always present at Step 4, there is no structured fallback block that mirrors the explicit skip-acknowledgement pattern used at other hard-stop locations. Adding an explicit fallback improves operator awareness in environments without push support.
+**Priority:** low
+**Dependencies:** none
+**Candidate piece:** single-line prose amendment to execute Step 4 notification block.
+**Captured:** 2026-05-14
+
+### [Deferred via /spec-flow:defer] Structured triage markers in review-board agent files
+
+**Source:** `shared/pi-013-goal-exec` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** The 12 review-board agent files touched in pi-013's Phase Group A.2 still emit free-form prose findings. Adding a `## Triage-eligible discoveries` section with a defined schema would make Step 8 routing deterministic. Natural follow-up to pi-013 since the same 12 files are already in a known-modified state. Existing backlog item from pi-010-discovery predates this piece.
+**Priority:** medium
+**Dependencies:** none
+**Candidate piece:** spec amendment or new piece — update 12 review-board agent files + execute Step 8 orchestrator.
+**Captured:** 2026-05-14
+
+### [Deferred via /spec-flow:defer] TeammateIdle timeout calibration with empirical data
+
+**Source:** `shared/pi-013-goal-exec` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** The TeammateIdle 10-minute timeout is hardcoded with no measurement feedback. Instrumenting the aggregation loop to record per-agent wall-clock completion times would allow replacement with a data-driven percentile after N executions. Depends on the existing "Phase Group parallelism — empirical timing measurement" backlog item.
+**Priority:** low
+**Dependencies:** "Phase Group parallelism — empirical timing measurement" (existing backlog item)
+**Candidate piece:** fold into Phase Group timing measurement piece when specced.
+**Captured:** 2026-05-14
