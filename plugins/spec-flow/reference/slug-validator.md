@@ -65,13 +65,14 @@ ERROR: piece-slug "user-authentication-service" is 27 characters; limit is 20.
 
 ## Where invoked
 
-Five skills enforce this validator. Each invokes it before creating a branch or worktree:
+Six skills enforce this validator. Each invokes it before creating a branch or worktree:
 
 - `/spec-flow:prd` — when assigning the PRD slug at PRD creation or import time.
 - `/spec-flow:spec` — before creating the `piece/<prd-slug>-<piece-slug>` branch and the piece worktree.
 - `/spec-flow:plan` — slug validation only (no branch or worktree creation; the `piece/` branch and worktree are inherited from the spec skill).
 - `/spec-flow:execute` — slug validation only (no branch or worktree creation; inherits from spec).
 - `/spec-flow:migrate` — before producing v3 paths and any branch that operates on the migrated layout.
+- `/spec-flow:small-change` — before creating the `change/<slug>` branch and `<worktrees_root>/<slug>` worktree.
 
 ## See also
 

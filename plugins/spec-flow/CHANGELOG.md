@@ -4,14 +4,70 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [4.10.0] — 2026-05-28
+
+### Added
+- **`plan/SKILL.md` — introspection.md persistence (Phase 4):** Exploration findings now write to `introspection.md` via a cluster-based approach (≤5 files/cluster). Pattern Catalog requires verbatim code blocks (3-10 lines), not file:line pointers. Phase 2 reads `introspection.md` as primary input.
+- **`plan/SKILL.md` — Change Specification Blocks (Phase 5):** [Build]/[Implement] blocks now use self-contained Change Specification format with T-N task IDs. MODIFY operations include CURRENT state (verbatim code), TARGET description, and inline Pattern code. CREATE/DELETE have structured templates.
+- **`execute/SKILL.md` — introspection forwarding (Phase 6):** Step 1b item 8 reads `introspection.md` and attaches Dependency Map + Test Landscape to agent prompts as `### Codebase context`.
+- **`qa-plan.md` — criteria 23-25 (Phase 7):** Three new review criteria: change specification completeness (must-fix), inline pattern resolution (must-fix), per-change verification (should-fix).
+- **`templates/plan.md` — Change Specifications in all tracks:** TDD, Implement, and non-TDD track examples updated with Change Specification Block format and per-change [Verify] checks.
+- **`templates/plan.md` — Agent Context Summary:** Implementer rows now include codebase context from `introspection.md`.
+
+## [4.9.0] — 2026-05-27
+
+### Added
+- **`plan/SKILL.md` — Executable AC Binding table (FR-6 of plan-mode-overhaul):** New required `## Executable AC Binding` section after `## AC Coverage Matrix`; maps every COVERED AC to its exact verification type (`shell`, `file-check`, `agent-step`), copy-pasteable `Command/Check`, and `Expected Result`. Acts as the contract between plan and execute.
+- **`plan/SKILL.md` — Phase boundary declarations (FR-7 of plan-mode-overhaul):** Each phase header must now declare explicit `In scope:` and `NOT in scope:` lists. File-level tracking (CREATE/MODIFY/DELETE) lives in the `**File changes:**` table inside `[Build]`/`[Implement]` blocks.
+- **`plan/SKILL.md` — Hard-gate: CREATE/MODIFY distinction in step 3:** Bullets (c) and (d) of the per-change-target requirements now carry `(MODIFY only — omit for CREATE targets)` carve-outs, preventing spurious line-range/snippet requirements on new-file phases.
+- **`plan/SKILL.md` — CREATE-only and zero-test edge cases in Code Introspection Report:** Edge-case guidance appended after the four-section bullet list — CREATE-only targets document target path + structure outline instead of verbatim code; greenfield projects with no test infrastructure note the missing setup as an explicit first-phase task.
+- **`qa-plan.md` — Criterion 22: Executable AC Binding presence and completeness:** New must-fix criterion that fires always; flags absent `## Executable AC Binding` section and any COVERED AC row missing a concrete `Command/Check`, valid `Verification Type`, or specific `Expected Result`.
+
+### Fixed
+- **`plan/SKILL.md` step 9a example table:** AC-2 row `Verification Type` corrected from `file-check` to `agent-step` (LLM-agent-step framing is `agent-step`, not `file-check`).
+- **`plan/SKILL.md` step 10 bullet 6:** `## Contracts` placement instruction corrected — now reads "immediately after `## Executable AC Binding`" (which itself follows `## AC Coverage Matrix`), matching the template ordering.
+- **`qa-plan.md` criterion 5:** Wording corrected from "function/class/method names (not line numbers)" to "function/class/method names and line ranges" — aligns with step 3's requirement for BOTH semantic anchors AND line ranges.
+
+## [4.8.0] — 2026-05-15
+
+### Added
+- **`small-change` skill** — adds `plugins/spec-flow/skills/small-change/SKILL.md`, a one-session brief + plan + execute entry point for small, focused changes with slug-collision guarding, resume warnings, scope-gate overrides, Jira gating, deferred-item disposition, and `change/<slug>` worktree routing.
+- **`reference/brainstorm-procedure.md`** — shared reference doc for charter loading, integration config, L-10 convention context scan, C-2 security sub-block, C-3 floor check pattern, and charter constraint identification. Replaces four inline procedure blocks in `spec/SKILL.md` and drives the `small-change` brainstorm.
+- **`templates/change-brief.md`** — template for change-track briefs with `charter_snapshot:` front-matter, six structured sections (Problem Statement, Functional Requirements, Acceptance Criteria, Non-Negotiables Honored, Coding Rules Honored, Out of Scope), and optional Jira fields (`jira_key:`, `jira_url:`).
+- **`execute/SKILL.md`** — change-track detection and routing: `change/<slug>` argument sets `track = "change"`; 5-agent Final Review (prd-alignment excluded for change-track); NN-P injection skip; improvement-backlog reflection routing for change-track pieces.
+- **`intake/SKILL.md`** — Q_scale prompt and signal-keyword detection (10 keywords: fix, bug, broken, regression, quick, tweak, minor, patch, one-off, small feature) for routing to `/small-change` at the New Domain branch.
+
+### Changed
+- **`spec/SKILL.md`** — replaced four inline procedure blocks (Phase 1 charter detection, integration config load, Phase 2 L-10 context scan, Phase 2 charter constraint identification) with citations to `reference/brainstorm-procedure.md`.
+
+## [4.7.1] — 2026-05-15
+
+### Changed
+- **Amendment budget raised 2 → 5** — hard cap on total plan/spec amendments per piece increased from 2 to 5; spec-amendment sub-budget unchanged at 1. Budget-exhaustion escalation prompt updated to reflect new threshold and recommends forking rather than re-spec.
+- **must-fix / should-fix severity classification in Final Review** — Final Review Step 2 triage adds `should-fix` as a distinct severity bucket between `must-fix` and `defer`; not merge-blocking.
+- **Severity label surfaced in triage prompt** — Final Review findings now display their severity label (`must-fix` / `should-fix`) in the Step 6c triage prompt so the operator can weigh the tradeoff. All findings still receive the full options menu `(a) amend  (f) fork  (d) defer` — the operator decides whether a should-fix warrants an amendment cycle.
+
 ## [4.7.0] — 2026-05-14
 
 ### Added
-- **GoalCreate integration at execute Step 0**: when `GoalCreate` is available, execute sets a goal that runs autonomously through all phase loops, QA gates, discovery triage (Step 6c), and Final Review fix-up, stopping only at the merge gate (Step 5.5) or a hard-stop condition.
-- **Background dispatch for review-board agents**: all twelve review-board agent files (six `.md` + six `.agent.md`) carry `background: true` in YAML frontmatter. Execute Final Review Step 1 now arms a `TeammateIdle` handler to aggregate results; a 10-minute timeout fallback fires as a hard stop if TeammateIdle never arrives.
-- **PushNotification wiring**: informational notification at Step 6c auto-mode resolution (goal continues); action-required notifications at the merge gate (Step 5.5) and at each of the four hard-stop conditions (per-phase QA circuit breaker, amendment budget exhausted, auto-mode cannot resolve discovery, Final Review circuit breaker).
-- **Monitor for plan.md progress**: execute Step 0 arms a monitor on `plan.md` when `Monitor` is available; each `[ ] → [x]` checkbox transition emits a one-line notification, debounced at ≥1 second per write session.
-- **Backward-compatible capability detection**: four independent probes at Step 0 (`goal_available`, `push_notif_available`, `monitor_available`, `background_available`); each feature silently no-ops when the tool is absent (NN-C-005).
+- **Dual uncertainty marker system** — spec and prd skills emit `[PENDING-DECISION: <area>]` markers when users explicitly defer decisions during brainstorm/interview; plan skill's prerequisites check refuses to proceed if surviving markers are found in spec.md (`FR-SPEC-001`, `FR-SPEC-002`, `FR-SPEC-003`)
+- **qa-spec criterion 7 extended** — now detects both `[NEEDS CLARIFICATION]` and `[PENDING-DECISION]` markers as must-fix; absence of either is not an error (`FR-SPEC-004`)
+- **qa-spec criterion 12: weasel word detection** — flags vague terms ("fast", "scalable", "as needed", "efficiently", "appropriately", "reasonable", "adequate", "properly", "optimal", "minimal overhead") in AC and FR text as must-fix; waivable per-occurrence with `<!-- weasel-waived: "<term>" — <justification> -->` inline comment (`FR-SPEC-005`)
+- **AC Coverage Matrix in plan.md** — plan skill generates `## AC Coverage Matrix` section mapping every spec AC to its covering phase(s) with COVERED/NOT COVERED status; NOT COVERED rows require forward pointers; plan skill prompts user for each uncovered AC (`FR-PLAN-001`, `FR-PLAN-002`)
+- **qa-plan criterion 12: AC matrix bidirectionality** — validates every spec AC appears in exactly one matrix row and every phase's ACs Covered field cites only existing ACs (`FR-PLAN-003`)
+- **Contracts section in plan.md** — plan skill extracts boundary-crossing interfaces from TDD-track phases and produces `## Contracts` section with typed contract definitions (ID, type, phase, signature, inputs, outputs, error cases, constraints); TDD-Red blocks reference contract IDs; phases with no boundary-crossing interfaces document the omission with rationale (`FR-PLAN-004`, `FR-PLAN-005`, `FR-PLAN-006`, `FR-PLAN-007`)
+- **execute skill injects contracts into tdd-red dispatch** — when plan.md contains `## Contracts`, matching contracts are extracted and appended to tdd-red prompt; graceful degradation when section absent (`FR-PLAN-007`)
+- **Architectural Decisions section in plan.md** — plan skill captures significant architectural decisions in `## Architectural Decisions` section using ADR format (context, decision, alternatives, consequences, charter alignment); section always present, with "No significant architectural decisions" note when applicable (`FR-PLAN-008`, `FR-PLAN-009`, `FR-PLAN-010`)
+- **qa-plan criterion 13: ADR completeness** — validates each ADR has non-empty alternatives (≥2) and non-empty consequences (`FR-PLAN-011`)
+- **qa-plan criterion 14: Contracts coverage** — new `should-fix` category finding; TDD-track phases must have `## Contracts` entries or a documented omission; `[TDD-Red]` and `[Build]` blocks must reference contract IDs from the Contracts section (`FR-PLAN-006`, `FR-PLAN-007`)
+- **qa-plan criterion 15: Algorithm term consistency** — new `must-fix` finding; identifier spelling/casing in plan prose must match the inline example in the same block
+- **verify.md item 5: Arithmetic spot-check** — new verification review task for computed YAML numeric fields; checks that derived numeric values (keys matching `total`, `count`, `weight`, `ratio`, `sum`, `average`) are arithmetically consistent with visible source values in the same YAML block
+- **plan.md template** — updated with placeholder sections for AC Coverage Matrix, Contracts, and Architectural Decisions
+
+### Backward compatible
+- Existing specs without `[PENDING-DECISION]` markers: no errors
+- Existing plans without AC Coverage Matrix, Contracts, or Architectural Decisions sections: no errors from qa-plan
+- tdd-red operates normally when no Contracts section exists in plan.md
 
 ## [4.6.2] — 2026-05-14
 

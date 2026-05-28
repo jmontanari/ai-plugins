@@ -264,6 +264,8 @@ This mode runs when the user has an idea but no existing PRD document. It conduc
 
 Ask one question at a time. Wait for the user's full answer before advancing to the next question. Do not batch multiple questions in a single turn.
 
+> **Deferred decisions throughout the interview:** Throughout the interview, if the user explicitly defers any decision (phrases like "I haven't decided yet", "TBD", "to be determined"), emit `[PENDING-DECISION: <brief area description>]` inline at the location of the deferred decision in the PRD draft and confirm with the user: "I've marked this as `[PENDING-DECISION: <brief area description>]` in the PRD." The step 8 prompt serves as a final catch-all for anything not yet captured.
+
 **Step 1: Problem statement elicitation**
 
 Ask in sequence:
@@ -308,6 +310,12 @@ For each major feature area identified: "What's the adjacent capability we're ex
 **Step 8: Open questions**
 
 "Are there things you still need to decide or research before development begins? Let's track them."
+
+For each open question the user identifies:
+- If the user wants to resolve it now, elicit the answer and record it inline in the PRD at the relevant FR or NFR.
+- If the user explicitly defers the decision ("I haven't decided yet" or equivalent), emit `[PENDING-DECISION: <decision area>]` inline in the PRD draft at the location of the deferred decision — not in a separate section. Confirm: "I've marked this as `[PENDING-DECISION: <decision area>]` in the PRD."
+
+`[PENDING-DECISION]` markers in the PRD are informational — they signal deferred product-level decisions. The spec skill for each piece resolves them when the affected piece is brainstormed. A surviving `[PENDING-DECISION]` in a PRD section is not an error in the PRD itself; it is a signal that the corresponding spec brainstorm must address it.
 
 After all steps: write the PRD using `${CLAUDE_PLUGIN_ROOT}/templates/prd.md` as the structural guide, populated with all elicited content. Set front-matter `slug: <prd-slug>`, `status: drafting`, `version: 1`.
 

@@ -59,6 +59,7 @@ Start with `/spec-flow:status` if you are new to the project or resuming after a
 | spec | Author a detailed specification for one piece from the manifest. | `/spec-flow:spec` |
 | plan | Turn an approved spec into an exhaustive phase-by-phase implementation plan. | `/spec-flow:plan` |
 | execute | Orchestrate implementation of an approved plan phase-by-phase via subagents. | `/spec-flow:execute` |
+| small-change | Single-session workflow for small, focused changes that don't warrant a full PRD pipeline. Conducts a focused brainstorm (5–8 questions), produces a change brief and inline plan, creates a worktree, and routes to execute — all in one session. Triggers: "small feature", "quick fix", "minor change", "one-off", "tweak", "patch", "small bug fix". | `/spec-flow:small-change` |
 
 ---
 

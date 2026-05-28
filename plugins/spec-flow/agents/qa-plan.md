@@ -20,7 +20,7 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 2. **Phase boundaries:** Does each phase have a clear exit gate? Are the mapped ACs testable together within the phase?
 3. **TDD structure:** Does every TDD-track phase follow the Red-QARed-Build-Verify-Refactor-QA pattern? Specifically, each `[TDD-Red]` block MUST be immediately followed by a `[QA-Red]` block that names the theater-pattern catalog review and the AC binding it checks — a missing `[QA-Red]` is a must-fix (it lets theater tests reach Build). Phase Group sub-phases follow the same rule: `[TDD-Red]` → `[QA-Red]` → `[Build]` → `[Verify]` → `[QA-lite]`. Implement-track phases skip both Red and QA-Red (they run `[Implement]` → `[Verify]` → optional `[Refactor]` → `[QA]`).
 4. **Parallelization validity:** For tasks marked [P], verify no file overlap and no shared state dependencies.
-5. **Semantic anchors:** Does the plan use function/class/method names (not line numbers) for code references?
+5. **Semantic anchors:** Does the plan use function/class/method names and line ranges for code references? **Exception:** MODIFY targets must include both; CREATE targets (new files) legitimately omit line ranges — verify they include a file-structure outline or equivalent description in their place (per SKILL.md step 3(c)). Flag absence of line ranges only for MODIFY targets.
 6. **Task completeness:** Does each task have enough detail for a Sonnet-tier agent to execute without design decisions? File paths, function signatures, test assertions, import patterns?
 7. **Dependency ordering:** Are phases ordered so each builds on the previous? No forward references?
 8. **Charter constraint allocation:** For every `NN-C-xxx`, `NN-P-xxx`, and `CR-xxx` entry the spec cites in its `### Non-Negotiables Honored` and `### Coding Rules Honored` sections, verify the plan allocates it to exactly one phase's "Charter constraints honored in this phase" slot. Drops (spec cites it, no phase claims it) and duplicates (two phases both claim it) are must-fix. The only acceptable exception is a cross-cutting entry the plan explicitly flags as "honored by all phases via <mechanism>" with the mechanism specified.
@@ -45,6 +45,104 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
       - Path-set intersection: empty. No cross-references found.
       - Neither phase declares `Why serial:` — flagging.
     ```
+
+12. **AC Coverage Matrix — bidirectional validation (activate only when plan.md contains `## AC Coverage Matrix`; skip if absent — pre-existing plans without the section are not errors).** Check both directions:
+    - **(a) Completeness:** Every spec AC must appear in exactly one row of the matrix. An AC present in the spec but missing from the matrix → must-fix. An AC appearing in two rows → must-fix.
+    - **(b) Validity:** Every phase's `**ACs Covered:**` (or sub-phase `**ACs:**`) field must cite only AC IDs that exist in the spec. A citation for a non-existent AC ID (e.g., a typo like `AC-99` when the spec has only AC-1 through AC-17) → must-fix.
+    - **(c) NOT COVERED forward pointers:** Every row with status `NOT COVERED` must have a non-empty, non-placeholder forward pointer. Flag as must-fix if the "Covered By" cell is: (1) blank/empty, (2) a bare `—` with no following text, (3) contains only the unfilled template placeholder `{{future_piece_slug_or_justification}}`, or (4) begins with `— Forward pointer:` but has no non-whitespace, non-template text following the colon. A cell that begins with `— Forward pointer:` followed by a non-empty, non-template slug or justification is valid and MUST NOT be flagged.
+
+    Evidence for each finding: quote the matrix row and the spec AC text.
+
+13. **Architectural Decisions — completeness (activate only when plan.md contains `## Architectural Decisions`; if the section contains "No significant architectural decisions for this piece." treat as valid and skip — but only when that phrase appears as plain prose text **outside** HTML comment blocks (`<!-- … -->`); a template instructional comment containing the sentinel phrase does NOT count as a deliberate skip signal; if absent from pre-existing plans, skip — not an error).** For each ADR entry (### ADR-N:):
+    - **Non-empty alternatives:** The `**Alternatives considered:**` field must list at least two alternatives with rationale. A field that names only the chosen approach ("we chose X") without alternatives → must-fix.
+    - **Non-empty consequences:** The `**Consequences:**` field must describe what becomes easier, harder, or irreversible. A field that says only "this is the right approach" without consequences → must-fix.
+    - **Stable ID:** Each ADR must have a stable numeric ID (ADR-1, ADR-2, ...) in the heading. Missing ID → must-fix.
+
+    Evidence: quote the thin field content and explain what is missing.
+
+14. **Contracts — coverage (activate only when plan.md contains `## Contracts`; if absent from pre-existing plans, skip — not an error per AC-13a).** For each TDD-track phase (phase with `[TDD-Red]` checkbox):
+    - **At least one contract OR documented omission.** Every TDD phase must either (a) have a corresponding entry in `## Contracts` (matched by phase reference), OR (b) have an explicit omission note in `## Contracts` with non-empty rationale. A TDD phase with no contract entry and no omission note → must-fix.
+    - **[TDD-Red] block references contract IDs.** Each `[TDD-Red]` block for a phase that has contracts must include "Contract references: C-N" or equivalent. Missing reference → should-fix.
+    - **Required contract fields present.** Each contract entry must have: ID, Type, Phase, Signature, Inputs, Outputs, Error cases, Constraints. Any missing field → must-fix.
+
+    For Implement-only plans (no TDD-track phases), a Contracts section with the "No TDD-track phases" note is valid.
+
+15. **Algorithm term consistency** (activate only when a phase's `[Build]` or `[Implement]` block introduces an algorithm term AND contains an inline example — a code snippet, pseudocode, or example invocation; skip if neither is present). For each such phase:
+    - Verify the algorithm term's identifier (exact spelling, casing) in the prose description matches the identifier used in the inline example.
+    - Inconsistency (synonym substitution, casing drift, partial abbreviation) → must-fix.
+
+16. **Verb alignment (spec→plan semantic fidelity):** For each spec AC containing action verbs (run, execute, validate, create, modify, delete, generate, deploy, test, migrate, configure), verify the covering plan phase contains a concrete step that PERFORMS that action — not documents, reviews, or inspects it.
+
+    Common failure patterns:
+    - AC "X runs" → phase "X is documented" ❌ (documentation substitution)
+    - AC "pipeline executes" → phase "pipeline is reviewed" ❌ (inspection substitution)
+    - AC "tests pass" → phase "test structure validated" ❌ (validation substitution, no actual test run)
+
+    Evidence: quote the AC text and the covering phase's `[Build]`/`[Implement]`/`[Verify]` text. **Must-fix.**
+
+17. **Verify command concreteness:** Every `[Verify]` block must contain at least one copy-pasteable shell command (or explicit LLM-agent-step for YAML/JSON/doc validation) with specific expected output values — not generic descriptions.
+
+    Flag:
+    - Prose-only descriptions without a command (e.g., "verify the feature works")
+    - Generic expected output without specific values (e.g., "all tests pass" without count)
+    - Surviving template placeholders: `{{test_command}}`, `{{expected_output}}`, etc.
+
+    Evidence: quote the offending `[Verify]` block. **Must-fix.**
+
+18. **Placeholder leakage detection:** Scan the entire plan document for unresolved template artifacts:
+    - `{{...}}` patterns (unreplaced template variables)
+    - `TODO`, `TBD`, `PLACEHOLDER` literals (case-insensitive)
+    - `<INSERT>`, `<FILL IN>`, `<SPECIFY>` patterns
+    - Empty sections: a heading followed immediately by the next heading with no content between
+
+    Evidence: quote the placeholder and its location (section/line context). **Must-fix.**
+
+19. **[Build]/[Implement] specificity:** Each `[Build]` or `[Implement]` block must reference specific files with change types (CREATE/MODIFY/DELETE). For MODIFY: must include a semantic anchor (function/class name) and line range from Phase 1 exploration.
+
+    Flag:
+    - Directory-only references (e.g., "edit src/auth/") without specific file paths
+    - File references without change type specification
+    - Missing per-file done criteria in multi-file phases
+    - MODIFY targets without semantic anchor or line range
+
+    Evidence: quote the block showing missing specificity. **Must-fix.**
+
+20. **Exit gate falsifiability:** Each phase's `**Exit Gate:**` must be mechanically evaluable — a shell command with expected output, a file existence check, or an LLM inspection step with specific named criteria.
+
+    Flag:
+    - Subjective judgment gates: "implementation complete", "working correctly", "properly implemented"
+    - Gates satisfiable without delivering the phase's ACs (e.g., "files created" when the AC requires behavior)
+    - Gates that merely duplicate `[Verify]` without adding structural value
+
+    Evidence: quote the exit gate and explain why it is unfalsifiable or trivially satisfiable. **Must-fix.**
+
+21. **Phase boundary clarity:** Adjacent phases that reference overlapping file scopes should declare explicit "NOT in scope" boundaries in at least one phase.
+
+    Flag:
+    - Two adjacent phases both listing the same file in their `[Build]`/`[Implement]` blocks without scope boundary declarations
+    - `[Build]`/`[Implement]` scope significantly broader than the "ACs Covered" mapping implies (e.g., implementing infrastructure not tied to any listed AC)
+
+    Evidence: cite the overlapping scope between the two phases. **Should-fix.**
+
+22. **Executable AC Binding — presence and completeness (activate always; if `## Executable AC Binding` section is absent from the plan, flag as must-fix — SKILL.md 9a requires this section for all plans):** For each AC listed as COVERED in the `## AC Coverage Matrix`, verify a corresponding row exists in the `## Executable AC Binding` table with: (a) a concrete `Command/Check` entry that is not a template placeholder (`{{...}}`), (b) a `Verification Type` of `shell`, `file-check`, or `agent-step`, and (c) an `Expected Result` that names a specific observable outcome.
+
+   Evidence: quote any missing, placeholder-filled, or incomplete row. **Must-fix.**
+
+23. **Change specification completeness.** Every change in a `[Build]` or `[Implement]` block must be a self-contained Change Specification Block with a task ID (T-N format), file path, and action type (CREATE/MODIFY/DELETE). For MODIFY operations: the block must include a semantic anchor (function/class name), line range from exploration, CURRENT state (verbatim code block with line numbers), and TARGET description with enough detail to write the code. For CREATE operations: a complete structure outline is required. Flag as must-fix:
+   - Changes missing a task ID (T-N numbering)
+   - MODIFY blocks without CURRENT verbatim code
+   - MODIFY blocks without a concrete TARGET description
+   - Changes using only prose ("edit file X — add Y") instead of the structured block format
+
+   Evidence: quote the incomplete change specification block. **Must-fix.**
+
+24. **Inline pattern resolution.** Pattern references in Change Specification Blocks ("follow pattern from X", "see pattern at Y:lines Z") must include inline verbatim code blocks (3-10 lines) — not just file:line pointers. A pointer without inline code forces the executor to read the referenced file, defeating the self-contained design. Exception: if the change explicitly states "no pattern reference needed" or the change type is DELETE.
+
+   Evidence: quote the dangling pattern pointer and its location. **Must-fix.**
+
+25. **Per-change verification.** Phases with ≥2 file changes must include per-change verification checkpoints in their `[Verify]` block — not just a single phase-level command. Each T-N task should have a corresponding verification entry. Flag phases with multiple changes but only phase-level verification.
+
+   Evidence: cite the phase's change count and quote the `[Verify]` block showing only phase-level verification. **Should-fix.**
 
 ## Output Format
 

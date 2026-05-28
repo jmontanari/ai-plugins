@@ -88,6 +88,21 @@ Check the user's message for unambiguous signals before asking any questions.
 | "hotfix", "regression", "CI failure" with no plan reference | `hotfix` — skip to Q4 |
 | "explore", "look at", "investigate", "understand" (no changes implied) | `exploratory` — skip to Step 4 |
 
+**Small-change pre-signals (note — final routing via Q_scale, not here):**
+Record in session state whether the user message contains any of these keywords for Q2's "New domain" branch:
+- `"fix"`
+- `"bug"`
+- `"broken"`
+- `"regression"`
+- `"quick"`
+- `"tweak"`
+- `"minor"`
+- `"patch"`
+- `"one-off"`
+- `"small feature"`
+
+These signals do NOT trigger auto-routing here. They are surfaced as `small_change_signals_detected` in session state for Q_scale (Q2 "New domain" branch) to consume. No silent routing — operator must explicitly select (AC-IN-5).
+
 If no signal is clear, proceed to the question tree.
 
 ---
@@ -116,7 +131,52 @@ Choices (build dynamically from pipeline state):
 - "Not a PRD-level change"
 
 - **PRD selected** → Q3 with that PRD
-- **"New domain"** → `type: pipeline-entry`, `stage: prd` → skip to Step 4
+- **"New domain"** → check `small_change_signals_detected`:
+
+  **If `small_change_signals_detected` is true** → present **Q_scale — scale check**:
+
+  > "Detected signals: [list detected keywords from user message].
+  > How would you like to handle this?
+  >
+  > Options:
+  > 1. Full PRD approach — continue to PRD pipeline
+  > 2. Small focused change — use /spec-flow:small-change"
+
+  No silent auto-routing — operator must explicitly select (AC-IN-5).
+
+  On operator selecting option 2 ("Small focused change"):
+  - Set `work_context.type = "small-change"`
+  - Set `pipeline_stage = null`
+  - Route recommendation: `"Run /spec-flow:small-change <slug> to begin the focused change workflow."`
+  - Skip remaining Q3 questions (no further pipeline classification needed) → proceed to Step 4
+
+  On operator selecting option 1 ("Full PRD approach"):
+  - Proceed to existing `type: pipeline-entry`, `stage: prd` routing unchanged (AC-IN-4) → skip to Step 4
+
+  **Worked example for Q_scale routing algorithm** (required — dense-algorithm guard applies to signal detection + two-branch routing):
+  ```
+  <!-- Example A: user says "quick fix for the button label color"
+    Q2 branch: "New domain — no PRD exists yet" (confirmed)
+    Signals detected: ["quick", "fix"]
+    Q_scale presented: "Detected signals: quick, fix. Full PRD approach or Small focused change?"
+    Operator selects option 2 "Small focused change"
+    work_context.type = "small-change"
+    pipeline_stage = null
+    Routing: /spec-flow:small-change <slug>
+    Q3 skipped.
+
+    Example B: same input, operator selects option 1 "Full PRD approach"
+    work_context.type = "pipeline-entry"
+    pipeline_stage = "prd"
+    Existing new-domain routing runs unchanged.
+
+    Example C: user says "add payment integration" — no signal keywords
+    Q_scale does NOT fire
+    Existing new-domain routing runs unchanged from Q2
+  -->
+  ```
+
+  **If `small_change_signals_detected` is false** → existing routing unchanged: `type: pipeline-entry`, `stage: prd` → skip to Step 4
 - **"Not a PRD-level change"** → Q4
 
 ### Q3 — Piece scope

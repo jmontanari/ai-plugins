@@ -40,6 +40,46 @@ If the model already contains `sonnet` → proceed to Step 0 immediately with no
 
 ## Step 0: Load Config
 
+**Change-track detection.** First, check the user argument:
+
+If the argument matches the pattern `change/<slug>` (i.e., starts with `change/` followed by
+lowercase alphanumeric characters and hyphens):
+- Set: `track = "change"`
+- Set: `slug = <extracted value after "change/">`
+- Set: `spec_path = "<docs_root>/changes/<slug>/brief.md"`
+- Set: `plan_path = "<docs_root>/changes/<slug>/plan.md"`
+- Set: `worktree = "<worktrees_root>/<slug>"`
+- Set: `branch = "change/<slug>"`
+
+Otherwise:
+- Set: `track = "piece"`
+- `[All existing Step 0 path-resolution logic runs unchanged]`
+
+**Worked example for change-track detection:**
+```
+<!-- Example A: user invokes `execute change/fix-button-label`
+  Argument "change/fix-button-label" matches pattern change/[a-z0-9-]+
+  track    = "change"
+  slug     = "fix-button-label"
+  spec_path  = "docs/changes/fix-button-label/brief.md"
+  plan_path  = "docs/changes/fix-button-label/plan.md"
+  worktree   = "worktrees/fix-button-label"
+  branch     = "change/fix-button-label"
+  → proceed to precondition checks below
+
+  Example B: user invokes `execute small-change/auth-token-refresh`
+  "small-change/auth-token-refresh" does NOT match pattern change/[a-z0-9-]+
+  track = "piece"
+  → existing resolution logic runs unchanged
+-->
+```
+
+**Precondition checks for change-track** (when `track = "change"`):
+- Verify `spec_path` (`<docs_root>/changes/<slug>/brief.md`) exists. If absent → halt: `"Error: brief.md not found at <docs_root>/changes/<slug>/brief.md. Run /spec-flow:small-change <slug> first."`
+- Verify `plan_path` (`<docs_root>/changes/<slug>/plan.md`) exists. If absent → halt: `"Error: plan.md not found at <docs_root>/changes/<slug>/plan.md. Run /spec-flow:small-change <slug> first."`
+- Skip: manifest status check (`specced` / `planned` gate) — no manifest entry exists for change-track pieces
+- Use `spec_path` (brief.md) wherever the standard path uses `spec.md` for context injection throughout execution
+
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
 **Integration config load.** If `integrations.issue_tracker.enabled: true`, read the
@@ -50,53 +90,6 @@ location:
 
 If the file is absent, proceed with built-in defaults (see `plugins/spec-flow/reference/integration-capability-check.md`). Store as `integration_cfg`. If disabled or absent, set
 `integration_cfg = null` and skip all integration steps in this skill.
-
-### Capability Probe
-
-At Step 0 startup, run four independent capability probes. Each probe checks whether its tool is available and stores the result in orchestrator state. No probe depends on another's result (AC-12). When a tool is absent the variable is set to `false`; no warning or error is emitted (FR-8, NN-C-005).
-
-```
-goal_available        = (GoalCreate tool is present)
-push_notif_available  = (PushNotification tool is present)
-monitor_available     = (Monitor tool is present)
-background_available  = (background agent dispatch is supported by the host)
-```
-
-**GoalCreate block.** If `goal_available`, set a goal at execute startup. The goal runs autonomously through all phase loops, QA gates, Step 6c discovery triage, and Final Review fix-up. It stops at Step 4 (Human Sign-Off, NN-P-002), the merge gate (Step 5.5), or at any hard-stop condition.
-
-`resuming_session` is true when the piece's manifest already shows `status: in-progress` at the moment execute starts (meaning Pre-Loop already committed the manifest change in a prior session).
-
-```
-if goal_available AND NOT resuming_session:
-  invoke GoalCreate(
-    piece = <slug>,
-    completion = "Step 5 (Capture Learnings) committed on piece branch"
-  )
-  record goal_id in orchestrator state
-elif goal_available AND resuming_session:
-  emit one-line note: "Resumed session — GoalCreate skipped; prior goal may still be active"
-# else: skip silently (FR-8, NN-C-005)
-# If execute halts before completion (at Prerequisites, charter-drift checks, dependency preconditions,
-# plan validation failures, hook escalation, budget exhaustion, or any other hard stop before Step 5),
-# the goal may remain open as an orphan; the operator must cancel it manually or re-run execute after
-# resolving the gate failure.
-```
-
-**Monitor arming block.** If `monitor_available`, arm a monitor on `plan.md` for the active piece. Each `[ ] → [x]` checkbox transition emits a one-line notification; rapid writes within the same write session are debounced with a ≥1-second minimum between notifications.
-
-```
-if monitor_available AND NOT resuming_session:
-  arm monitor on docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
-  emit one-line notification per [ ] → [x] checkbox transition
-  debounce: ≥1 second between notifications for the same write session
-  record monitor_armed = true in orchestrator state
-elif monitor_available AND resuming_session:
-  emit one-line note: "Resumed session — Monitor arming skipped; prior Monitor may still be active"
-  record monitor_armed = true in orchestrator state  # prior session may have armed it; ensure teardown fires
-# else: skip silently (FR-8, NN-C-005)
-```
-
-Plan.md may receive multiple rapid checkbox writes within a single phase commit; debouncing prevents a notification flood while still emitting a timely event per distinct write session.
 
 ## Prerequisites
 
@@ -282,7 +275,7 @@ If the trigger does NOT fire, set `mid_piece_opus_pass: not-triggered` for this 
    - **Cumulative diff:** `git diff $(git merge-base origin/main HEAD)..HEAD` output (the full diff from piece start through the last completed phase). The cumulative diff baseline is computed at dispatch time as `git merge-base origin/main HEAD` — the piece's branch point from main. Resume-safe because it's recomputed each time.
    - **Full spec:** the complete text of `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md`.
    - **AC matrix:** the union of `## AC Coverage Matrix` rows from all completed phase Build reports, held in orchestrator state since Step 3.8's validation gate captured them per-phase as `phase_<id>_ac_matrix` keys (one per phase / sub-phase). Format: phase-N | AC-id | status | pointer.
-   - **Charter raw text (always-attach):** verbatim contents of `<docs_root>/charter/non-negotiables.md` and the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md`. Plus, if the spec's `### Coding Rules Honored` block cites any `CR-xxx` entries, attach those specific entries (not the full file) extracted from `<docs_root>/charter/coding-rules.md`. Match Step 6's existing extraction pattern.
+   - **Charter raw text (always-attach):** verbatim contents of `<docs_root>/charter/non-negotiables.md` and the Step 6 track-aware NN-P payload. If `track = "piece"`, attach the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` unchanged. If `track = "change"`, skip NN-P injection silently — no warning, no error. Plus, if the spec's `### Coding Rules Honored` block cites any `CR-xxx` entries, attach those specific entries (not the full file) extracted from `<docs_root>/charter/coding-rules.md`. Match Step 6's existing extraction pattern.
 
 2. Dispatch:
    ```
@@ -320,8 +313,9 @@ git rev-parse HEAD
 On resume mid-phase (phase not yet marked complete in plan.md), recover the SHA the same way: `git rev-parse HEAD`. Under the v2.7.0 unified-commit model, the phase produces at most two work-commits before Step 7 — the implementer's unified commit (Red's staged tests + Build's production code) and the optional Refactor commit. If the phase is resumed AFTER the implementer's commit lands, `git rev-parse HEAD` will return that commit, not the pre-Red SHA — and that's fine, because the post-commit integrity and reconciliation gates have already run. The `phase_N_start_sha` used for diff-baseline calculations (Verify inputs, QA surface map, Step 6b hook sweep) is always computed from the resume-time HEAD minus the commits produced by this phase's already-completed steps, inferred from plan.md's checked boxes.
 
 **Integration — transition phase task to In Progress (if `integration_cfg != null` and `auto_transition: true`):**
-Read the `jira_key:` field immediately following this phase's heading in plan.md. If present,
-run the capability check (`plugins/spec-flow/reference/integration-capability-check.md`) for
+Read the `jira_key:` field immediately following this phase's heading in plan.md. If present, use it.
+If `track = "change"` and the plan.md phase heading has no `jira_key:` field, fall back to reading `jira_key:` from `spec_path` (brief.md) front-matter.
+Run the capability check (`plugins/spec-flow/reference/integration-capability-check.md`) for
 operations `get_transitions` and `transition_issue`. If available, transition the task to the
 "phase execute starts" status from `integration_cfg` (default: `In Progress`).
 Store the issue key as `phase_issue_key` — it will be prepended to commit messages per
@@ -354,9 +348,11 @@ Before dispatching Red or Implement, the orchestrator collects facts the agents 
 
 7. **Fast mode flag** — check the plan's front-matter `fast:` field. If `fast: true`, record `orchestrator_fast_mode: true` in session state. Fast mode skips all per-phase inline QA agent dispatches (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`, Group Deep QA) and replaces per-phase verify agent dispatch with a direct test-command shell invocation. The end-of-piece Final Review board gains a 7th member (`verify Mode: Piece Full`) to compensate. Log once: `"Fast mode: ENABLED — inline QA skipped, end-of-piece board +1 (verify-piece-full)"`. If `fast:` is absent or `false`, record `orchestrator_fast_mode: false` and proceed normally.
 
+8. **Introspection context** — if `introspection.md` exists in the piece's working directory (alongside plan.md), read it. For the current phase's declared file scope, extract the Dependency Map and Test Landscape sections from the relevant cluster(s). Match phase file paths against the File Inventory entries in each cluster's H2 section. Append matching sections to `## Pre-flight snapshot` as `### Codebase context`. Skip the File Inventory and Pattern Catalog — the plan's Change Specification Blocks already embed their verbatim code from those sections. If `introspection.md` is absent (pre-v4.10 plans or CREATE-only phases), skip silently — no warning, no error.
+
 Compose two attachments for later steps:
 
-- `## Pre-flight snapshot` — items 1–5 above, verbatim. Attached to BOTH the Red prompt (Step 2) and the Implement prompt (Step 3) — Red benefits from symbol presence and schema samples too.
+- `## Pre-flight snapshot` — items 1–5 above plus item 8 (codebase context from `introspection.md`), verbatim. Attached to BOTH the Red prompt (Step 2) and the Implement prompt (Step 3) — Red benefits from symbol presence and schema samples too.
 - `## Orchestrator pre-decisions` — item 6, one resolved decision per bullet. Attached only to the Implement prompt. Empty section OK (include the heading with "(none)" if no conditionals matched).
 
 If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents commit normally without any hooks running.
@@ -367,6 +363,19 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/tdd-red.md`
 2. Compose prompt with: phase [TDD-Red] tasks from plan, spec ACs, existing test patterns, and the `## Pre-flight snapshot` block from Step 1b. Red does NOT commit — the pre-commit hook does not run during its turn. The `--no-verify` test-running-hook carve-out from pre-v2.7.0 is obsolete (there's no Red commit for the hook to block).
+
+   **Contract injection (AC-13 / graceful degradation).** Before dispatching, check whether `plan.md` contains a `## Contracts` section:
+   - **Section present:** Scan the `## Contracts` section for entries whose `**Phase:**` field matches the current phase (or sub-phase). Phase matching uses **token-based whole-word comparison** (case-insensitive): normalize both strings by stripping leading `###`/`####` and surrounding whitespace, then split into whitespace-delimited tokens, then strip trailing colons from each individual token (e.g., `"2:"` → `"2"`, `"a.1:"` → `"a.1"`). A contract entry matches the current phase if the contract's `**Phase:**` token sequence is a contiguous prefix match of the current phase's heading tokens, starting at position 0 (e.g., contract `**Phase:** Phase 2` tokens `["phase","2"]` match heading `### Phase 2: Authentication Module` tokens `["phase","2","authentication","module"]` — `"phase"=="phase"` and `"2"=="2"` at positions 0–1 ✓; but would NOT match `### Phase 10: Indexing` tokens `["phase","10","indexing"]` since `"2" ≠ "10"`). Sub-phase identifiers like `Sub-Phase A.1` are matched by the same rule applied to `["sub-phase","a.1"]`. If no contracts match for a TDD phase that does have a Contracts section with entries for other phases, emit a warning in the prompt: "Note: No contracts matched phase [normalized heading] by name — verify Phase field values in plan.md `## Contracts` section." Extract the full entry text for each matching contract. Append to the tdd-red prompt as a structured block:
+
+     ```
+     ## Contracts for this phase
+     The following interface contracts have been defined for this phase. Write tests that verify the implementation honors each contract's signature, inputs, outputs, and error cases.
+
+     <paste full C-N entry text for each matching contract>
+     ```
+
+   - **Section absent:** Do not add the `## Contracts for this phase` block. tdd-red operates as today with no error. The `## Context Provided` section of tdd-red.md already handles this gracefully — contracts input is absent but not required.
+
 3. Dispatch:
    ```
    Agent({
@@ -651,7 +660,10 @@ Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 
 
    - **`## Phase ACs`** — attach ONLY the acceptance criteria for this phase (mapped via plan.md), not the full spec. Use the plan's "AC map" section or the spec's AC sections that the plan references for this phase.
 
-   - **`## Non-negotiables`** — project constraints. Attach `<docs_root>/charter/non-negotiables.md` (NN-C, project-wide) and the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` (NN-P, product-specific). If `<docs_root>/charter/` is absent (pre-charter project), attach only the legacy NN section from the PRD.
+   - **`## Non-negotiables`** — project constraints.
+     - **NN-P injection (track-aware):**
+       - If `track = "piece"`: attach `<docs_root>/charter/non-negotiables.md` (NN-C, project-wide) and the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` (NN-P, product-specific). If `<docs_root>/charter/` is absent (pre-charter project), attach only the legacy NN section from the PRD.
+       - If `track = "change"`: attach `<docs_root>/charter/non-negotiables.md` when available, and skip NN-P injection silently — no warning, no error (no PRD in change-track).
 
    - **`## Coding rules cited by this phase`** — if the plan's phase block's "Charter constraints honored in this phase" slot cites any `CR-xxx` entries from `<docs_root>/charter/coding-rules.md`, attach those specific entries (not the full file). Absent slot or no citations → skip this block.
 
@@ -679,14 +691,8 @@ Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 
      Hooks run on the commit. If a hook fails, re-dispatch the fix agent with the hook error appended to its context; do not bypass with `--no-verify`.
 
    - **Re-dispatch:** QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings. The agent template's iter-2 rules hard-cap out-of-scope reads (return BLOCKED rather than fetching).
+   - **Widened-window rule:** Before dispatching, count the number of times each file:location (file path + hunk context line) appears in the cumulative piece diff (`git diff $piece_start_sha..HEAD -- <phase-scope-files>`). If any file:location has been revised ≥2 times within this piece, add a `Widened context: ±10 lines` directive to the focused re-review dispatch — the QA agent must expand its review window to ±10 lines around each changed line in that location rather than the default narrower context used for first-time focused re-review.
    - **Circuit breaker:** 3 iterations max, then escalate.
-
-   - **Action-required notification (hard stop — execute halts):**
-     ```
-     if push_notif_available:
-       send action-required notification: "Hard stop: QA circuit breaker fired in <phase> — <piece-slug> needs operator attention"
-     # else: skip silently
-     ```
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate — no point re-running QA.
 
 ### Step 6a: Deferred-finding tracking (FR-10)
@@ -751,7 +757,7 @@ Every intermediate commit in the phase already ran hooks (the implementer's unif
 
 This step consumes the orchestrator state Step 4's Reason-routing sub-step persists (`phase_<id>_routed_discoveries`) together with the per-phase QA gate's deferred-to-reflection findings and any Build oracle escalations citing missing prerequisites. It runs once per phase, after Step 6b's hook sweep is clean and before Step 7's progress commit, so every discovery surfaced during the phase is triaged into one of three outcomes — amend, fork, defer — before the phase is marked done.
 
-**Amendment budget enforcement.** Before any `amend` (or `amend-spec`) dispatch under this step, the orchestrator checks the per-piece amendment budget (2 amendments total per piece, of which at most 1 may be a spec amendment). See "Amendment budget tracking" below for the counters, refusal strings, and budget-exhaustion escalation flow.
+**Amendment budget enforcement.** Before any `amend` (or `amend-spec`) dispatch under this step, the orchestrator checks the per-piece amendment budget (5 amendments total per piece, of which at most 1 may be a spec amendment). See "Amendment budget tracking" below for the counters, refusal strings, and budget-exhaustion escalation flow.
 
 #### Aggregation
 
@@ -796,6 +802,8 @@ Choose for each (or 'A' to amend all that fit < 50% threshold, 'D' to defer all)
 
 A fourth option, `(s) amend-spec`, is offered ONLY for discoveries whose finding text names a missing FR/AC or contradiction in the spec — these are the only discoveries where amending the spec is the correct lever rather than amending the plan. The orchestrator gates this option by inspecting the `row_text` for spec-shaped citations (`FR-`, `AC-`, "contradicts spec", or equivalent); if none are present, `(s)` is not offered for that discovery.
 
+**Severity label shown in prompt (Final Review findings).** When a finding originates from a Final Review board reviewer, its severity (`must-fix` or `should-fix`) is displayed in the triage prompt so the operator can weigh it. Severity does NOT suppress options — the full menu `(a) amend  (f) fork  (d) defer` is always presented. The operator decides whether a should-fix finding warrants an amendment cycle.
+
 **Aggregate shortcuts decompose into per-discovery dispatches.** The `'A'` (amend all that fit < 50% threshold) and `'D'` (defer all) shortcuts are input sugar — they decompose into the same per-discovery dispatch flow as if the operator had typed `(a)` or `(d)` for each discovery individually. There is no batched-amend or batched-defer code path. `'A'` produces one `plan-amend` (or `spec-amend`) dispatch and one `chore(plan): amend` (or `chore(spec): amend`) commit per amended discovery; `'D'` produces one `/spec-flow:defer` invocation and one `chore: defer` commit per deferred discovery. Per-discovery `.discovery-log.md` rows append per the Resolution-commit cell convention (below) regardless of which input form was used.
 
 #### Auto-mode threshold (FR-17)
@@ -820,21 +828,7 @@ Discovery in <phase> surfaced before any cumulative diff exists — auto-amend c
 
 where `<phase>` is the discovery's source phase ID. After emitting this message the orchestrator falls back to the operator-mode triage prompt for that discovery only; subsequent discoveries in the same triage event remain in auto-mode and are evaluated independently per the per-discovery rule (each subsequent discovery may have a non-zero cumulative diff if the first discovery's resolution committed work in between).
 
-**Action-required notification (hard stop — execute halts awaiting operator):**
-```
-if push_notif_available:
-  send action-required notification: "Hard stop: auto-mode cannot evaluate threshold in <phase> (no cumulative diff yet) — <piece-slug> needs operator attention"
-# else: skip silently
-```
-
-**Auto-amend if `ratio < 0.5`.** The orchestrator dispatches the amend flow (plan-amend by default; spec-amend only when the discovery's `(s) amend-spec` option would have been offered per the Triage prompt rules — i.e., the finding text names a missing FR/AC or contradiction in the spec) without operator prompting. The Amendment budget tracking gate still applies — auto-mode does NOT bypass the 2-total / 1-spec-max budget; if the budget is exhausted the auto-amend dispatch is refused exactly as in operator mode.
-
-**Informational notification (execute continues):**
-```
-if push_notif_available:
-  send informational notification: "Discovery resolved: <summary> — execute continues"
-# else: skip silently
-```
+**Auto-amend if `ratio < 0.5`.** The orchestrator dispatches the amend flow (plan-amend by default; spec-amend only when the discovery's `(s) amend-spec` option would have been offered per the Triage prompt rules — i.e., the finding text names a missing FR/AC or contradiction in the spec) without operator prompting. The Amendment budget tracking gate still applies — auto-mode does NOT bypass the 5-total / 1-spec-max budget; if the budget is exhausted the auto-amend dispatch is refused exactly as in operator mode.
 
 **Otherwise (`ratio ≥ 0.5`) auto-mode escalates** with the verbatim message:
 
@@ -843,13 +837,6 @@ Discovery in <phase> would expand piece by <X>% — exceeding 50% auto-amend thr
 ```
 
 where `<phase>` is the discovery's source phase ID and `<X>` is `ratio × 100` rounded to one decimal place. After emitting this message the orchestrator falls back to the operator-mode triage prompt (the Triage prompt block above) for THAT discovery only; subsequent discoveries in the same triage event remain in auto-mode and are evaluated independently per the per-discovery rule above.
-
-**Action-required notification (hard stop — execute halts awaiting operator):**
-```
-if push_notif_available:
-  send action-required notification: "Hard stop: auto-mode cannot resolve discovery in <phase> (>50% expansion) — <piece-slug> needs operator attention"
-# else: skip silently
-```
 
 **Auto-mode never auto-forks or auto-defers.** Fork and defer always require operator triage, regardless of any threshold computation. The auto-mode default applies exclusively to the `amend` choice (and only when `ratio < 0.5`). When the operator-mode triage prompt fires under auto-mode (because of threshold escalation), the operator's choice can still be fork or defer — auto-mode does not constrain the operator's selection, only the auto-resolution path.
 
@@ -932,7 +919,7 @@ For each discovery the operator routes `defer`:
 
 #### Amendment budget tracking
 
-Per FR-14, each piece has a hard amendment budget: **2 amendments total per piece, of which at most 1 may be a spec amendment.** The budget is piece-scoped — the counters survive across all phases of the piece (including amendment phases that pi-010-discovery's FR-13 introduces). They are NOT phase-scoped and they are NOT triage-event-scoped; an amendment dispatched in phase 3's Step 6c counts against the same budget as an amendment dispatched in phase 7's Step 6c or via Step 8's Final Review Triage flow.
+Per FR-14, each piece has a hard amendment budget: **5 amendments total per piece, of which at most 1 may be a spec amendment.** The budget is piece-scoped — the counters survive across all phases of the piece (including amendment phases that pi-010-discovery's FR-13 introduces). They are NOT phase-scoped and they are NOT triage-event-scoped; an amendment dispatched in phase 3's Step 6c counts against the same budget as an amendment dispatched in phase 7's Step 6c or via Step 8's Final Review Triage flow.
 
 **Counters.** The orchestrator maintains two integer counters in piece-scoped state:
 
@@ -948,7 +935,7 @@ This counts only successful amend commits (failed dispatches produce no commit a
 
 **Pre-dispatch budget check.** Before invoking `plan-amend` or `spec-amend` for any discovery (whether operator-chosen or auto-resolved under `--auto`), the orchestrator checks the budget:
 
-1. If `piece_amendment_count >= 2`, refuse the dispatch with the budget-exhaustion escalation prompt (below). Do NOT dispatch the amend agent.
+1. If `piece_amendment_count >= 5`, refuse the dispatch with the budget-exhaustion escalation prompt (below). Do NOT dispatch the amend agent.
 2. If the choice is `amend-spec` AND `piece_spec_amendment_count >= 1`, refuse with the verbatim string:
    ```
    Refused — spec-amend budget exhausted (1/1); choose plan-amend, fork, or defer.
@@ -958,26 +945,20 @@ This counts only successful amend commits (failed dispatches produce no commit a
 **Counter increment on successful amend.** The counters are incremented only after the amend dispatch produces a successful commit (the `chore(plan): amend — ...` or `chore(spec): amend — ...` commit lands cleanly per Amend dispatch step 5/7). The increment rules:
 
 - For ANY successful amend (plan or spec): `piece_amendment_count++`.
-- ADDITIONALLY for a successful spec amend: `piece_spec_amendment_count++`. Spec amendments increment BOTH counters — they consume one slot of the 2-total budget AND the 1-spec-max sub-budget.
+- ADDITIONALLY for a successful spec amend: `piece_spec_amendment_count++`. Spec amendments increment BOTH counters — they consume one slot of the 5-total budget AND the 1-spec-max sub-budget.
 
 A failed amend (diff fails `git apply --check` and the operator chooses not to re-dispatch, or the dispatched agent halts with BLOCKED) does NOT increment either counter. The "no extra budget slot for re-dispatch within the same triage event" provision under Amend dispatch step 4 means: a discovery's amend dispatch consumes one slot total, regardless of how many plan-amend/spec-amend invocations the orchestrator runs to produce a clean diff for that one discovery.
 
-**Budget-exhaustion escalation prompt.** When `piece_amendment_count >= 2` blocks an amend dispatch, the orchestrator prompts the operator with the verbatim string:
+**Budget-exhaustion escalation prompt.** When `piece_amendment_count >= 5` blocks an amend dispatch, the orchestrator prompts the operator with the verbatim string:
 
 ```
-Amendment budget exhausted — piece scope was inadequate. Escalating: abandon and re-spec from scratch is recommended. Continue anyway? (y/n)
+Amendment budget exhausted (5/5) — this piece may be under-scoped. Consider forking remaining must-fix work into a new piece. Continue anyway? (y/n)
 ```
 
 This is a y/n confirmation gated by NN-C-006 (operator confirmation required for destructive or piece-state-changing operations).
 
 - **On `y`:** the orchestrator continues execution with **no further amendments allowed**. Subsequent discoveries — whether in the current triage event, later phases, or Step 8's Final Review Triage — may only choose `fork` or `defer`. The `(a) amend` and `(s) amend-spec` options are no longer offered. Auto-mode under `--auto` falls back to the operator prompt (since auto-amend cannot dispatch) and the operator must choose fork or defer.
-- **On `n`:** **Action-required notification (hard stop — execute halts):**
-  ```
-  if push_notif_available:
-    send action-required notification: "Hard stop: amendment budget exhausted — <piece-slug> halting, re-spec recommended"
-  # else: skip silently
-  ```
-  the orchestrator halts execute. It sets the current piece's status to `blocked` in `docs/prds/<prd-slug>/manifest.yaml` with a notes-line citing budget exhaustion (the operator's `n` response constitutes the explicit confirmation NN-C-006 requires; this is therefore not a destructive operation without confirmation). It commits the manifest update on the current worktree branch:
+- **On `n`:** the orchestrator halts execute. It sets the current piece's status to `blocked` in `docs/prds/<prd-slug>/manifest.yaml` with a notes-line citing budget exhaustion (the operator's `n` response constitutes the explicit confirmation NN-C-006 requires; this is therefore not a destructive operation without confirmation). It commits the manifest update on the current worktree branch:
   ```bash
   git add docs/prds/<prd-slug>/manifest.yaml
   git commit -m "chore(<piece-slug>): block — amendment budget exhausted"
@@ -1245,6 +1226,18 @@ Agent({ description: "Architecture review (iter 1, full)", prompt: <review-board
 Agent({ description: "Security review (iter 1, full)", prompt: <review-board-security.md + Input Mode: Full + diff + spec (for trust boundary context)>, model: "opus" })
 ```
 
+**Change-track Final Review (when `track = "change"`):**
+When `track = "change"`, dispatch exactly **5 agents** (not 6 or 7):
+- `review-board-architecture` (with all charter files)
+- `review-board-blind`
+- `review-board-edge-case`
+- `review-board-security`
+- `review-board-spec-compliance` (with `spec_path` = `brief.md` as the spec reference)
+
+SKIP: `review-board-prd-alignment` — no PRD in change-track; this agent is explicitly excluded for `track = "change"`.
+
+When `track = "piece"`, the existing 6-standard-agent dispatch runs unchanged.
+
 **Fast mode — 7th board member:** if `orchestrator_fast_mode: true`, additionally dispatch concurrently:
 
 ```
@@ -1257,26 +1250,11 @@ Agent({
 
 This 7th agent compensates for the per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches that fast mode skips.
 
-**Note on `background_available` probe:** the `background_available` variable set in the Capability Probe represents whether the host supports background agent dispatch (i.e., the Agent() call accepts a `background: true` parameter or equivalent). The implementer may look for an environment capability flag or attempt a probe call — the exact mechanism is host-specific. The prose below should describe the intent ("host supports background agent dispatch") rather than a host-specific API call.
-
-**if `background_available`:** After dispatching all review-board agents concurrently with `background: true`, arm a `TeammateIdle` handler. When the last background agent completes and `TeammateIdle` fires, collect all results and advance the orchestrator to Step 2 (Triage).
-
-**Note on `TeammateIdle` event name:** `TeammateIdle` is the Claude Code v2.1.139+ event that fires when the last concurrently-dispatched background agent completes. If the Claude Code host uses a different event name for this concept (e.g., `BackgroundAgentsComplete` or similar), substitute that name in the prose above. The semantics — "fires when last background agent finishes" — are canonical; the identifier is what to verify against the host's actual API.
-
-**10-minute timeout fallback (hard stop, AC-14).** If `TeammateIdle` has not fired within 10 minutes of the last review-board agent dispatch — for example because a background agent crashed or timed out and will never signal — treat as a hard stop. Before halting, collect any agent results that have ALREADY arrived and surface them to the operator (do not discard partial results — display what has been received so the operator has maximum context). Then:
-```
-if push_notif_available:
-  send action-required notification: "Hard stop: Final Review TeammateIdle timeout — <piece-slug> needs operator attention"
-# else: skip silently
-```
-Halt execute awaiting operator action. Do NOT auto-advance to Step 2 (Triage).
-
-**else (foreground host — `background_available` is false):** Agents were dispatched without `background: true` and returned their results directly (synchronously) to the orchestrator via the Agent() call. No TeammateIdle event will fire. Collect all results immediately as each Agent() call returns and advance the orchestrator to Step 2 (Triage) without waiting for any event.
-
 ### Step 2: Triage
 
 Collect findings from all board agents (6 in standard mode; 7 in fast mode — the 7th is `verify-piece-full`). Deduplicate (same issue reported by multiple reviewers). Classify:
-- `must-fix` — blocks merge
+- `must-fix` — blocks merge; amendment-eligible in Step 8 triage
+- `should-fix` — non-blocking improvement; addressed via fix-code loop (same iter loop) if capacity allows, otherwise deferred; NOT amendment-eligible
 - `defer` — pre-existing issue, not introduced by this spec
 - `dismiss` — false positive or noise
 
@@ -1294,23 +1272,21 @@ If must-fix findings exist:
   git commit -m "fix: final-review iter M must-fix"
   ```
   Hooks run normally. If a hook fails, re-dispatch the fix agent with the hook output appended; don't bypass.
-- Re-dispatch ALL 6 standard reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. Note: the 7th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
+- Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 5-agent set (security, blind, architecture, edge-case, spec-compliance) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 6 standard agents. Note: the 7th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** 3 full review cycles maximum.
-
-- **Action-required notification (hard stop — execute halts):**
-  ```
-  if push_notif_available:
-    send action-required notification: "Hard stop: Final Review circuit breaker fired — <piece-slug> needs operator attention"
-  # else: skip silently
-  ```
 - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
 ### Step 8: Final Review Triage
 
 **Trigger.** When Final Review's iter-loop (Steps 1–3) terminates with must-fix findings remaining (the iter-loop's circuit breaker fired or the operator has chosen to triage residual must-fix items rather than continue iterating), the orchestrator invokes Step 8 once before any merge action — i.e., before Step 4 (Human Sign-Off), Step 4.5 (Reflection), Step 5 (Capture Learnings), or Step 6 (Merge). Step 8 also fires when Final Review surfaces non-must-fix discoveries that nonetheless require triage (`requires-amendment`, `requires-fork`, `does-not-block-goal-deferred`, or `qa-deferred-to-reflection` markers from any of the end-of-piece reviewers — blind, spec-compliance, architecture, edge-case, prd-alignment, security, and in fast mode also verify-piece-full — even when the iter-loop returned must-fix=None overall). If Final Review returns clean across all board reviewers AND no triage-eligible discoveries surfaced, Step 8 is a no-op and execution proceeds to Step 4.
 
-**Per-finding routing.** For each must-fix finding (or triage-eligible discovery) emerging from Final Review, the orchestrator dispatches the Step 6c triage flow per FR-16a. Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, `security`, or (in fast mode) `verify-piece-full` — matching the active end-of-piece reviewer roles.
+**Per-finding routing.** For each finding emerging from Final Review, the orchestrator routes by severity before dispatching Step 6c:
+
+- **`must-fix` and `should-fix`:** dispatches the Step 6c triage flow with the full options menu — `(a) amend`, `(s) amend-spec` (where spec-eligible), `(f) fork`, `(d) defer`. The finding's severity label is surfaced in the triage prompt so the operator can weigh whether a should-fix warrants reopening the piece. Amendment budget applies to any amend choice regardless of severity.
+- **`defer` and `dismiss`:** no Step 6c invocation; the finding is either discarded (`dismiss`) or written directly to the backlog without operator triage (`defer` — pre-existing issues require no new rationale).
+
+Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, `security`, or (in fast mode) `verify-piece-full` — matching the active end-of-piece reviewer roles.
 
 **Amendment phase IDs.** Amendment phases inserted via Step 8 use the suffix-form IDs `phase_final_amend_<K>` where `<K>` is the 1-indexed amendment counter for the Final Review triage event (`phase_final_amend_1`, `phase_final_amend_2`, etc.). The originating phase token is the literal string `final` since there is no specific upstream phase. This naming distinguishes Step 8-induced amendment phases from per-phase Step 6c-induced amendment phases (`phase_<N>_amend_<K>` with `<N>` a numeric phase ID per FR-13).
 
@@ -1318,7 +1294,7 @@ If must-fix findings exist:
 
 **Per-choice flow.**
 
-- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 (iter-1 full review across all board reviewers: blind, edge-case, spec-compliance, prd-alignment, architecture, security, and verify-piece-full in fast mode) on the new cumulative diff `git diff main..HEAD`. The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
+- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 on the new cumulative diff `git diff main..HEAD`. For `track = "change"` pieces: re-dispatch the same 5-agent set (security, blind, architecture, edge-case, spec-compliance) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 6 standard agents (blind, edge-case, spec-compliance, prd-alignment, architecture, security, and verify-piece-full in fast mode). The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
 
 - **On `fork`:** a follow-up piece is written to `docs/prds/<prd-slug>/manifest.yaml` with `depends_on: [<current-piece-slug>]`, exactly as Step 6c's Fork dispatch specifies. The current piece **merges as-is** with the discovery deferred to the new piece — Step 8's fork choice does NOT re-open the piece and does NOT re-run Final Review. Execution proceeds to Step 4 (Human Sign-Off) once all Step 8 findings have been routed. The current piece's status remains `executing` (or whatever its pre-Step-8 status was); the operator's sign-off at Step 4 is on the merge-as-is artifact with the forked discovery noted.
 
@@ -1327,13 +1303,6 @@ If must-fix findings exist:
 **`.discovery-log.md` authoring.** Step 8's per-finding rows append to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.discovery-log.md` per the Step 6c Resolution-commit cell convention, with the `Phase` column set to the literal `final-review` token. The row append lands as part of the same commit as the resolution (amend-with-audit-trail, fork-with-audit-trail, or defer-with-audit-trail) per the Step 6c authoring rules.
 
 ### Step 4: Human Sign-Off
-
-**Action-required notification (human gate — NN-P-002):**
-```
-if push_notif_available:
-  send action-required notification: "<piece-slug> ready for human sign-off — operator review required (NN-P-002)"
-# else: skip silently
-```
 
 Present to user:
 - Summary of what was built (phases, files, test counts)
@@ -1377,6 +1346,10 @@ Read the `reflection` key from `.spec-flow.yaml` (valid values: `auto`, `off`; d
 
 In `auto` mode, dispatch two reflection agents concurrently (read-only, Sonnet). Execute dispatches each with the resolved `<prd-slug>` and `<piece-slug>` context. As of v3.2.0 (pi-010-discovery Phase 10), the reflection agents emit STRUCTURED FINDINGS reports back to the orchestrator — they do NOT write to backlog files directly. Per the CAP-F invariant established in Phase 1 of pi-010-discovery, `/spec-flow:defer` is the sole supported path for backlog writes; the orchestrator routes each reflection finding through Step 6c on receipt, and only the operator-chosen resolution (defer / amend / fork) produces a commit.
 
+**Reflection track routing (track-aware):**
+- If `track = "piece"`: existing per-PRD reflection behavior remains unchanged — route future-opportunities to `<docs_root>/prds/<prd-slug>/backlog.md` and process-retro to `docs/improvement-backlog.md`.
+- If `track = "change"`: use `docs/improvement-backlog.md` for all deferred findings (no per-change backlog file; no manifest status update). Where Step 4.5 below references the PRD-local backlog or manifest, substitute `docs/improvement-backlog.md` and omit the manifest input.
+
 ```
 Agent({ description: "Process retro for <prd-slug>/<piece-slug>", prompt: <process-retro composed>, model: "sonnet" })
 Agent({ description: "Future opportunities for <prd-slug>/<piece-slug>", prompt: <future-opportunities composed>, model: "sonnet" })
@@ -1393,9 +1366,10 @@ Agent({ description: "Future opportunities for <prd-slug>/<piece-slug>", prompt:
 - Final spec for this piece (with acceptance criteria, including any deferred ACs)
 - Final plan (with `NOT COVERED` rows from Build's AC matrix)
 - Cumulative diff (`git diff $piece_start_sha..HEAD`)
-- Current `<docs_root>/prds/<prd-slug>/backlog.md` contents, OR the literal string "(file does not exist yet)" if absent
-- `<docs_root>/prds/<prd-slug>/manifest.yaml`
-- Findings target: emit a structured `## Findings` report to the orchestrator (Phase Group B's `reflection-future-opportunities.md` agent rewrite owns the report-shape contract). Do NOT write to `<docs_root>/prds/<prd-slug>/backlog.md` directly.
+- If `track = "piece"`: current `<docs_root>/prds/<prd-slug>/backlog.md` contents, OR the literal string "(file does not exist yet)" if absent
+- If `track = "piece"`: `<docs_root>/prds/<prd-slug>/manifest.yaml`
+- If `track = "change"`: current `docs/improvement-backlog.md` contents, OR the literal string "(file does not exist yet)" if absent; do not load a per-change backlog or manifest
+- Findings target: emit a structured `## Findings` report to the orchestrator (Phase Group B's `reflection-future-opportunities.md` agent rewrite owns the report-shape contract). Do NOT write to the resolved backlog target directly.
 
 Wait for both agents to complete. Each agent's output is a structured `## Findings` block listing zero or more individual findings. **Empty-findings sentinel:** after stripping leading and trailing blank lines from the `## Findings` section body, if the remaining content consists solely of one line that begins with `(no concrete items surfaced` AND no `### Finding` subheadings appear anywhere in the section, treat N=0 for that agent — skip the Step 6c dispatch entirely for that agent's output. Do NOT pass the sentinel string to Step 6c as a discovery. If any `### Finding` subheadings exist (even if one finding's body happens to begin with the sentinel prefix), the section is NOT treated as empty — process each finding normally. Hold both reflection outputs in orchestrator state for Step 5 synthesis (the Step 5 learnings.md commit consumes the same outputs and is unchanged by this rerouting).
 
@@ -1424,8 +1398,8 @@ For each agent's findings, dispatch the Step 6c triage flow with `.discovery-log
 #### What gets committed (and what does not)
 
 - **The reflection step itself produces ZERO commits.** The agents emit findings; the orchestrator routes them through Step 6c; the resolution path commits.
-- **On `defer` for any reflection finding:** `/spec-flow:defer` writes the backlog entry and commits it itself with a message of the form `chore(<piece-slug>): defer <finding-summary>` per Step 6c's Defer dispatch step 2. The `.discovery-log.md` row append lands as part of THAT commit. Future-opportunities defer targets the PRD-local `<docs_root>/prds/<prd-slug>/backlog.md`; process-retro defer targets the global `<docs_root>/improvement-backlog.md`. Per AC-24, the resulting backlog entry's `**Source:**` line names the originating phase as `step-4.5-reflection` and the agent as either `reflection-future-opportunities` or `reflection-process-retro`.
-- **On `amend` / `amend-spec` for any reflection finding:** the standard Step 6c amend dispatch fires — `plan-amend` (or `spec-amend`) agent runs, the amendment commits with `chore(plan): amend` (or `chore(spec): amend`), and amendment phases run through the full Per-Phase Loop. The amendment budget applies (2 amendments total per piece, of which at most 1 may be a spec amendment; reflection findings consume the same budget as per-phase Step 6c amendments).
+- **On `defer` for any reflection finding:** `/spec-flow:defer` writes the backlog entry and commits it itself with a message of the form `chore(<piece-slug>): defer <finding-summary>` per Step 6c's Defer dispatch step 2. The `.discovery-log.md` row append lands as part of THAT commit. If `track = "piece"`, future-opportunities defer targets the PRD-local `<docs_root>/prds/<prd-slug>/backlog.md` and process-retro defer targets the global `<docs_root>/improvement-backlog.md`. If `track = "change"`, all reflection defers target `docs/improvement-backlog.md`. Per AC-24, the resulting backlog entry's `**Source:**` line names the originating phase as `step-4.5-reflection` and the agent as either `reflection-future-opportunities` or `reflection-process-retro`.
+- **On `amend` / `amend-spec` for any reflection finding:** the standard Step 6c amend dispatch fires — `plan-amend` (or `spec-amend`) agent runs, the amendment commits with `chore(plan): amend` (or `chore(spec): amend`), and amendment phases run through the full Per-Phase Loop. The amendment budget applies (5 amendments total per piece, of which at most 1 may be a spec amendment; reflection findings consume the same budget as per-phase Step 6c amendments).
 - **On `fork` for any reflection finding:** the standard Step 6c fork dispatch fires — a follow-up piece is written to `docs/prds/<prd-slug>/manifest.yaml` with `depends_on: [<current-piece-slug>]`.
 - **The Step 5 learnings.md commit remains unchanged.** Step 5 synthesizes a human-readable narrative from the held reflection outputs plus the cumulative diff and produces its own `learnings: <prd-slug>/<piece-slug>` commit.
 
@@ -1457,14 +1431,6 @@ for `pr` the PR merge carries it. The piece branch must show `status: merged` be
 any push or PR is opened — if the branch reaches main with `status: in-progress`, the
 next `status` scan will show the piece as stale-active with no worktree.
 
-**Action-required notification (merge gate — execute halts):**
-```
-if push_notif_available:
-  send action-required notification: "<piece-slug> ready to merge — operator action required"
-# else: skip silently
-# execute halts here; no auto-merge
-```
-
 ```bash
 # update docs/prds/<prd-slug>/manifest.yaml:
 #   status: merged
@@ -1480,14 +1446,6 @@ git revert HEAD --no-edit   # reverts the Step 5.5 manifest commit
 ```
 After escalation, if the human resolves the issue and retries, **re-run Step 5.5 first**
 (re-commit `status: merged` + `merged_at`) before retrying Step 6.
-
-**Monitor teardown.** If `monitor_available` and Monitor was armed at Step 0, disarm it now:
-```
-if monitor_available AND monitor_armed:
-  disarm monitor on docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
-# else: skip silently
-```
-This prevents the Monitor from watching a path that no longer exists after the worktree is removed at Step 6.
 
 ### Step 6: Merge
 
@@ -1516,8 +1474,8 @@ does not carry a stale `merged` status (see Step 5.5 failure path above).
 **If `merge_strategy: pr`:**
 **Integration — transition task to In Review before opening PR (if `integration_cfg != null` and `auto_transition: true`):**
 Before displaying the PR command, run the capability check for `transition_issue`. If available,
-iterate over all `jira_key:` fields from plan.md and transition each task to the "PR opened"
-status from `integration_cfg` (default: `In Review`).
+iterate over all `jira_key:` fields from plan.md to collect task keys. If `track = "change"` and plan.md has no `jira_key:` fields, fall back to reading `jira_key:` from `spec_path` (brief.md) front-matter.
+Transition each collected task key to the "PR opened" status from `integration_cfg` (default: `In Review`).
 On tool unavailable → emit warning → skip (do NOT block the merge).
 
 Display the following command for the human to copy-paste and run manually:

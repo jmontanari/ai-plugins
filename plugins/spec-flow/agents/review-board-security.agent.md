@@ -5,5 +5,4 @@ tools:
   - read
   - grep
   - glob
-background: true
 ---

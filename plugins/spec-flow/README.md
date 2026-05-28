@@ -20,18 +20,19 @@ One consequence: the orchestrator (the main conversation) writes **zero** implem
 
 ## How it's structured
 
-The plugin ships five skills, a pool of specialized agents, reusable templates, and a doctrine document loaded on every session.
+The plugin ships six skills, a pool of specialized agents, reusable templates, and a doctrine document loaded on every session.
 
 ```
 plugins/spec-flow/
-├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute, /defer
+├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute, /defer, /small-change
 │   ├── status/      # Pipeline dashboard + next-action recommendation + charter divergence resolver
 │   ├── charter/     # Bootstrap/update/retrofit charter — project-wide binding constraints (v2.0.0)
 │   ├── prd/         # Import/normalize PRD, decompose into pieces, update manifest
 │   ├── spec/        # Author a spec for one piece (Socratic brainstorm + QA)
 │   ├── plan/        # Turn spec into exhaustive implementation plan + QA
 │   ├── execute/     # Orchestrate implementation phase-by-phase with subagents
-│   └── defer/       # Record a non-blocking finding to a backlog file with provenance (v3.2.0)
+│   ├── defer/       # Record a non-blocking finding to a backlog file with provenance (v3.2.0)
+│   └── small-change/  # Single-session combined flow: brainstorm, scope-gate, plan, and hand off to execute
 │
 ├── agents/          # Subagent templates dispatched by the skills above
 │   ├── tdd-red.md           # Writes failing tests (TDD mode only)
@@ -199,6 +200,7 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 | **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
 | **plan** | Approved spec + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
 | **execute** | Approved plan | Working code on `piece/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. v3.2.0+ adds synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) — discoveries route to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (2 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + final review board (6 agents; 7 in fast mode) | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **small-change** | User description of a small focused change | `docs/changes/<slug>/change-brief.md` + `plan.md` on `change/<slug>` branch; worktree ready for `/spec-flow:execute change/<slug>`. Use when the change fits in 1–3 implementation phases and doesn't require the full PRD → spec → plan pipeline. | scoped brainstorm (5–8 questions) + scope gate | — |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
 
 ### Synchronous discovery triage (v3.2.0+)

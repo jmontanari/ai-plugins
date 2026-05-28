@@ -48,6 +48,17 @@ Record the decision in plan front-matter as `fast: true` or `fast: false`. If th
 - `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` must exist and be approved
 - Must be on the worktree branch `piece/<prd-slug>-<piece-slug>` (created by spec skill via `{{worktree_root}}/`)
 
+- **No surviving `[PENDING-DECISION]` markers:** Scan `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` for any `[PENDING-DECISION` strings. When scanning, skip lines inside fenced code blocks (between opening ``` and closing ``` fences) and skip lines inside HTML comments (between `<!--` and `-->`). Only raw marker text in prose counts as a surviving marker. If any are found, refuse to proceed and list each surviving marker:
+
+  ```
+  Plan refused — spec.md contains N surviving [PENDING-DECISION] markers that must be resolved before planning:
+    1. [PENDING-DECISION: <decision area>] — found at: <surrounding sentence>
+    ...
+  Resolve each marker by editing spec.md to replace the marker with the decided text, then re-run the plan skill.
+  ```
+
+  If no markers are found, this check is a silent no-op and Phase 1 continues.
+
 ## Workflow
 
 ### Phase 1: Read-Only Exploration
@@ -78,15 +89,54 @@ Gather:
   Charter content is exploration priors, same as code — it influences phase decomposition and the per-phase "Charter constraints honored" slots.
   - **If `integrations.md` exists:** read it fully before authoring any phase that touches external services, APIs, SDKs, or third-party libraries. The naming conventions, status transition rules, hierarchy rules, and any additional notes sections define how integrations must be set up and managed. Every phase that creates, configures, or calls an external integration must be consistent with the principles in this file — treat it the same as non-negotiables for that scope.
 - **Spec's `### Non-Negotiables Honored` and `### Coding Rules Honored` sections** — these enumerate the NN-C/NN-P/CR entries the piece claims it honors. The plan allocates each entry to the specific phase(s) that implement it via the per-phase "Charter constraints honored in this phase" slot.
+- **Architectural decisions** — during Phase 1 exploration, record every significant architectural decision made. A decision is significant if it involves a choice between two or more approaches with non-trivial trade-offs, OR if it constrains future implementation options. Capture each as a draft ADR entry during exploration; these are finalized in Phase 2 step 11 below.
+
+#### Exploration Deliverable: Code Introspection Report → `introspection.md`
+
+Phase 1 writes exploration findings incrementally to `introspection.md` in the piece's working directory (alongside plan.md). The file is a working artifact — not committed, not gitignored, just untracked.
+
+**Cluster identification.** Before exploring, group the spec's target files by functional cohesion (files that share callers, imports, or data types). Each cluster contains ≤ 5 files. If the spec touches ≤ 3 files total, treat the entire scope as a single cluster (no grouping overhead).
+
+**Per-cluster exploration loop.** For each cluster, in dependency order (inner-most first):
+
+1. **Explore** — read the cluster's files, resolve callers/callees, scan test coverage.
+2. **Append** — write four sections to `introspection.md` under an H2 heading for the cluster:
+   - **File Inventory:** per-file path, line count, key functions/classes with line ranges, and current code blocks (verbatim with line numbers) for all areas the spec requires modification
+   - **Dependency Map:** per-file callers (file:line), callees (file:line), shared state, import chains relevant to the spec's scope
+   - **Test Landscape:** existing test files, framework/assertion patterns, runner command, and coverage gaps relative to the spec's ACs
+   - **Pattern Catalog:** naming conventions, error handling patterns, logging patterns — each with **verbatim code blocks** (3-10 lines) from the codebase, not just file:line pointers. These blocks are pasted into Phase 2's [Build]/[Implement] blocks as the executor's inline pattern reference.
+3. **Release** — after appending, the orchestrator may release the cluster's raw file contents from context. The written sections in `introspection.md` carry the information forward.
+
+**Resume.** On resume, check whether `introspection.md` exists. If it does, read it and skip clusters whose H2 headings already appear. This is cheap and always runs.
+
+The Code Introspection Report is the Phase 2 author's primary input. Without it, Phase 2 produces abstract plans that force executor agents to re-explore the codebase.
+
+**Edge cases:** For CREATE-only targets (no existing file to modify), the File Inventory entry documents the target path and intended structure outline instead of verbatim code. For projects with no existing test infrastructure, the Test Landscape notes "No existing tests — the plan's first phase must include test framework setup as an explicit [Implement] task."
 
 ### Phase 2: Generate Plan
 
-Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_ROOT}/templates/plan.md`:
+Using the spec, `introspection.md` (reading section-by-section to manage context — load one cluster's sections at a time, draft its phases, then move to the next cluster), and the plan template at `${CLAUDE_PLUGIN_ROOT}/templates/plan.md`:
 
 1. Define phases — each phase is a testable unit of work:
    - Map each phase to specific acceptance criteria from the spec
    - Define a clear exit gate for each phase
    - Order phases by dependency (inside-out execution)
+
+1a. **Verb alignment check** — extract the primary action verb from each spec AC and verify the covering plan phase PERFORMS that action. Action verbs to check: run, execute, validate, generate, create, modify, delete, deploy, test, migrate, configure, verify.
+
+    A phase description must contain a concrete step that PERFORMS the verb — not documents, reviews, inspects, or scaffolds it.
+
+    **Alignment failure patterns:**
+    - AC "X runs and produces output" → phase `[Verify]` says "verify X is documented" ❌
+    - AC "pipeline executes end-to-end" → phase `[Build]` says "pipeline structure is reviewed" ❌
+    - AC "tests pass with N passing" → phase `[Verify]` says "test structure is valid" ❌
+
+    **Correct alignment examples:**
+    - AC "X runs and produces output" → phase `[Verify]`: `run X, expect output Y` ✓
+    - AC "pipeline executes end-to-end" → phase `[Verify]`: `execute pipeline, confirm N stages complete` ✓
+    - AC "tests pass with N passing" → phase `[Verify]`: `run pytest, expect N passed, 0 failed` ✓
+
+    This check applies BEFORE the QA loop dispatch (Phase 3) and blocks plan finalization on misalignment. If a spec AC's verb cannot be matched to a plan phase's concrete step, the AC is NOT COVERED — update the AC Coverage Matrix accordingly.
 
 2. For each phase, choose ONE track and generate its structure. A phase must have exactly one track marker — the executor branches on it mechanically.
 
@@ -94,13 +144,55 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    - **[TDD-Red]**: Exact test file paths, test names, assertions, patterns to follow
    - **[QA-Red]**: Theater-pattern review of Red's authored tests before Build (rejects tautology, mock-echo, truthy-only, no-assertion, name/body mismatch, implementation coupling, etc.); verifies adversarial AC binding
    - **[Build]**: Exact source file paths, class/function signatures, implementation approach
-   - **[Verify]**: Test command to run, expected output
+   - **[Verify]**: Exact shell command (copy-pasteable) with specific expected output values. **Verify command concreteness requirement:** every `[Verify]` block must contain at minimum: the exact command to run, expected output with specific values (numbers, strings), and a failure indicator (what bad output looks like). Template placeholders (`{{test_command}}`, `{{expected_output}}`) must be resolved before plan sign-off.
+
+     ✓ `Run: pytest tests/auth/test_token.py -v — Expected: 3 passed, 0 failed`
+     ✓ `Run: ruff check src/auth/ — Expected: exit code 0, no output`
+     ✓ LLM-agent-step: `read src/config.yaml and confirm key "timeout" exists with value 30`
+     ✗ `Run tests and verify they pass`
+     ✗ `Confirm the implementation works correctly`
+     ✗ `Run: {{test_command}} — Expected: all tests pass`
    - **[Refactor]**: Scope constraints (phase files only)
    - **[QA]**: ACs to review against, diff baseline
 
    **Implement track** (for config, infra, scaffolding, glue/wiring, docs-as-code, fixtures, migrations — where unit-level TDD is ceremony without payoff):
    - **[Implement]**: Exact file paths, signatures/structure, pattern pointers, architecture constraints the phase must honor. **When the phase modifies multiple files of the same class** (e.g., three playbooks that each require FQCN, a `when` guard, and a validation assert), list explicit per-file exit criteria — name each file and state what "done" means for it. A class-level description alone is insufficient; the implementer will finish the first file correctly and skip the constraint on the second.
+   **Per-file specificity requirement:** Each `[Implement]` block must enumerate every file as a numbered Change Specification Block per step 3. Each change is self-contained — the executor can implement it without reading surrounding context or chasing pattern pointers.
+
+   **Bad (insufficient):** `edit src/auth/token.py — add refresh logic`
+
+   **Good (sufficient):**
+   ```
+   T-3: MODIFY src/auth/token.py
+   Anchor: class TokenManager (lines 42-67)
+   CURRENT:
+    42  class TokenManager:
+    43      def __init__(self, vault_client):
+    44          self.vault_client = vault_client
+    45      def validate_token(self, token: str) -> bool:
+    46          ...
+    67  # end of class
+   TARGET: Add refresh_token() after validate_token (line 67).
+   Must call self.vault_client.renew() and handle TokenExpiredError.
+   Pattern (from src/auth/session.py:23-41):
+    23  def renew_session(self):
+    24      try:
+    25          self.vault_client.renew()
+    26      except TokenExpiredError:
+    27          self._invalidate()
+    28          raise
+   Done: refresh_token() exists, calls vault_client, raises on failure.
+   Verify: `grep -n "def refresh_token" src/auth/token.py` returns a match.
+   ```
    - **[Verify]**: The verification command the plan author chooses (lint, type check, build, smoke run, integration test) and its expected output. For YAML/JSON validation in [Verify] blocks, default to LLM-agent-step framing per the plan template. External parsers (yq, jq, language interpreters) are not preconditions of this pipeline. **When the modified component is consumed by a wrapper or sibling component that has its own test suite** (e.g., an Ansible role consumed by a wrapper role with its own molecule suite), the `[Verify]` block must name ALL test suites that must pass — including those in wrapper/consumer components — not just the test suite of the directly modified component.
+   **Verify command concreteness requirement:** every `[Verify]` block must contain the exact command to run with specific expected output (numbers, strings, exit codes), and a failure indicator. Template placeholders must be resolved before plan sign-off.
+
+     ✓ `Run: molecule test -s default — Expected: PLAY RECAP with 0 failed, 0 unreachable`
+     ✓ `Run: ansible-lint playbooks/ — Expected: exit code 0`
+     ✓ LLM-agent-step: `read plugins/spec-flow/agents/qa-plan.md and confirm criterion 16 contains the string "verb alignment"`
+     ✗ `Run the tests and confirm they pass`
+     ✗ `Verify the implementation is correct`
+     ✗ `Run: {{lint_command}} — Expected: no errors`
    - **[Refactor]** (optional): Include only if cleanup is plausibly needed
    - **[QA]**: ACs to review against, diff baseline
 
@@ -144,7 +236,62 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
 
     **Escape hatch (v3.1.1+):** the plan author may suppress the validator on a phase by adding `exit_gate_override: <reason>` as a single-line preamble to the offending phase's body (same convention as `phase_size_override`). Use ONLY when the matched pattern is legitimate quoted prose — e.g., a `[Verify]` block that asserts the absence of the forbidden pattern in some target file, or a meta-plan whose body documents the rejected pattern itself. The override is logged for posterity and surfaces in the plan's QA-loop input as `exit_gate_override active: <phase> — <reason>`. Per CR-008 the validator stays orchestrator-side; the override is a plan-author declaration, not an agent-side decision.
 
-3. Use semantic anchors (function names, class names) NOT line numbers
+2c. **Dense algorithm prose guard.** After drafting any `[Implement]` block that edits a paragraph in a `SKILL.md` file encoding a multi-step algorithm — a paragraph where ≥3 sequential steps are encoded in prose, recognizable by ordered-list steps, "then … then …" chains, or "normalize → split → match" notation — the plan MUST require in that same phase:
+    1. An inline worked example immediately following the algorithm paragraph: a concrete input→output trace showing the full algorithm at a single representative input. The worked example may use a `<!-- Example: … -->` comment, a markdown code fence, or an inline parenthetical, but MUST show actual values (not `<input>` placeholders).
+    2. A `[Verify]` assertion that confirms the worked example is present in the committed file.
+
+    Without a concrete trace, each fix cycle on algorithm prose exposes adjacent latent ambiguity in the surrounding prose — as observed when the contract-injection paragraph in execute/SKILL.md required three sequential revision cycles (NM-1 → NM-B → NM-C) within a single piece.
+
+3. **Self-contained Change Specification Blocks.** Every file change inside a [Build]/[Implement] block must be a complete, self-contained specification the executor can implement without reading surrounding context or chasing pattern pointers. Use BOTH semantic anchors AND line ranges. Number each change sequentially within the phase (T-1, T-2, ...) to create a task inventory the executor iterates.
+
+   **MODIFY operations — required fields:**
+   (a) Task ID and file path: `T-N: MODIFY <file_path>`
+   (b) Semantic anchor: function/class/method name
+   (c) Line range from `introspection.md` (e.g. lines 42-67)
+   (d) CURRENT state: verbatim code block (5-15 lines) with line numbers showing what exists today
+   (e) TARGET state: concrete description of what to change — include function signatures, parameter types, return types, error handling expectations. Specific enough that the executor can write the code.
+   (f) Pattern to follow: if the change should follow a pattern from elsewhere in the codebase, paste the **verbatim code block** (3-10 lines) from `introspection.md`'s Pattern Catalog inline — do NOT leave it as a pointer ("follow pattern from X:lines Y-Z")
+   (g) Done criteria: what "done" means for this specific change (not for the phase)
+   (h) Verify: how to verify this specific change succeeded (may be part of the phase [Verify] or a standalone check)
+
+   **CREATE operations — required fields:**
+   (a) Task ID and file path: `T-N: CREATE <file_path>`
+   (b) Complete structure outline: sections, key classes/functions, imports, types
+   (c) Pattern to follow: verbatim code block from a similar existing file
+   (d) Done criteria and Verify
+
+   **DELETE operations — required fields:**
+   (a) Task ID and file path: `T-N: DELETE <file_path>`
+   (b) Rationale: why this file is being removed
+   (c) Impact check: what other files reference it (from Dependency Map)
+   (d) Verify: confirm no remaining imports/references
+
+   **Worked example (MODIFY):**
+   ```
+   T-3: MODIFY src/auth/token.py
+   Anchor: class TokenManager (lines 42-67)
+   CURRENT:
+     42  class TokenManager:
+     43      def __init__(self, vault_client):
+     44          self.vault_client = vault_client
+     45      def validate_token(self, token: str) -> bool:
+     46          ...
+     67  # end of class
+   TARGET: Add refresh_token() method after validate_token (line 67).
+   Must call self.vault_client.renew() and handle TokenExpiredError.
+   Return the new token string on success.
+   Pattern (from src/auth/session.py:23-41):
+     23  def renew_session(self):
+     24      try:
+     25          self.vault_client.renew()
+     26      except TokenExpiredError:
+     27          self._invalidate()
+     28          raise
+   Done: refresh_token() exists, calls vault_client.renew(), raises TokenExpiredError on failure.
+   Verify: `grep -n "def refresh_token" src/auth/token.py` returns a match.
+   ```
+
+   **Note:** Line ranges are from `introspection.md` exploration time — they may shift during execution. The semantic anchor is the primary locator; the line range prevents the executor from searching the entire file.
 4. Mark parallel-eligible tasks with `[P]` — verify no file overlap
 5. **Order the bullets inside `[Build]` / `[Implement]` blocks in checkpoint progression.** The implementer agent commits at each logical checkpoint during its dispatch; a well-ordered bullet list gives the agent natural checkpoint boundaries. Good order: data model or types first → public constructors / factories → public methods/functions → internal helpers → error paths and edge cases. Bad order: leaf helpers first, then the public API that calls them. Each bullet (or small group of bullets) should be a point where the code in-flight is lint-clean and internally consistent even if not yet feature-complete. This is guidance for readability and checkpoint quality, not a hard structural requirement — the agent will infer checkpoints regardless.
 6. Include the agent context summary table
@@ -216,6 +363,133 @@ Using the spec, exploration findings, and the plan template at `${CLAUDE_PLUGIN_
    **Scope discipline:** each Sub-Phase MUST declare its `**Scope:**` as a literal file path list (glob patterns rejected). The orchestrator validates disjointness at dispatch time — if two sibling sub-phases declare overlapping file paths, the whole group falls back to serial execution (parallelism would race on the overlap).
 
    **Phase 0 Scaffold interacts with Phase Groups.** If sub-phases in a group each need to append entries to a shared coordination file (a common `__init__.py`, a shared fixtures file, a test registry), author a Phase 0 Scaffold BEFORE the Phase Group to pre-create the entries. Otherwise concurrent sub-phases will race on the shared file. The existing Scaffold guidance above (previous rule) covers this pattern.
+
+9. **AC Coverage Matrix generation (FR-PLAN-001 / FR-PLAN-002).** After all phases are drafted, generate the `## AC Coverage Matrix` section. Steps:
+
+   1. Extract every AC from the spec in AC-ID order (AC-1, AC-2, ...). Parse by scanning **only the `### Acceptance Criteria` section** (or `## Acceptance Criteria` if the spec uses an H2 heading) of spec.md for lines matching the pattern `AC-N:` or `**AC-N**`. Do not scan the full spec document — prose references to ACs in other sections are not definitions.
+   2. For each AC, scan every phase's `**ACs Covered:**` field and sub-phase `**ACs:**` field in the plan. Build a mapping: `AC-N → [Phase M, Phase P, ...]`.
+   3. Determine status per AC:
+      - `COVERED` — appears in at least one phase's ACs Covered/ACs field.
+      - `NOT COVERED` — not referenced by any phase.
+   4. Render the section as a markdown table:
+
+      ```markdown
+      ## AC Coverage Matrix
+
+      | AC ID | Summary | Status | Covered By |
+      |-------|---------|--------|------------|
+      | AC-1  | <one-line summary from spec> | COVERED | Phase 1 |
+      | AC-3  | <one-line summary> | NOT COVERED | — Forward pointer: `<future-piece-slug>` or `<explicit justification>` |
+      ```
+
+      The summary column is a one-line extract from the spec's AC text (truncate at 80 chars).
+
+   5. **NOT COVERED prompt (FR-PLAN-002).** For each NOT COVERED row, the plan skill must prompt the user before finalizing:
+
+      ```
+      AC-N (<summary>) is NOT COVERED by any phase in this plan. What should we do?
+      ```
+
+      Choices:
+      - "Defer to future piece: `<piece-slug>`" — record the piece slug as the forward pointer in the NOT COVERED row.
+      - "Add coverage to Phase M" — update Phase M's `ACs Covered` field and re-run the matrix.
+      - "Explicit justification" — enter free-form text as the forward pointer (e.g., "out of scope by spec decision — see Out of Scope section").
+
+      Do not finalize plan.md until all NOT COVERED rows have a forward pointer.
+
+      If the user provides an empty or unrecognised answer, re-prompt once with: "Please choose: (1) Defer to future piece — provide slug, (2) Add coverage to Phase M — provide phase, or (3) Explicit justification — provide text. An empty answer is not valid." If the second response is also empty, unrecognised, or the session is interrupted, abort plan generation with: "Plan generation halted — all NOT COVERED ACs require a forward-pointer decision before plan.md can be finalized." Do not write a partial plan.md.
+
+   6. Place `## AC Coverage Matrix` after the last phase (or Phase Group) and before `## Parallel Execution Notes` in plan.md.
+
+9a. **Executable AC Binding table (FR-6 of plan-mode-overhaul).** After the AC Coverage Matrix, generate an `## Executable AC Binding` section that maps every COVERED AC to its exact verification. This table is the contract between plan and execute — if a phase cannot fill in the "Command/Check" column with something concrete, the phase's `[Verify]` block is not specific enough.
+
+    ```markdown
+    ## Executable AC Binding
+
+    | AC ID | Verification Type | Command/Check | Expected Result |
+    |-------|------------------|---------------|-----------------|
+    | AC-1  | shell | `pytest tests/auth/ -v` | 3 passed, 0 failed |
+    | AC-2  | agent-step | LLM-agent-step: read `src/config.yaml` and confirm key "timeout" is 30 | Key exists with value 30 |
+    | AC-3  | agent-step | LLM-agent-step: read `plugins/spec-flow/agents/qa-plan.md` lines 70-90 and confirm criterion 16 exists | Criterion 16 present with verb list |
+    ```
+
+    Verification Type values:
+    - `shell` — exact shell command, copy-pasteable
+    - `file-check` — assert file exists, contains specific string, or has specific structure
+    - `agent-step` — LLM-agent reads a file and confirms specific content
+
+9b. **Phase boundary declarations (FR-7 of plan-mode-overhaul).** Each phase must declare explicit scope boundaries to prevent executor scope creep. The execute skill's discovery protocol applies when a sub-agent discovers work not listed in "In scope."
+
+    Each phase must include in its header block:
+    - **`In scope:`** explicit list of what this phase does (file changes, behaviors added)
+    - **`NOT in scope:`** explicit list of what this phase does NOT do, with forward references to the phase that covers it (e.g., "NOT in scope: qa-plan.md changes — covered by Phase 2")
+
+    The file list with change types (CREATE/MODIFY/DELETE) is captured in the `**File changes:**` table inside each `[Build]`/`[Implement]` block and does not need to be duplicated in the header.
+
+    An executor discovering that implementing a spec AC requires changes to files NOT listed in "In scope" must escalate via the discovery protocol (Step 6c of execute) rather than silently expanding scope.
+
+10. **Contracts section generation (FR-PLAN-004 / FR-PLAN-005 / FR-PLAN-006 / FR-PLAN-007).** After all phases are drafted, generate the `## Contracts` section. Steps:
+
+    1. Scan every `[TDD-Red]` (or `[Build]`) block in the plan for boundary-crossing interfaces. A boundary-crossing interface is one consumed by code *outside* the defining phase — public API endpoints, exported functions, shared data schemas, event contracts. Internal helpers and private functions are not contracts.
+
+    2. For each identified boundary-crossing interface, define a contract entry:
+
+       ```markdown
+       ### C-N: <interface name>
+       - **ID:** C-N
+       - **Type:** Function | API Endpoint | Event Schema | Data Schema
+       - **Phase:** Phase M (or Sub-Phase X.Y)
+       - **Signature:** `<function/endpoint signature with types>`
+       - **Inputs:** `<param>: <type>` — <description>; (repeat per input)
+       - **Outputs:** `<return type>` — <description>
+       - **Error cases:** `<error condition>` → `<behavior/exception>`; (repeat)
+       - **Constraints:** <any invariants, preconditions, postconditions>
+       ```
+
+    3. **TDD phases with no boundary-crossing interfaces (AC-11).** If a TDD-track phase's [TDD-Red] block has no boundary-crossing interfaces, document the omission explicitly:
+
+       ```markdown
+       ### Phase M — no boundary-crossing interfaces
+       Omission rationale: <e.g., "Phase M refactors internal helpers only; no exported symbols">
+       ```
+
+    4. **Non-TDD / Implement-only pieces (AC-13a compatibility).** If the plan has no TDD-track phases at all, include:
+
+       ```markdown
+       ## Contracts
+
+       No TDD-track phases in this plan — contracts section present for forward compatibility. tdd-red agents will not be dispatched; no contract injection occurs.
+       ```
+
+    5. **Reference contract IDs in [TDD-Red] blocks (AC-12).** After the Contracts section is written, go back and add a contract reference line to each [TDD-Red] block that has a corresponding contract. Append to the [TDD-Red] block: `Contract references: C-N (and C-M if applicable). Write tests against these contract signatures.`
+
+    6. Place `## Contracts` immediately after `## Executable AC Binding` in plan.md (which itself follows `## AC Coverage Matrix`).
+
+11. **Architectural Decisions section generation (FR-PLAN-008 / FR-PLAN-009 / FR-PLAN-010).** Generate the `## Architectural Decisions` section using ADR format. Steps:
+
+    1. Collect all draft ADR entries recorded during Phase 1 exploration.
+    2. For each decision, render an ADR entry:
+
+       ```markdown
+       ### ADR-N: <decision title>
+       **Context:** <why this decision was needed — what forces are at play>
+       **Decision:** <what was decided, stated precisely>
+       **Alternatives considered:** <at least two alternatives with one-line rationale each>
+       **Consequences:** <what becomes easier, harder, or irreversible as a result>
+       **Charter alignment:** <which NN-C/NN-P/CR entries this decision honors or constrains>
+       ```
+
+    3. **No-decisions fallback (AC-15).** If no significant architectural decisions were made during Phase 1, include:
+
+       ```markdown
+       ## Architectural Decisions
+
+       No significant architectural decisions for this piece.
+       ```
+
+       The section is always present — never omit it.
+
+    4. Place `## Architectural Decisions` before `## Phases` (near the top of the plan, after `## Overview`).
 
 Write the plan to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md`. Populate the `charter_snapshot:` front-matter with charter dates captured during Phase 1 exploration: v4 → `git log` last-commit date per domain; v3 → `last_updated:` value per file. Populate each phase's "Charter constraints honored in this phase" slot with the subset of NN-C/NN-P/CR entries from the spec that the phase implements (every entry must appear in exactly one phase — no drops, no duplicates).
 
