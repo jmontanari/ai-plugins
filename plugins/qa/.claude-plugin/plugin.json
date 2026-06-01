@@ -1,0 +1,16 @@
+{
+  "name": "qa",
+  "description": "Paranoid adversarial QA validator: 4-dimension assessment (MISSING/BROKEN/FRAGILE/EXPLOITABLE) for implementation work",
+  "version": "1.1.1",
+  "author": {
+    "name": "Joe Montanari"
+  },
+  "license": "MIT",
+  "keywords": [
+    "qa",
+    "testing",
+    "validation",
+    "adversarial"
+  ],
+  "hooks": "./.claude-plugin/hooks.json"
+}

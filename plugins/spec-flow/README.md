@@ -24,7 +24,7 @@ The plugin ships six skills, a pool of specialized agents, reusable templates, a
 
 ```
 plugins/spec-flow/
-├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute, /defer, /small-change
+├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute, /defer, /small-change, /review-board
 │   ├── status/      # Pipeline dashboard + next-action recommendation + charter divergence resolver
 │   ├── charter/     # Bootstrap/update/retrofit charter — project-wide binding constraints (v2.0.0)
 │   ├── prd/         # Import/normalize PRD, decompose into pieces, update manifest
@@ -32,7 +32,8 @@ plugins/spec-flow/
 │   ├── plan/        # Turn spec into exhaustive implementation plan + QA
 │   ├── execute/     # Orchestrate implementation phase-by-phase with subagents
 │   ├── defer/       # Record a non-blocking finding to a backlog file with provenance (v3.2.0)
-│   └── small-change/  # Single-session combined flow: brainstorm, scope-gate, plan, and hand off to execute
+│   ├── small-change/  # Single-session combined flow: brainstorm, scope-gate, plan, and hand off to execute
+│   └── review-board/  # On-demand: run the Final Review board on any PR/branch/diff, out of band
 │
 ├── agents/          # Subagent templates dispatched by the skills above
 │   ├── tdd-red.md           # Writes failing tests (TDD mode only)
@@ -54,6 +55,8 @@ plugins/spec-flow/
 │   ├── review-board-spec-compliance.md  # Final Review — spec compliance
 │   ├── review-board-prd-alignment.md    # Final Review — PRD alignment
 │   ├── review-board-architecture.md     # Final Review — architecture + charter
+│   ├── review-board-security.md         # Final Review — security audit (SAST + semantic)
+│   ├── review-board-ground-truth.md     # Final Review — ground-truth / oracle correctness
 │   ├── reflection-process-retro.md      # End-of-piece — orchestration retro
 │   └── reflection-future-opportunities.md  # End-of-piece — forward-looking ideas
 │
@@ -180,9 +183,10 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
                    │                qa-phase                           │
                    └───────────────────────────────────────────────────┘
                                                 ▼
-                   final review:   6 parallel reviewers (Opus); 7 in fast mode
+                   final review:   7 parallel reviewers (Opus); 8 in fast mode
                    ─────────────   blind, edge-case, spec-compliance,
-                                   prd-alignment, architecture, security
+                                   prd-alignment, architecture, security,
+                                   ground-truth
                                    (+ verify Piece Full in fast mode)
                                                 ▼
                                    learnings.md, squash-merge to main
@@ -199,8 +203,9 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 | **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml` with numbered FR/NFR/NN-P/SC and a piece list | Human (during brainstorm) | — |
 | **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
 | **plan** | Approved spec + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
-| **execute** | Approved plan | Working code on `piece/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. v3.2.0+ adds synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) — discoveries route to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (2 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + final review board (6 agents; 7 in fast mode) | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **execute** | Approved plan | Working code on `piece/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. v3.2.0+ adds synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) — discoveries route to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (2 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + final review board (7 agents; 8 in fast mode) | `implementer` (Sonnet, Mode: TDD or Implement) |
 | **small-change** | User description of a small focused change | `docs/changes/<slug>/change-brief.md` + `plan.md` on `change/<slug>` branch; worktree ready for `/spec-flow:execute change/<slug>`. Use when the change fits in 1–3 implementation phases and doesn't require the full PRD → spec → plan pipeline. | scoped brainstorm (5–8 questions) + scope gate | — |
+| **review-board** | A PR #, branch, path(s), or working-tree changes (out of band — no piece required) | Consolidated adversarial findings by severity; `--fix` routes findings into `/spec-flow:small-change` for a planned, QA-gated, board-reviewed fix (never patches the tree directly); `--comment` posts inline PR comments. Never merges, amends, forks, or signs off. | the Final Review board itself (blind, edge-case, security, ground-truth, architecture; +spec-compliance/prd-alignment when context supplied) | routes to `/spec-flow:small-change` (with `--fix`) |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
 
 ### Synchronous discovery triage (v3.2.0+)
@@ -214,7 +219,7 @@ The execution that finds the work also fixes it. Discoveries surfaced during a p
   - **spec-amend** — the spec was wrong within the piece's stated goals; rewrite affected sections via the `spec-amend` agent (max 1 per piece).
   - **fork** — the discovery exceeds the piece's goals; spawn a new piece in the manifest.
   - **defer** — the discovery does not block the piece's goals; record to a backlog via `/spec-flow:defer` with provenance.
-- **Step 8: Final Review Triage** — applies the same Step 6c routing to findings surfaced by the final review board (6 agents standard; 7 in fast mode) at end-of-piece, before merge.
+- **Step 8: Final Review Triage** — applies the same Step 6c routing to findings surfaced by the final review board (7 agents standard; 8 in fast mode) at end-of-piece, before merge.
 
 **Per-piece amendment budget.** A piece may take at most **2 amendments total** (combined plan-amend + spec-amend), with **at most 1 spec-amend**. Hitting the budget forces fork-or-defer for any further discovery — the piece is either done as scoped or the work belongs in another piece. The budget is the load-bearing safeguard against a piece amending itself indefinitely.
 

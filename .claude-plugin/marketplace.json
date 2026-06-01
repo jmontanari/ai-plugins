@@ -12,7 +12,16 @@
       "name": "spec-flow",
       "source": "./plugins/spec-flow",
       "description": "PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability",
-      "version": "4.7.0",
+      "version": "4.11.0",
+      "author": {
+        "name": "Joe"
+      }
+    },
+    {
+      "name": "qa",
+      "source": "./plugins/qa",
+      "description": "Paranoid adversarial QA validator: 4-dimension assessment (MISSING/BROKEN/FRAGILE/EXPLOITABLE) for implementation work",
+      "version": "1.1.1",
       "author": {
         "name": "Joe"
       }

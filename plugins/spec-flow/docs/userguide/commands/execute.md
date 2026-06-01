@@ -1,6 +1,6 @@
 # /spec-flow:execute
 
-Orchestrate implementation of an approved plan phase-by-phase. Each phase dispatches subagents (Red, Build, Verify, Refactor, QA), runs verification oracles, and advances only when gates pass. Ends with a final review board (6 agents in standard mode; 7 in fast mode) and merge to master.
+Orchestrate implementation of an approved plan phase-by-phase. Each phase dispatches subagents (Red, Build, Verify, Refactor, QA), runs verification oracles, and advances only when gates pass. Ends with a final review board (7 agents in standard mode; 8 in fast mode) and merge to master.
 
 ## What it does
 
@@ -11,7 +11,7 @@ The heaviest skill in spec-flow. Walks the plan from Phase 1 to Phase N, for eac
 3. Runs Phase QA (Opus adversarial review)
 4. Advances to the next phase
 
-At the end of the last phase, runs the Final Review board (6 agents; 7 in fast mode), produces a reflection, and merges the piece to master.
+At the end of the last phase, runs the Final Review board (7 agents; 8 in fast mode), produces a reflection, and merges the piece to master.
 
 ## When to run it
 
@@ -107,9 +107,9 @@ Orchestrator commits a progress marker with the phase's checkboxes marked `[x]`.
 
 After the final phase:
 
-### Final Review — board (6 agents; 7 in fast mode)
+### Final Review — board (7 agents; 8 in fast mode)
 
-Six reviewers dispatched **in parallel**, each with a specialized lens. In fast mode, a 7th reviewer (`verify Mode: Piece Full`) is added, compensating for the per-phase QA gates that fast mode skips:
+Seven reviewers dispatched **in parallel**, each with a specialized lens. In fast mode, an 8th reviewer (`verify Mode: Piece Full`) is added, compensating for the per-phase QA gates that fast mode skips:
 
 | Reviewer | Focus |
 |---|---|
@@ -119,6 +119,7 @@ Six reviewers dispatched **in parallel**, each with a specialized lens. In fast 
 | **prd-alignment** | Advances PRD goals? Respects non-negotiables? |
 | **architecture** | Layer boundaries, charter compliance, CR-xxx drift. |
 | **security** | CWE Top 25, injection, crypto, auth/authz, supply chain, language-specific anti-patterns. |
+| **ground-truth** | Do computed/measured outputs reproduce an independently-derived correct answer? Degenerate results, lookahead leakage, scope contamination, parity mismatch, silent truncation. |
 
 Findings resolved by fix-code/fix-doc, same 3-iteration cap.
 
@@ -169,7 +170,7 @@ Phase 4 (TDD — JSON writer):  [P] with 3: 5 min   clean
 Phase 5 (TDD — API endpoint):             11 min  Build needed 2 attempts; Full-mode Verify; QA found 1 must-fix (error-shape doesn't match CR-011); fix-code iter-2 clean
 Phase 6 (Implement — docs):               3 min   clean
 
-Final Review:                             8 min   6 agents parallel; prd-alignment flagged missing NN-P-003 dogfood citation; fix-doc added it; iter-2 clean
+Final Review:                             8 min   7 agents parallel; prd-alignment flagged missing NN-P-003 dogfood citation; fix-doc added it; iter-2 clean
 
 Reflection:                               4 min   process-retro noted "Phase 5's oracle retry was due to stale mock signature — pattern worth capturing"
 

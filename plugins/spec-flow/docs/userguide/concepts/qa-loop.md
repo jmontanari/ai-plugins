@@ -13,7 +13,7 @@ Every artifact in the pipeline hits at least one QA gate:
 | Plan authoring | qa-plan | Phase boundaries, TDD structure, semantic anchors, charter allocation |
 | Phase execution | qa-phase (Opus) | Phase diff vs mapped ACs, regression risk, spec deviation |
 | Sub-phase execution | qa-phase-lite (Sonnet) | Narrow spot-check for sub-phase boundaries inside Phase Groups |
-| End-of-piece merge | review-board (6 agents in parallel) | Blind / edge-case / spec-compliance / prd-alignment / architecture / security |
+| End-of-piece merge | review-board (7 agents in parallel) | Blind / edge-case / spec-compliance / prd-alignment / architecture / security / ground-truth |
 | End-of-pipeline | qa-prd-review | Whole PRD fulfillment across all completed specs |
 
 Every reviewer is spawned fresh — no conversation history, no prior-iteration context. They see only the artifact, the binding references (PRD, charter), and their review criteria. Fresh context is deliberate: it prevents the reviewer from rationalizing away problems they saw the author work through.
@@ -67,7 +67,7 @@ The circuit breaker exists because AI agents will *cheerfully loop on the same f
 
 ## The end-of-piece review board
 
-At merge time, spec-flow runs a different kind of QA — six reviewers **in parallel**, each with a specialized lens:
+At merge time, spec-flow runs a different kind of QA — seven reviewers **in parallel**, each with a specialized lens:
 
 | Reviewer | Sees | Asks |
 |---|---|---|
@@ -77,8 +77,9 @@ At merge time, spec-flow runs a different kind of QA — six reviewers **in para
 | **prd-alignment** | Diff + PRD + charter | Does this advance PRD goals and honor non-negotiables? |
 | **architecture** | Diff + charter + coding rules | Layer boundaries respected? CR-xxx rules obeyed? |
 | **security** | Diff + spec | CWE Top 25 covered? Injection, crypto, auth/authz, supply chain, language anti-patterns? |
+| **ground-truth** | Diff + spec | Do computed/measured outputs reproduce an *independently-derived* correct answer — not just match the plan or a self-captured golden file? Degenerate results, lookahead leakage, scope contamination, parity mismatch, silent truncation? |
 
-Parallel dispatch means all six return in roughly the time of the slowest — about one Opus round-trip. Catches problems that a single reviewer would rationalize away because each lens has a different priority.
+Parallel dispatch means all seven return in roughly the time of the slowest — about one Opus round-trip. Catches problems that a single reviewer would rationalize away because each lens has a different priority.
 
 Must-fix findings from the board are resolved the same way as any other QA boundary: fix-doc or fix-code makes targeted fixes, the affected reviewers re-review, up to 3 iterations.
 

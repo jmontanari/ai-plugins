@@ -2,13 +2,13 @@
 name: execute
 description: >-
   Implement an approved plan phase-by-phase. Dispatches TDD or Implement track agents per phase,
-  QA gates between phases, final review board (6-7 agents) before merge. Main window writes zero
+  QA gates between phases, final review board (7-8 agents) before merge. Main window writes zero
   code. Triggers: "execute", "implement", "run the plan".
 ---
 
 # Execute — Orchestrate Plan Implementation
 
-Execute an approved plan phase by phase using dedicated agents for each step. Each phase runs in Mode: TDD or Mode: Implement based on the plan's chosen track, with QA gates at every boundary and a final review board (6 agents in standard mode; 7 in fast mode) before merge.
+Execute an approved plan phase by phase using dedicated agents for each step. Each phase runs in Mode: TDD or Mode: Implement based on the plan's chosen track, with QA gates at every boundary and a final review board (7 agents in standard mode; 8 in fast mode) before merge.
 
 ## Pre-flight: Model Check
 
@@ -36,7 +36,7 @@ If the active model name does **not** contain `sonnet` (case-insensitive):
 
 If the model already contains `sonnet` → proceed to Step 0 immediately with no prompt.
 
-**Why Sonnet.** Execute orchestrates multi-agent, multi-phase work: it builds task lists, manages QA gates, routes discoveries, tracks SHA-256 manifests, and dispatches up to 7 review-board agents in sequence (6 standard; 7 in fast mode). Opus adds latency and cost with no orchestration benefit (Opus is dispatched by sub-agents when deep review is warranted). Haiku or mini-class models lack the reasoning capacity to reliably evaluate agent reports, parse AC matrices, and route findings through the Step 6c discovery tree.
+**Why Sonnet.** Execute orchestrates multi-agent, multi-phase work: it builds task lists, manages QA gates, routes discoveries, tracks SHA-256 manifests, and dispatches up to 8 review-board agents in sequence (7 standard; 8 in fast mode). Opus adds latency and cost with no orchestration benefit (Opus is dispatched by sub-agents when deep review is warranted). Haiku or mini-class models lack the reasoning capacity to reliably evaluate agent reports, parse AC matrices, and route findings through the Step 6c discovery tree.
 
 ## Step 0: Load Config
 
@@ -346,7 +346,7 @@ Before dispatching Red or Implement, the orchestrator collects facts the agents 
    - "if <file/symbol> exists, reuse; otherwise create ..." — evaluate using symbol presence.
    Resolve each into a bullet under `## Orchestrator pre-decisions`. Other conditional phrasings (runtime-state conditions, fuzzy natural-language conditionals) pass through unchanged — the orchestrator is not a general-purpose plan interpreter.
 
-7. **Fast mode flag** — check the plan's front-matter `fast:` field. If `fast: true`, record `orchestrator_fast_mode: true` in session state. Fast mode skips all per-phase inline QA agent dispatches (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`, Group Deep QA) and replaces per-phase verify agent dispatch with a direct test-command shell invocation. The end-of-piece Final Review board gains a 7th member (`verify Mode: Piece Full`) to compensate. Log once: `"Fast mode: ENABLED — inline QA skipped, end-of-piece board +1 (verify-piece-full)"`. If `fast:` is absent or `false`, record `orchestrator_fast_mode: false` and proceed normally.
+7. **Fast mode flag** — check the plan's front-matter `fast:` field. If `fast: true`, record `orchestrator_fast_mode: true` in session state. Fast mode skips all per-phase inline QA agent dispatches (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`, Group Deep QA) and replaces per-phase verify agent dispatch with a direct test-command shell invocation. The end-of-piece Final Review board gains an 8th member (`verify Mode: Piece Full`) to compensate. Log once: `"Fast mode: ENABLED — inline QA skipped, end-of-piece board +1 (verify-piece-full)"`. If `fast:` is absent or `false`, record `orchestrator_fast_mode: false` and proceed normally.
 
 8. **Introspection context** — if `introspection.md` exists in the piece's working directory (alongside plan.md), read it. For the current phase's declared file scope, extract the Dependency Map and Test Landscape sections from the relevant cluster(s). Match phase file paths against the File Inventory entries in each cluster's H2 section. Append matching sections to `## Pre-flight snapshot` as `### Codebase context`. Skip the File Inventory and Pattern Catalog — the plan's Change Specification Blocks already embed their verbatim code from those sections. If `introspection.md` is absent (pre-v4.10 plans or CREATE-only phases), skip silently — no warning, no error.
 
@@ -1194,7 +1194,7 @@ One review session handles the whole batch — no per-sub-phase interruptions.
 
 Triggered automatically when the last phase's QA passes.
 
-### Step 1: Iteration 1 — Full Review (6 Parallel Agents; 7 in fast mode)
+### Step 1: Iteration 1 — Full Review (7 Parallel Agents; 8 in fast mode)
 
 Get the full worktree diff:
 
@@ -1215,7 +1215,7 @@ counting phase checkboxes.
 git diff main..HEAD
 ```
 
-Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<role>.md` and dispatch ALL SIX concurrently with `Input Mode: Full`:
+Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<role>.md` and dispatch ALL SEVEN concurrently with `Input Mode: Full`:
 
 ```
 Agent({ description: "Blind review (iter 1, full)", prompt: <review-board-blind.md + Input Mode: Full + diff only>, model: "opus" })
@@ -1224,21 +1224,23 @@ Agent({ description: "Spec compliance review (iter 1, full)", prompt: <review-bo
 Agent({ description: "PRD alignment review (iter 1, full)", prompt: <review-board-prd-alignment.md + Input Mode: Full + diff + spec + PRD + manifest>, model: "opus" })
 Agent({ description: "Architecture review (iter 1, full)", prompt: <review-board-architecture.md + Input Mode: Full + diff + charter (all six files if present; else legacy arch docs) + NN-C + NN-P>, model: "opus" })
 Agent({ description: "Security review (iter 1, full)", prompt: <review-board-security.md + Input Mode: Full + diff + spec (for trust boundary context)>, model: "opus" })
+Agent({ description: "Ground-truth review (iter 1, full)", prompt: <review-board-ground-truth.md + Input Mode: Full + diff + spec (for known/expected results and worked examples)>, model: "opus" })
 ```
 
 **Change-track Final Review (when `track = "change"`):**
-When `track = "change"`, dispatch exactly **5 agents** (not 6 or 7):
+When `track = "change"`, dispatch exactly **6 agents** (not 7 or 8):
 - `review-board-architecture` (with all charter files)
 - `review-board-blind`
 - `review-board-edge-case`
 - `review-board-security`
 - `review-board-spec-compliance` (with `spec_path` = `brief.md` as the spec reference)
+- `review-board-ground-truth` (with `spec_path` = `brief.md` for any known/expected results)
 
 SKIP: `review-board-prd-alignment` — no PRD in change-track; this agent is explicitly excluded for `track = "change"`.
 
-When `track = "piece"`, the existing 6-standard-agent dispatch runs unchanged.
+When `track = "piece"`, the existing 7-standard-agent dispatch runs unchanged.
 
-**Fast mode — 7th board member:** if `orchestrator_fast_mode: true`, additionally dispatch concurrently:
+**Fast mode — 8th board member:** if `orchestrator_fast_mode: true`, additionally dispatch concurrently:
 
 ```
 Agent({
@@ -1248,11 +1250,11 @@ Agent({
 })
 ```
 
-This 7th agent compensates for the per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches that fast mode skips.
+This 8th agent compensates for the per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches that fast mode skips.
 
 ### Step 2: Triage
 
-Collect findings from all board agents (6 in standard mode; 7 in fast mode — the 7th is `verify-piece-full`). Deduplicate (same issue reported by multiple reviewers). Classify:
+Collect findings from all board agents (7 in standard mode; 8 in fast mode — the 8th is `verify-piece-full`). Deduplicate (same issue reported by multiple reviewers). Classify:
 - `must-fix` — blocks merge; amendment-eligible in Step 8 triage
 - `should-fix` — non-blocking improvement; addressed via fix-code loop (same iter loop) if capacity allows, otherwise deferred; NOT amendment-eligible
 - `defer` — pre-existing issue, not introduced by this spec
@@ -1272,21 +1274,21 @@ If must-fix findings exist:
   git commit -m "fix: final-review iter M must-fix"
   ```
   Hooks run normally. If a hook fails, re-dispatch the fix agent with the hook output appended; don't bypass.
-- Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 5-agent set (security, blind, architecture, edge-case, spec-compliance) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 6 standard agents. Note: the 7th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
+- Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 6-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 7 standard agents. Note: the 8th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** 3 full review cycles maximum.
 - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
 ### Step 8: Final Review Triage
 
-**Trigger.** When Final Review's iter-loop (Steps 1–3) terminates with must-fix findings remaining (the iter-loop's circuit breaker fired or the operator has chosen to triage residual must-fix items rather than continue iterating), the orchestrator invokes Step 8 once before any merge action — i.e., before Step 4 (Human Sign-Off), Step 4.5 (Reflection), Step 5 (Capture Learnings), or Step 6 (Merge). Step 8 also fires when Final Review surfaces non-must-fix discoveries that nonetheless require triage (`requires-amendment`, `requires-fork`, `does-not-block-goal-deferred`, or `qa-deferred-to-reflection` markers from any of the end-of-piece reviewers — blind, spec-compliance, architecture, edge-case, prd-alignment, security, and in fast mode also verify-piece-full — even when the iter-loop returned must-fix=None overall). If Final Review returns clean across all board reviewers AND no triage-eligible discoveries surfaced, Step 8 is a no-op and execution proceeds to Step 4.
+**Trigger.** When Final Review's iter-loop (Steps 1–3) terminates with must-fix findings remaining (the iter-loop's circuit breaker fired or the operator has chosen to triage residual must-fix items rather than continue iterating), the orchestrator invokes Step 8 once before any merge action — i.e., before Step 4 (Human Sign-Off), Step 4.5 (Reflection), Step 5 (Capture Learnings), or Step 6 (Merge). Step 8 also fires when Final Review surfaces non-must-fix discoveries that nonetheless require triage (`requires-amendment`, `requires-fork`, `does-not-block-goal-deferred`, or `qa-deferred-to-reflection` markers from any of the end-of-piece reviewers — blind, spec-compliance, architecture, edge-case, prd-alignment, security, ground-truth, and in fast mode also verify-piece-full — even when the iter-loop returned must-fix=None overall). If Final Review returns clean across all board reviewers AND no triage-eligible discoveries surfaced, Step 8 is a no-op and execution proceeds to Step 4.
 
 **Per-finding routing.** For each finding emerging from Final Review, the orchestrator routes by severity before dispatching Step 6c:
 
 - **`must-fix` and `should-fix`:** dispatches the Step 6c triage flow with the full options menu — `(a) amend`, `(s) amend-spec` (where spec-eligible), `(f) fork`, `(d) defer`. The finding's severity label is surfaced in the triage prompt so the operator can weigh whether a should-fix warrants reopening the piece. Amendment budget applies to any amend choice regardless of severity.
 - **`defer` and `dismiss`:** no Step 6c invocation; the finding is either discarded (`dismiss`) or written directly to the backlog without operator triage (`defer` — pre-existing issues require no new rationale).
 
-Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, `security`, or (in fast mode) `verify-piece-full` — matching the active end-of-piece reviewer roles.
+Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, `security`, `ground-truth`, or (in fast mode) `verify-piece-full` — matching the active end-of-piece reviewer roles.
 
 **Amendment phase IDs.** Amendment phases inserted via Step 8 use the suffix-form IDs `phase_final_amend_<K>` where `<K>` is the 1-indexed amendment counter for the Final Review triage event (`phase_final_amend_1`, `phase_final_amend_2`, etc.). The originating phase token is the literal string `final` since there is no specific upstream phase. This naming distinguishes Step 8-induced amendment phases from per-phase Step 6c-induced amendment phases (`phase_<N>_amend_<K>` with `<N>` a numeric phase ID per FR-13).
 
@@ -1294,7 +1296,7 @@ Each finding is processed as a separate Step 6c invocation (one Step 6c invocati
 
 **Per-choice flow.**
 
-- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 on the new cumulative diff `git diff main..HEAD`. For `track = "change"` pieces: re-dispatch the same 5-agent set (security, blind, architecture, edge-case, spec-compliance) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 6 standard agents (blind, edge-case, spec-compliance, prd-alignment, architecture, security, and verify-piece-full in fast mode). The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
+- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 on the new cumulative diff `git diff main..HEAD`. For `track = "change"` pieces: re-dispatch the same 6-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 7 standard agents (blind, edge-case, spec-compliance, prd-alignment, architecture, security, ground-truth, and verify-piece-full in fast mode). The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
 
 - **On `fork`:** a follow-up piece is written to `docs/prds/<prd-slug>/manifest.yaml` with `depends_on: [<current-piece-slug>]`, exactly as Step 6c's Fork dispatch specifies. The current piece **merges as-is** with the discovery deferred to the new piece — Step 8's fork choice does NOT re-open the piece and does NOT re-run Final Review. Execution proceeds to Step 4 (Human Sign-Off) once all Step 8 findings have been routed. The current piece's status remains `executing` (or whatever its pre-Step-8 status was); the operator's sign-off at Step 4 is on the merge-as-is artifact with the forked discovery noted.
 

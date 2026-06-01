@@ -4,6 +4,17 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [4.11.0] — 2026-06-01
+
+### Added
+- **`agents/review-board-ground-truth.md` — new Final Review board member:** A generic ground-truth / oracle reviewer that audits computational, measurement, and transform components against *independently-derived* correct answers — closing the failure mode where a green test suite + clean review coexist with a confidently-wrong component (output that "matches the plan" but not reality). Probe catalog: oracle reproduction, degenerate/dead-knob detection, lookahead/information leakage, population/scope contamination, domain-model & live-parity mismatch, silent truncation / comparison-biasing non-determinism, result-attribution soundness, and sample-sensitivity. Emits a per-component **solidity verdict** (`SOLID` / `UNVERIFIED` / `DIVERGES`) — no punting. Read-only (Read/Grep/Glob); ships as flat `.md` + `.agent.md` twins per the Copilot-CLI loader convention.
+- **`execute/SKILL.md` — board wired to 7 standard members (8 in fast mode):** Final Review Step 1 now dispatches `review-board-ground-truth` alongside the existing six; change-track (`track = "change"`, used by `small-change`) grows from 5 to 6 members so one-session changes get the same ground-truth review. Fix-loop re-dispatch and Step 8 triage source-agent enumerations updated; the fast-mode `verify-piece-full` compensator is now the 8th member.
+- **`skills/review-board/SKILL.md` — new `/spec-flow:review-board` skill (out-of-band review board):** Points the Final Review board at ANY target — a PR number, a branch, working-tree changes, or a set of files — decoupled from the pipeline merge gate. Reuses the existing `review-board-*.md` agents (no new reviewers). Default lens set runs without a spec/PRD (blind, edge-case, security, ground-truth, architecture); spec-compliance and prd-alignment auto-join when a spec/PRD is supplied or discoverable; `--lenses` overrides. Reports consolidated findings by severity; `--fix` routes the findings into `/spec-flow:small-change` (brief → plan → execute, so the fix is itself QA-gated and re-reviewed by the change-track board — never an un-gated tree patch); `--comment` posts inline PR comments via `gh`. Standalone — needs only a git repo, not an active piece. Never patches code directly, merges, amends, forks, writes the backlog, or gates sign-off.
+- **`small-change/SKILL.md` — Seeded-input provision (Step 6):** small-change now recognizes a pre-formed requirement set (e.g. a `source: review-board` findings digest from `/spec-flow:review-board --fix`) and runs a scope-confirmation pass instead of an open brainstorm — treating the findings as authoritative requirements, seeding ACs from each suggested correction, and recording provenance in `brief.md`.
+
+### Changed
+- **`README.md` — agent inventory and board counts:** Added `review-board-security` (previously omitted) and `review-board-ground-truth` to the agent tree; updated end-of-piece board counts to 7 standard / 8 fast.
+
 ## [4.10.0] — 2026-05-28
 
 ### Added
