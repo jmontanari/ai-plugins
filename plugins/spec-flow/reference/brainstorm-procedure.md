@@ -1,7 +1,7 @@
 # Brainstorm Procedure
 
 Invocation order:
-1. Charter Context Loading Protocol — run first; outputs `charter_variant`, `charter_snapshot`, `integration_cfg`
+1. Charter Context Loading Protocol — run first; outputs `charter_root`, `charter_snapshot`, `integration_cfg`
 2. L-10 Convention Context Scan (from Core Brainstorm Building Blocks) — runs before any questions; outputs conventions list
 3. Charter Constraint Identification Protocol — runs after L-10; uses L-10 results for conventions block
 4. Remaining Core Brainstorm Building Blocks (C-2 always-run, C-3, Approach+Tradeoffs) — run during brainstorm session
@@ -9,33 +9,33 @@ Invocation order:
 ## Charter Context Loading Protocol
 
 ### Algorithm
-1. [shared] Detect `charter_variant`: if `.github/skills/charter-non-negotiables/SKILL.md` exists, set `charter_variant = "v4"`; else if `<docs_root>/charter/` exists, set `charter_variant = "v3"`; else set `charter_variant = "legacy"`.
-2. [shared] Read the charter file set for the detected variant: `v4` reads `.github/skills/charter-{architecture,non-negotiables,tools,processes,flows,coding-rules,integrations}/SKILL.md` when present; `v3` reads `<docs_root>/charter/{architecture,non-negotiables,tools,processes,flows,coding-rules,integrations}.md` when present; `legacy` reads `<docs_root>/architecture/` when present.
-3. [shared] Capture `charter_snapshot`: for `v4`, run `git log -1 --format=%ci` against each present `.github/skills/charter-<domain>/SKILL.md`; for `v3`, read each charter file's `last_updated:` front-matter; for `legacy`, omit `charter_snapshot`.
-4. [spec-only] Preserve the PRD-side product constraint source for later enumeration: `docs/prds/<prd-slug>/prd.md` `## Non-Negotiables (Product)` remains the authoritative `NN-P` source regardless of `charter_variant`; small-change runs with no PRD-derived `NN-P` source.
-5. [shared] As the final load step, read `.spec-flow.yaml` `integrations.issue_tracker`; when enabled, read `charter-integrations` from `.github/skills/charter-integrations/SKILL.md` for `v4` or `<docs_root>/charter/<charter_file>.md` for `v3` (default `integrations.md`), then resolve the hierarchy and sibling fields into `integration_cfg`; when disabled or absent, set `integration_cfg = null`.
+1. [shared] Resolve `charter_root` (`.github` or `.claude`) per `plugins/spec-flow/reference/charter-location.md`. If no `charter-*/SKILL.md` files exist under either root, set `charter_root = null` (a pre-charter project).
+2. [shared] When `charter_root` is set, read the charter skill set: `<charter_root>/skills/charter-{architecture,non-negotiables,tools,processes,flows,coding-rules,integrations}/SKILL.md` (each when present).
+3. [shared] Capture `charter_snapshot`: run `git log -1 --format=%ci` against each present `<charter_root>/skills/charter-<domain>/SKILL.md`. When `charter_root = null`, omit `charter_snapshot`.
+4. [spec-only] Preserve the PRD-side product constraint source for later enumeration: `docs/prds/<prd-slug>/prd.md` `## Non-Negotiables (Product)` remains the authoritative `NN-P` source; small-change runs with no PRD-derived `NN-P` source.
+5. [shared] As the final load step, read `.spec-flow.yaml` `integrations.issue_tracker`; when enabled, read `charter-integrations` from `<charter_root>/skills/charter-integrations/SKILL.md`, then resolve the hierarchy and sibling fields into `integration_cfg`; when disabled or absent, set `integration_cfg = null`.
 
-<!-- Example: v4 project
-  Input: project root contains .github/skills/charter-non-negotiables/SKILL.md
-  Step 1 [shared]: detect v4 — .github/skills/charter-non-negotiables/SKILL.md exists → charter_variant = "v4"
-  Step 2 [shared]: read .github/skills/charter-{architecture,non-negotiables,tools,processes,flows,coding-rules,integrations}/SKILL.md
-  Step 3 [shared]: git log -1 --format=%ci .github/skills/charter-architecture/SKILL.md → "2026-05-07"
+<!-- Example: charter under .claude
+  Input: project root contains .claude/skills/charter-non-negotiables/SKILL.md
+  Step 1 [shared]: resolve per charter-location.md → charter_root = ".claude"
+  Step 2 [shared]: read .claude/skills/charter-{architecture,non-negotiables,tools,processes,flows,coding-rules,integrations}/SKILL.md
+  Step 3 [shared]: git log -1 --format=%ci .claude/skills/charter-architecture/SKILL.md → "2026-05-07"
                    repeat per domain → charter_snapshot = {architecture: "2026-05-07", non-negotiables: "2026-05-07", ...}
-  Step 4 [shared]: read integrations.issue_tracker from .spec-flow.yaml; read .github/skills/charter-integrations/SKILL.md
+  Step 4 [shared]: read integrations.issue_tracker from .spec-flow.yaml; read .claude/skills/charter-integrations/SKILL.md
                    → integration_cfg = {enabled: true, project_key: "EIT", base_url: "https://...", hierarchy: [...]}
-  Output: charter_variant = "v4", charter_snapshot = {...7 dates...}, integration_cfg = {...}
+  Output: charter_root = ".claude", charter_snapshot = {...7 dates...}, integration_cfg = {...}
 -->
 
 ### Fallback Behavior
-- If no v4 or v3 charter files are present, set `charter_variant = "legacy"`, read `docs/architecture/` only when it exists, and continue with `charter_snapshot` omitted.
+- If no charter skills are present under either root, set `charter_root = null`, skip charter reads, and continue with `charter_snapshot` omitted.
 - If `.spec-flow.yaml` is absent, default `docs_root = "docs"`, `worktrees_root = "worktrees"`, and `integration_cfg = null` unless the caller injects equivalent defaults.
-- If `git log -1 --format=%ci` returns no history for a v4 charter file, omit that domain from `charter_snapshot` and continue; if the integrations charter file is missing, keep `.spec-flow.yaml` values and fall back to the built-in defaults described by `plugins/spec-flow/reference/integration-capability-check.md`.
+- If `git log -1 --format=%ci` returns no history for a charter skill file, omit that domain from `charter_snapshot` and continue; if the integrations charter file is missing, keep `.spec-flow.yaml` values and fall back to the built-in defaults described by `plugins/spec-flow/reference/integration-capability-check.md`.
 
 ## Charter Constraint Identification Protocol
 
 ### Read Charter Files
-1. [shared] Read all `NN-C-*` entries from `.github/skills/charter-non-negotiables/SKILL.md` when `charter_variant = "v4"`, from `<docs_root>/charter/non-negotiables.md` when `charter_variant = "v3"`, or skip when `charter_variant = "legacy"`. Do not present the full list to the user.
-2. [shared] Read all `CR-*` entries from `.github/skills/charter-coding-rules/SKILL.md` when `charter_variant = "v4"`, from `<docs_root>/charter/coding-rules.md` when `charter_variant = "v3"`, or skip when `charter_variant = "legacy"`. Do not present the full list to the user.
+1. [shared] Read all `NN-C-*` entries from `<charter_root>/skills/charter-non-negotiables/SKILL.md` when `charter_root` is set, or skip when `charter_root = null`. Do not present the full list to the user.
+2. [shared] Read all `CR-*` entries from `<charter_root>/skills/charter-coding-rules/SKILL.md` when `charter_root` is set, or skip when `charter_root = null`. Do not present the full list to the user.
 3. [spec-only] Read all `NN-P-*` entries from the `## Non-Negotiables (Product)` section of `docs/prds/<prd-slug>/prd.md`. Skip entirely for small-change (no PRD source).
 
 ### Infer Applicability from Brainstorm Context

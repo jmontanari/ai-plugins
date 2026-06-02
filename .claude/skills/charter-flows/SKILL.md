@@ -1,5 +1,6 @@
 ---
-last_updated: 2026-04-21
+name: charter-flows
+description: "Read before changing how plugins install, how the marketplace manifest is resolved, or session-start and hook behavior in the shared-plugins marketplace."
 ---
 
 # Flows
@@ -32,8 +33,8 @@ user starts a session:
 SessionStart event
   ├─ read .spec-flow.yaml (or copy template if missing)
   ├─ read reference/spec-flow-doctrine.md
-  ├─ if docs/charter/ exists and config's charter.doctrine_load is non-empty:
-  │    └─ read each listed charter file and append to session context
+  ├─ resolve charter_root (.github or .claude) and, if charter.doctrine_load is non-empty:
+  │    └─ read each listed charter skill from <charter_root>/skills/charter-<domain>/SKILL.md and append to session context
   ├─ JSON-escape the composed context string
   └─ emit {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "..."}}
 ```

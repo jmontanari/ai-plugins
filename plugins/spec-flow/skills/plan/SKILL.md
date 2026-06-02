@@ -11,10 +11,7 @@ Generate an exhaustive implementation plan from an approved spec. The plan is so
 
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
-**Integration config load.** If `integrations.issue_tracker.enabled: true`, read the integrations charter file for task naming and transition rules — path depends on charter location:
-- v4 (`.github/skills/charter-integrations/SKILL.md` exists): read that file
-- v3: `<docs_root>/charter/<charter_file>.md` (default `charter/integrations.md`)
-Store as `integration_cfg`. If integration is disabled or the key is absent, set `integration_cfg = null` and skip all integration steps below.
+**Integration config load.** If `integrations.issue_tracker.enabled: true`, read the integrations charter skill for task naming and transition rules at the active charter root (resolved per `plugins/spec-flow/reference/charter-location.md`) — `<charter_root>/skills/charter-integrations/SKILL.md`, where `<charter_root>` is `.github` or `.claude`. Store as `integration_cfg`. If integration is disabled or the key is absent, set `integration_cfg = null` and skip all integration steps below.
 
 > The plan skill does NOT create or transition any "plan" Jira item. The Epic (created by
 > the spec skill) represents the piece. This skill creates per-phase Tasks at sign-off.
@@ -67,7 +64,7 @@ Record the decision in plan front-matter as `fast: true` or `fast: false`. If th
 
 **1a. Dependency precondition check (FR-5 of pi-010-discovery, AC-9).** Run the resolution + status + triage logic specified in `plugins/spec-flow/reference/depends-on-precondition.md` against the target piece's `depends_on:` list, read from the piece's manifest entry at `docs/prds/<prd-slug>/manifest.yaml`. For each ref, resolve per the reference doc's "Reference resolution" section (qualified `<dep-prd-slug>/<dep-piece-slug>` against `docs/prds/<dep-prd-slug>/manifest.yaml`; bare `<dep-piece-slug>` against the current PRD's manifest). On resolution failure, refuse with the exact resolution-failure refusal string from the reference doc — do NOT prompt for triage on a malformed/missing ref. On successful resolution, classify each dep's `status:` per the reference doc's "Status interpretation" section. If every resolved dep is `merged` or `done`, this step is a silent no-op (no prompt, no recorded state) and Phase 1 continues to the charter-drift check below (NN-C-005). If any resolved dep has a transient or structural-failure status, render the three-option triage prompt verbatim from the reference doc's "Triage options at spec/plan time" section (literal `(1) pull-deps-in`, `(2) fork`, `(3) proceed` markers; one bullet per unmet dep). Record the operator's choice and the per-dep status snapshot in orchestrator state keyed for Phase 2's plan.md authoring step to read. **Structural-failure statuses (`superseded`, `blocked`) refuse the `(3) proceed` option** — apply that rule symmetrically to the plan-time prompt per the reference doc. The plan-time triage may produce a different choice than spec-time triage (e.g., spec was authored with `proceed --ignore-deps`, but at plan time the operator now wants to `pull-deps-in`); the plan-time choice is recorded independently of any spec-time choice.
 
-**Charter-drift check (always applies — runs after step 1a).** A piece reaching plan stage already has a spec carrying a `charter_snapshot:` front-matter. Before any other exploration, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live charter files (v4: `.github/skills/charter-*/SKILL.md`; v3: `<docs_root>/charter/`). If drift is detected, halt Phase 1 and escalate per the reference doc — do not proceed with planning on stale charter constraints.
+**Charter-drift check (always applies — runs after step 1a).** A piece reaching plan stage already has a spec carrying a `charter_snapshot:` front-matter. Before any other exploration, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live charter skills at the active charter root (resolved per `plugins/spec-flow/reference/charter-location.md`) — `<charter_root>/skills/charter-*/SKILL.md`, where `<charter_root>` is `.github` or `.claude`. If drift is detected, halt Phase 1 and escalate per the reference doc — do not proceed with planning on stale charter constraints.
 
 Then extensively explore the codebase using ONLY read operations:
 - `Read` — examine source files, test files, existing patterns
@@ -83,11 +80,9 @@ Gather:
 - Test framework patterns used in the project
 - Import conventions and module structure
 - Architecture constraints visible in the code
-- **Charter files** — auto-detect location:
-  - **v4** (`.github/skills/charter-non-negotiables/SKILL.md` exists): read each charter skill file present from `.github/skills/charter-*/SKILL.md` (architecture, non-negotiables, tools, processes, flows, coding-rules, integrations). For `charter_snapshot`, capture last-commit date per domain via `git log -1 --format=%ci .github/skills/charter-<domain>/SKILL.md` — v4 skills have no `last_updated:` front-matter.
-  - **v3** (`<docs_root>/charter/` exists): read charter files present (architecture.md, non-negotiables.md, tools.md, processes.md, flows.md, coding-rules.md, integrations.md). Record each file's `last_updated` date for the plan's `charter_snapshot:` front-matter.
+- **Charter skills** — resolve the active charter root per `plugins/spec-flow/reference/charter-location.md` (`<charter_root>` is `.github` or `.claude`). Read each charter skill file present from `<charter_root>/skills/charter-*/SKILL.md` (architecture, non-negotiables, tools, processes, flows, coding-rules, integrations). For `charter_snapshot`, capture last-commit date per domain via `git log -1 --format=%ci <charter_root>/skills/charter-<domain>/SKILL.md` — charter skills have no `last_updated:` front-matter.
   Charter content is exploration priors, same as code — it influences phase decomposition and the per-phase "Charter constraints honored" slots.
-  - **If `integrations.md` exists:** read it fully before authoring any phase that touches external services, APIs, SDKs, or third-party libraries. The naming conventions, status transition rules, hierarchy rules, and any additional notes sections define how integrations must be set up and managed. Every phase that creates, configures, or calls an external integration must be consistent with the principles in this file — treat it the same as non-negotiables for that scope.
+  - **If the `charter-integrations` skill exists** (`<charter_root>/skills/charter-integrations/SKILL.md`)**:** read it fully before authoring any phase that touches external services, APIs, SDKs, or third-party libraries. The naming conventions, status transition rules, hierarchy rules, and any additional notes sections define how integrations must be set up and managed. Every phase that creates, configures, or calls an external integration must be consistent with the principles in this file — treat it the same as non-negotiables for that scope.
 - **Spec's `### Non-Negotiables Honored` and `### Coding Rules Honored` sections** — these enumerate the NN-C/NN-P/CR entries the piece claims it honors. The plan allocates each entry to the specific phase(s) that implement it via the per-phase "Charter constraints honored in this phase" slot.
 - **Architectural decisions** — during Phase 1 exploration, record every significant architectural decision made. A decision is significant if it involves a choice between two or more approaches with non-trivial trade-offs, OR if it constrains future implementation options. Capture each as a draft ADR entry during exploration; these are finalized in Phase 2 step 11 below.
 
@@ -491,7 +486,7 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
 
     4. Place `## Architectural Decisions` before `## Phases` (near the top of the plan, after `## Overview`).
 
-Write the plan to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md`. Populate the `charter_snapshot:` front-matter with charter dates captured during Phase 1 exploration: v4 → `git log` last-commit date per domain; v3 → `last_updated:` value per file. Populate each phase's "Charter constraints honored in this phase" slot with the subset of NN-C/NN-P/CR entries from the spec that the phase implements (every entry must appear in exactly one phase — no drops, no duplicates).
+Write the plan to `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md`. Populate the `charter_snapshot:` front-matter with charter dates captured during Phase 1 exploration: `git log` last-commit date per domain (charter skills carry no `last_updated:` front-matter). Populate each phase's "Charter constraints honored in this phase" slot with the subset of NN-C/NN-P/CR entries from the spec that the phase implements (every entry must appear in exactly one phase — no drops, no duplicates).
 
 **`## Dependency Triage` section (FR-6 of pi-010-discovery, AC-9).** Read the dependency-triage choice recorded by Phase 1 step 1a from orchestrator state and branch as follows (per the `## Dependency Triage` section format in `plugins/spec-flow/reference/depends-on-precondition.md`). The plan-time choice is recorded independently of any spec-time choice already present in spec.md — operators may revise their triage between spec and plan stages.
 
@@ -508,7 +503,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 1. Read template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-plan.md`
 
-2. **Iteration 1 (full review):** Dispatch QA agent (Opus) with `Input Mode: Full`, the full plan, spec, PRD sections, and charter files (if present — all six; otherwise legacy `docs/architecture/`). The QA agent cross-checks that every NN-C/NN-P/CR cited in the spec appears in exactly one phase's "Charter constraints honored" slot, with no drops and no duplicates.
+2. **Iteration 1 (full review):** Dispatch QA agent (Opus) with `Input Mode: Full`, the full plan, spec, PRD sections, and charter skills (all seven if present — architecture, non-negotiables, tools, processes, flows, coding-rules, integrations — at the active charter root resolved per `plugins/spec-flow/reference/charter-location.md`: `<charter_root>/skills/charter-*/SKILL.md`, where `<charter_root>` is `.github` or `.claude`). The QA agent cross-checks that every NN-C/NN-P/CR cited in the spec appears in exactly one phase's "Charter constraints honored" slot, with no drops and no duplicates.
    ```
    Agent({
      description: "Plan QA for <piece-name> (iter 1, full)",
@@ -542,7 +537,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
      (default: `[phase] {piece-slug}/{phase-number} — {phase-name}`).
      Pass `additional_fields: {"parent": "<parent_key_value>"}` to link each phase issue
      to the piece issue.
-   - Apply Task Creation Defaults from `charter-integrations` (`.github/skills/charter-integrations/SKILL.md`).
+   - Apply Task Creation Defaults from `charter-integrations` (the active charter root, resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-integrations/SKILL.md`, where `<charter_root>` is `.github` or `.claude`).
      All Jira calls use MCP tools only (`jira_create_issue`, `jira_update_issue`, `jira_transition_issue`).
      - **Story points:** estimate phase effort in days, compute `ceil(days × 0.5)` (rounded up to next Fibonacci number) per `charter-integrations`.
        Read `story_points_field` from `phase_level` (the `managed_by: plan` hierarchy entry in `integration_cfg`).

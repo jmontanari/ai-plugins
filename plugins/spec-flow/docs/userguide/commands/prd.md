@@ -20,20 +20,53 @@ A piece is a unit of work that can be specced and shipped independently. Pieces 
 - **When the PRD amends** — add a new section, revise goals, add a new success criterion. The skill supports incremental updates, not just first-time import.
 - **When you need to re-decompose** — pieces have turned out to be wrong and need re-slicing.
 
+## Three modes
+
+The skill auto-detects mode from arguments and project state; if nothing disambiguates, it asks:
+
+```
+How would you like to start?
+(a) Import — I have an existing PRD document (BMad output, Notion export, plain markdown, etc.)
+(b) Create — I have an idea but no document yet; help me build the PRD from scratch
+(c) Update — I have an existing PRD in this pipeline I want to amend
+```
+
+- **Import** — point at a source doc; the skill extracts and re-numbers content into the template.
+- **Create** — a structured Socratic interview elicits problem, personas, user stories, success metrics, non-goals, constraints, risks, and open questions before writing the PRD.
+- **Update** — amend an existing PRD (add pieces, reprioritize, revise goals); runs an impact assessment and offers to re-review affected pieces' specs.
+
+(A fourth path, `--review`, is the end-of-pipeline fulfillment check — see "qa-prd vs qa-prd-review" below.)
+
 ## The flow
 
-1. **Import mode** — you paste or point at a source PRD (often a markdown doc, a Google Docs export, or freeform bullet points).
-2. **Normalization** — the skill assigns stable IDs to every requirement section. Goals become `G-1`, `G-2`, ...; functional requirements become `FR-001`, `FR-002`, ...; non-negotiables become `NN-P-001`, `NN-P-002`, ...
-3. **Decomposition brainstorm** — Socratic dialogue to break the PRD into pieces:
-   - What's the smallest independently-shippable unit?
-   - Which sections does each piece cover?
-   - What's the dependency order?
-   - What's deferred / out-of-scope?
-4. **Manifest authoring** — produces `manifest.yaml` with one entry per piece.
-5. **qa-prd-review** adversarially reviews the PRD + manifest for coverage: every requirement is either mapped to a piece, or explicitly marked as uncovered-intentional with a reason.
-6. If findings emerge, fix-doc makes targeted fixes. Up to 3 iterations.
-7. You sign off.
-8. Both files commit to master.
+1. **Argument parsing → slug validation → slug uniqueness check** — before any greenfield write.
+2. **Charter prerequisite check** — if `charter.required: true` and no charter exists, the skill halts and tells you to run `/spec-flow:charter` first.
+3. **Normalization / interview** — the skill assigns stable IDs to every requirement section. Goals become `G-1`, `G-2`, …; functional requirements become `FR-001`, `FR-002`, …; success criteria `SC-001`, …; product non-negotiables `NN-P-001`, … (project-wide constraints are proposed for the charter as `NN-C-xxx` instead). During the Create interview, decisions the user explicitly defers are marked `[PENDING-DECISION: <area>]` inline — these are informational at PRD level; the spec brainstorm for the affected piece resolves them.
+4. **Decomposition brainstorm** — Socratic dialogue to break the PRD into pieces: smallest shippable unit, which sections each piece covers, dependency order, what's deferred. The brainstorm also captures the **branching strategy** (step 4l).
+5. **qa-prd gate** (Opus, PRD completeness) — runs *before* the manifest is created; must-fix findings block manifest creation.
+6. **Manifest authoring** — produces `manifest.yaml` with one entry per piece, plus the branching fields.
+7. If findings emerge, fix-doc makes targeted fixes. Up to 3 iterations.
+8. You sign off.
+9. PRD, manifest, and `backlog.md` commit to master.
+
+## qa-prd vs qa-prd-review
+
+Two distinct PRD review agents, at opposite ends of the pipeline:
+
+- **qa-prd** (Opus) — the **pre-manifest completeness gate** during import/create. Checks the PRD itself is complete and falsifiable before pieces are enumerated. Must-fix findings block manifest creation.
+- **qa-prd-review** (Opus) — the **end-of-pipeline fulfillment review**, run via `/spec-flow:prd --review <slug>` after all pieces ship. Reads the PRD, every completed spec, and the codebase, and validates that what was built actually fulfills the PRD.
+
+## Branching strategy fields
+
+The decomposition brainstorm asks how the PRD's pieces are branched, and writes three fields to the manifest front-matter that every downstream skill enforces automatically:
+
+```yaml
+feature_branch: <name or null>   # piece branches base off this and merge here after execute
+merge_target: <name>             # where feature_branch merges when the full PRD ships (default: master)
+pr_required: <true|false>        # piece branches merge via PR (default true) vs direct push
+```
+
+If `feature_branch` is set, piece branches base off it (not master) and never commit PRD work directly to `merge_target` until the PRD ships.
 
 ## Loops
 
@@ -80,6 +113,9 @@ schema_version: 1
 generated: 2026-04-27
 last_updated: 2026-04-27
 prd_source: "docs/prds/ddf-creator/prd.md"
+feature_branch: feature/ddf-creator    # or null for direct-to-master
+merge_target: master
+pr_required: true
 
 pieces:
   - name: pipeline-infra
@@ -109,11 +145,11 @@ Note that `spec:` and `plan:` fields are added to a piece entry by the skill whe
 
 ## Handoff
 
-Next: pick an `open` piece and run `/spec-flow:spec <prd-slug>/<piece-name>` — or run `/spec-flow:status` and let it tell you which piece to start with.
+Next: pick an `open` piece and run `/spec-flow:spec <prd-slug>/<piece-slug>` — or run `/spec-flow:status` and let it tell you which piece to start with.
 
 ## Multiple PRDs in one project
 
-A project can have more than one PRD. Each lives in its own `docs/prds/<prd-slug>/` directory with its own manifest, its own pieces, and its own lifecycle state. The charter at `docs/charter/` is shared — it applies to every PRD in the repo.
+A project can have more than one PRD. Each lives in its own `docs/prds/<prd-slug>/` directory with its own manifest, its own pieces, and its own lifecycle state. The charter at `<charter_root>/skills/charter-*/` (`.github` or `.claude`, resolved per [reference/charter-location.md](../../../reference/charter-location.md)) is shared — it applies to every PRD in the repo.
 
 Common reasons to add a second PRD:
 - A new major product area with distinct goals and success criteria (not just more pieces on the same capability).

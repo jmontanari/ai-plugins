@@ -1,6 +1,6 @@
 # The TDD loop
 
-spec-flow enforces strict TDD discipline on every behavior-bearing code phase inside `/spec-flow:execute`. The loop is Red → Build → Verify → Refactor, orchestrated by the execute skill and run by four dedicated agents.
+spec-flow enforces strict TDD discipline on every behavior-bearing code phase inside `/spec-flow:execute`. The per-phase loop is Red → QA-TDD-Red → Build → Verify → Refactor → Phase-QA, orchestrated by the execute skill and run by dedicated agents. (Execute numbers these as Step 2 / 2.5 / 3 / 4 / 5 / 6 around per-phase bookkeeping steps; the names are what matter.)
 
 ## The Three Laws
 
@@ -31,8 +31,15 @@ The execute orchestrator dispatches them in sequence, runs validation between st
 
 For a TDD-track phase (behavior-bearing code):
 
+### Step 0a — Mid-piece Opus QA pass *(conditional — long pieces only)*
+- Evaluated at the **start** of each phase iteration, before any work for the phase.
+- Fires **once per piece**, at the half-way phase boundary, and only for pieces with **6 or more phases** (for an N-phase piece the trigger fires before phase ⌈N/2⌉+1). Shorter pieces never trigger it — the end-of-piece review board is enough.
+- Dispatches `qa-phase` (Opus) with `Input Mode: Mid-piece full review` over everything built so far, using the accumulated per-phase AC matrices. Must-fix findings run the same iter-until-clean fix-code loop as any QA gate; a marker commit records that the pass fired so a resumed session doesn't re-run it.
+- The point is to catch a compounding design mistake at the midpoint of a long piece rather than discovering it only at the merge-time board, when unwinding it is expensive.
+
 ### Step 1 — Red (stage, don't commit)
 - **tdd-red** writes failing tests for this phase and `git add`s them by literal path. Does NOT commit.
+- **Contracts injection:** if `plan.md` has a `## Contracts` section, the orchestrator extracts the contract entries whose `**Phase:**` matches the current phase and appends them to the tdd-red prompt as `## Contracts for this phase` — so Red writes tests that verify each contract's signature, inputs, outputs, and error cases. If no `## Contracts` section exists, the step is silently skipped.
 - Orchestrator runs the test suite against the staged tests (no commit needed — the runner reads from the working tree).
 - Orchestrator captures a `## Staged test manifest` (path → SHA-256) for the anti-tampering check later.
 - **Validation (two invariants, both required):**
@@ -40,7 +47,7 @@ For a TDD-track phase (behavior-bearing code):
   - **Right failure reason** — each failing test fails because the feature is missing, not from a typo / import / fixture error.
 - The verbatim failing output becomes the oracle for Step 2.
 
-### Step 1.5 — QA-Red
+### Step 1.5 — QA-TDD-Red
 - **qa-tdd-red** reviews Red's authored tests before Build is dispatched.
 - Applies the 11-pattern theater catalog (tautology, self-referential, mock-echo, call-count only, assert-the-assignment, truthy-only, exception swallowing, no-assertion, name/body mismatch, implementation coupling, redundant cluster) + an AC-binding check ("if I implemented this AC wrong, would this test catch it?").
 - **Validation:** PASS advances to Build; FAIL re-dispatches `tdd-red` once with findings surfaced. Two consecutive FAIL verdicts escalate — the phase's ACs are likely too vague (spec defect) or the plan's `[TDD-Red]` block directs Red toward un-testable surface (plan defect).
@@ -48,6 +55,7 @@ For a TDD-track phase (behavior-bearing code):
 
 ### Step 2 — Build (unified commit)
 - **implementer** receives `Mode: TDD`, the failing-test output, Red's `## Staged test manifest`, the plan's `[Build]` block, and pre-flight snapshots (LOC, existing patterns, symbol presence, pre-commit hook inventory). Red's test files are in the staging area when implementer starts.
+- **Introspection context:** if `introspection.md` exists beside `plan.md`, the orchestrator extracts the **Dependency Map** and **Test Landscape** sections matching the current phase's file scope and appends them to the `## Pre-flight snapshot` as `### Codebase context`. Both the Red and Build prompts carry this block — the agent starts with the codebase map the plan built during exploration instead of rediscovering it. (Absent for pre-v4.10 plans or CREATE-only phases — skipped silently.)
 - Implementer writes the simplest code that turns the failing tests green, `git add`s its production files by literal path, then creates ONE unified commit containing Red's staged tests + its own code.
 - Orchestrator runs the full test suite.
 - **Validation (three invariants, all required):**
@@ -132,13 +140,13 @@ Non-TDD mode is a piece-level decision, declared in the plan's front-matter as `
 
 **What stays the same:**
 - Phase QA (`qa-phase`) runs on every phase.
-- Final Review (6-agent board) runs after all phases.
+- Final Review (7-agent board; 8 in fast mode) runs after all phases.
 - Reflection (Step 4.5) runs normally.
 - Circuit breakers, escape hatches, and escalation rules are identical.
 - The `implementer` agent still runs, but in `Mode: Implement`.
 - The `refactor` agent still runs when the phase has a `[Refactor]` checkbox.
 
-Non-TDD mode is a valid, complete choice. It is not a "reduced" version of TDD -- it is a different strategy with different trade-offs. The pipeline remains rigorous: every phase still gets adversarial QA review and the final piece still gets a 6-agent review board.
+Non-TDD mode is a valid, complete choice. It is not a "reduced" version of TDD -- it is a different strategy with different trade-offs. The pipeline remains rigorous: every phase still gets adversarial QA review and the final piece still gets a 7-agent review board (8 in fast mode).
 
 ## Where to go next
 

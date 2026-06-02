@@ -3,13 +3,13 @@ name: charter
 description: >-
   Bootstrap project architecture constraints via Socratic dialogue. Outputs charter skills:
   non-negotiables, architecture, tools, processes, flows, coding-rules, integrations. Modes:
-  create, update, retrofit. Triggers: "set up charter", "define architecture", "establish
+  create, update. Triggers: "set up charter", "define architecture", "establish
   non-negotiables", "onboard project".
 ---
 
 # Charter — Project-Wide Binding Constraints
 
-Produce a codified, binding set of project-wide constraints in `.github/skills/charter-*/` via Socratic dialogue. Charter skills are the single source of truth — no separate `docs/charter/` directory. Charter content is referenced by every downstream skill (`prd`, `spec`, `plan`, `execute`) and binds every implementation.
+Produce a codified, binding set of project-wide constraints, published as charter **skills** under the project's host-native skills root — either `.github/skills/charter-*/` or `.claude/skills/charter-*/` (resolve per `plugins/spec-flow/reference/charter-location.md`). Charter skills are the single source of truth — there is no `docs/charter/` directory. Charter content is referenced by every downstream skill (`prd`, `spec`, `plan`, `execute`) and binds every implementation.
 
 Charter skills use a **two-tier loading model** to balance coverage against context cost:
 
@@ -22,23 +22,28 @@ The session-start hook (v4) reads `doctrine_load` and injects only those charter
 
 ## Step 0: Load Config
 
-Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` for docs-rooted paths below. Charter skill files live under `.github/skills/charter-*/` regardless of `docs_root`. If the file is missing, default to `docs`.
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` for docs-rooted paths below. Charter skill files live under the resolved charter root (`.github/skills/charter-*/` or `.claude/skills/charter-*/`) regardless of `docs_root` — resolve it per `plugins/spec-flow/reference/charter-location.md`. If `.spec-flow.yaml` is missing, default `docs_root` to `docs`.
 
-Charter-specific config keys (added in piece 2 — safe defaults if absent):
-- `charter.required` — default `false` in piece 1; piece 2 changes default to `true`
-- `charter.doctrine_load` — default `[non-negotiables, architecture]` when absent; piece 2 wires doctrine
+Charter-specific config keys (safe defaults if absent):
+- `charter.required` — default `true`
+- `charter.doctrine_load` — default `[non-negotiables, architecture]` when absent
+- `charter_root` — `.github` or `.claude`; the resolved charter location, written at bootstrap (see Phase 0)
 
 ## Modes
 
 Detected from current state:
 
-- **Bootstrap mode** — No `.github/skills/charter-*/SKILL.md` files exist. Full Socratic flow → write seven files → QA → sign-off.
-- **Update mode** (v2.0.0 piece 5) — `.github/skills/charter-*/SKILL.md` files exist and no legacy signals. User wants to change a charter file.
-- **Retrofit mode** (piece 6) — legacy `docs/charter/` exists, legacy `docs/prd.md` or `<docs_root>/manifest.yaml` exists at the flat path, or unprefixed `NN-xxx` is detected in the existing PRD. Reclassify + migrate. Not implemented until piece 6.
+- **Bootstrap mode** — No `charter-*/SKILL.md` files exist under either skills root. Full Socratic flow → resolve a write location (Phase 0) → write seven files → QA → sign-off.
+- **Update mode** — `charter-*/SKILL.md` files exist under the resolved charter root. User wants to change a charter file.
 
-Explicit mode flags (optional): `/spec-flow:charter --update`, `/spec-flow:charter --retrofit`. Without flags, mode is auto-detected.
+Explicit mode flag (optional): `/spec-flow:charter --update`. Without a flag, mode is auto-detected.
 
-If retrofit signals detected (legacy layout including `docs/charter/`, or unprefixed NN-xxx) and piece 6 isn't shipped yet, respond: `"Retrofit mode lands in v2.0.0 piece 6. To update existing charter files in the meantime, run /spec-flow:charter --update."`
+## Phase 0: Resolve charter location
+
+Before writing any charter file, resolve where charter lives per `plugins/spec-flow/reference/charter-location.md`:
+
+- **Update mode / charter already exists:** use the existing root (detect by existence, or `charter_root` from `.spec-flow.yaml`).
+- **Bootstrap mode / no charter yet:** detect which host directory the project already has — `.github/` or `.claude/` — and recommend that root; if both exist, present both and let the user pick; if neither exists, ask the user which root to use. **Never assume a default.** After the user confirms, persist `charter_root: .github` (or `.claude`) to `.spec-flow.yaml` and write charter to `<charter_root>/skills/charter-<domain>/SKILL.md`.
 
 ## Bootstrap Mode Workflow
 
@@ -301,7 +306,7 @@ Only proceed to Phase 2 after user confirms.
 After Phase 1.3 confirmation, serialize the Signal Summary to a recoverable format. Offer:
 > "I'll save the confirmed Signal Summary so we can resume if this session is interrupted."
 
-Write to `.github/skills/.charter-signal-summary.yaml` (gitignored, add to `.gitignore` if absent). If the session is interrupted and restarted, the user can instruct the skill to load this file instead of re-running the scan.
+Write to `<charter_root>/skills/.charter-signal-summary.yaml` (gitignored, add to `.gitignore` if absent), where `<charter_root>` is resolved in Phase 0. If the session is interrupted and restarted, the user can instruct the skill to load this file instead of re-running the scan.
 
 ### Phase 2: Socratic dialogue — section by section
 
@@ -355,7 +360,7 @@ Write to `.github/skills/.charter-signal-summary.yaml` (gitignored, add to `.git
   Wait for explicit confirmation before treating it as settled.
 - **Pattern provenance:** every code-derived claim cites specific file paths. Never state "the codebase uses X" without naming at least 2 files.
 - **NN capture flag:** any user answer containing "always," "never," "must," "cannot," "required," "forbidden," or "every X must" → silently queue that statement for Section F review. Do not interrupt the current section — collect and surface later.
-- **Session checkpoints:** every 15 questions, pause: "We've covered a lot — want a break and continue later, or push through?" If continuing later, remind user the Signal Summary is saved at `.github/skills/.charter-signal-summary.yaml`.
+- **Session checkpoints:** every 15 questions, pause: "We've covered a lot — want a break and continue later, or push through?" If continuing later, remind user the Signal Summary is saved at `<charter_root>/skills/.charter-signal-summary.yaml`.
 - **Per-section mini-confirmation:** at the end of EACH section, before moving to the next: "Here's what I've captured for [section name]: [3–5 bullet summary]. Anything to correct before I move on?"
 - **Unresolved answers** → `[NEEDS CLARIFICATION]` marker in the draft. QA treats these as must-fix.
 
@@ -594,7 +599,7 @@ Do not proceed past this gate until the check passes.
 
 Load templates from `${CLAUDE_PLUGIN_ROOT}/templates/charter/`. Populate placeholders from Socratic answers.
 
-**Write directly to `.github/skills/charter-<domain>/SKILL.md`** (create `.github/skills/charter-<domain>/` if absent). These ARE the authoritative charter files — there is no separate `docs/charter/` directory in the v4 model.
+**Write directly to `<charter_root>/skills/charter-<domain>/SKILL.md`** (create the directory if absent), where `<charter_root>` is the location resolved in Phase 0 (`.github` or `.claude`). These ARE the authoritative charter files — there is no `docs/charter/` directory.
 
 Each skill file uses standard skill frontmatter — NO `last_updated:` field (use `git log` for history):
 
@@ -653,13 +658,14 @@ Present the seven charter files to the user for review. User approves → contin
 One commit per file so `git blame` is useful:
 
 ```bash
-git add .github/skills/charter-architecture/SKILL.md && git commit -m "charter: add architecture"
-git add .github/skills/charter-tools/SKILL.md && git commit -m "charter: add tools"
-git add .github/skills/charter-flows/SKILL.md && git commit -m "charter: add flows"
-git add .github/skills/charter-coding-rules/SKILL.md && git commit -m "charter: add coding-rules"
-git add .github/skills/charter-processes/SKILL.md && git commit -m "charter: add processes"
-git add .github/skills/charter-non-negotiables/SKILL.md && git commit -m "charter: add non-negotiables"
-git add .github/skills/charter-integrations/SKILL.md && git commit -m "charter: add integrations"
+# <charter_root> is .github or .claude, resolved in Phase 0
+git add <charter_root>/skills/charter-architecture/SKILL.md && git commit -m "charter: add architecture"
+git add <charter_root>/skills/charter-tools/SKILL.md && git commit -m "charter: add tools"
+git add <charter_root>/skills/charter-flows/SKILL.md && git commit -m "charter: add flows"
+git add <charter_root>/skills/charter-coding-rules/SKILL.md && git commit -m "charter: add coding-rules"
+git add <charter_root>/skills/charter-processes/SKILL.md && git commit -m "charter: add processes"
+git add <charter_root>/skills/charter-non-negotiables/SKILL.md && git commit -m "charter: add non-negotiables"
+git add <charter_root>/skills/charter-integrations/SKILL.md && git commit -m "charter: add integrations"
 ```
 
 ### Phase 6.5: Initialize project infrastructure
@@ -680,7 +686,8 @@ After committing charter files, ensure the project infrastructure is ready for t
    Required values to set:
    ```yaml
    layout_version: 4
-   docs_root: <docs_root>   # set if not already present
+   docs_root: <docs_root>      # set if not already present
+   charter_root: <charter_root>  # .github or .claude — resolved in Phase 0
    charter:
      required: true
      doctrine_load: [non-negotiables, architecture]
@@ -694,21 +701,21 @@ After committing charter files, ensure the project infrastructure is ready for t
 
 ### Phase 7: Doctrine wiring reminder
 
-Since v2.0.0 piece 2, the SessionStart hook auto-loads charter files listed in `.spec-flow.yaml`'s `charter.doctrine_load` (default `[non-negotiables, architecture]`). Users need to run `/reload-plugins` (or start a new session) to pick up newly-authored charter into agent doctrine context.
+The SessionStart hook auto-loads charter files listed in `.spec-flow.yaml`'s `charter.doctrine_load` (default `[non-negotiables, architecture]`). Users need to run `/reload-plugins` (or start a new session) to pick up newly-authored charter into agent doctrine context.
 
 Inform the user after Phase 6:
 > "Charter files committed. Run `/reload-plugins` (or start a new session) so downstream skills and agents pick up the charter via SessionStart doctrine load. Future runs of `prd`, `spec`, `plan`, `execute`, and `status` will read from these files automatically."
 
-## Update Mode Workflow (v2.0.0 piece 5)
+## Update Mode Workflow
 
-Triggered when `.github/skills/charter-*/SKILL.md` files exist and no legacy signals are detected. Purpose: edit one or more charter files with the same Socratic+QA rigor as bootstrap, but scoped to only the touched files.
+Triggered when `charter-*/SKILL.md` files exist under the resolved charter root (Phase 0). Purpose: edit one or more charter files with the same Socratic+QA rigor as bootstrap, but scoped to only the touched files.
 
 ### Phase U1 — Ask which file(s) to edit
 
-Present the seven files with their current `last committed` dates:
+Present the seven files with their current `last committed` dates (`<charter_root>` is `.github` or `.claude`, resolved in Phase 0):
 
 ```
-.github/skills/
+<charter_root>/skills/
   charter-architecture/SKILL.md      last committed: 2026-02-15
   charter-non-negotiables/SKILL.md   last committed: 2026-03-20
   charter-tools/SKILL.md             last committed: 2026-02-15
@@ -718,7 +725,7 @@ Present the seven files with their current `last committed` dates:
   charter-integrations/SKILL.md      last committed: 2026-04-10
 ```
 
-Read `last committed` from `git log -1 --format=%ci .github/skills/charter-<domain>/SKILL.md`.
+Read `last committed` from `git log -1 --format=%ci <charter_root>/skills/charter-<domain>/SKILL.md`.
 
 Ask: "Which file(s) do you want to change? (comma-separated, or 'all')."
 
@@ -738,7 +745,7 @@ Default is **retire**. Retired entries get the tombstone format (strikethrough t
 
 ### Phase U3 — Write touched skills
 
-Write each touched file to `.github/skills/charter-<domain>/SKILL.md`. No `last_updated` field — git history is the record.
+Write each touched file to `<charter_root>/skills/charter-<domain>/SKILL.md`. No `last_updated` field — git history is the record.
 
 ### Phase U4 — QA on touched files only
 
@@ -751,7 +758,7 @@ Iteration loop is the same as bootstrap mode's Phase 4 (fix-doc diff, focused re
 Human reviews diffs. On approval, commit each touched file separately:
 
 ```bash
-git add .github/skills/charter-<domain>/SKILL.md && git commit -m "charter: update <domain> — <brief summary>"
+git add <charter_root>/skills/charter-<domain>/SKILL.md && git commit -m "charter: update <domain> — <brief summary>"
 ```
 
 ### Phase U6 — Divergence awareness
@@ -761,185 +768,6 @@ After commit, check the manifest for pieces at `specced`, `planned`, or `impleme
 > "The following pieces are now diverged: [list]. Run `/spec-flow:status --resolve <piece-name>` to walk through divergence resolution options."
 
 Do NOT automatically re-spec or re-plan — human decides per piece.
-
-## Retrofit Mode Workflow (v2.0.0 piece 6)
-
-Triggered when retrofit signals are detected: legacy `docs/charter/`, legacy `<docs_root>/prd.md` at the flat path, unprefixed `NN-xxx` entries in PRD, or `<docs_root>/manifest.yaml` at the legacy path. Also invocable explicitly as `/spec-flow:charter --retrofit`.
-
-### Entry confirmation
-
-Before any file change, announce:
-
-> "Detected a pre-charter spec-flow project (v1.5.x or earlier). Retrofit mode migrates to v2.0.0:
-> - Reclassifies existing NN-xxx entries into NN-C (project-wide) and NN-P (product-specific)
-> - Migrates docs/ layout to the new structure (prd/, backlog/, specs/ stays)
-> - Rewrites existing specs and plans to cite the new namespaces
->
-> This produces a series of review-gated commits — no destructive operations, every step is revertable.
->
-> Proceed? (yes / dry-run / cancel)"
-
-- **yes** → run the full pipeline (steps 1–9 below)
-- **dry-run** → run pipeline in dry-run mode: walk each step, produce a combined diff preview, no commits. User reviews; can then re-invoke without dry-run to apply.
-- **cancel** → abort, no changes made
-
-### Step 1 — Snapshot pre-state
-
-Create `<docs_root>/archive/pre-charter-migration-<YYYY-MM-DD>/` and copy current:
-- `<docs_root>/prd.md` (or `<docs_root>/prd/prd.md` if already partially migrated)
-- `<docs_root>/manifest.yaml` (or new location)
-- `<docs_root>/specs/<piece>/spec.md` and `plan.md` for every piece
-
-Commit: `chore: snapshot pre-charter state to archive/ before retrofit`
-
-Pure safety net — if any later step is wrong, user has the pre-migration state verbatim. Print the commit SHA to the user so they know the rollback target.
-
-### Step 2 — Reclassify NN-xxx
-
-Socratic, one entry at a time. For each existing `NN-xxx` in the PRD:
-
-> "NN-003: **[entry statement]**
->
-> - **C** — project-wide rule (charter; applies across all pieces and products in this repo)
-> - **P** — product-specific rule (stays in PRD; tied to this PRD only)
-> - **R** — retire (no longer binding; will be tombstoned)"
-
-Record all user choices in an in-memory mapping table. No file changes yet.
-
-### Step 3 — Bootstrap Socratic for other six charter files
-
-Run Phase 2 Socratic (from bootstrap mode above) for the six non-NN files: `architecture.md`, `tools.md`, `processes.md`, `flows.md`, `coding-rules.md`, `integrations.md`. Use detection signals (Phase 1.1) + any user-supplied sources (Phase 1.2) as priors.
-
-Additionally, promote the **C** classified NN entries into `.github/skills/charter-non-negotiables/SKILL.md` with new sequential `NN-C-001`... IDs. Keep the mapping in state:
-
-```
-old NN-003 → NN-C-001
-old NN-007 → NN-C-002
-old NN-001 → NN-P-001 (stays in PRD, renumber on next step)
-old NN-012 → RETIRED (tombstone)
-```
-
-Persist the mapping table to `<docs_root>/archive/pre-charter-migration-<date>/nn-mapping.md` for post-migration traceability.
-
-Commit per charter file:
-```bash
-git add .github/skills/charter-architecture/SKILL.md && git commit -m "charter: add architecture (retrofit)"
-git add .github/skills/charter-tools/SKILL.md && git commit -m "charter: add tools (retrofit)"
-git add .github/skills/charter-flows/SKILL.md && git commit -m "charter: add flows (retrofit)"
-git add .github/skills/charter-coding-rules/SKILL.md && git commit -m "charter: add coding-rules (retrofit)"
-git add .github/skills/charter-processes/SKILL.md && git commit -m "charter: add processes (retrofit)"
-git add .github/skills/charter-non-negotiables/SKILL.md && git commit -m "charter: add non-negotiables (from migrated NN-xxx)"
-git add .github/skills/charter-integrations/SKILL.md && git commit -m "charter: add integrations (retrofit)"
-```
-
-### Step 4 — Layout migration via `git mv`
-
-Use `git mv` to preserve history:
-
-```bash
-git mv <docs_root>/prd.md <docs_root>/prd/prd.md
-git mv <docs_root>/manifest.yaml <docs_root>/prd/manifest.yaml
-git mv <docs_root>/improvement-backlog.md <docs_root>/backlog/backlog.md   # if exists
-```
-
-(Per-piece artifacts at `<docs_root>/specs/<piece>/` already match the new layout — no moves needed.)
-
-If `docs/charter/` exists (v3 legacy), the charter retrofit step removes it — charter content was migrated to `.github/skills/charter-*/SKILL.md` by the charter skill itself.
-
-Commit: `chore: migrate docs/ layout to charter structure (retrofit)`
-
-### Step 5 — Rewrite PRD
-
-Update `<docs_root>/prd/prd.md`:
-
-1. Drop the unprefixed `## Non-Negotiables` section.
-2. Add `## Non-Negotiables (Product)` section. Each NN-P classified entry gets renumbered per the mapping (NN-P-001, NN-P-002, ...) and converted to structured schema (Type / Statement / Scope / Rationale / How QA verifies).
-3. Add `**Charter:** .github/skills/charter-*/SKILL.md (NN-C namespace — project-wide binding rules; applies to every piece)` reference line near the top (matches `templates/prd.md`).
-4. Update any inline references in the PRD body text (e.g., "see NN-003" → "see NN-C-001").
-
-Commit: `prd: promote NN to namespaces, reference charter (retrofit)`
-
-### Step 6 — Per-piece spec rewrite (dispatch fix-doc)
-
-For every `<docs_root>/specs/<piece>/spec.md` that cites unprefixed `NN-xxx`:
-
-1. Read the spec.
-2. Dispatch `fix-doc` with the mapping table + spec content:
-
-   ```
-   Agent({
-     description: "Retrofit: rewrite NN citations in spec/<piece>",
-     prompt: <fix-doc.md + mapping table + spec content + "Rewrite every NN-xxx citation to use the new NN-C-xxx or NN-P-xxx ID per this mapping. Retired entries → return BLOCKED citing the piece cannot drop the reference without human judgment.">,
-     model: "sonnet"
-   })
-   ```
-
-3. `fix-doc` returns a diff. Orchestrator applies and stages.
-4. Update `charter_snapshot` front-matter with today's date for every charter file.
-5. If any citation maps to RETIRED, escalate: *"Piece `<piece>`'s spec cites NN-012 which you retired during reclassification. How should I handle this — drop the citation, upgrade to a specific superseding entry, or re-open the piece for re-spec?"*
-
-Commit per piece: `spec(<piece>): update NN citations to charter namespaces (retrofit)`
-
-### Step 7 — Per-piece plan rewrite
-
-Same loop as step 6 for every `<docs_root>/specs/<piece>/plan.md` where plans exist. Updates per-phase "Charter constraints honored in this phase" slots (if they exist; older plans without the slot just get citation rewrites in the body).
-
-Retrofit also auto-populates per-phase slots by allocating each cited entry to the phase whose scope overlaps — if ambiguous, escalate to the user.
-
-Commit per piece: `plan(<piece>): update NN citations to charter namespaces (retrofit)`
-
-### Step 8 — Update `.spec-flow.yaml`
-
-Ensure `.spec-flow.yaml` has the charter block with retrofit-appropriate defaults:
-
-```yaml
-charter:
-  required: true                                    # retrofitted project has charter; enforce on future PRDs
-  doctrine_load: [non-negotiables, architecture]
-```
-
-If the file already has these keys, leave them as-is. If `required: false`, flip to `true` only with user confirmation.
-
-Commit: `config: enable charter stage (retrofit)`
-
-### Step 9 — Full QA sweep
-
-Dispatch reviewers sequentially (not parallel — the orchestrator's single-window context budget and each review's must-fix resolution may depend on the prior):
-
-1. `qa-charter` on the new charter (iter-1 full + loop — see bootstrap Phase 4). Retrofit-mode additions (checks 14 + 15 in qa-charter.md) are active: re-keying completeness + spec back-reference integrity.
-2. For every rewritten spec: `qa-spec` iter-1 full.
-3. For every rewritten plan: `qa-plan` iter-1 full.
-
-Any must-fix finding loops back to the appropriate fix-doc + re-review. Human sign-off before calling retrofit complete.
-
-### Dry-run mode (`--retrofit --dry-run`)
-
-Walks all nine steps using an internal staging area (e.g., orchestrator's in-memory buffer or a scratch `git stash`). Produces a combined unified diff preview of every planned change. No commits. No file writes outside the staging area. Output: human-readable summary of each step's planned changes, plus the full diff.
-
-Users can then re-invoke without `--dry-run` to apply for real.
-
-### Opt-out (`/spec-flow:charter --decline`)
-
-Writes `.spec-flow.yaml` with `charter.required: false` and creates a marker file `<docs_root>/.charter-declined` with a short note:
-
-```
-Charter declined on 2026-04-20.
-Reason: <user-supplied>
-Reversible: run /spec-flow:charter at any time to enter retrofit mode.
-```
-
-Downstream skills (prd, spec, plan, execute, status) skip all charter checks when `charter.required: false`. Existing v1.5.x behavior is fully preserved. Retrofit can be run at any time later — the decline is reversible.
-
-Commit: `config: decline charter stage (reversible)`
-
-### Rollback
-
-No destructive commands anywhere in the pipeline. Options to revert:
-
-- `git revert <step-N-sha>` — reverts a specific step while preserving later commits (may introduce conflicts if later steps build on the reverted step; resolve per normal git workflow).
-- `git reset --hard <pre-state-snapshot-sha>` — nuclear option. Moves back to the snapshot commit from step 1. Requires user confirmation since it rewrites history locally.
-
-The pre-state snapshot in step 1 is always available via `git log --follow <docs_root>/archive/pre-charter-migration-<date>/` — even if the user discards the migration commits, the snapshot copies remain.
 
 ## No QA Gate Between Charter Skill and User
 

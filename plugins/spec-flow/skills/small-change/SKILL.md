@@ -15,7 +15,7 @@ Create `brief.md` and `plan.md` for a bounded one-session change, create the `ch
 
 - Read `.spec-flow.yaml`; capture `docs_root` and `worktrees_root`. If absent, default to `docs` and `worktrees`.
 - Default directory for change briefs: `<docs_root>/changes/`. All `brief.md` and `plan.md` paths below live under `<docs_root>/changes/<slug>/`.
-- Run the Charter Context Loading Protocol in `plugins/spec-flow/reference/brainstorm-procedure.md` per `## Charter Context Loading Protocol`; store `charter_variant`, `charter_snapshot`, and `integration_cfg`.
+- Run the Charter Context Loading Protocol in `plugins/spec-flow/reference/brainstorm-procedure.md` per `## Charter Context Loading Protocol`; store `charter_root`, `charter_snapshot`, and `integration_cfg`.
 - Read `integrations.issue_tracker.enabled` from `.spec-flow.yaml`.
 - Run the integration capability check in `plugins/spec-flow/reference/integration-capability-check.md` for operation `create_phase_issue`; store the result as `jira_available`.
 - If the integration capability check fails, emit the standard warning block, set `jira_available = false`, and continue (NN-C-005).
@@ -55,7 +55,7 @@ Create `brief.md` and `plan.md` for a bounded one-session change, create the `ch
 
 ## Step 4: Charter Context Loading
 
-- `charter_variant`, `charter_snapshot`, and `integration_cfg` should already be populated from Step 0.
+- `charter_root`, `charter_snapshot`, and `integration_cfg` should already be populated from Step 0.
 - Treat this step as a validation checkpoint before drafting `brief.md` and `plan.md`.
 - If any output is missing, re-run the Charter Context Loading Protocol in `plugins/spec-flow/reference/brainstorm-procedure.md` under `## Charter Context Loading Protocol`.
 - Carry the validated `charter_snapshot` forward into `brief.md` front-matter in Step 12.

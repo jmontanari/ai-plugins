@@ -83,10 +83,9 @@ Otherwise:
 Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
 
 **Integration config load.** If `integrations.issue_tracker.enabled: true`, read the
-integrations charter file for transition rules and commit format — path depends on charter
-location:
-- **v4** (`.github/skills/charter-integrations/SKILL.md` exists): read that file
-- **v3**: `<docs_root>/charter/<charter_file>.md` (key `charter_file` from `.spec-flow.yaml`, default `charter/integrations.md`)
+integrations charter skill for transition rules and commit format. Resolve the active charter
+root per `plugins/spec-flow/reference/charter-location.md`, then read
+`<charter_root>/skills/charter-integrations/SKILL.md` (`<charter_root>` ∈ {`.github`, `.claude`}).
 
 If the file is absent, proceed with built-in defaults (see `plugins/spec-flow/reference/integration-capability-check.md`). Store as `integration_cfg`. If disabled or absent, set
 `integration_cfg = null` and skip all integration steps in this skill.
@@ -134,7 +133,7 @@ Before the Phase Scheduler dispatches any phase, execute resolves `<prd-slug>` a
 
 ### 1a. Charter-drift check (always applies — runs first)
 
-A piece reaching execute stage already has a spec carrying a `charter_snapshot:` front-matter and a plan aligned to that snapshot. Before any phase dispatch, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live `<docs_root>/charter/` files. If drift is detected, halt Phase 1 and escalate per the reference doc — do not dispatch phases against stale charter constraints.
+A piece reaching execute stage already has a spec carrying a `charter_snapshot:` front-matter and a plan aligned to that snapshot. Before any phase dispatch, run the charter-drift check per `plugins/spec-flow/reference/charter-drift-check.md` against the spec's `charter_snapshot:` and the live charter skills at the active charter root (resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-*/SKILL.md`, `<charter_root>` ∈ {`.github`, `.claude`}). If drift is detected, halt Phase 1 and escalate per the reference doc — do not dispatch phases against stale charter constraints.
 
 ### 1b. Path resolution
 
@@ -275,7 +274,7 @@ If the trigger does NOT fire, set `mid_piece_opus_pass: not-triggered` for this 
    - **Cumulative diff:** `git diff $(git merge-base origin/main HEAD)..HEAD` output (the full diff from piece start through the last completed phase). The cumulative diff baseline is computed at dispatch time as `git merge-base origin/main HEAD` — the piece's branch point from main. Resume-safe because it's recomputed each time.
    - **Full spec:** the complete text of `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md`.
    - **AC matrix:** the union of `## AC Coverage Matrix` rows from all completed phase Build reports, held in orchestrator state since Step 3.8's validation gate captured them per-phase as `phase_<id>_ac_matrix` keys (one per phase / sub-phase). Format: phase-N | AC-id | status | pointer.
-   - **Charter raw text (always-attach):** verbatim contents of `<docs_root>/charter/non-negotiables.md` and the Step 6 track-aware NN-P payload. If `track = "piece"`, attach the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` unchanged. If `track = "change"`, skip NN-P injection silently — no warning, no error. Plus, if the spec's `### Coding Rules Honored` block cites any `CR-xxx` entries, attach those specific entries (not the full file) extracted from `<docs_root>/charter/coding-rules.md`. Match Step 6's existing extraction pattern.
+   - **Charter raw text (always-attach):** verbatim contents of the active charter root's `charter-non-negotiables/SKILL.md` (resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-non-negotiables/SKILL.md`, `<charter_root>` ∈ {`.github`, `.claude`}) and the Step 6 track-aware NN-P payload. If `track = "piece"`, attach the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` unchanged. If `track = "change"`, skip NN-P injection silently — no warning, no error. Plus, if the spec's `### Coding Rules Honored` block cites any `CR-xxx` entries, attach those specific entries (not the full file) extracted from `<charter_root>/skills/charter-coding-rules/SKILL.md`. Match Step 6's existing extraction pattern.
 
 2. Dispatch:
    ```
@@ -662,10 +661,10 @@ Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 
 
    - **`## Non-negotiables`** — project constraints.
      - **NN-P injection (track-aware):**
-       - If `track = "piece"`: attach `<docs_root>/charter/non-negotiables.md` (NN-C, project-wide) and the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` (NN-P, product-specific). If `<docs_root>/charter/` is absent (pre-charter project), attach only the legacy NN section from the PRD.
-       - If `track = "change"`: attach `<docs_root>/charter/non-negotiables.md` when available, and skip NN-P injection silently — no warning, no error (no PRD in change-track).
+       - If `track = "piece"`: attach the active charter root's `charter-non-negotiables/SKILL.md` (NN-C, project-wide — resolved per `plugins/spec-flow/reference/charter-location.md` as `<charter_root>/skills/charter-non-negotiables/SKILL.md`, `<charter_root>` ∈ {`.github`, `.claude`}) and the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` (NN-P, product-specific).
+       - If `track = "change"`: attach the resolved `<charter_root>/skills/charter-non-negotiables/SKILL.md` when available, and skip NN-P injection silently — no warning, no error (no PRD in change-track).
 
-   - **`## Coding rules cited by this phase`** — if the plan's phase block's "Charter constraints honored in this phase" slot cites any `CR-xxx` entries from `<docs_root>/charter/coding-rules.md`, attach those specific entries (not the full file). Absent slot or no citations → skip this block.
+   - **`## Coding rules cited by this phase`** — if the plan's phase block's "Charter constraints honored in this phase" slot cites any `CR-xxx` entries from the active charter root's `charter-coding-rules/SKILL.md` (resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-coding-rules/SKILL.md`, `<charter_root>` ∈ {`.github`, `.claude`}), attach those specific entries (not the full file). Absent slot or no citations → skip this block.
 
    **Do NOT attach:** full spec, PRD sections, full plan, or full test-runner output. PRD alignment is the Final Review board's job (`review-board-prd-alignment.md`). Per-phase QA is about correctness against the plan, not PRD compliance.
 
@@ -1222,7 +1221,7 @@ Agent({ description: "Blind review (iter 1, full)", prompt: <review-board-blind.
 Agent({ description: "Edge case review (iter 1, full)", prompt: <review-board-edge-case.md + Input Mode: Full + diff + codebase note>, model: "opus" })
 Agent({ description: "Spec compliance review (iter 1, full)", prompt: <review-board-spec-compliance.md + Input Mode: Full + diff + spec + plan + (charter NN-C/CR + prd NN-P for claim verification)>, model: "opus" })
 Agent({ description: "PRD alignment review (iter 1, full)", prompt: <review-board-prd-alignment.md + Input Mode: Full + diff + spec + PRD + manifest>, model: "opus" })
-Agent({ description: "Architecture review (iter 1, full)", prompt: <review-board-architecture.md + Input Mode: Full + diff + charter (all six files if present; else legacy arch docs) + NN-C + NN-P>, model: "opus" })
+Agent({ description: "Architecture review (iter 1, full)", prompt: <review-board-architecture.md + Input Mode: Full + diff + charter (all charter skills at the active charter root resolved per plugins/spec-flow/reference/charter-location.md — <charter_root>/skills/charter-*/SKILL.md, <charter_root> ∈ {.github, .claude}, if present) + NN-C + NN-P>, model: "opus" })
 Agent({ description: "Security review (iter 1, full)", prompt: <review-board-security.md + Input Mode: Full + diff + spec (for trust boundary context)>, model: "opus" })
 Agent({ description: "Ground-truth review (iter 1, full)", prompt: <review-board-ground-truth.md + Input Mode: Full + diff + spec (for known/expected results and worked examples)>, model: "opus" })
 ```

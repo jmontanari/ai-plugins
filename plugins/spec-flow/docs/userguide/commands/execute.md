@@ -1,6 +1,6 @@
 # /spec-flow:execute
 
-Orchestrate implementation of an approved plan phase-by-phase. Each phase dispatches subagents (Red, Build, Verify, Refactor, QA), runs verification oracles, and advances only when gates pass. Ends with a final review board (7 agents in standard mode; 8 in fast mode) and merge to master.
+Orchestrate implementation of an approved plan phase-by-phase. Each phase dispatches subagents (Red, Build, Verify, Refactor, QA), runs verification oracles, and advances only when gates pass. Ends with a final review board (7 agents in standard mode; 8 in fast mode) and a merge that follows the PRD's branching topology.
 
 ## What it does
 
@@ -11,30 +11,53 @@ The heaviest skill in spec-flow. Walks the plan from Phase 1 to Phase N, for eac
 3. Runs Phase QA (Opus adversarial review)
 4. Advances to the next phase
 
-At the end of the last phase, runs the Final Review board (7 agents; 8 in fast mode), produces a reflection, and merges the piece to master.
+At the end of the last phase, runs the Final Review board (7 agents; 8 in fast mode), produces a reflection, and merges the piece per the manifest's branching strategy.
 
 ## When to run it
 
 - Piece status is `planned` in the manifest.
-- You're on the piece's worktree branch (`spec/<piece-name>`).
-- All manifest dependencies are `done`.
+- You're on the piece's worktree branch (`piece/<prd-slug>-<piece-slug>`).
+- All manifest dependencies are `merged`/`done` (or you pass `--ignore-deps` for transient-status deps).
+
+It also handles **change-track** work: invoking `/spec-flow:execute change/<slug>` runs the same engine against a small-change brief + inline plan produced by `/spec-flow:small-change` (no manifest entry, no `specced`/`planned` gate).
 
 ## The flow at a high level
 
-![Execute flow](../assets/execute-flow.png)
+```mermaid
+flowchart TD
+    start["planned piece on piece/&lt;prd-slug&gt;-&lt;piece-slug&gt; branch"] --> phase{"for each phase"}
+    phase -->|TDD mode| red["tdd-red → qa-tdd-red"]
+    red --> build["implementer — Build"]
+    phase -->|Implement mode| build
+    build --> verify["verify (Audit or Full)"]
+    verify --> refactor["refactor — often skipped"]
+    refactor --> phaseqa["qa-phase → fix-code (≤3 iterations)"]
+    phaseqa --> phase
+    phase -->|all phases done| board["final review board: 7 agents (8 in fast mode)"]
+    board --> reflect["reflection + learnings"]
+    reflect --> merge["merge to target branch"]
+```
 
 For the conceptual overview of what happens inside a phase, see [tdd-loop.md](../concepts/tdd-loop.md).
+
+## Pre-flight: model check
+
+Before anything else, execute verifies the active model is **Sonnet-class**. If it isn't, it blocks and prompts you to switch (or cancel). Sonnet is required because the orchestrator builds task lists, manages QA gates, parses AC matrices, tracks SHA manifests, and dispatches up to 8 review-board agents — Opus adds cost with no orchestration benefit; Haiku-class lacks the reasoning to route findings reliably.
 
 ## Pre-loop
 
 Before phase 1 starts (fresh-start only):
 
-- Updates the manifest on master to mark the piece `implementing`.
-- Switches back to the worktree branch.
+- Updates the manifest **on the piece branch** to mark the piece `in-progress` (main keeps `planned` until merge/PR). Skipped on resume.
+- Builds a harness task list (`TaskCreate` once, then `TaskUpdate` per phase). Progress is tracked via **both** the harness task list and plan.md checkboxes — neither alone is sufficient.
 
 ## Per-phase loop
 
 For each phase in plan.md (skips phases where all checkboxes are `[x]`):
+
+### Step 0a — Mid-piece Opus QA pass (≥6-phase pieces)
+
+At the half-way phase boundary of a piece with 6 or more phases, the orchestrator dispatches a single Opus mid-piece QA pass over the work so far — a coarse net for AC gaps and cross-phase drift that per-phase QA (scoped to one diff) can't see. It fires once per piece, guarded against re-firing on resume via a session-state file and a marker commit.
 
 ### Step 1 — Capture phase-start SHA
 
@@ -68,6 +91,16 @@ Attached to all subsequent agent prompts as `## Pre-flight snapshot` and `## Orc
 - Orchestrator runs the test suite — expects failures for the *right reasons* (feature missing, not setup broken).
 - Captures the verbatim failing output as `phase_N_oracle_block` — Step 3's oracle.
 - Post-commit contamination check: reconciles the committed file list against the agent's `## Tests Written` paths to catch concurrent agent work sweeping in.
+
+### Step 2.5 — QA-TDD-Red (TDD mode only)
+
+- Between Red and Build, the **qa-tdd-red** agent reviews the just-authored tests for theater patterns — tautologies, mock-echo, truthy-only assertions, no-assertion tests, name/body mismatch, implementation coupling — and verifies adversarial AC binding. This catches weak tests *before* Build writes production code fit to pass them.
+- FAIL re-dispatches Red once with the findings; a second failure escalates (the ACs are too vague or the `[TDD-Red]` block targets un-testable surface).
+- **Skipped in fast mode** (`fast: true`) — the end-of-piece `verify Mode: Piece Full` board member compensates.
+
+### Step 2.7 — Write-Tests (non-TDD mode only)
+
+- For `tdd: false` pieces there is no Red. After Step 3 implements the code, an agent writes tests for the existing implementation (no fail-first, no theater review, no SHA manifest) and stages them for Verify.
 
 ### Step 3 — Implement (both modes)
 
@@ -125,18 +158,19 @@ Findings resolved by fix-code/fix-doc, same 3-iteration cap.
 
 ### Reflection (optional)
 
-Two reflection agents (if `reflection: on` in `.spec-flow.yaml`):
+Two reflection agents run (unless `reflection: off` in `.spec-flow.yaml`):
 
 - **reflection-process-retro** — what worked / what didn't in the pipeline flow for this piece.
 - **reflection-future-opportunities** — forward-looking candidates for future pieces or spec amendments.
 
-Findings accumulate in `docs/improvement-backlog.md` for future `/spec-flow:spec` runs to consume.
+Reflection agents **emit structured findings to the orchestrator; they do not write to any backlog directly**. Each finding is routed through Step 6c discovery triage where *you* choose amend / fork / defer. Only the `defer` choice writes to a backlog, and it does so through `/spec-flow:defer`: process-retro findings land in the global `docs/improvement-backlog.md`; future-opportunities findings land in the PRD-local `docs/prds/<prd-slug>/backlog.md`. There is no auto-accumulation.
 
-### Merge to master
+### Merge
 
-- Flips manifest status to `done`.
-- Merges `spec/<piece-name>` → `master` (the user's choice of merge commit or squash).
-- Cleans up the worktree and feature branch.
+- Step 5.5 commits the terminal `status: merged` (+ `merged_at`) to the **piece branch** first — a mandatory gate before any push/PR, so the branch never reaches main as stale-active.
+- Step 6 merges per `merge_strategy` in `.spec-flow.yaml`: `squash_local` (default) squash-merges the piece branch and cleans up the worktree; `pr` prints a `gh pr create` command for you to run (the skill never runs `gh` itself).
+- The merge destination follows the manifest's branching topology, not always master: piece branches base off and merge to the PRD's `feature_branch:` when set, and the feature branch ships to `merge_target:` only when the full PRD is done.
+- With Jira integration, tasks transition to Done (squash) or In Review (PR) automatically.
 
 ## Loops
 
@@ -150,9 +184,9 @@ Every loop has a circuit breaker. No loop is unbounded.
 
 - Production code committed to the worktree branch, phase-by-phase.
 - A clean git history showing each phase's progression.
-- A `docs/prds/<prd-slug>/specs/<piece-name>/learnings.md` file if the pipeline surfaced interesting findings (smoketest records, in-phase bug fixes, design pivots).
-- Manifest flipped to `status: done`.
-- Piece merged to master with full review-board sign-off.
+- A `docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md` file synthesized from the reflection findings plus the cumulative diff.
+- Manifest flipped to `status: merged` on the piece branch.
+- Piece merged (squash or PR) to its branch target with full review-board sign-off.
 
 ## Handoff
 
@@ -194,3 +228,6 @@ Total: ~45 min of pipeline time. You signed off at every user-gate (spec, plan, 
 - [QA loop concepts](../concepts/qa-loop.md) — how fix-and-re-review works.
 - [Orchestrator model](../concepts/orchestrator-model.md) — the skill-vs-agent separation.
 - [Pipeline concepts](../concepts/pipeline.md) — where execute sits in the full chain.
+- [/spec-flow:small-change](./small-change.md) — the `change/<slug>` track execute also runs.
+- [/spec-flow:review-board](./review-board.md) — run the end-of-piece board out of band.
+- [/spec-flow:defer](./defer.md) — the sole write path for reflection/QA findings into backlogs.

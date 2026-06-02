@@ -11,7 +11,7 @@ version: 1
 **Project:** {{project_name}}
 **Date:** {{date}}
 **Status:** draft
-**Charter:** docs/charter/ (NN-C namespace — project-wide binding rules; applies to every piece)
+**Charter:** <charter_root>/skills/charter-*/SKILL.md (NN-C namespace — project-wide binding rules; applies to every piece)
 
 ## Problem Statement
 
@@ -112,7 +112,7 @@ version: 1
 
 ## Non-Negotiables (Product)
 
-`NN-P-xxx` — product-specific binding rules. Tied to this PRD. For project-wide rules (security, compliance, architecture, tooling), see `docs/charter/non-negotiables.md` (`NN-C-xxx`).
+`NN-P-xxx` — product-specific binding rules. Tied to this PRD. For project-wide rules (security, compliance, architecture, tooling), see `<charter_root>/skills/charter-non-negotiables/SKILL.md` (`NN-C-xxx`).
 
 ### NN-P-001: {{name}}
 - **Type:** Rule

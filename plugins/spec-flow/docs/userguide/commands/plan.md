@@ -4,27 +4,33 @@ Turn an approved spec into an exhaustive phase-by-phase implementation plan. The
 
 ## What it does
 
-Produces `docs/prds/<prd-slug>/specs/<piece-name>/plan.md` — a file-level plan with:
+Produces `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` — a file-level plan with:
 
 - Phases ordered by dependency
 - For each phase: file paths, function/class signatures, test file locations, the verification command
 - Red/Build/Verify/Refactor checkboxes per phase
+- Self-contained **Change Specification Blocks** (MODIFY / CREATE / DELETE) inside each Build/Implement block — verbatim current-state code with line numbers plus an inline pattern excerpt, so the executor implements without re-exploring
 - Explicit charter-entry allocation — every NN-C / NN-P / CR the spec cites is allocated to exactly one phase
-- Semantic anchors (function and class names) instead of line numbers
+- Semantic anchors (function and class names) alongside line ranges
 - Parallelization hints where safe
+- Four required cross-cutting sections introduced v4.7–4.10: **AC Coverage Matrix**, **Executable AC Binding**, **Contracts**, **Architectural Decisions**
 
 By the time this plan is approved, every design decision is captured. The execute command's job becomes mechanical: dispatch agents against the plan.
 
 ## When to run it
 
 - After `/spec-flow:spec` has been signed off and the piece's status is `specced`.
-- Run from the piece's worktree (`worktrees/<piece-name>/`).
+- Run from the piece's worktree (`worktrees/prd-<prd-slug>/piece-<piece-slug>/`) on branch `piece/<prd-slug>-<piece-slug>`.
+
+## Prerequisites gate
+
+Before exploration, the plan skill **refuses to proceed if spec.md still contains surviving `[PENDING-DECISION: <area>]` markers** (markers inside fenced code blocks or HTML comments don't count). It lists each surviving marker and tells you to resolve it in spec.md, then re-run. This is the hard handoff from spec: deferred product decisions must be decided before they reach planning.
 
 ## The flow
 
 ### Phase 1: Read-only exploration
 
-The skill explores the codebase using *only read operations* — Read, Grep, Glob, and read-only bash. No files are written or modified in this phase. Purpose: gather facts the plan will reference.
+The skill explores the codebase using *only read operations* — Read, Grep, Glob, and read-only bash. It does not touch source files. Purpose: gather facts the plan will reference. A `depends_on:` precondition check (with pull-deps-in / fork / proceed triage) and a charter-drift check run first.
 
 Collected:
 - Existing code patterns relevant to the spec
@@ -32,6 +38,10 @@ Collected:
 - Test framework patterns used in the project
 - Import conventions and module structure
 - Architecture constraints visible in the code
+- Charter files (v4: `<charter_root>/skills/charter-*/SKILL.md` — `.github` or `.claude`, resolved per [reference/charter-location.md](../../../reference/charter-location.md)) as exploration priors
+- Significant architectural decisions, recorded as draft ADRs
+
+**`introspection.md` is written during this phase.** Exploration findings (file inventory with verbatim code, dependency map, test landscape, pattern catalog) are written incrementally to `introspection.md` in the piece's working directory — an untracked working artifact, not committed. So Phase 1 is read-only *against the codebase* but does produce this one scratch file, which is the Phase 2 author's primary input and what makes resume cheap.
 
 ### Phase 2: Generate the plan
 
@@ -41,14 +51,28 @@ Using the spec, the exploration findings, and the plan template:
 2. **Pick a track per phase:**
    - **TDD track** — default for behavior-bearing code. Has `[TDD-Red]`, `[Build]`, `[Verify]`, `[Refactor]`, `[QA]` checkboxes.
    - **Implement track** — for config, infra, scaffolding, glue/wiring, docs-as-code. Has `[Implement]`, `[Verify]`, `[QA]` checkboxes.
-3. **Fill in details per phase:**
+3. **Fill in details per phase** as numbered, self-contained **Change Specification Blocks** (`T-1`, `T-2`, …). Each MODIFY block carries the verbatim CURRENT-state code (with line numbers from `introspection.md`), the TARGET description, an **inline** pattern excerpt (pasted, not a pointer), done criteria, and a verify command. CREATE and DELETE blocks have their own required fields. The executor can implement each block without reading surrounding context.
    - TDD: exact test file paths, test names, assertions, patterns to mirror.
    - Build: exact source file paths, class/function signatures, implementation approach.
-   - Verify: test command, expected output.
+   - Verify: copy-pasteable command with specific expected output (numbers/strings/exit code) — template placeholders must be resolved before sign-off.
 4. **Allocate charter entries** — every cited NN-C / NN-P / CR from the spec's "Non-Negotiables Honored" section gets allocated to exactly one phase's "Charter constraints honored in this phase" slot. Drops or duplicates are caught by qa-plan.
 5. **Mark parallel-safe phases** with `[P]` — verify no file overlap.
-6. **Consider Phase Groups** — for pieces with ≥2 disjoint work units (e.g., N adapters), decompose into a group with parallel `[P]`-marked sub-phases.
+6. **Consider Phase Groups** — for pieces with ≥2 disjoint work units (e.g., N adapters), decompose into a group with parallel `[P]`-marked sub-phases. (Parallel-by-default: a serial chain over disjoint scopes needs a `Why serial:` justification.)
 7. **Consider Phase 0 Scaffold** — if multiple phases append to the same shared coordination file, pre-append stubs in a single Scaffold phase first.
+8. **Generate the four cross-cutting sections** (see "Required plan sections" below).
+
+### Required plan sections (v4.7–4.10)
+
+Beyond the phases, every plan carries four sections the qa-plan agent checks for completeness:
+
+- **`## AC Coverage Matrix`** — every spec AC mapped to the covering phase, each marked `COVERED` or `NOT COVERED`. Each NOT COVERED row must get a forward pointer (defer to a named future piece, add coverage to a phase, or explicit justification) before the plan can finalize — the skill prompts you per row.
+- **`## Executable AC Binding`** — each COVERED AC bound to a concrete verification (shell command, file-check, or agent-step) with an expected result. This is the contract between plan and execute.
+- **`## Contracts`** — typed boundary interfaces for TDD-track phases (signature, inputs, outputs, error cases, constraints). A TDD phase with no boundary-crossing interface documents the omission explicitly; an Implement-only plan states the section is present for forward compatibility.
+- **`## Architectural Decisions`** — ADR-format entries (Context / Decision / Alternatives considered / Consequences / Charter alignment) for every significant decision recorded during exploration. Always present, even when it's "No significant architectural decisions for this piece."
+
+### Fast mode (`fast:` front-matter)
+
+The plan front-matter records `fast: true` or `fast: false` (default `false`, or inherited from `.spec-flow.yaml`). **`fast: true`** drops the per-phase inline QA agents (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`) and replaces the per-phase verify-agent dispatch with a direct test-command shell call; to compensate, the end-of-piece Final Review board gains an 8th member (`verify Mode: Piece Full`). It saves roughly 60% of QA token cost and suits config/infra/moderate-complexity pieces ≤12 phases — not security-critical, compliance, or cross-phase-dependent work.
 
 
 ### Choosing TDD vs. Implement
@@ -66,19 +90,24 @@ See [TDD loop concepts](../concepts/tdd-loop.md#non-tdd-mode--the-piece-level-to
 ### Phase 3: QA loop
 
 1. **qa-plan agent review** (Opus, adversarial):
-   - Every spec AC covered by a phase?
-   - Every phase has a clear exit gate?
+   - AC Coverage Matrix bidirectional — every spec AC covered by a phase, and no phantom ACs?
+   - Every phase has a clear exit gate? Verb alignment (the phase actually performs the AC's action)?
    - Red/Build/Verify/Refactor pattern complete for TDD phases?
    - Parallelization valid (no file overlap on `[P]` phases)?
-   - Semantic anchors used (not line numbers)?
+   - Semantic anchors + line ranges used; Change Specification Blocks complete?
    - Charter allocations complete and unique?
+   - Contracts coverage (every boundary-crossing interface in a TDD phase has a contract, or a documented omission)?
+   - Architectural Decisions section complete (ADR fields filled)?
+   - Executable AC Binding present with concrete commands per AC?
+   - Algorithm-term consistency (dense algorithm prose carries a worked example)?
 2. If findings emerge, fix-doc makes targeted fixes, qa-plan re-reviews the delta. Up to 3 iterations.
 3. **You sign off.**
 
 ### Phase 4: Finalize
 
-- Manifest on master: piece status → `planned`.
+- Manifest on the piece branch: status → `planned` (main advances on merge/PR).
 - Plan commits to the worktree branch.
+- When Jira integration is configured (`auto_create_tasks: true`), per-phase issues are created and their `jira_key:` / `jira_url:` recorded inline in plan.md.
 
 ## Loops
 
@@ -87,26 +116,27 @@ See [TDD loop concepts](../concepts/tdd-loop.md#non-tdd-mode--the-piece-level-to
 
 ## What you get
 
-`docs/prds/<prd-slug>/specs/<piece-name>/plan.md` with this shape:
+`docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with this shape:
 
 ```markdown
 ---
-slug: <piece-name>
+slug: <piece-slug>
 prd: docs/prds/<prd-slug>/prd.md
-spec: docs/prds/<prd-slug>/specs/<piece-name>/spec.md
+spec: docs/prds/<prd-slug>/specs/<piece-slug>/spec.md
 tdd: true
+fast: false
 created: <date>
 approved: <date>
-branch: spec/<prd-slug>-<piece-name>
+branch: piece/<prd-slug>-<piece-slug>
 charter_snapshot:
   non-negotiables: <date>
   architecture: <date>
   coding-rules: <date>
 ---
 
-# Plan: <piece-name>
+# Plan: <piece-slug>
 
-**Spec:** docs/prds/<prd-slug>/specs/<piece-name>/spec.md
+**Spec:** docs/prds/<prd-slug>/specs/<piece-slug>/spec.md
 **Status:** draft
 
 charter_snapshot:
@@ -133,7 +163,7 @@ charter_snapshot:
 ## Phase 2: ...
 ```
 
-And the manifest shows `<piece-name>: status: planned`.
+And the manifest shows `<piece-slug>: status: planned`.
 
 ## Phase Groups — when to use them
 
@@ -186,7 +216,7 @@ Phases 3 and 4 are marked `[P]` — disjoint file scopes (`csv_writer.py` vs `js
 
 qa-plan flags two issues in iteration 1: Phase 2's Refactor scope was vague, and CR-011 wasn't allocated to any phase. fix-doc resolves both. Iteration 2 clears. You sign off.
 
-Plan commits as `plan: add PI-104-data-export implementation plan` on the worktree branch. Manifest on master shows `PI-104-data-export: status: planned` and the `plan:` field now points to `docs/prds/my-product/specs/PI-104-data-export/plan.md`.
+Plan commits as `plan: add my-product/PI-104-data-export implementation plan` on the `piece/my-product-PI-104-data-export` branch. The manifest update (`status: planned`) commits to the same branch — main's manifest advances when the branch merges or a PR opens. The `plan:` field now points to `docs/prds/my-product/specs/PI-104-data-export/plan.md`.
 
 ## Where to go next
 

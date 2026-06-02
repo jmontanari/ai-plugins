@@ -4,11 +4,14 @@ docs_root: docs
 worktrees_root: worktrees
 
 # layout_version: docs/ layout schema version
-#   4       — enables v4 charter layout (.github/skills/charter-*/) + multi-PRD docs/prds/<prd-slug>/ layout
-#   3       — enables multi-PRD docs/prds/<prd-slug>/ layout with legacy docs/charter/ (v3.0.0+)
-#   1, 2    — legacy single-PRD layouts (docs/prd/, docs/specs/<piece>/)
-#   absent  — treated as legacy; SessionStart hook emits a yellow warning prompting `/spec-flow:migrate`
-layout_version: 3
+#   4       — charter as skills under charter_root/skills/charter-*/ + multi-PRD docs/prds/<prd-slug>/ layout
+layout_version: 4
+
+# charter_root: where charter skills live — .github or .claude. Resolved and written
+#   by /spec-flow:charter at bootstrap (it detects which host dir exists and recommends one).
+#   Charter domains live at <charter_root>/skills/charter-<domain>/SKILL.md.
+#   See plugins/spec-flow/reference/charter-location.md. Leave unset until charter is created.
+# charter_root: .claude
 
 # Orchestrator behavior
 # refactor: controls Step 5 (Refactor) dispatch
@@ -47,11 +50,11 @@ phase_groups: auto
 #   off     — skip Step 4.5; learnings.md authored without reflection-agent input (pre-v1.5 behavior)
 reflection: auto
 
-# charter: configures the charter stage (new in v2.0.0)
-#   required      — if true, prd/spec/plan skills fail fast when no charter files are found
-#                   (v4: .github/skills/charter-*/SKILL.md; v3: docs/charter/)
-#                   default: false for backward compat; new projects default to true after running /spec-flow:charter
-#   doctrine_load — list of charter files (by base name) to auto-load into session context via the SessionStart hook
+# charter: configures the charter stage
+#   required      — if true, prd/spec/plan skills fail fast when no charter skills are found
+#                   at <charter_root>/skills/charter-*/SKILL.md
+#                   default: false until /spec-flow:charter runs, which sets it true
+#   doctrine_load — list of charter domains (by base name) to auto-load into session context via the SessionStart hook
 #                   default: [non-negotiables, architecture]
 #                   set to [] to disable auto-load entirely
 charter:

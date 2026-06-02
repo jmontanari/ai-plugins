@@ -32,8 +32,10 @@ d = json.load(open('.claude-plugin/marketplace.json'))
 entry = next(p for p in d['plugins'] if p['name'] == 'spec-flow')
 print('marketplace.json:', entry['version'])
 "
-head -6 plugins/spec-flow/CHANGELOG.md   # should show ## [X.Y.Z] at line 5
+head -10 plugins/spec-flow/CHANGELOG.md  # latest ## [X.Y.Z] entry sits just below ## [Unreleased]
 ```
+
+> **Tip.** `/release spec-flow` invokes the `release` skill, which tags and publishes the GitHub release from the CHANGELOG once the four files above are bumped and verified. Update + verify the version-bearing files first, then run `/release` to cut the tag and release.
 
 ---
 
@@ -57,8 +59,9 @@ v3.7.0 was released with that file still at 3.6.0 — caught post-merge.
 After merging to master, sync the plugin dir to the local installed copy:
 
 ```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
 rsync -av --delete \
-  /Volumes/joeData/ai-plugins/plugins/spec-flow/ \
+  "$REPO_ROOT/plugins/spec-flow/" \
   ~/.copilot/installed-plugins/shared-plugins/spec-flow/
 ```
 
@@ -69,5 +72,5 @@ Verify: `grep '"version"' ~/.copilot/installed-plugins/shared-plugins/spec-flow/
 ## Adding a new version-bearing file in the future
 
 1. Add it to the table above with the version it was introduced.
-2. Update NN-C-009's "How QA verifies" list in `docs/charter/non-negotiables.md`.
+2. Update NN-C-009's "How QA verifies" list in `.claude/skills/charter-non-negotiables/SKILL.md`.
 3. Bump the spec-flow minor version (new capability → minor per NN-C-003).

@@ -1,5 +1,6 @@
 ---
-last_updated: 2026-04-21
+name: charter-coding-rules
+description: "Read before authoring or editing agent files, SKILL.md files, or plugin manifests — CR conventions for frontmatter schemas, naming, and file structure in the shared-plugins marketplace."
 ---
 
 # Coding Rules

@@ -306,24 +306,12 @@ Run `cd <worktree-path>` and confirm `pwd` before any further file operations.
 
 ### 5b — Charter constraint loading
 
-Charter loading varies by work type and `layout_version` in `.spec-flow.yaml`.
+Charter loading varies by work type. Charter is always published as skill files under the
+active charter root, resolved per `plugins/spec-flow/reference/charter-location.md` —
+`<charter_root>/skills/charter-<domain>/SKILL.md`, `<charter_root>` ∈ {`.github`, `.claude`}.
+Resolve the root once (read-only) before loading, then apply the tier matrix below.
 
-**Read layout_version:**
-
-```bash
-layout_version=$(grep -E '^layout_version:' .spec-flow.yaml 2>/dev/null | sed -E 's/^layout_version:[[:space:]]*//' | tr -d '"' | head -n1)
-layout_version="${layout_version:-3}"
-```
-
-**Check for v3 migration notice** (non-blocking — emit once, do not block work):
-
-If `layout_version` is `3` AND `<docs_root>/charter/` exists AND no `.github/skills/charter-*/SKILL.md` files are present, emit:
-
-> 💡 Charter skills not yet published. Run `/spec-flow:migrate` to publish charter constraints as project-level skills, enabling enforcement across all tools (editors, CI, etc.).
-
----
-
-**Tier matrix** — apply for `layout_version: 4` projects (charter skills published):
+**Tier matrix** — which charter domains to load:
 
 | Charter domain | Tier | Load when |
 |----------------|------|-----------|
@@ -347,44 +335,20 @@ If `layout_version` is `3` AND `<docs_root>/charter/` exists AND no `.github/ski
 | `exploratory` | none | (skip loading) |
 | vague/unclassified | Tier 1 | non-negotiables, processes, coding-rules |
 
-**v4 loading (`.github/skills/charter-*/SKILL.md` present):**
+**Charter loading (resolved location):**
 
-Invoke each charter skill matching the tier matrix above. Skills are invoked by reading their SKILL.md file into context — they carry their own descriptions and will persist.
+Invoke each charter skill matching the tier matrix above from the active charter root. Skills are invoked by reading their `SKILL.md` file into context — they carry their own descriptions and will persist. With `<charter_root>` resolved per `plugins/spec-flow/reference/charter-location.md` (`<charter_root>` ∈ {`.github`, `.claude`}):
 
 ```
 Invoke:
-  .github/skills/charter-non-negotiables/SKILL.md
-  .github/skills/charter-processes/SKILL.md
-  .github/skills/charter-coding-rules/SKILL.md
+  <charter_root>/skills/charter-non-negotiables/SKILL.md
+  <charter_root>/skills/charter-processes/SKILL.md
+  <charter_root>/skills/charter-coding-rules/SKILL.md
   [+ tier 2 domains if applicable]
 ```
 
-**v3 fallback (`doctrine_load` path):**
-
-If `layout_version` is `3` (or absent), load charter via the legacy `doctrine_load` list from `.spec-flow.yaml`:
-
-1. Read `non-negotiables.md` — extract all `### NN-C-NNN:` headings that are **not** under a `RETIRED` marker.
-2. Read `coding-rules.md` — extract all `### CR-NNN:` headings that are **not** retired.
-3. Emit the compact digest:
-
-```
-Charter constraints active for this session (N NNs, M CRs):
-
-Non-Negotiables:
-  NN-C-001: <title>
-  NN-C-002: <title>  ...
-
-Coding Rules:
-  CR-001: <title>
-  CR-002: <title>
-  ...
-
-These apply to ALL work regardless of type. To read a full rule:
-  view <docs_root>/charter/non-negotiables.md
-  view <docs_root>/charter/coding-rules.md
-```
-
-If a charter file is absent, note it but do not block.
+If a charter skill is absent, note it but do not block. If no charter root resolves at all (a
+pre-charter project), skip charter loading — there are no project-level NN-C/CR to apply.
 
 ### 5c — Piece context (plan-scoped only)
 
@@ -407,7 +371,7 @@ After context is loaded, emit a clear next-action recommendation:
 | `pipeline-entry` | `plan` | `Run /spec-flow:plan <prd>/<piece>` |
 | `pipeline-entry` | `execute` | `Run /spec-flow:execute <prd>/<piece>` |
 | `hotfix` | — | `Branch [branch] ready. Work directly — charter constraints are active.` |
-| `charter` | — | `Run /spec-flow:charter --update, or edit <docs_root>/charter/ directly.` |
+| `charter` | — | `Run /spec-flow:charter --update, or edit the charter skills under the resolved charter root (<charter_root>/skills/charter-*/SKILL.md) directly.` |
 | `exploratory` | — | `No branch or constraint requirements. Proceed with read-only exploration.` |
 
 Do not invoke the target skill automatically — present the recommendation and

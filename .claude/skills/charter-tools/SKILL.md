@@ -1,5 +1,6 @@
 ---
-last_updated: 2026-04-21
+name: charter-tools
+description: "Read before introducing any language, framework, dependency, or test tooling — the shared-plugins toolchain is markdown, YAML, JSON, and POSIX bash only, with no runtime dependencies."
 ---
 
 # Tools

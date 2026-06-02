@@ -44,7 +44,7 @@ This is the API boundary. The skill composes a prompt with exactly what the agen
 
 ## Why internal agents block on direct invocation
 
-Several spec-flow agents (implementer, tdd-red, verify, refactor, qa-phase, fix-code, reflection-process-retro, reflection-future-opportunities) have a **first-turn entrypoint check** that rejects the dispatch if orchestrator-injected context is missing. If you invoke `implementer` directly (without the execute skill) it will respond:
+Several spec-flow agents — implementer, tdd-red, qa-tdd-red, verify, refactor, qa-phase, qa-phase-lite, fix-code, spec-amend, plan-amend, reflection-process-retro, reflection-future-opportunities — have a **first-turn entrypoint check** (Rule 0) that rejects the dispatch if orchestrator-injected context is missing. If you invoke `implementer` directly (without the execute skill) it will respond:
 
 > BLOCKED — entrypoint violation. This agent is dispatched internally by `spec-flow:execute`. Calling it directly bypasses context-injection invariants (Mode flag, pre-flight snapshot, oracle anchors, matrix validation). Re-run through `spec-flow:execute` with a valid plan.
 
@@ -73,6 +73,15 @@ The implementer agent treats pre-decisions as binding — it does not re-deliber
 
 This keeps plan conditionals from forcing every agent to redo the same fact-gathering.
 
+## Tracking progress — two sources, both required
+
+The orchestrator tracks where it is in a piece via **two** records that must stay in sync:
+
+1. **plan.md checkboxes** — the durable, on-disk record. Each phase step (`[TDD-Red]`, `[Build]`, `[Verify]`, …) flips to `[x]` as it completes. This is what survives a session boundary and what a resumed run reads to recover position.
+2. **A harness task list** — execute calls `TaskCreate` once at the start (one task per dispatch unit, all `pending`) and `TaskUpdate` per phase as work moves to `in_progress` / `completed`. This makes the run visible to you in real time and makes interruption recovery unambiguous.
+
+Neither alone is sufficient. The checkboxes are the source of truth on resume; the task list is the live view. On resume, the orchestrator reconciles the two — if they disagree (e.g. the plan was edited mid-flight), it surfaces the mismatch to you rather than silently rebuilding. (On Copilot CLI, where the Task tools are unavailable, the orchestrator uses the built-in `sql` `todos` table for the same role.)
+
 ## The separation, in one image
 
 ```
@@ -84,7 +93,7 @@ This keeps plan conditionals from forcing every agent to redo the same fact-gath
 │  - Dispatches agents                                        │
 │  - Runs verification (tests, lint, build)                   │
 │  - Decides: proceed / retry / escalate                      │
-│  - Tracks progress via plan checkboxes                      │
+│  - Tracks progress via plan checkboxes + harness task list  │
 │                                                             │
 │  Writes ZERO implementation code                            │
 │                                                             │
@@ -99,6 +108,6 @@ The orchestrator is a pure conductor. Agents are narrow executors. The Agent too
 
 ## Where to go next
 
-- [TDD loop](./tdd-loop.md) — how the four execute-time agents coordinate inside the orchestrator.
+- [TDD loop](./tdd-loop.md) — how the execute-time agents (tdd-red, qa-tdd-red, implementer, verify, refactor, qa-phase) coordinate inside the orchestrator.
 - [QA loop](./qa-loop.md) — the review agents and the fresh-context principle.
 - [commands/execute.md](../commands/execute.md) — the orchestrator walkthrough.

@@ -20,8 +20,8 @@ See `plugins/spec-flow/README.md` for the canonical deeper reference on these pr
 
 Each stage has a single primary skill invocation, produces a concrete artifact, and has an explicit entry condition for the stage that follows.
 
-- **charter** (`/spec-flow:charter`) — Runs a Socratic brainstorm to produce `docs/charter/` (six files: architecture, non-negotiables, tools, processes, flows, coding-rules). Passes through a QA-charter agent before sign-off. Enables prd once the charter is approved.
-- **prd** (`/spec-flow:prd`) — Imports or normalizes a PRD, decomposes it into implementable pieces, and produces `docs/prd/prd.md` + `docs/prd/manifest.yaml`. Enables spec on each piece once the manifest is committed.
+- **charter** (`/spec-flow:charter`) — Runs a Socratic brainstorm to produce the charter skills at `<charter_root>/skills/charter-*/SKILL.md` — `<charter_root>` is `.github` or `.claude`, resolved per `reference/charter-location.md` (seven domains: architecture, non-negotiables, coding-rules, tools, processes, flows, integrations). Passes through a QA-charter agent before sign-off. Enables prd once the charter is approved.
+- **prd** (`/spec-flow:prd`) — Imports, creates, or normalizes a PRD, decomposes it into implementable pieces, and produces `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml`. Passes through a QA-prd agent. Enables spec on each piece once the manifest is committed.
 - **spec** (`/spec-flow:spec`) — Authors a detailed specification for one piece, including acceptance criteria, functional requirements, and non-negotiables. Passes through a QA-spec agent. Enables plan once the spec is approved.
 - **plan** (`/spec-flow:plan`) — Reads the spec and explores the codebase to produce an exhaustive phase-by-phase implementation plan with file paths, signatures, and verification commands per phase. Passes through a QA-plan agent. Enables execute once the plan is approved.
 - **execute** (`/spec-flow:execute`) — Orchestrates implementation phase-by-phase. Each phase dispatches a subagent (TDD mode or Implement mode) and runs an oracle gate before advancing. Reports DONE when all phases pass.
@@ -49,18 +49,20 @@ See `plugins/spec-flow/reference/spec-flow-doctrine.md` for the full doctrine, a
 
 ## Entry-point skills
 
-Start with `/spec-flow:status` if you are new to the project or resuming after a break — it shows the current pipeline state and recommends the next action.
+Start with `/spec-flow:intake` at the beginning of every session — it classifies the work, sets the working directory, loads charter constraints, and routes you to the right pipeline skill (`/spec-flow:status` runs inside it for a read-only snapshot).
 
 | Skill | Purpose | Invocation |
 |-------|---------|------------|
-| status | Pipeline dashboard: shows which pieces are in which stage, what is blocked, and what to work on next. Start here. | `/spec-flow:status` |
-| charter | Bootstrap, update, or retrofit the project charter (six binding constraint files). | `/spec-flow:charter` |
-| prd | Import or normalize a PRD and decompose it into implementable pieces in the manifest. | `/spec-flow:prd` |
+| intake | Session-start triage: classify incoming work, set CWD, load charter, route to the right skill. Run first, every session. | `/spec-flow:intake` |
+| status | Pipeline dashboard: shows which pieces are in which stage, what is blocked, and what to work on next. | `/spec-flow:status` |
+| charter | Bootstrap or update the project charter (seven domain skills under `.github/skills/charter-*/` or `.claude/skills/charter-*/`). | `/spec-flow:charter` |
+| prd | Import, create, or normalize a PRD and decompose it into implementable pieces in the manifest. | `/spec-flow:prd` |
 | spec | Author a detailed specification for one piece from the manifest. | `/spec-flow:spec` |
 | plan | Turn an approved spec into an exhaustive phase-by-phase implementation plan. | `/spec-flow:plan` |
 | execute | Orchestrate implementation of an approved plan phase-by-phase via subagents. | `/spec-flow:execute` |
 | small-change | Single-session workflow for small, focused changes that don't warrant a full PRD pipeline. Conducts a focused brainstorm (5–8 questions), produces a change brief and inline plan, creates a worktree, and routes to execute — all in one session. Triggers: "small feature", "quick fix", "minor change", "one-off", "tweak", "patch", "small bug fix". | `/spec-flow:small-change` |
 | review-board | Run the end-of-piece Final Review board on any target out of band — a PR, branch, working-tree changes, or files — decoupled from the merge gate. Reports adversarial findings by severity; optionally applies fixes (`--fix`) and posts inline PR comments (`--comment`). Never merges, amends, forks, or signs off. Triggers: "run the review board", "board-review this", "adversarial review of this PR/branch/diff". | `/spec-flow:review-board` |
+| defer | Record a non-blocking finding to a backlog file with provenance. The sole supported write path for `improvement-backlog.md` and `prds/<slug>/backlog.md`; requires `--rationale`. Triggers: "defer", "log to backlog", "record finding". | `/spec-flow:defer` |
 
 ---
 

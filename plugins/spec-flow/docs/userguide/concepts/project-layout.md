@@ -12,17 +12,20 @@ After running `charter → prd → spec → plan → execute` on one PRD (`my-ap
 
 ```
 your-project/
-├── .spec-flow.yaml                         pipeline config (layout, TDD mode, etc.)
+├── .spec-flow.yaml                         pipeline config (layout_version, TDD mode, etc.)
+├── .orchestra-state.json                   pipeline session state (current piece, counters)
+│
+├── <charter_root>/                         .github or .claude — resolved per reference/charter-location.md
+│   └── skills/                             charter — published as host-loadable skills
+│       ├── charter-architecture/SKILL.md   layer boundaries, dependency direction
+│       ├── charter-non-negotiables/SKILL.md NN-C-xxx entries — hard project rules
+│       ├── charter-coding-rules/SKILL.md   CR-xxx entries — code conventions
+│       ├── charter-tools/SKILL.md          approved languages, frameworks, test runners
+│       ├── charter-processes/SKILL.md      branching, commit, release, review policy
+│       ├── charter-flows/SKILL.md          standard end-to-end workflows
+│       └── charter-integrations/SKILL.md   external service constraints (Jira/MCP/CI)
 │
 ├── docs/
-│   ├── charter/                            project-wide constraints — one set per repo
-│   │   ├── architecture.md                 layer boundaries, dependency direction
-│   │   ├── non-negotiables.md              NN-C-xxx entries — hard project rules
-│   │   ├── coding-rules.md                 CR-xxx entries — code conventions
-│   │   ├── tools.md                        approved languages, frameworks, test runners
-│   │   ├── processes.md                    branching, commit, release, review policy
-│   │   └── flows.md                        standard end-to-end workflows
-│   │
 │   ├── prds/                               one directory per PRD (multi-PRD supported)
 │   │   └── my-api/                         PRD slug = "my-api"
 │   │       ├── prd.md                      goals, requirements, NN-P-xxx entries
@@ -32,17 +35,27 @@ your-project/
 │   │           ├── user-auth/              piece slug = "user-auth" (merged)
 │   │           │   ├── spec.md             acceptance criteria, functional requirements
 │   │           │   ├── plan.md             phase-by-phase implementation plan
+│   │           │   ├── introspection.md    codebase map written by plan during exploration
 │   │           │   └── learnings.md        written by execute after the piece merges
 │   │           └── api-gateway/            piece slug = "api-gateway" (in-progress)
 │   │               ├── spec.md
-│   │               └── plan.md             (no learnings yet — still executing)
+│   │               ├── plan.md
+│   │               └── introspection.md    (no learnings yet — still executing)
+│   │
+│   ├── changes/                            small-change track (sibling to prds/)
+│   │   └── fix-rate-limit-header/          change slug
+│   │       ├── change-brief.md             coverage-based brief + inline plan
+│   │       └── learnings.md
 │   │
 │   └── improvement-backlog.md              cross-PRD learnings, process retros
 │
 └── worktrees/
-    └── spec-my-api-api-gateway/            active worktree for the in-progress piece
-        └── ...                             (removed from this list after merge)
+    └── prd-my-api/
+        └── piece-api-gateway/              active worktree for the in-progress piece
+            └── ...                         (removed after the piece merges)
 ```
+
+**Where does `<charter_root>` resolve?** A project uses exactly one charter root — either `.github` or `.claude` — recorded as `charter_root` in `.spec-flow.yaml`. The example above shows the `.github` case; a Claude Code project would have `.claude/skills/charter-*/` instead. See [reference/charter-location.md](../../../reference/charter-location.md) for how the root is detected and chosen.
 
 **More than one PRD?** Add another directory under `docs/prds/`. The charter stays singular — it governs every PRD in the project.
 
@@ -62,28 +75,34 @@ Created automatically on first use. Edit to match your project.
 ```yaml
 docs_root: docs
 worktrees_root: worktrees
-layout_version: 3          # multi-PRD layout (v3.0.0+)
+layout_version: 4          # v4 charter (<charter_root>/skills/charter-*/) + multi-PRD docs/prds/
 
 refactor: auto             # skip Refactor when Build is clean on first attempt
 merge_strategy: squash_local  # or: pr (for protected-branch repos)
 tdd: auto                  # ask at plan time; or: true / false
 
+charter_root: .github      # .github | .claude — where charter skills live (reference/charter-location.md)
 charter:
-  required: false          # set true after you've run /spec-flow:charter
-  doctrine_load: [non-negotiables, architecture]
+  required: true           # prd/spec/plan/execute fail fast if no charter is found
+  doctrine_load: [non-negotiables, architecture]  # always-on domains
 ```
 
 ---
 
 ## Charter files
 
-Authored once via `/spec-flow:charter`. Rarely changed after that. Every downstream spec, plan, and reviewer cites entries from these files by ID.
+Authored once via `/spec-flow:charter`. Rarely changed after that. Each charter domain is a **skill** under `<charter_root>/skills/charter-<domain>/SKILL.md` — `<charter_root>` is `.github` or `.claude` (resolved per [reference/charter-location.md](../../../reference/charter-location.md)) — with `name:`/`description:` frontmatter; the description is what lets the host load the domain on demand. Every downstream spec, plan, and reviewer cites entries from these files by ID. (See [Charter system](./charter-system.md) for the two-tier loading model.) The section headings below show the `.github` root as a concrete example; a Claude Code project has the identical layout under `.claude/skills/`.
 
-### `docs/charter/architecture.md`
+### `.github/skills/charter-architecture/SKILL.md`
 
 Defines the layers of your project, what can call what, and which components own which concerns.
 
 ```markdown
+---
+name: charter-architecture
+description: "Read before changing layer structure, module boundaries, or dependency direction."
+---
+
 # Architecture
 
 ## Top-level layers
@@ -107,9 +126,9 @@ Defines the layers of your project, what can call what, and which components own
 | `src/repositories/` | Data team | DB queries |
 ```
 
-### `docs/charter/non-negotiables.md`
+### `.github/skills/charter-non-negotiables/SKILL.md`
 
-Project-wide hard rules with stable IDs. Each entry has: statement, scope, rationale, and a concrete QA verification command. IDs are never reused — retired entries become tombstones.
+Project-wide hard rules with stable IDs. Each entry has: statement, scope, rationale, and a concrete QA verification command. IDs are never reused — retired entries become tombstones. This is one of the two always-on doctrine domains, injected into every agent by the SessionStart hook.
 
 ```markdown
 # Non-Negotiables (Project)
@@ -135,7 +154,7 @@ Project-wide hard rules with stable IDs. Each entry has: statement, scope, ratio
   documented in this file.
 ```
 
-### `docs/charter/coding-rules.md`
+### `.github/skills/charter-coding-rules/SKILL.md`
 
 Conventions with teeth — the "style guide" that reviewers check. Uses `CR-xxx` IDs.
 
@@ -162,7 +181,7 @@ Conventions with teeth — the "style guide" that reviewers check. Uses `CR-xxx`
   `fix`, `docs`, `chore`, `refactor`, `release`.
 ```
 
-### `docs/charter/tools.md`
+### `.github/skills/charter-tools/SKILL.md`
 
 The approved toolchain. Agents must not introduce alternatives without updating this file.
 
@@ -194,7 +213,7 @@ The approved toolchain. Agents must not introduce alternatives without updating 
 - `lodash` — use native ES2022+ methods
 ```
 
-### `docs/charter/processes.md`
+### `.github/skills/charter-processes/SKILL.md`
 
 Branching model, review policy, release cadence, rollback procedure.
 
@@ -204,9 +223,10 @@ Branching model, review policy, release cadence, rollback procedure.
 ## Branching model
 
 - **Main branch:** `main`
-- **Feature branches:** `spec/<prd-slug>-<piece-slug>` for spec-flow pieces.
+- **Piece branches:** `piece/<prd-slug>-<piece-slug>` — one branch per piece, created by
+  `/spec-flow:spec` and shared by plan and execute through merge.
 - **Hotfix branches:** `hotfix/<short-description>` directly off `main`.
-- **Worktrees location:** `worktrees/` (per `.spec-flow.yaml`)
+- **Worktrees location:** `worktrees/prd-<prd-slug>/piece-<piece-slug>/` (per `.spec-flow.yaml`)
 
 ## Review policy
 
@@ -224,7 +244,7 @@ Branching model, review policy, release cadence, rollback procedure.
 - Squash-merge spec-flow pieces onto main.
 ```
 
-### `docs/charter/flows.md`
+### `.github/skills/charter-flows/SKILL.md`
 
 End-to-end system workflows that agents designing new features must respect.
 
@@ -253,6 +273,22 @@ POST /api/users/signup
 ```
 ```
 
+### `.github/skills/charter-integrations/SKILL.md`
+
+External service constraints — issue trackers (Jira), MCP servers, CI systems, webhooks. For each integration: what it enables, the prerequisites to use it, which skills invoke it, and how the pipeline degrades gracefully when the integration is absent. The Jira block here mirrors the `integrations.issue_tracker` config in `.spec-flow.yaml`.
+
+```markdown
+# Integrations
+
+## Jira (issue tracker)
+
+- **Provider:** jira — `EIT` project at `https://team.atlassian.net`
+- **Hierarchy:** Epic (manual) → Story (per-piece, managed by spec) → Task (per-phase, managed by plan)
+- **Constraints:** the integration handles its own credentials via MCP. If the
+  declared MCP tools are unavailable, an ⚠️ INTEGRATION WARNING is emitted and the
+  step is skipped — the rest of the pipeline continues unaffected.
+```
+
 ---
 
 ## PRD: `docs/prds/<prd-slug>/prd.md`
@@ -270,7 +306,7 @@ version: 1
 # Product Requirements — My API
 
 **Project:** my-api
-**Charter:** docs/charter/
+**Charter:** <charter_root>/skills/charter-*/SKILL.md   (.github or .claude)
 
 ## Goals
 
@@ -375,19 +411,20 @@ Authored by `/spec-flow:spec`. Defines *what* done looks like — from the user'
 
 ```markdown
 ---
-charter_snapshot:
+charter_snapshot:        # commit date of each charter skill this spec was authored against
   architecture: 2026-04-01
   non-negotiables: 2026-04-01
   coding-rules: 2026-04-01
   tools: 2026-04-01
   processes: 2026-04-01
   flows: 2026-04-01
+  integrations: 2026-04-01
 slug: user-auth
 prd: my-api
 status: approved
 created: 2026-04-04
 approved: 2026-04-05
-branch: spec/my-api-user-auth
+branch: piece/my-api-user-auth
 ---
 
 # Spec: user-auth — User Authentication
@@ -446,7 +483,7 @@ should be issued without verifying the hash.
 
 ## Plan: `docs/prds/<prd-slug>/specs/<piece>/plan.md`
 
-Authored by `/spec-flow:plan`. Defines *how* the code will be shaped — file paths, class signatures, test patterns — phase by phase.
+Authored by `/spec-flow:plan`. Defines *how* the code will be shaped — file paths, class signatures, test patterns — phase by phase. A v4 plan carries several required sections beyond the phase list: an **AC Coverage Matrix** (every spec AC → the phase that covers it), **Contracts** (interface signatures, injected into the tdd-red prompt per phase), **Architectural Decisions (ADR)**, **Executable AC Binding**, and per-phase **Change Specification Blocks** (verbatim code/diff scope). During exploration the plan skill also writes a sibling `introspection.md` — a read-only codebase map whose Dependency Map and Test Landscape sections are injected into execute's agent prompts.
 
 ```markdown
 ---
@@ -457,13 +494,14 @@ charter_snapshot:
   tools: 2026-04-01
   processes: 2026-04-01
   flows: 2026-04-01
+  integrations: 2026-04-01
 slug: user-auth
 prd: my-api
 spec: docs/prds/my-api/specs/user-auth/spec.md
 tdd: true
 created: 2026-04-06
 approved: 2026-04-07
-branch: spec/my-api-user-auth
+branch: piece/my-api-user-auth
 ---
 
 # Plan: user-auth — User Authentication
@@ -530,7 +568,7 @@ pnpm test src/services/__tests__/UserService.test.ts
 
 ## Learnings: `docs/prds/<prd-slug>/specs/<piece>/learnings.md`
 
-Written by `/spec-flow:execute` after a piece merges. Captures what worked, what QA caught, and concrete recommendations for future specs. Two reflection agents contribute: `reflection-process-retro` (orchestration lessons) and `reflection-future-opportunities` (new feature ideas and backlog candidates).
+Written by `/spec-flow:execute` after a piece merges. Captures what worked, what QA caught, and concrete recommendations for future specs. Two reflection agents contribute: `reflection-process-retro` (orchestration lessons) and `reflection-future-opportunities` (new feature ideas and backlog candidates). The reflection agents **emit** findings to the orchestrator — they do not write backlog files themselves. Findings the operator chooses to defer are written by `/spec-flow:defer` (see the backlog-routing rule below).
 
 ```markdown
 # Learnings: my-api/user-auth
@@ -570,14 +608,15 @@ that a <1s test run could produce a flaky assertion. Fixed before merge.
 
 ---
 
-## Worktrees: `worktrees/<branch-slug>/`
+## Worktrees: `worktrees/prd-<prd-slug>/piece-<piece-slug>/`
 
 Each piece gets its own working directory so you can context-switch without stashing.
-The branch and worktree are named by combining the PRD slug and piece slug:
+One `piece/<prd-slug>-<piece-slug>` branch is created by `/spec-flow:spec` and shared by
+plan and execute for the full lifetime of the piece:
 
 ```
-branch name:    spec/my-api-api-gateway
-worktree path:  worktrees/spec-my-api-api-gateway/
+branch name:    piece/my-api-api-gateway
+worktree path:  worktrees/prd-my-api/piece-api-gateway/
 ```
 
 The worktree is created by `/spec-flow:spec` when the piece branch is first set up.
@@ -587,20 +626,23 @@ It's removed after the piece merges to main.
 
 ```
 worktrees/
-├── spec-my-api-api-gateway/     piece 1 (in-progress on this PRD)
-└── spec-data-platform-ingest/   piece from a different PRD, also in-progress
+├── prd-my-api/
+│   └── piece-api-gateway/        piece 1 (in-progress on this PRD)
+└── prd-data-platform/
+    └── piece-ingest/             piece from a different PRD, also in-progress
 ```
 
 Each worktree is a full checkout of the repo on its branch. `git status` inside
-`worktrees/spec-my-api-api-gateway/` sees only that branch's uncommitted changes.
+`worktrees/prd-my-api/piece-api-gateway/` sees only that branch's uncommitted changes.
 
 ---
 
 ## `docs/improvement-backlog.md` — cross-PRD learnings
 
-Process retros and future feature ideas that don't belong to any one PRD. Written by
-`reflection-process-retro` during execute. New backlog items surface here when they're
-too large or cross-cutting to fit in a single PRD's `backlog.md`.
+Process retros and future feature ideas that don't belong to any one PRD. Process-retro and
+global findings land here; PRD-local future-opportunities land in `docs/prds/<slug>/backlog.md`.
+Both paths are written **only** by `/spec-flow:defer` after the operator triages a finding at
+execute Step 6c — reflection agents never write these files directly.
 
 ```markdown
 # Improvement Backlog
@@ -620,15 +662,16 @@ Proposed layout (sibling to `docs/prds/`):
 This item stays here until it graduates to a formal PRD piece.
 ```
 
-**Routing rule:** items that apply to one PRD go in `docs/prds/<slug>/backlog.md`;
-items that span multiple PRDs or relate to spec-flow's own process go here.
+**Routing rule:** future-opportunities scoped to one PRD go in `docs/prds/<slug>/backlog.md`;
+process-retro items and anything cross-cutting (or about spec-flow's own process) go here.
+All writes go through `/spec-flow:defer` — it is the sole write path for both files.
 
 ---
 
 ## How the files connect
 
 ```
-docs/charter/                     ← authored once, rarely changed
+<charter_root>/skills/charter-*/SKILL.md  ← authored once, rarely changed (.github or .claude)
     └── NN-C-xxx, CR-xxx IDs
 
 docs/prds/<prd-slug>/prd.md       ← cites charter; defines NN-P-xxx
@@ -636,26 +679,29 @@ docs/prds/<prd-slug>/prd.md       ← cites charter; defines NN-P-xxx
     └── manifest.yaml             ← lists pieces + statuses
           │
           ├── specs/<piece>/spec.md  ← cites NN-C, NN-P, CR IDs by name
-          │                             charter_snapshot: records charter dates
+          │                             charter_snapshot: records charter commit dates
           │
           └── specs/<piece>/plan.md  ← cites same IDs; allocates to phases
+                │                       (+ introspection.md written during exploration)
                 │
                 └── execute produces:
                       ├── learnings.md  (in same specs/<piece>/ dir)
-                      └── entries in docs/improvement-backlog.md
+                      └── findings → /spec-flow:defer → backlog.md / improvement-backlog.md
 ```
 
-Every artifact carries a `charter_snapshot:` front-matter block with the `last_updated`
-dates of the charter files it was authored against. If the charter changes after a spec is
-written, the pipeline flags the drift and prompts resolution before the plan runs.
+Every artifact carries a `charter_snapshot:` front-matter block recording the **commit date**
+of each charter skill it was authored against (read via `git log`). If a charter skill changes
+after a spec is written, the pipeline flags the drift and prompts resolution before the plan runs.
 
 ---
 
 ## Where to go next
 
-- [Pipeline](./pipeline.md) — why the five stages exist and what ambiguity each resolves.
+- [Pipeline](./pipeline.md) — why the stages exist and what ambiguity each resolves.
 - [Charter system](./charter-system.md) — deep dive on NN-C / NN-P / CR namespaces and citation integrity.
+- [commands/intake.md](../commands/intake.md) — the session entry point that routes work to the right stage.
 - [commands/charter.md](../commands/charter.md) — running `/spec-flow:charter` step by step.
 - [commands/prd.md](../commands/prd.md) — running `/spec-flow:prd`, including multi-PRD projects.
 - [commands/spec.md](../commands/spec.md) — running `/spec-flow:spec`.
 - [commands/plan.md](../commands/plan.md) — running `/spec-flow:plan`.
+- [commands/small-change.md](../commands/small-change.md) — the lightweight `docs/changes/<slug>/` track.

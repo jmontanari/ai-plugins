@@ -23,26 +23,13 @@ Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/
 
 ## Step 0.5: Charter Prerequisite Check
 
-Read the `charter:` block from `.spec-flow.yaml` (added in v2.0.0). Two keys: `required` (default `false`) and `doctrine_load`.
+Read the `charter:` block from `.spec-flow.yaml`. Key: `required` (default `false`).
 
-**Auto-detect charter location** (check in this order):
-1. **v4** — `.github/skills/charter-non-negotiables/SKILL.md` exists → charter lives at `.github/skills/charter-*/SKILL.md`
-2. **v3** — `<docs_root>/charter/` directory exists → charter lives at `<docs_root>/charter/`
-3. **none** — neither exists
+**Resolve charter location.** Charter is published as skill files under the active charter root, resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-<domain>/SKILL.md`, `<charter_root>` ∈ {`.github`, `.claude`}. Resolution either yields a root (charter present) or finds none (a pre-charter project).
 
-Record the detected variant as `charter_variant` (`v4`, `v3`, or `none`) for use in later steps.
-
-- If `charter.required: true` and `charter_variant == none` → respond with: *"Charter is required for this project but no charter files were found at `.github/skills/charter-*/SKILL.md` or `<docs_root>/charter/`. Run `/spec-flow:charter` first to bootstrap the charter, then re-run `prd`."* Halt.
-- If `charter_variant == v4` → continue; cite `NN-C-xxx` entries from `.github/skills/charter-non-negotiables/SKILL.md` when classifying PRD constraints.
-- If `charter_variant == v3` → continue; cite `NN-C-xxx` entries from `<docs_root>/charter/non-negotiables.md` when classifying PRD constraints.
-- If `charter_variant == none` and `charter.required: false` → continue. Treat this as a pre-charter project; the PRD holds all non-negotiables as unprefixed `NN-xxx` (legacy) until the project chooses to retrofit.
-
-**Legacy layout detection:** if `<docs_root>/prd.md` exists at the legacy flat path (v1.5.x and prior) rather than `<docs_root>/prd/prd.md`, present the retrofit offer: *"Detected legacy docs layout (pre-v2.0). Run `/spec-flow:charter --retrofit` to migrate to the new charter-aware layout — nine-step, commit-per-step, fully revertable."* Then pause:
-
-> "Do you want to run the retrofit now before continuing? (yes / no / remind me later)"
-
-- **yes** → halt and direct the user to run `/spec-flow:charter --retrofit` first; do not continue.
-- **no or remind me later** → emit a persistent warning banner: `⚠️ [LEGACY-MODE] This project uses the pre-v2.0 layout. Some skill features are limited until retrofit.` Write `legacy_mode: true` under the `charter:` block in `.spec-flow.yaml`. Note `[LEGACY-MODE: true]` in the manifest YAML front-matter (written at commit time) so downstream skills have a visible signal. Continue with legacy path behavior for backward compat.
+- If `charter.required: true` and no charter root resolves → respond with: *"Charter is required for this project but no charter skills were found at `<charter_root>/skills/charter-*/SKILL.md` (`<charter_root>` ∈ {`.github`, `.claude`}). Run `/spec-flow:charter` first to bootstrap the charter, then re-run `prd`."* Halt.
+- If a charter root resolves → continue; cite `NN-C-xxx` entries from `<charter_root>/skills/charter-non-negotiables/SKILL.md` when classifying PRD constraints.
+- If no charter root resolves and `charter.required: false` → continue. The PRD holds product-specific non-negotiables as `NN-P-xxx`; no project-level NN-C is available until `/spec-flow:charter` bootstraps one.
 
 ## Argument parsing (v3)
 
@@ -114,13 +101,9 @@ Read the confirmed source PRD and reorganize its content into the template struc
 - Extract problem statement / background / context → `## Problem Statement`
 - Extract assumptions → `## Assumptions`
 - Extract open questions → `## Open Questions`
-- Extract constraints / non-negotiables:
-  - If `charter_variant` is `v4` or `v3`, classify each constraint:
-    - Project-wide (security, compliance, architecture, tooling) → propose adding to charter as `NN-C-xxx`. Ask the user to confirm; if accepted, append the new entry to the charter non-negotiables file:
-      - v4: `.github/skills/charter-non-negotiables/SKILL.md`
-      - v3: `<docs_root>/charter/non-negotiables.md`
-    - Product-specific (tied to this PRD) → number as `NN-P-001, NN-P-002, ...` in the `## Non-Negotiables (Product)` section of `prd.md`.
-  - If charter does not exist (legacy pre-charter project) → number as unprefixed `NN-001, NN-002, ...` in the PRD's legacy `## Non-Negotiables` section. Retrofit (piece 6) will reclassify later.
+- Extract constraints / non-negotiables. Classify each constraint:
+  - Project-wide (security, compliance, architecture, tooling) → propose adding to charter as `NN-C-xxx`. Ask the user to confirm; if accepted, append the new entry to the charter non-negotiables skill at the resolved charter root: `<charter_root>/skills/charter-non-negotiables/SKILL.md` (`<charter_root>` ∈ {`.github`, `.claude`}, resolved per `plugins/spec-flow/reference/charter-location.md`).
+  - Product-specific (tied to this PRD) → number as `NN-P-001, NN-P-002, ...` in the `## Non-Negotiables (Product)` section of `prd.md`.
 
 **Persona content rule:** Preserve substantive persona content (differing user roles, usage contexts, behavioral constraints) into `## Personas`. Strip only: vacuous one-liner bios with no product-specific constraint, process checklists, meeting notes, template instructions. When in doubt: preserve and flag for user review with a `[NEEDS REVIEW: possible persona theater]` inline marker.
 
@@ -218,7 +201,6 @@ At `<docs_root>/prds/<prd-slug>/manifest.yaml` (v3 layout):
 - All pieces start with status: `open`
 - Calculate coverage section
 - For each piece, verify `prd_sections:` references real FR-xxx / NFR-xxx identifiers from the normalized PRD (no dangling references)
-- If `legacy_mode: true` (from Step 0.5), add `legacy_mode: true` to the manifest YAML front-matter
 - Write branching strategy from step 4l into the manifest front-matter:
   ```yaml
   feature_branch: <value or null>  # piece branches base off this and merge here after execute
@@ -241,7 +223,7 @@ Any `[NEEDS REVIEW]` markers still present must be resolved or explicitly accept
 
 **Step 9: Archive legacy import scrap (optional, not for PRDs)**
 
-This step exists ONLY for legacy import artifacts (BMad `_bmad-output/`, old hand-written specs predating spec-flow) — NOT for PRDs themselves. Archived PRDs in v3 stay in place via `status: archived` front-matter; there is no `docs/prds/archive/` convention.
+This step exists ONLY for import-source artifacts (BMad `_bmad-output/`, hand-written specs predating spec-flow) — NOT for PRDs themselves. Archived PRDs stay in place via `status: archived` front-matter; there is no `docs/prds/archive/` convention.
 
 - If legacy import scrap exists, create `<docs_root>/archive/` (the import-scrap folder, not a PRD location) and move the scrap there.
 - Do NOT delete — move only.
@@ -250,9 +232,7 @@ This step exists ONLY for legacy import artifacts (BMad `_bmad-output/`, old han
 **Step 10: Commit**
 
 - v3 layout: `git add <docs_root>/prds/<prd-slug>/prd.md <docs_root>/prds/<prd-slug>/manifest.yaml <docs_root>/prds/<prd-slug>/backlog.md`
-- Also stage any charter non-negotiables updates if you appended NN-C entries in step 2a:
-  - v4: `git add .github/skills/charter-non-negotiables/SKILL.md`
-  - v3: `git add <docs_root>/charter/non-negotiables.md`
+- Also stage any charter non-negotiables updates if you appended NN-C entries in step 2a: `git add <charter_root>/skills/charter-non-negotiables/SKILL.md` (`<charter_root>` ∈ {`.github`, `.claude`}, resolved per `plugins/spec-flow/reference/charter-location.md`).
 - Also stage `<docs_root>/archive/` only if step 9 actually moved scrap there.
 - `git commit -m "feat(<prd-slug>): import and normalize PRD, create manifest"`
 

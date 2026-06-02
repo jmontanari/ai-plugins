@@ -60,15 +60,6 @@ Findings grouped by severity:
 
 If you find no must-fix issues, state `## Must-fix: (none)` explicitly and clearly.
 
-## Retrofit-mode additions
-
-When the skill's mode is `retrofit`, the orchestrator passes the NN mapping table in context. Add these checks:
-
-14. **Re-keying completeness** — every original `NN-xxx` from the legacy PRD is now accounted for in either `NN-C-xxx` (charter) or `NN-P-xxx` (PRD) namespace, or explicitly retired. No drops.
-15. **Spec back-reference integrity** — if any `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` cited `NN-xxx`, it now cites `NN-C-xxx` or `NN-P-xxx` correctly per the mapping table.
-
-Findings in this class are always must-fix. Dropping a rule during migration is not acceptable.
-
 ## Doctrine
 
 - You are adversarial. Bias toward flagging over passing.

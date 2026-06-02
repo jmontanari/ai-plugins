@@ -1,6 +1,6 @@
 # Charter drift check (Phase-1 procedure)
 
-This document specifies the charter-drift check that every spec-flow skill touching a piece runs as part of its Phase-1 setup. The check compares the piece spec's `charter_snapshot:` values against the current charter dates — v4 projects (`.github/skills/charter-*/SKILL.md`) use `git log` last-commit dates; v3 projects (`docs/charter/*.md`) use `last_updated:` front-matter. When any charter domain has advanced past the snapshot, the skill dispatches `qa-spec` in `Input Mode: Focused charter re-review` and either auto-advances the snapshot (clean) or halts the skill (must-fix). There is no escape hatch.
+This document specifies the charter-drift check that every spec-flow skill touching a piece runs as part of its Phase-1 setup. The check compares the piece spec's `charter_snapshot:` values against the current charter dates — charter skills (`<charter_root>/skills/charter-*/SKILL.md`, where `<charter_root>` is `.github` or `.claude`, resolved per `plugins/spec-flow/reference/charter-location.md`) use `git log` last-commit dates. When any charter domain has advanced past the snapshot, the skill dispatches `qa-spec` in `Input Mode: Focused charter re-review` and either auto-advances the snapshot (clean) or halts the skill (must-fix). There is no escape hatch.
 
 ## When to run
 
@@ -17,9 +17,7 @@ Every skill that touches a piece runs this in Phase 1:
 
 The 7-step algorithm (verbatim from spec.md lines 305-313):
 
-1. Detect charter location and load current dates into `charter_now`:
-   - **v4** (`.github/skills/charter-non-negotiables/SKILL.md` exists): for each charter domain, run `git log -1 --format=%ci .github/skills/charter-<domain>/SKILL.md` and store the date as `charter_now[<domain>]`.
-   - **v3** (`<docs_root>/charter/` exists): load each `docs/charter/*.md` front-matter `last_updated:` value into `charter_now[<filename>]`.
+1. Resolve `<charter_root>` per `plugins/spec-flow/reference/charter-location.md` and load current dates into `charter_now`: for each charter domain, run `git log -1 --format=%ci <charter_root>/skills/charter-<domain>/SKILL.md` and store the date as `charter_now[<domain>]`.
 2. Load piece spec's `charter_snapshot:` values into `snapshot`.
 3. For each charter file where `charter_now[file] > snapshot[file]`: mark drifted.
 4. If any drifted: dispatch `qa-spec` with `Input Mode: Focused charter re-review`, passing the full self-contained input bundle from FR-009 (full spec body, drifted charter file bodies, snapshot values, manifest entry, PRD's NN-P section, spec's NN/CR honoring blocks).
@@ -33,12 +31,10 @@ No new agent file is needed: `qa-spec` gains a third `Input Mode` alongside `Ful
 
 The 7-step algorithm above assumes `charter_now[file]` and `snapshot[file]` both exist for every charter file. In practice they may not. Handle these states explicitly:
 
-- **v3: Charter file missing `last_updated:` front-matter.** Refuse the drift check — print `charter file <name> has no last_updated: front-matter; drift cannot be detected. Add the field (or run /spec-flow:charter retrofit) and re-run.` Do not silently treat the missing date as "infinitely old" or "infinitely new."
-- **v4: Charter skill has no git history** (file exists but `git log` returns empty — e.g., staged but never committed). Refuse the drift check — print `charter skill <domain> has no commit history; drift cannot be detected. Commit the charter file and re-run.`
-- **Spec has no `charter_snapshot:` block at all (legacy pre-charter piece).** Skip the drift check silently and emit a one-line note in the caller's output: `drift check skipped — spec predates charter_snapshot.` This is consistent with `/spec-flow:status`'s passive surfacing rule.
+- **Charter skill has no git history** (file exists but `git log` returns empty — e.g., staged but never committed). Refuse the drift check — print `charter skill <domain> has no commit history; drift cannot be detected. Commit the charter file and re-run.`
+- **Spec has no `charter_snapshot:` block at all (a pre-charter piece).** Skip the drift check silently and emit a one-line note in the caller's output: `drift check skipped — spec predates charter_snapshot.` This is consistent with `/spec-flow:status`'s passive surfacing rule.
 - **New charter file (in `charter_now`, not in `snapshot`).** Mark drifted. The piece's spec must be re-reviewed against the new file in case it added a new NN-C/NN-P/CR entry.
 - **Removed/renamed charter file (in `snapshot`, not in `charter_now`).** Mark drifted. The piece's spec may cite an entry that no longer exists; re-review surfaces orphaned citations.
-- **Both present, malformed `last_updated:` value (not a parseable date).** Refuse the drift check — print `charter file <name> has malformed last_updated: <value>; expected ISO 8601 (YYYY-MM-DD). Fix and re-run.`
 
 These extensions ensure a new charter file with a NN-C/NN-P/CR entry the spec violates is never silently ignored.
 
@@ -47,7 +43,7 @@ These extensions ensure a new charter file with a NN-C/NN-P/CR entry the spec vi
 When step 4 fires, the skill dispatches `qa-spec` with the full self-contained input bundle required by NN-C-008 (verbatim from FR-009, items (a)-(f)):
 
 (a) the full body of the piece's `spec.md`,
-(b) the full body of every charter file whose `last_updated:` advanced past the snapshot,
+(b) the full body of every charter file whose commit date advanced past the snapshot,
 (c) the piece's previous `charter_snapshot:` values for those files,
 (d) the piece's manifest entry (so the agent sees `prd_sections` and dependencies),
 (e) the PRD's `## Non-Negotiables (Product)` section (so the agent can cross-check NN-P drift),
@@ -63,7 +59,7 @@ When `qa-spec` returns `clean` (step 6), the orchestrator rewrites the piece spe
 charter_snapshot updated YYYY-MM-DD — no content changes required
 ```
 
-The date is the calendar date of the auto-advance, not the charter file's `last_updated:`. The log line accumulates over the lifetime of the spec — successive clean re-reviews append additional lines rather than overwriting prior entries — so the spec's history is auditable.
+The date is the calendar date of the auto-advance, not the charter file's commit date. The log line accumulates over the lifetime of the spec — successive clean re-reviews append additional lines rather than overwriting prior entries — so the spec's history is auditable.
 
 ## Caller responsibilities
 

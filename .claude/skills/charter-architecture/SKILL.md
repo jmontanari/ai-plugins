@@ -1,5 +1,6 @@
 ---
-last_updated: 2026-04-21
+name: charter-architecture
+description: "Read before changing marketplace/plugin layering, where skills, agents, hooks, templates, or reference docs live, or the dependency direction across the shared-plugins marketplace."
 ---
 
 # Architecture

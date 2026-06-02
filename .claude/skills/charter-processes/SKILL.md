@@ -1,5 +1,6 @@
 ---
-last_updated: 2026-04-21
+name: charter-processes
+description: "Read before branching, releasing, or merging in the shared-plugins marketplace — branching model, review policy, release cadence, and the plugin/marketplace version-sync process."
 ---
 
 # Processes

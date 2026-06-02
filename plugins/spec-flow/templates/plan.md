@@ -18,7 +18,7 @@ fast: false                  # true = fast mode: skips per-phase QA agents (qa-t
 # Plan: {{piece_name}}
 
 **Spec:** docs/prds/{{prd_slug}}/specs/{{piece_slug}}/spec.md
-**Charter:** docs/charter/ (binding — each phase enumerates its honored NN-C/NN-P/CR entries)
+**Charter:** <charter_root>/skills/charter-*/SKILL.md (binding — each phase enumerates its honored NN-C/NN-P/CR entries)
 **Status:** draft
 
 ## Overview

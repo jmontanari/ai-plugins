@@ -20,36 +20,39 @@ One consequence: the orchestrator (the main conversation) writes **zero** implem
 
 ## How it's structured
 
-The plugin ships six skills, a pool of specialized agents, reusable templates, and a doctrine document loaded on every session.
+The plugin ships ten skills, a pool of 25 specialized agents, reusable templates, and a doctrine document loaded on every session.
 
 ```
 plugins/spec-flow/
-├── skills/          # Entry points — invoked via /status, /charter, /prd, /spec, /plan, /execute, /defer, /small-change, /review-board
+├── skills/          # Entry points — /intake, /status, /charter, /prd, /spec, /plan, /execute, /defer, /small-change, /review-board
+│   ├── intake/      # Session-start triage: classify work, set CWD, load charter, route to the right skill — run first
 │   ├── status/      # Pipeline dashboard + next-action recommendation + charter divergence resolver
-│   ├── charter/     # Bootstrap/update/retrofit charter — project-wide binding constraints (v2.0.0)
-│   ├── prd/         # Import/normalize PRD, decompose into pieces, update manifest
+│   ├── charter/     # Bootstrap/update charter — project-wide binding constraints (7 domains as skills under .github or .claude)
+│   ├── prd/         # Import/create/update PRD, decompose into pieces, update manifest
 │   ├── spec/        # Author a spec for one piece (Socratic brainstorm + QA)
 │   ├── plan/        # Turn spec into exhaustive implementation plan + QA
 │   ├── execute/     # Orchestrate implementation phase-by-phase with subagents
-│   ├── defer/       # Record a non-blocking finding to a backlog file with provenance (v3.2.0)
+│   ├── defer/       # Record a non-blocking finding to a backlog file with provenance
 │   ├── small-change/  # Single-session combined flow: brainstorm, scope-gate, plan, and hand off to execute
 │   └── review-board/  # On-demand: run the Final Review board on any PR/branch/diff, out of band
 │
-├── agents/          # Subagent templates dispatched by the skills above
+├── agents/          # 25 subagent templates dispatched by the skills above
 │   ├── tdd-red.md           # Writes failing tests (TDD mode only)
-│   ├── qa-tdd-red.md        # Reviews Red's tests for theater patterns before Build (TDD mode only, v2.5.0)
+│   ├── qa-tdd-red.md        # Reviews Red's tests for theater patterns before Build (TDD mode only)
 │   ├── implementer.md       # Unified code-writer; runs in Mode: TDD or Mode: Implement
 │   ├── verify.md            # Confirms correctness against spec ACs
 │   ├── refactor.md          # Phase-scoped cleanup
-│   ├── qa-phase.md          # Reviews each completed phase
+│   ├── qa-phase.md          # Reviews each completed phase (Opus)
+│   ├── qa-phase-lite.md     # Narrow Sonnet review of a Phase Group sub-phase
 │   ├── qa-spec.md           # Reviews spec before plan
 │   ├── qa-plan.md           # Reviews plan before execution
-│   ├── qa-charter.md        # Reviews charter files before sign-off (v2.0.0)
+│   ├── qa-prd.md            # Reviews PRD completeness before manifest creation
+│   ├── qa-charter.md        # Reviews charter files before sign-off
 │   ├── qa-prd-review.md     # End-of-pipeline: did we actually fulfill the PRD?
 │   ├── fix-code.md          # Targeted fixes after QA findings
 │   ├── fix-doc.md           # Same, for spec/plan/charter documents
-│   ├── plan-amend.md        # Amends the plan in response to a discovery (v3.2.0)
-│   ├── spec-amend.md        # Amends the spec in response to a discovery (v3.2.0)
+│   ├── plan-amend.md        # Amends the plan in response to a discovery
+│   ├── spec-amend.md        # Amends the spec in response to a discovery
 │   ├── review-board-blind.md            # Final Review — blind reviewer (diff-only)
 │   ├── review-board-edge-case.md        # Final Review — edge-case hunter
 │   ├── review-board-spec-compliance.md  # Final Review — spec compliance
@@ -61,7 +64,7 @@ plugins/spec-flow/
 │   └── reflection-future-opportunities.md  # End-of-piece — forward-looking ideas
 │
 ├── templates/       # Starting shapes for PRD, spec, plan, manifest, charter
-│   └── charter/     # Six charter templates (architecture, non-negotiables, tools, processes, flows, coding-rules)
+│   └── charter/     # Seven charter templates (architecture, non-negotiables, tools, processes, flows, coding-rules, integrations)
 ├── reference/       # spec-flow-doctrine.md — auto-loaded on session start
 └── hooks/           # SessionStart hook that loads the doctrine + charter files
 ```
@@ -78,36 +81,41 @@ The user guide covers the full pipeline with per-command walkthroughs, concept d
 |---|---|
 | **[User guide overview](./docs/userguide/README.md)** | Index of all pages + quickstart |
 | [Project layout](./docs/userguide/concepts/project-layout.md) | Full directory tree after running the pipeline; annotated examples of every file type (charter, PRD, manifest, spec, plan, learnings) |
-| [Pipeline concepts](./docs/userguide/concepts/pipeline.md) | Why `charter → prd → spec → plan → execute` is five stages and not one |
+| [Pipeline concepts](./docs/userguide/concepts/pipeline.md) | Why `charter → prd → spec → plan → execute` is staged, and what each artifact is and isn't |
 | [Charter system](./docs/userguide/concepts/charter-system.md) | NN-C / NN-P / CR namespaces; how citations flow through specs and plans |
 | [TDD loop](./docs/userguide/concepts/tdd-loop.md) | Red / Build / Verify / Refactor enforced by the orchestrator |
 | [QA loop](./docs/userguide/concepts/qa-loop.md) | Iterative fix-and-re-review; circuit-breaker behavior |
 | [Orchestrator model](./docs/userguide/concepts/orchestrator-model.md) | Why skills orchestrate and agents implement; context isolation |
-| [/charter command](./docs/userguide/commands/charter.md) | Bootstrap, update, or retrofit — full walkthrough |
-| [/prd command](./docs/userguide/commands/prd.md) | Import PRD, decompose into pieces, multi-PRD layout |
+| [/intake command](./docs/userguide/commands/intake.md) | Session-start triage and routing — run first every session |
+| [/charter command](./docs/userguide/commands/charter.md) | Bootstrap or update the charter — full walkthrough |
+| [/prd command](./docs/userguide/commands/prd.md) | Import, create, or update a PRD; decompose into pieces; multi-PRD layout |
 | [/spec command](./docs/userguide/commands/spec.md) | Author a spec for one piece |
 | [/plan command](./docs/userguide/commands/plan.md) | Turn a spec into an implementation plan |
 | [/execute command](./docs/userguide/commands/execute.md) | Run the plan phase-by-phase via subagents |
 | [/status command](./docs/userguide/commands/status.md) | Pipeline dashboard |
+| [/small-change command](./docs/userguide/commands/small-change.md) | One-session track for small focused changes |
+| [/review-board command](./docs/userguide/commands/review-board.md) | Run the Final Review board out of band on any PR/branch/diff |
+| [/defer command](./docs/userguide/commands/defer.md) | Record a non-blocking finding to a backlog with provenance |
 
 ---
 
-## Multi-PRD support (v3.0.0+)
+## Multi-PRD support
 
-Spec-flow v3.0.0 lifts the single-PRD-per-project assumption. A repo can host multiple PRDs in parallel under a singular `docs/charter/`, each with its own pieces, specs, plans, manifest, and lifecycle state. The charter remains one per project — it captures project-wide architectural constraints that apply across every PRD.
+A repo can host multiple PRDs in parallel under a single project-wide charter, each with its own pieces, specs, plans, manifest, and lifecycle state. The charter remains one per project — it captures project-wide architectural constraints that apply across every PRD, and lives as charter skills under the project's charter root, `.github/skills/charter-*/` or `.claude/skills/charter-*/` (see [Charter](#charter)).
 
-**Layout.** Each PRD lives at `docs/prds/<prd-slug>/`:
+**Layout.** The charter lives under `<charter_root>/skills/` (`<charter_root>` is `.github` or `.claude`); each PRD lives at `docs/prds/<prd-slug>/`:
 
 ```
+<charter_root>/skills/                 # Project-wide charter (.github or .claude) — applies to every PRD
+├── charter-architecture/SKILL.md
+├── charter-non-negotiables/SKILL.md  # NN-C-xxx (project-wide)
+├── charter-coding-rules/SKILL.md     # CR-xxx
+├── charter-tools/SKILL.md
+├── charter-processes/SKILL.md
+├── charter-flows/SKILL.md
+└── charter-integrations/SKILL.md     # external integrations (Jira, MCP, CI, webhooks)
+
 docs/
-├── charter/                          # Singular — applies to every PRD in the repo
-│   ├── architecture.md
-│   ├── non-negotiables.md            # NN-C-xxx (project-wide)
-│   ├── tools.md
-│   ├── processes.md
-│   ├── flows.md
-│   └── coding-rules.md               # CR-xxx
-│
 ├── prds/                             # One subdirectory per PRD
 │   ├── <prd-slug>/
 │   │   ├── prd.md                    # Includes status front-matter
@@ -117,9 +125,15 @@ docs/
 │   │       └── <piece-slug>/
 │   │           ├── spec.md
 │   │           ├── plan.md
+│   │           ├── introspection.md  # codebase exploration notes (untracked)
 │   │           └── learnings.md
 │   └── <other-prd-slug>/
 │       └── ...
+│
+├── changes/                          # small-change track artifacts
+│   └── <slug>/
+│       ├── change-brief.md
+│       └── plan.md
 │
 └── improvement-backlog.md            # Global — cross-PRD learnings + spec-flow process retros
 ```
@@ -131,6 +145,8 @@ See `plugins/spec-flow/reference/v3-path-conventions.md` for the canonical path 
 **Slug naming.** Slugs (≤20 chars, charset `[a-z0-9-]`, ≤50-char branch length when combined with `<prd-slug>-<piece-slug>`) keep paths and branches readable. See `plugins/spec-flow/reference/slug-validator.md` for rules and the validator behavior the skills enforce.
 
 **Cross-PRD piece dependencies.** A piece in PRD A can declare a dependency on a piece in PRD B via a qualified `depends_on:` ref of the shape `<prd-slug>/<piece-slug>` (unqualified refs continue to mean same-PRD). `/spec-flow:execute` blocks on unmerged cross-PRD dependencies by default; pass `--ignore-deps` for deliberate deviations.
+
+**Branching topology.** Each manifest captures the PRD's branch strategy in front-matter — `feature_branch:` (an optional accumulator branch that pieces merge into), `merge_target:` (where pieces merge — an accumulator branch or `main`/`master`), and `pr_required:` (whether the merge goes through a pull request). `/spec-flow:execute` reads these to decide each piece's merge destination; a piece does not always merge straight to `main`.
 
 **Dual backlog routing.** Two distinct backlogs serve two distinct audiences:
 
@@ -146,12 +162,13 @@ The `spec` skill reads the PRD-local backlog at brainstorm start to surface cand
 A piece of work flows through the pipeline linearly. Each stage has an output, a QA gate, and a status update in the manifest.
 
 ```
-  ┌──────────┐   Socratic   ┌─────────┐   QA    ┌──────────────────────────────┐
-  │ charter  │─ brainstorm ▶│ charter │──loop──▶│  docs/charter/ (six files)   │
-  │ (v2.0.0) │              │         │  (Opus) │  architecture, tools, flows, │
-  │          │              │         │         │  processes, coding-rules,    │
-  │          │              │         │         │  non-negotiables (NN-C-xxx)  │
-  └──────────┘              └─────────┘         └──────────────────────────────┘
+  ┌──────────┐   Socratic   ┌─────────┐   QA    ┌──────────────────────────────────┐
+  │ charter  │─ brainstorm ▶│ charter │──loop──▶│ <charter_root>/skills/charter-* (7)│
+  │          │              │         │  (Opus) │  architecture, tools, flows,     │
+  │          │              │         │         │  processes, coding-rules,        │
+  │          │              │         │         │  integrations,                   │
+  │          │              │         │         │  non-negotiables (NN-C-xxx)      │
+  └──────────┘              └─────────┘         └──────────────────────────────────┘
                                                │
                                    binds everything below ↓
                               ┌──────────────────────────────────────────────┐
@@ -199,16 +216,16 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 
 | Stage | Input | Output | Reviewer | Main model |
 |---|---|---|---|---|
-| **charter** (v2.0.0) | Detection signals + user-supplied sources (team wikis, handbooks) | `docs/charter/` — six files with architecture, NN-C, tools, processes, flows, CR | `qa-charter` (Opus, up to 3 fix loops) | — |
-| **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) | Normalized `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml` with numbered FR/NFR/NN-P/SC and a piece list | Human (during brainstorm) | — |
-| **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` with acceptance criteria + cited NN-C/NN-P/CR | `qa-spec` (Opus, up to 3 fix loops) | — |
-| **plan** | Approved spec + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with per-phase TDD or Implement tracks, semantic anchors, charter allocations | `qa-plan` (Opus, up to 3 fix loops) | — |
-| **execute** | Approved plan | Working code on `piece/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. v3.2.0+ adds synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) — discoveries route to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (2 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + final review board (7 agents; 8 in fast mode) | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **charter** | Detection signals + user-supplied sources (team wikis, handbooks) | `<charter_root>/skills/charter-*/` (`.github` or `.claude`) — seven domain skills (architecture, non-negotiables, coding-rules, tools, processes, flows, integrations) | `qa-charter` (Opus, up to 3 fix loops) | — |
+| **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) or a from-scratch interview | Normalized `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml` with numbered FR/NFR/NN-P/SC, branching fields, and a piece list | `qa-prd` (Opus, up to 3 fix loops) | — |
+| **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` with acceptance criteria, cited NN-C/NN-P/CR, and any `[PENDING-DECISION]` markers | `qa-spec` (Opus, up to 3 fix loops) | — |
+| **plan** | Approved spec + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with per-phase TDD or Implement tracks, AC Coverage Matrix, Contracts, Architectural Decisions, Executable AC Binding, and Change Specification Blocks | `qa-plan` (Opus, up to 3 fix loops) | — |
+| **execute** | Approved plan | Working code on `piece/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. Synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) routes discoveries to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (5 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + final review board (7 agents; 8 in fast mode) | `implementer` (Sonnet, Mode: TDD or Implement) |
 | **small-change** | User description of a small focused change | `docs/changes/<slug>/change-brief.md` + `plan.md` on `change/<slug>` branch; worktree ready for `/spec-flow:execute change/<slug>`. Use when the change fits in 1–3 implementation phases and doesn't require the full PRD → spec → plan pipeline. | scoped brainstorm (5–8 questions) + scope gate | — |
 | **review-board** | A PR #, branch, path(s), or working-tree changes (out of band — no piece required) | Consolidated adversarial findings by severity; `--fix` routes findings into `/spec-flow:small-change` for a planned, QA-gated, board-reviewed fix (never patches the tree directly); `--comment` posts inline PR comments. Never merges, amends, forks, or signs off. | the Final Review board itself (blind, edge-case, security, ground-truth, architecture; +spec-compliance/prd-alignment when context supplied) | routes to `/spec-flow:small-change` (with `--fix`) |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
 
-### Synchronous discovery triage (v3.2.0+)
+### Synchronous discovery triage
 
 The execution that finds the work also fixes it. Discoveries surfaced during a phase — a missing AC, an architectural assumption that turned out wrong, an unanticipated dependency — get triaged at end-of-phase rather than silently deferred to a backlog where they decay.
 
@@ -221,7 +238,7 @@ The execution that finds the work also fixes it. Discoveries surfaced during a p
   - **defer** — the discovery does not block the piece's goals; record to a backlog via `/spec-flow:defer` with provenance.
 - **Step 8: Final Review Triage** — applies the same Step 6c routing to findings surfaced by the final review board (7 agents standard; 8 in fast mode) at end-of-piece, before merge.
 
-**Per-piece amendment budget.** A piece may take at most **2 amendments total** (combined plan-amend + spec-amend), with **at most 1 spec-amend**. Hitting the budget forces fork-or-defer for any further discovery — the piece is either done as scoped or the work belongs in another piece. The budget is the load-bearing safeguard against a piece amending itself indefinitely.
+**Per-piece amendment budget.** A piece may take at most **5 amendments total** (combined plan-amend + spec-amend), with **at most 1 spec-amend**. Hitting the budget forces fork-or-defer for any further discovery — the piece is either done as scoped or the work belongs in another piece. The budget is the load-bearing safeguard against a piece amending itself indefinitely.
 
 **Per-piece artifact.** Every amend / fork / defer decision lands a row in `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.discovery-log.md` with provenance (phase, AC ID, route, rationale). The AC matrix grows a `Reason:` field with values `does-not-block-goal | requires-amendment | requires-fork` so the route is auditable from the matrix alone.
 
@@ -244,24 +261,24 @@ A phase must pick exactly one track. Both markers, or neither, is treated as a m
 
 ---
 
-## Charter (v2.0.0)
+## Charter
 
-Charter is the pre-PRD stage that captures project-wide binding constraints — the stuff that doesn't change when the product changes. Six focused files live in `docs/charter/`:
+Charter is the pre-PRD stage that captures project-wide binding constraints — the stuff that doesn't change when the product changes. Seven focused domains are published as charter **skills** under the project's charter root — `.github/skills/charter-<domain>/SKILL.md` or `.claude/skills/charter-<domain>/SKILL.md` (resolved per [`reference/charter-location.md`](./reference/charter-location.md)). They are the single source of truth — there is no `docs/charter/` directory. Each is loaded by the host either always-on or on-demand (see [Charter system](./docs/userguide/concepts/charter-system.md)):
 
-| File | Content |
-|---|---|
-| `architecture.md` | Layers, dependency direction, component ownership, module boundaries |
-| `non-negotiables.md` | `NN-C-xxx` — project-wide binding rules (security, compliance, architecture, tooling) |
-| `tools.md` | Language, framework, test runner, linter, CI, approved/banned libraries |
-| `processes.md` | Branching, review policy, release cadence, CI gates, incident response |
-| `flows.md` | Request flow, auth flow, data-write path, other critical end-to-end flows |
-| `coding-rules.md` | `CR-xxx` — numbered coding conventions, citable from specs and plans |
+| Domain (`<charter_root>/skills/charter-<domain>/SKILL.md`) | Content | Loading |
+|---|---|---|
+| `architecture` | Layers, dependency direction, component ownership, module boundaries | always-on |
+| `non-negotiables` | `NN-C-xxx` — project-wide binding rules (security, compliance, architecture, tooling) | always-on |
+| `coding-rules` | `CR-xxx` — numbered coding conventions, citable from specs and plans | on-demand |
+| `tools` | Language, framework, test runner, linter, CI, approved/banned libraries | on-demand |
+| `processes` | Branching, review policy, release cadence, CI gates, incident response | on-demand |
+| `flows` | Request flow, auth flow, data-write path, other critical end-to-end flows | on-demand |
+| `integrations` | External integrations — Jira/issue tracker, MCP servers, CI systems, webhooks | on-demand |
 
-### Three modes
+### Two modes
 
-- **Bootstrap** — `docs/charter/` doesn't exist. Full Socratic flow → write six files → QA → per-file commits. Runs on new projects or projects adopting charter for the first time.
-- **Update** — scoped re-run of Socratic on specific files. Retirement UX (retire-vs-delete) preserves historical traceability via tombstones. Post-commit, in-flight pieces get a divergence notice.
-- **Retrofit** — automated migration for pre-v2.0 projects. Nine-step commit-per-step pipeline with `--dry-run` preview. Reclassifies existing NN-xxx into NN-C / NN-P / retired. `git mv`-based layout migration. Per-piece spec and plan rewrites via `fix-doc`. Full QA sweep at the end.
+- **Bootstrap** — no `charter-*/SKILL.md` files exist under either skills root. Charter detects which host directory the project already has (`.github/` or `.claude/`) and recommends that root — prompting you to choose if both or neither exist (never assuming a default). Full Socratic flow → write seven domain skills to `<charter_root>/skills/` → QA → per-domain commits → write `.spec-flow.yaml` with `layout_version: 4`, `charter_root`, and `charter.required: true`.
+- **Update** — scoped re-run of Socratic on specific domains under the resolved charter root. Retirement UX (retire-vs-delete) preserves historical traceability via tombstones. Post-commit, in-flight pieces get a divergence notice.
 
 ### Entry schema — `Rule` vs `Reference`
 
@@ -274,11 +291,11 @@ Reference entries let you point at Maven conventions, Google Java Style, your ow
 
 ---
 
-## Non-negotiables: two namespaces (v2.0.0)
+## Non-negotiables: two namespaces
 
-- **`NN-C-xxx`** (Charter) — project-wide. Applies across every product and every piece in the repo. Lives in `docs/charter/non-negotiables.md`. Changes rarely.
+- **`NN-C-xxx`** (Charter) — project-wide. Applies across every product and every piece in the repo. Lives in `<charter_root>/skills/charter-non-negotiables/SKILL.md`. Changes rarely.
 - **`NN-P-xxx`** (Product) — product-specific. Tied to a single PRD. Lives in `docs/prds/<prd-slug>/prd.md` under `## Non-Negotiables (Product)`. Grows with each PRD import.
-- **`CR-xxx`** (Coding Rules) — a third citable namespace for coding conventions, separate from binding rules. Lives in `docs/charter/coding-rules.md`.
+- **`CR-xxx`** (Coding Rules) — a third citable namespace for coding conventions, separate from binding rules. Lives in `<charter_root>/skills/charter-coding-rules/SKILL.md`.
 
 Specs and plans cite specific IDs. Every piece's spec enumerates the NN-C, NN-P, and CR entries its scope touches under `### Non-Negotiables Honored` and `### Coding Rules Honored`, with a per-entry "how this piece honors it" line. Plans allocate each cited entry to exactly one phase's "Charter constraints honored in this phase" slot. QA checks that every claim is demonstrably honored in the final diff.
 
@@ -296,20 +313,18 @@ Specs and plans cite specific IDs. Every piece's spec enumerates the NN-C, NN-P,
 claude plugin install spec-flow
 ```
 
-**First session on a new project (v2.0.0 flow):**
+**First session on a new project:**
 
-1. `/status` — reports "No pipeline initialized."
-2. `/spec-flow:charter` — Socratic bootstrap of `docs/charter/`. Detects existing signals (`README`, `package.json`, `.github/workflows/`, etc.), asks for any additional sources (team wikis, handbooks), then walks you through six files one question at a time. `qa-charter` reviews. Per-file commits.
-3. `/prd` — imports your PRD. Classifies each extracted non-negotiable as `NN-C` (adds to charter) or `NN-P` (stays in PRD). Decomposes into pieces with you, writes `docs/prds/<prd-slug>/manifest.yaml`.
+1. `/spec-flow:intake` — classifies the work and routes you. On an uninitialized project it reports "no charter yet" and points you to charter.
+2. `/spec-flow:charter` — Socratic bootstrap of the charter skills. It first picks a charter root (`.github/skills/` or `.claude/skills/`) by detecting which host directory your project already has, then detects existing signals (`README`, `package.json`, `.github/workflows/`, etc.), asks for any additional sources (team wikis, handbooks), and walks you through seven domains one question at a time. `qa-charter` reviews. Per-domain commits.
+3. `/prd` — imports (or creates) your PRD. Classifies each extracted non-negotiable as `NN-C` (adds to charter) or `NN-P` (stays in PRD). Decomposes into pieces with you, writes `docs/prds/<prd-slug>/manifest.yaml`.
 4. `/spec` — authors a spec for the first `open` piece. Loads charter, identifies the NN-C/NN-P/CR entries this piece touches, brainstorms with you, creates a worktree on `piece/<prd-slug>-<piece-slug>`, runs `qa-spec`, asks for sign-off.
 5. `/plan` — reads charter + spec, allocates every cited NN/CR to a specific phase, writes an exhaustive plan, runs `qa-plan`, asks for sign-off.
 6. `/execute` — runs the per-phase loop until all phases are green and the final review board is clean. Asks for merge approval.
 7. Repeat `/spec` → `/plan` → `/execute` for each remaining piece.
 8. When the manifest shows all pieces `done`, `/prd --review` validates full PRD fulfillment.
 
-**Upgrading from v1.5.x:** run `/spec-flow:charter --retrofit --dry-run` first to preview the nine-step migration. When you're comfortable, re-invoke without `--dry-run`. Or opt out with `/spec-flow:charter --decline` to keep v1.5.x behavior.
-
-**Every session:** start with `/status` to see where you are. The SessionStart hook loads the TDD doctrine and (if present) the charter files listed under `charter.doctrine_load` in `.spec-flow.yaml`.
+**Every session:** start with `/spec-flow:intake` — it sets the working directory, loads charter constraints, and routes you to the right skill (`/status` runs inside it for a read-only snapshot). The SessionStart hook loads the TDD doctrine and the always-on charter domains (non-negotiables + architecture); the remaining charter domains load on-demand by description.
 
 ---
 
@@ -329,22 +344,26 @@ claude plugin install spec-flow
 On first use, a `.spec-flow.yaml` is created at the project root:
 
 ```yaml
-docs_root: docs            # Where charter/, prds/, improvement-backlog.md live
+docs_root: docs            # Where prds/ and improvement-backlog.md live (charter lives in .github/skills/)
 worktrees_root: worktrees  # Where feature branches get checked out
-layout_version: 3          # v3.0.0+ — PRDs at docs/prds/<prd-slug>/. Absence triggers a SessionStart warning.
+layout_version: 4          # charter as skills under <charter_root>/skills/ + multi-PRD docs/prds/<prd-slug>/
+charter_root: .github      # .github or .claude — where charter skills live (written by /spec-flow:charter)
 
 # Orchestrator behavior
 refactor: auto             # auto | always | never — skip Refactor when Build is clean
-qa_iter2: auto             # auto | always — skip QA iter-2 re-dispatch when fix diff is small + self-verified
 phase_groups: auto         # auto | always | off — use Phase Group scheduler when plan has groups
 reflection: auto           # auto | off — dispatch end-of-piece reflection agents (Step 4.5)
 ```
 
-Edit if your project uses different layouts (e.g., `docs_root: repo/docs`) or wants different orchestrator defaults. The `refactor` and `qa_iter2` keys both default to `auto` — they skip low-yield steps based on the Build agent's own self-reported cleanliness. Set to `always` if you want every phase to get a Refactor pass and every fix-code iteration to get an Opus QA re-review regardless of self-report — costs ~20–30 min/phase of extra wall time but catches anything the skip predicates might miss. Set `refactor: never` for repetitive-pattern tracks (e.g. adapter boilerplate) where Refactor historically produces only comment cleanups.
+Edit if your project uses different layouts (e.g., `docs_root: repo/docs`) or wants different orchestrator defaults. The `refactor` key defaults to `auto` — it skips low-yield steps based on the Build agent's own self-reported cleanliness. Set to `always` if you want every phase to get a Refactor pass regardless of self-report — costs ~20–30 min/phase of extra wall time but catches anything the skip predicate might miss. Set `refactor: never` for repetitive-pattern tracks (e.g. adapter boilerplate) where Refactor historically produces only comment cleanups.
 
-The `phase_groups` key controls the v1.4.0 Phase Scheduler. In `auto` (default), plans that use Phase Group headings (`## Phase Group <letter>:`) dispatch their Sub-Phases concurrently; plans using only flat phases (`### Phase <N>`) run serially as before. Set to `off` to disable the scheduler entirely (treats groups as flat serial phases) — useful for rollback if you hit scheduler bugs in a new release. Set to `always` to have the orchestrator warn when a plan has only flat phases in a piece that looks parallelizable — catches over-flat plans during doctrine adoption.
+> **Deprecated keys.** `qa_iter2` and `charter.doctrine_load` are still parsed for backward compatibility but no longer drive behavior: QA iter-2 re-dispatch is always on, and v4 loads charter via the charter-skill scan (always-on for `non-negotiables` + `architecture`, on-demand for the rest).
 
-The `reflection` key (new in v1.5.0) controls Step 4.5 of Final Review. In `auto` (default), two read-only Sonnet reflection agents fire after Human Sign-Off and before Capture Learnings: a process retro examining session metrics + escalation log + cumulative diff to identify what worked / what didn't in the orchestration flow, and a future-opportunities agent examining the spec/plan/diff/manifest to surface candidate future pieces. As of v3.2.0, findings are emitted to the orchestrator as structured reports; the orchestrator routes each finding through Step 6c discovery triage (amend / fork / defer). Only the operator-chosen `defer` resolution writes to a backlog file — via `/spec-flow:defer` — producing one `chore(<piece-slug>): defer ...` commit per deferred finding. Step 5's `learnings.md` synthesis consumes the same reflection outputs and is unchanged. Set to `off` to skip Step 4.5 entirely (preserves pre-v1.5 behavior — `learnings.md` authored without reflection-agent input).
+**Fast mode** is a per-plan toggle, not a `.spec-flow.yaml` key. Set `fast: true` in a plan's front-matter to skip the per-phase `qa-tdd-red` and `qa-phase` gates and compensate with an 8th end-of-piece reviewer (`verify` Mode: Piece Full). See [/plan](./docs/userguide/commands/plan.md).
+
+The `phase_groups` key controls the Phase Scheduler. In `auto` (default), plans that use Phase Group headings (`## Phase Group <letter>:`) dispatch their Sub-Phases concurrently; plans using only flat phases (`### Phase <N>`) run serially as before. Set to `off` to disable the scheduler entirely (treats groups as flat serial phases) — useful for rollback if you hit scheduler bugs in a new release. Set to `always` to have the orchestrator warn when a plan has only flat phases in a piece that looks parallelizable — catches over-flat plans during doctrine adoption.
+
+The `reflection` key controls Step 4.5 of Final Review. In `auto` (default), two read-only Sonnet reflection agents fire after Human Sign-Off and before Capture Learnings: a process retro examining session metrics + escalation log + cumulative diff to identify what worked / what didn't in the orchestration flow, and a future-opportunities agent examining the spec/plan/diff/manifest to surface candidate future pieces. Findings are emitted to the orchestrator as structured reports; the orchestrator routes each finding through Step 6c discovery triage (amend / fork / defer). Only the operator-chosen `defer` resolution writes to a backlog file — via `/spec-flow:defer` — producing one `chore(<piece-slug>): defer ...` commit per deferred finding. Step 5's `learnings.md` synthesis consumes the same reflection outputs and is unchanged. Set to `off` to skip Step 4.5 entirely (`learnings.md` is then authored without reflection-agent input).
 
 ### Recommended project-level setup
 
@@ -370,7 +389,7 @@ The common shape for a test hook: take `pass_filenames: true`, receive the chang
 
 **Scaffold-first commits for multi-phase coordination-file edits.** See the [scaffold-first phase guidance in the plan skill](skills/plan/SKILL.md) — when a piece has ≥2 phases each appending to the same shared coordination files, authoring a single scaffold phase upfront unblocks parallel dispatch of the later phases.
 
-### Phase Groups (v1.4.0+) — parallel execution of independent work
+### Phase Groups — parallel execution of independent work
 
 When a piece contains multiple independent units of work (N adapters, N endpoints, per-table migrations), the plan skill can decompose them into a **Phase Group** with parallel-eligible Sub-Phases. The execute skill's Phase Scheduler dispatches the Sub-Phases concurrently, runs each through its own Red → Build → Verify → QA-lite cycle, then runs one group-level Refactor + Opus QA on the cumulative diff.
 
@@ -393,23 +412,23 @@ This tiering drops net Opus QA cost: instead of N Opus dispatches per group (one
 
 See the plan skill's rule 8 for Phase Group structure; see `skills/execute/SKILL.md` "Phase Group Loop" for the execution flow.
 
-### Reflection stage (v1.5.0+) — end-of-piece retros + improvement backlog
+### Reflection stage — end-of-piece retros + improvement backlog
 
 Each piece ends with a two-agent reflection stage (Step 4.5 in execute) before the synthesized `learnings.md` gets written. The agents run in parallel:
 
 - **Process retro** (Sonnet, read-only) examines session metrics, per-phase escalation log, and the cumulative diff to identify orchestration patterns worth keeping or changing for future pieces. Output: `must-improve` / `worked-well` / `metrics` sections.
 - **Future opportunities** (Sonnet, read-only) examines the spec, plan, cumulative diff, current improvement backlog, and manifest to surface candidate future pieces (deferred ACs, hinted features, tech debt accrued, dependencies unlocked, cross-piece patterns). Every item must reference a concrete artifact — no speculation.
 
-**v3.2.0 routing (synchronous triage, not auto-write).** As of v3.2.0, reflection agent findings are emitted as structured reports to the orchestrator. The orchestrator routes each finding through Step 6c discovery triage — the operator chooses amend, fork, or defer per finding. Only the `defer` choice writes to a backlog file, via `/spec-flow:defer`, with one `chore(<piece-slug>): defer ...` commit per deferred finding. There is no automatic backlog-write commit at the end of the reflection step.
+**Routing (synchronous triage, not auto-write).** Reflection agent findings are emitted as structured reports to the orchestrator. The orchestrator routes each finding through Step 6c discovery triage — the operator chooses amend, fork, or defer per finding. Only the `defer` choice writes to a backlog file, via `/spec-flow:defer`, with one `chore(<piece-slug>): defer ...` commit per deferred finding. There is no automatic backlog-write commit at the end of the reflection step.
 
-Backlog routing by target (v3.0.0+) — applies to defer resolutions:
+Backlog routing by target — applies to defer resolutions:
 
 - **Future-opportunities findings** (capability-scoped) route to `docs/prds/<prd-slug>/backlog.md` (PRD-local) when deferred. The `spec` skill reads this file at brainstorm start (Phase 1, step 6) and surfaces ~5 most-relevant items as candidate considerations for new pieces *within the same PRD*. Items the user marks `incorporated` or `obsolete` during brainstorm get pruned after spec sign-off (Phase 5, step 4); `deferred` items stay for future surface-up.
 - **Process-retro findings** (cross-PRD, pipeline-level) route to `docs/improvement-backlog.md` (global) when deferred. Spec-flow's own retros consume this; per-piece brainstorms do not.
 
 The improvement backlog is intentionally pruneable working state, not an immutable log. Manually delete entries when they're addressed or no longer relevant.
 
-Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the pre-v1.5 single-shot `learnings.md` flow.
+Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the single-shot `learnings.md` flow without reflection agents.
 
 ---
 
@@ -419,7 +438,7 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 - **Doctrine** — `reference/spec-flow-doctrine.md` is loaded on every session. Adjust the TDD laws, safeguards, or testing ratios to your engineering culture.
 - **Agents** — each agent is a short Markdown template under `agents/`. Rules, context shape, and output format are all text you can tune.
 - **Review board** — add or remove reviewers by dropping / deleting `agents/review-board-<lens>.md` files. The final review dispatches whatever flat-name agents match that prefix in parallel.
-- **Internal vs. user-facing agents** — user-facing skills (`spec-flow:prd`, `spec-flow:spec`, `spec-flow:plan`, `spec-flow:execute`, `spec-flow:status`) are the documented API. Internal agents (`implementer`, `tdd-red`, `verify`, `refactor`, `qa-phase`, `qa-phase-lite`, `fix-code`) are dispatched by the execute skill with orchestrator-injected context; they are not meant to be called directly and will BLOCK on a first-turn entrypoint check if invoked without the correct context. If you customize an internal agent, preserve the Rule 0 check — it's the safety net against direct-dispatch contamination.
+- **Internal vs. user-facing agents** — the user-facing skills (`spec-flow:intake`, `:status`, `:charter`, `:prd`, `:spec`, `:plan`, `:execute`, `:small-change`, `:review-board`, `:defer`) are the documented API. Internal agents (`implementer`, `tdd-red`, `qa-tdd-red`, `verify`, `refactor`, `qa-phase`, `qa-phase-lite`, `fix-code`, `fix-doc`, `spec-amend`, `plan-amend`, `reflection-*`) are dispatched by the skills with orchestrator-injected context; they are not meant to be called directly and will BLOCK on a first-turn entrypoint check if invoked without the correct context. If you customize an internal agent, preserve the Rule 0 check — it's the safety net against direct-dispatch contamination.
 
 ---
 
@@ -431,7 +450,7 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 
 **Why the implementer is a single agent with a mode flag** (not two agents). The rules of good implementation — follow the plan, respect architecture, stay in scope, don't guess — are identical regardless of whether the oracle is failing tests or a lint command. Splitting them created drift. One file, one flag, shared doctrine.
 
-**Why six parallel reviewers at merge time (seven in fast mode).** Each reviewer has a lens: blind (no context, just the diff), edge-case, spec-compliance, PRD-alignment, architecture, security (CWE Top 25, injection, crypto, auth/authz, supply chain). Running them in parallel with fresh context is cheap (one round-trip) and catches the things a single reviewer would rationalize away. In fast mode, a 7th reviewer (`verify Mode: Piece Full`) is added — it applies the full 11-pattern theater catalog and AC binding check across the entire piece's test surface, compensating for the per-phase `qa-tdd-red` and `qa-phase` gates that fast mode skips.
+**Why seven parallel reviewers at merge time (eight in fast mode).** Each reviewer has a lens: blind (no context, just the diff), edge-case, spec-compliance, PRD-alignment, architecture, security (CWE Top 25, injection, crypto, auth/authz, supply chain), and ground-truth (do computed outputs reproduce an independently-derived correct answer?). Running them in parallel with fresh context is cheap (one round-trip) and catches the things a single reviewer would rationalize away. In fast mode, an 8th reviewer (`verify Mode: Piece Full`) is added — it applies the full theater-pattern catalog and AC binding check across the entire piece's test surface, compensating for the per-phase `qa-tdd-red` and `qa-phase` gates that fast mode skips.
 
 **Why circuit breakers everywhere.** AI coding agents will cheerfully loop on the same failure forever. 2 build attempts, 3 QA cycles, 3 review cycles — then escalate. If the pipeline can't make progress, the human is the right solver, not another retry.
 
@@ -470,13 +489,16 @@ Once installed, spec-flow exposes the same skills on either host:
 
 | Command | Description |
 |---|---|
-| `/spec-flow:status` | Pipeline dashboard — shows which pieces are in which stage and what to work on next. Start here. |
-| `/spec-flow:charter` | Bootstrap, update, or retrofit the project charter. |
-| `/spec-flow:prd` | Import or normalize a PRD and decompose it into pieces. |
+| `/spec-flow:intake` | Session-start triage — classify work, set CWD, load charter, route to the right skill. Run first. |
+| `/spec-flow:status` | Pipeline dashboard — shows which pieces are in which stage and what to work on next. |
+| `/spec-flow:charter` | Bootstrap or update the project charter (seven domain skills under `.github/skills/` or `.claude/skills/`). |
+| `/spec-flow:prd` | Import, create, or update a PRD and decompose it into pieces. |
 | `/spec-flow:spec` | Author a detailed specification for one piece. |
 | `/spec-flow:plan` | Generate an exhaustive phase-by-phase implementation plan from an approved spec. |
 | `/spec-flow:execute` | Orchestrate implementation phase-by-phase via subagents. |
-| `/spec-flow:defer` | Record a non-blocking discovery to a backlog file with provenance (v3.2.0+). Sole supported path for writing to `<docs_root>/prds/<prd-slug>/backlog.md` or `<docs_root>/improvement-backlog.md`. |
+| `/spec-flow:small-change` | One-session track for a small focused change that doesn't warrant the full PRD pipeline. |
+| `/spec-flow:review-board` | Run the Final Review board out of band on a PR, branch, working tree, or files. |
+| `/spec-flow:defer` | Record a non-blocking discovery to a backlog file with provenance. Sole supported path for writing to `<docs_root>/prds/<prd-slug>/backlog.md` or `<docs_root>/improvement-backlog.md`. |
 
 **Dual-path details that make this work:**
 

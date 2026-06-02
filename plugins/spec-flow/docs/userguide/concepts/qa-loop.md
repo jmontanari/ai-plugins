@@ -48,12 +48,24 @@ This saves context, keeps iterations fast, and prevents the reviewer from drifti
 
 ## The fix agents
 
-Two fix agents exist, specialized for different artifacts:
+Four fix agents exist, specialized for different kinds of finding:
 
 - **fix-doc** — fixes spec.md, plan.md, charter files from must-fix findings. Outputs a unified diff; does NOT commit. The orchestrator stages and commits after QA passes.
 - **fix-code** — fixes production code from must-fix findings (or Verify findings during execute). Same output contract: unified diff, orchestrator commits.
+- **plan-amend** — used when a finding requires a *structural* plan change (a new phase, a re-scoped phase, a corrected contract) rather than a patch. Re-runs qa-plan after the amend.
+- **spec-amend** — used when a finding reveals a missing FR/AC or a contradiction in the spec itself. Re-runs qa-spec after the amend.
 
-Both agents have one hard rule: **fix only what the findings identify**. No scope creep. No "while I'm here" cleanups. If a finding requires user input to resolve (genuine ambiguity, not a technical error), the fix agent reports BLOCKED and the orchestrator escalates.
+All four have one hard rule: **fix only what the findings identify**. No scope creep. No "while I'm here" cleanups. If a finding requires user input to resolve (genuine ambiguity, not a technical error), the fix agent reports BLOCKED and the orchestrator escalates.
+
+### When a finding needs a spec/plan change, not a code patch
+
+Some execute-time findings can't be resolved by editing code or docs at the same altitude — they reveal that the *plan* or *spec* is wrong. Execute routes these through **Step 6c discovery triage**: the operator picks a resolution per finding —
+
+- **amend** — dispatch `plan-amend` (or `spec-amend`) to correct the plan/spec in place, then re-QA.
+- **fork** — split the work into a new piece rather than expanding the current one.
+- **defer** — record it via `/spec-flow:defer` to the backlog as future work.
+
+Amendments are budgeted: **5 amendments total per piece, of which at most 1 may be a spec amendment.** When the budget is exhausted the orchestrator refuses further amends and escalates (fork or block the piece). This keeps a piece from silently growing without an operator deciding it should.
 
 ## The circuit breaker
 
@@ -81,7 +93,9 @@ At merge time, spec-flow runs a different kind of QA — seven reviewers **in pa
 
 Parallel dispatch means all seven return in roughly the time of the slowest — about one Opus round-trip. Catches problems that a single reviewer would rationalize away because each lens has a different priority.
 
-Must-fix findings from the board are resolved the same way as any other QA boundary: fix-doc or fix-code makes targeted fixes, the affected reviewers re-review, up to 3 iterations.
+**Fast mode** trades per-phase rigor for speed: when the plan declares `fast: true`, execute skips the per-phase inline QA gates (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`) and runs the phase test command directly instead of dispatching `verify`. To compensate for the skipped gates, the end-of-piece board gains an **8th member — `verify` Mode: Piece Full** — which runs the full verification pass over the whole piece at merge time. So standard mode = 7 board members; fast mode = 8.
+
+Must-fix findings from the board are resolved the same way as any other QA boundary: fix-doc or fix-code makes targeted fixes (or plan-amend/spec-amend via Step 6c when the finding is structural), the affected reviewers re-review, up to 3 iterations.
 
 ## The focused-re-review discipline
 

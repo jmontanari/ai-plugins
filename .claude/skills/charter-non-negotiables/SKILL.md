@@ -1,5 +1,6 @@
 ---
-last_updated: 2026-04-21
+name: charter-non-negotiables
+description: "Read before any plugin release, version bump, or change under plugins/* — NN-C project-wide binding rules for the shared-plugins marketplace: version/marketplace sync, no runtime dependencies, agent and skill file conventions."
 ---
 
 # Non-Negotiables (Project)
@@ -36,7 +37,7 @@ last_updated: 2026-04-21
 
 ### NN-C-005: Hooks silently no-op when their optional dependencies are absent
 - **Type:** Rule
-- **Statement:** SessionStart (and any other harness-invoked) hooks must not fail or produce user-visible errors when an optional resource is missing. Missing `.spec-flow.yaml` → use template defaults. Missing `docs/charter/` → skip charter doctrine load. Missing `reference/doctrine.md` → inject a short fallback string. Log nothing on missing-optional-input; log to stderr on genuine errors.
+- **Statement:** SessionStart (and any other harness-invoked) hooks must not fail or produce user-visible errors when an optional resource is missing. Missing `.spec-flow.yaml` → use template defaults. Missing charter skills (no `<charter_root>/skills/charter-*/SKILL.md`) → skip charter doctrine load. Missing `reference/doctrine.md` → inject a short fallback string. Log nothing on missing-optional-input; log to stderr on genuine errors.
 - **Scope:** Every script under `plugins/*/hooks/`
 - **Rationale:** Hooks run on every session start for every user. A single noisy failure mode degrades trust across the whole plugin.
 - **How QA verifies:** Smoke-test the hook in three scenarios: (a) all dependencies present, (b) optional dependencies absent, (c) config file absent. All three must exit 0 with valid JSON on stdout.
@@ -74,7 +75,7 @@ last_updated: 2026-04-21
   |---|---|---|
   | **Patch** (X.Y.`Z+1`) | Bug fixes, typo fixes, documentation clarifications that don't change behavior, internal refactors with identical public surface | Fix a broken link in SKILL.md; clarify a rule in doctrine.md; fix a hook script bug that was producing wrong output |
   | **Minor** (X.`Y+1`.0) | New features, new config keys (with safe defaults), new skills or agents, new templates, new optional capabilities. Backward-compatible additions. | Add a new config key with a default; add a new optional skill; extend a template with an optional section |
-  | **Major** (`X+1`.0.0) | Breaking changes. Removed or renamed config keys. Removed or renamed skills/agents/templates. Changed behavior of existing features. Changed file-layout expectations affecting existing user projects. Any change that requires a user to update their project or their project's CLAUDE.md to continue working. | Rename `docs/prd.md` → `docs/prd/prd.md` (v2.0.0 did this via retrofit). Remove a deprecated agent. Flip a config default from `auto` → `off`. |
+  | **Major** (`X+1`.0.0) | Breaking changes. Removed or renamed config keys. Removed or renamed skills/agents/templates. Changed behavior of existing features. Changed file-layout expectations affecting existing user projects. Any change that requires a user to update their project or their project's CLAUDE.md to continue working. | Change the on-disk layout existing projects depend on. Remove a deprecated agent or skill. Flip a config default from `auto` → `off`. |
 
   When uncertain, go up one tier. Semver violations cost users more than conservative bumps do.
 

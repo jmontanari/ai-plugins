@@ -6,7 +6,7 @@ A cross-host plugin marketplace. One repository hosts one or more plugins that i
 
 | Plugin | Version | Description |
 |---|---|---|
-| [**spec-flow**](./plugins/spec-flow) | 3.0.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. |
+| [**spec-flow**](./plugins/spec-flow) | 4.11.0 | PRD-to-code pipeline with TDD agents, adversarial QA gates, and PRD traceability. |
 
 More plugins will live here over time. Each is self-contained and independently versioned.
 
@@ -43,7 +43,7 @@ A PRD is ambiguous by nature. A spec resolves it into acceptance criteria. A pla
 
 - **PRD-to-code traceability.** Every line of code maps back to a spec acceptance criterion, which maps to a PRD requirement, which maps to a charter-level non-negotiable.
 - **TDD discipline baked in.** Red/Build/Verify/Refactor is enforced by the orchestrator, not the human's memory.
-- **Adversarial QA at every stage** — spec review, plan review, per-phase review, final 5-reviewer board before merge.
+- **Adversarial QA at every stage** — spec review, plan review, per-phase review, final 7-reviewer board before merge (8 in fast mode).
 - **Circuit breakers everywhere.** Agents that loop on the same failure hit a retry cap, then escalate to you. The pipeline is designed not to waste your compute on doomed loops.
 - **Charter governance.** Project-wide constraints (architecture, non-negotiables, coding rules) are cited by ID in every spec and enforced at every review gate.
 - **Cross-host support.** Runs on Claude Code and GitHub Copilot CLI from the same installation. Same skills, same agents, same workflow.
@@ -102,12 +102,16 @@ Once spec-flow is installed, these skills are available on either host via the s
 
 | Command | Description | Details |
 |---|---|---|
-| `/spec-flow:status` | Pipeline dashboard — start here. Shows which pieces are in which stage and what to work on next. | [guide](./plugins/spec-flow/docs/userguide/commands/status.md) |
-| `/spec-flow:charter` | Bootstrap, update, or retrofit the project charter (six binding constraint files). | [guide](./plugins/spec-flow/docs/userguide/commands/charter.md) |
-| `/spec-flow:prd` | Import or normalize a PRD and decompose it into implementable pieces. Supports one or more PRDs per project. | [guide](./plugins/spec-flow/docs/userguide/commands/prd.md) |
+| `/spec-flow:intake` | Session-start triage — classify work, set CWD, load charter, route to the right skill. Run first. | [guide](./plugins/spec-flow/docs/userguide/commands/intake.md) |
+| `/spec-flow:status` | Pipeline dashboard. Shows which pieces are in which stage and what to work on next. | [guide](./plugins/spec-flow/docs/userguide/commands/status.md) |
+| `/spec-flow:charter` | Bootstrap or update the project charter (seven domain skills under `.github/skills/` or `.claude/skills/`). | [guide](./plugins/spec-flow/docs/userguide/commands/charter.md) |
+| `/spec-flow:prd` | Import, create, or normalize a PRD and decompose it into implementable pieces. Supports one or more PRDs per project. | [guide](./plugins/spec-flow/docs/userguide/commands/prd.md) |
 | `/spec-flow:spec` | Author a detailed specification for one piece from the manifest. | [guide](./plugins/spec-flow/docs/userguide/commands/spec.md) |
 | `/spec-flow:plan` | Turn an approved spec into an exhaustive phase-by-phase implementation plan. | [guide](./plugins/spec-flow/docs/userguide/commands/plan.md) |
 | `/spec-flow:execute` | Orchestrate implementation of an approved plan phase-by-phase via subagents. | [guide](./plugins/spec-flow/docs/userguide/commands/execute.md) |
+| `/spec-flow:small-change` | One-session track for a small focused change that doesn't warrant the full PRD pipeline. | [guide](./plugins/spec-flow/docs/userguide/commands/small-change.md) |
+| `/spec-flow:review-board` | Run the Final Review board out of band on a PR, branch, working tree, or files. | [guide](./plugins/spec-flow/docs/userguide/commands/review-board.md) |
+| `/spec-flow:defer` | Record a non-blocking finding to a backlog file with provenance. | [guide](./plugins/spec-flow/docs/userguide/commands/defer.md) |
 
 New to spec-flow? Start with **[the user guide](./plugins/spec-flow/docs/userguide/README.md)** for the pipeline narrative, concepts, and per-command walkthroughs. Want to see what files the pipeline creates? **[Project layout and artifacts](./plugins/spec-flow/docs/userguide/concepts/project-layout.md)** has the full annotated directory tree and file examples.
 
@@ -133,6 +137,8 @@ See the spec-flow plugin's [PI-007 learnings](./docs/prds/shared/specs/PI-007-co
 ├── README.md                    (this file)
 ├── .claude-plugin/
 │   └── marketplace.json         marketplace manifest — lists all plugins
+├── .claude/skills/              project-wide charter (this repo's charter_root)
+│   └── charter-<domain>/SKILL.md   architecture, non-negotiables, coding-rules, tools, processes, flows
 ├── plugins/
 │   └── spec-flow/               one plugin per directory; self-contained
 │       ├── .claude-plugin/plugin.json
@@ -146,7 +152,6 @@ See the spec-flow plugin's [PI-007 learnings](./docs/prds/shared/specs/PI-007-co
 │       ├── hooks/               harness hooks
 │       └── reference/           auto-loaded doctrine
 ├── docs/
-│   ├── charter/                 project-wide binding constraints
 │   ├── improvement-backlog.md   cross-PRD process learnings
 │   └── prds/                    one directory per PRD (multi-PRD layout)
 │       └── <prd-slug>/          PRD root — currently `shared/`
@@ -160,12 +165,12 @@ See the spec-flow plugin's [PI-007 learnings](./docs/prds/shared/specs/PI-007-co
 
 This marketplace is self-hosting — its own evolution is governed by the `spec-flow` plugin that lives inside it. New work is brainstormed into a PRD, decomposed into pieces in `docs/prds/<prd-slug>/manifest.yaml` (currently `docs/prds/shared/manifest.yaml`), and each piece goes through `spec → plan → execute → review → merge` with TDD discipline and adversarial QA gates at every boundary.
 
-Binding project-wide rules live under `docs/charter/`:
+Binding project-wide rules live as charter skills under `.claude/skills/charter-*/SKILL.md` (this repo's `charter_root` is `.claude`):
 
-- `architecture.md` — layer boundaries, plugin isolation, dependency direction.
-- `non-negotiables.md` — NN-C-xxx entries the whole marketplace honors (e.g., marketplace/plugin version sync, POSIX-only tooling).
-- `coding-rules.md` — CR-xxx conventions applied across all plugins.
-- `processes.md`, `flows.md`, `tools.md` — how work gets done in this repo.
+- `charter-architecture` — layer boundaries, plugin isolation, dependency direction.
+- `charter-non-negotiables` — NN-C-xxx entries the whole marketplace honors (e.g., marketplace/plugin version sync, POSIX-only tooling).
+- `charter-coding-rules` — CR-xxx conventions applied across all plugins.
+- `charter-processes`, `charter-flows`, `charter-tools` — how work gets done in this repo.
 
 ## Adding a new plugin
 
@@ -173,7 +178,7 @@ Binding project-wide rules live under `docs/charter/`:
 2. Add an entry to `.claude-plugin/marketplace.json` under `plugins`. The `source` value is relative to the marketplace.json directory (e.g. `./plugins/your-plugin`). Do **not** add a `metadata.pluginRoot` field — Copilot CLI concatenates it with `source` and produces duplicated paths.
 3. Author a `CLAUDE.md` at the plugin root so both hosts can auto-load the plugin overview.
 4. Keep the plugin self-contained — no imports from or references to other plugins' internals.
-5. Bump the plugin's `version` field on each release in **both** `plugin.json` and the matching `marketplace.json` entry (this is enforced by NN-C-001 and will be CI-checked when PI-002 lands).
+5. Bump the `version` field in all version-bearing files on each release — `.claude-plugin/plugin.json`, the plugin-root `plugin.json`, and the matching `.claude-plugin/marketplace.json` entry — and prepend the release to `CHANGELOG.md`. See [`plugins/spec-flow/docs/releasing.md`](./plugins/spec-flow/docs/releasing.md) for the full checklist and verification commands (enforced by NN-C-001 / NN-C-009).
 
 ## License
 

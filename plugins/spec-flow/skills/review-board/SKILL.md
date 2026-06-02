@@ -42,7 +42,7 @@ Record the changed-file set (`git diff --name-only` on the resolved range, or th
 ## Step 2: Resolve context and select lenses
 
 **Default lens set (no spec/PRD needed):** `blind`, `edge-case`, `security`, `ground-truth`, `architecture`.
-- `architecture` runs by default because layering, coupling, and dependency-direction judgments apply to almost any code. Discover a charter at `<docs_root>/charter/` (six files) and pass whatever exists; if none, tell the architecture reviewer to apply general architecture principles (no charter available) rather than skip.
+- `architecture` runs by default because layering, coupling, and dependency-direction judgments apply to almost any code. Discover the charter skills at the resolved charter root (`.github/skills/charter-*/SKILL.md` or `.claude/skills/charter-*/SKILL.md`, per `plugins/spec-flow/reference/charter-location.md`) and pass whatever exists; if none, tell the architecture reviewer to apply general architecture principles (no charter available) rather than skip.
 - `ground-truth` always runs — its oracle/correctness lens is the one most likely to catch defects that survive functional tests, and it needs only the diff (plus any worked examples from a spec, if supplied).
 
 **Context-bound lenses — add only when their input is available:**

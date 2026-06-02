@@ -62,13 +62,13 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
 
 2. **PRD discovery (FR-007):** Scan `<docs_root>/prds/` for subdirectories containing `prd.md`. Each `<docs_root>/prds/<prd-slug>/prd.md` is one PRD. Read its YAML front-matter: `slug:`, `status:` (one of `drafting | active | shipped | archived`), `version:`.
 
-   **Pre-v3 fallback:** If the scan of `<docs_root>/prds/` finds no `prd.md` files (directory missing, empty, or no subdirectory contains a `prd.md`), print exactly one line and stop:
+   **No-PRD fallback:** If the scan of `<docs_root>/prds/` finds no `prd.md` files (directory missing, empty, or no subdirectory contains a `prd.md`), print exactly one line and stop:
 
-   > ``No PRDs found at `docs/prds/`. Run `/spec-flow:migrate` to upgrade from v1.x/v2.x layout, or `/spec-flow:prd <slug>` to create the first PRD.``
+   > ``No PRDs found at `docs/prds/`. Run `/spec-flow:prd <slug>` to create the first PRD.``
 
-   Do not walk legacy `<docs_root>/prd/` or `<docs_root>/specs/` paths — v1.x/v2.x runtime coexistence is out of scope. The user must run `/spec-flow:migrate` to advance.
+   Do not walk legacy `<docs_root>/prd/` or `<docs_root>/specs/` paths — pre-v3 layouts are not supported.
 
-2a. **Read charter state:** Check `<docs_root>/charter/` directory. If present, read each file's `last_updated:` front-matter into memory for the drift comparison in step 5. If absent, note charter is missing (only surface if `charter.required: true` in config).
+2a. **Read charter state:** Resolve the charter root (`<charter_root>` = `.github` or `.claude`) per `plugins/spec-flow/reference/charter-location.md`, then scan `<charter_root>/skills/charter-*/SKILL.md` (the charter domains). For each domain skill found, capture its last commit date with `git log -1 --format=%cs -- <charter_root>/skills/charter-<domain>/SKILL.md` into memory for the drift comparison in step 5. If no charter skills are present under either root, note charter is missing (only surface if `charter.required: true` in config).
 
 3. **Archive filter (FR-020 / AC-8):** Partition the discovered PRDs into `active-set` (lifecycle state ≠ `archived`) and `archived-set` (lifecycle state == `archived`).
 
@@ -123,7 +123,7 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    This is a passive surface (NN-C-005). The user is informed; the fix is a manual
    manifest edit. Do not block, error, or prevent other pieces from displaying.
 
-5. **Drift surfacing per active PRD (FR-008 passive):** For each non-archived PRD, iterate its pieces whose status is `specced`, `planned`, or `in-progress`. For each such piece, read its `charter_snapshot:` front-matter from `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (and `plan.md` if present). Compare every snapshot date against the current `<docs_root>/charter/<file>.md` `last_updated:` value loaded in step 2a. If any current `last_updated:` is newer than the corresponding snapshot, flag the piece as **diverged** and record which file(s) changed.
+5. **Drift surfacing per active PRD (FR-008 passive):** For each non-archived PRD, iterate its pieces whose status is `specced`, `planned`, or `in-progress`. For each such piece, read its `charter_snapshot:` front-matter from `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (and `plan.md` if present). Compare every snapshot date against the matching charter skill's last commit date (`git log -1 --format=%cs -- <charter_root>/skills/charter-<domain>/SKILL.md`) loaded in step 2a. If any current commit date is newer than the corresponding snapshot, flag the piece as **diverged** and record which domain(s) changed.
 
    Status surfaces drift only — it does NOT dispatch the drift-mode `qa-spec` agent. Active resolution (FR-009) is the job of `spec`, `plan`, `execute`, and `prd --update` during their Phase-1 context load. When this skill surfaces drift, it points the user at `/spec-flow:spec <piece>` / `/spec-flow:plan <piece>` / `/spec-flow:execute <piece>` (each of which triggers resolution) or at `/spec-flow:status --resolve <piece>` for the walk-through flow documented below.
 
@@ -132,7 +132,7 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
 6. **Present status — all-PRDs default view:** Group output by PRD. For each PRD in the `active-set` (and the `archived-set` if `--include-archived`):
 
    ```
-   Charter: present (last_updated 2026-04-20)    <-- omit line if docs/charter/ absent
+   Charter: present (<charter_root>/skills/, 7 domains, last change 2026-04-20)   <-- omit line if no charter skills
 
    PRD: auth (active, v1)                        <-- from docs/prds/auth/prd.md
      Pieces: 5 total — 2 merged, 1 in-progress, 1 planned, 1 open
@@ -195,7 +195,7 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
      `jira_key:` field found. Append the issue key and live status to the piece line:
      ```
        ● token-refresh       in-progress   spec ✓   plan ✓   execute ✓
-           Branch:   execute/auth-token-refresh
+           Branch:   piece/auth-token-refresh
            Phase:    3 of 5 (Refactor)
            Issues:   PROJ-42 [In Progress], PROJ-43 [In Review]
      ```
@@ -203,7 +203,7 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    - Only emit the `Issues:` line when at least one key is found in plan.md.
 
 8. **Recommend next action:**
-   - No PRDs discovered → pre-v3 fallback message (see step 2).
+   - No PRDs discovered → No-PRD fallback message (see step 2).
    - All PRDs present, no active piece anywhere → "Run `/spec-flow:spec <prd-slug>/<piece-slug>` on the next `open` piece."
    - Spec exists, no plan → "Run `/spec-flow:plan <prd-slug>/<piece-slug>`."
    - Plan exists, not started → "Run `/spec-flow:execute <prd-slug>/<piece-slug>`."
@@ -223,8 +223,8 @@ Invoked as `/spec-flow:status --resolve <piece-name>`. Walks the user through ea
 
 ### Preconditions
 - Piece exists in manifest
-- Piece status is `specced`, `planned`, or `in-progress` (per the v3 piece-status state machine — `implementing` is the pre-v3 alias and may also be present in legacy manifests)
-- At least one charter file's current `last_updated` > piece's `charter_snapshot` for that file
+- Piece status is `specced`, `planned`, or `in-progress` (`implementing` is a legacy alias that may also appear in older manifests)
+- At least one charter domain's current commit date > piece's `charter_snapshot` for that domain
 
 If no divergence exists, respond: *"No divergence detected for `<piece-name>`. `charter_snapshot` matches current charter."*
 
@@ -233,7 +233,7 @@ If no divergence exists, respond: *"No divergence detected for `<piece-name>`. `
 For each diverged file (in order of the `charter_snapshot` block in spec.md), present:
 
 ```
-<piece-name> diverges on charter/non-negotiables.md
+<piece-name> diverges on <charter_root>/skills/charter-non-negotiables/SKILL.md
   Snapshot: 2026-03-01
   Current:  2026-04-20
   Changes since snapshot:
@@ -275,7 +275,7 @@ Which option? (1/2/3, default 3)
    ```markdown
    ### Accepted Charter Divergence
    
-   - **charter/<file>.md** (snapshot 2026-03-01, current 2026-04-20) accepted on 2026-04-20.
+   - **<charter_root>/skills/charter-<domain>/SKILL.md** (snapshot 2026-03-01, current 2026-04-20) accepted on 2026-04-20.
      - Reason: <user-provided paragraph explaining why the changes don't apply to this piece>
    ```
 2. Update `charter_snapshot` for the touched file in spec.md to today's date (marks the divergence as resolved).
@@ -301,13 +301,13 @@ Walk every `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (per `plugin
 1. **Extract cited IDs.** Read the `### Non-Negotiables Honored` block. Match all `NN-C-[0-9]+` and `NN-P-[0-9]+` patterns. Read the `### Coding Rules Honored` block. Match all `CR-[0-9]+` patterns.
 
 2. **Verify each ID against its charter file.**
-   - For each `NN-C-` ID: confirm the heading `### NN-C-N:` exists in `<docs_root>/charter/non-negotiables.md` and is not under a `RETIRED` tombstone marker. Drift if absent or retired.
+   - For each `NN-C-` ID: confirm the heading `### NN-C-N:` exists in `<charter_root>/skills/charter-non-negotiables/SKILL.md` and is not under a `RETIRED` tombstone marker. Drift if absent or retired.
    - For each `NN-P-` ID: confirm the heading `### NN-P-N:` exists in `<docs_root>/prds/<prd-slug>/prd.md`. Drift if absent or retired.
-   - For each `CR-` ID: confirm the heading `### CR-N:` exists in `<docs_root>/charter/coding-rules.md`. Drift if absent or retired.
+   - For each `CR-` ID: confirm the heading `### CR-N:` exists in `<charter_root>/skills/charter-coding-rules/SKILL.md`. Drift if absent or retired.
 
 3. **Missing-section behavior (NN-C-005):** When a spec lacks both the `### Non-Negotiables Honored` and `### Coding Rules Honored` sections, treat as "no citations to verify" — count the spec in N but record zero drift for it.
 
-4. **Missing-charter-file behavior (NN-C-005):** When `<docs_root>/charter/non-negotiables.md`, `<docs_root>/charter/coding-rules.md`, or a PRD file is absent, the scan counts specs normally but cannot verify the citations that rely on the missing file. In that case: emit a stderr note `note: charter file <path> absent; <K> NN-C/NN-P/CR citations not verified.` and continue. Exit 0 regardless. No error, no stderr escalation beyond the note.
+4. **Missing-charter-file behavior (NN-C-005):** When `<charter_root>/skills/charter-non-negotiables/SKILL.md`, `<charter_root>/skills/charter-coding-rules/SKILL.md`, or a PRD file is absent, the scan counts specs normally but cannot verify the citations that rely on the missing file. In that case: emit a stderr note `note: charter file <path> absent; <K> NN-C/NN-P/CR citations not verified.` and continue. Exit 0 regardless. No error, no stderr escalation beyond the note.
 
 ### Output format
 
@@ -317,7 +317,7 @@ Walk every `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (per `plugin
   ```
   Example:
   ```
-  Citation drift in docs/prds/auth/specs/token-refresh/spec.md: cited NN-C-099 not present in docs/charter/non-negotiables.md
+  Citation drift in docs/prds/auth/specs/token-refresh/spec.md: cited NN-C-099 not present in <charter_root>/skills/charter-non-negotiables/SKILL.md
   ```
 
 - **No drift:** print one summary line and exit 0:

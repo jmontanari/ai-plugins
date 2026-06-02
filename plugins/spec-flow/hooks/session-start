@@ -11,62 +11,30 @@ fi
 
 doctrine_content=$(cat "${PLUGIN_ROOT}/reference/spec-flow-doctrine.md" 2>/dev/null || echo "spec-flow doctrine not found")
 
-# Charter doctrine (v2.0.0) — conditionally load specific charter files into session context.
-# Controlled by `charter.doctrine_load` in .spec-flow.yaml. Silent no-op if:
-#   - docs/charter/ doesn't exist (pre-charter project, or opted-out)
-#   - charter.doctrine_load is absent, empty, or [] in config
-#   - individual charter file doesn't exist (user hasn't authored it yet)
+# Charter doctrine — load the doctrine_load-listed charter skills into session context.
+# Charter lives under <charter_root>/skills/charter-<domain>/SKILL.md, where <charter_root>
+# is `.github` or `.claude` (resolved from the `charter_root` config key, else by detection).
+# Controlled by `charter.doctrine_load` in .spec-flow.yaml. Silent no-op if no charter skills
+# exist, doctrine_load is absent/empty/[], or a listed domain isn't authored yet.
 docs_root=$(grep -E '^docs_root:' "$CONFIG_FILE" 2>/dev/null | sed -E 's/^docs_root:[[:space:]]*//' | tr -d '"' | head -n1 || true)
 docs_root="${docs_root:-docs}"
 
-layout_warning=""
-if [ -f "$CONFIG_FILE" ]; then
-  # Strip leading `layout_version:`, trailing `# comment` (if any), surrounding whitespace, and quotes (single or double).
-  layout_version=$(grep -E '^layout_version:' "$CONFIG_FILE" 2>/dev/null \
-    | sed -E 's/^layout_version:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]+$//' \
-    | tr -d "\"'" | head -n1 || true)
-  # Fire warning when: empty, non-integer (typos like "v3", trailing text), or numeric value < 3.
-  if [ -z "$layout_version" ] \
-     || ! printf '%s' "$layout_version" | grep -qE '^[0-9]+$' \
-     || [ "$layout_version" -lt 3 ]; then
-    layout_warning=$'\n\n⚠️  Layout is pre-v3. Run `/spec-flow:migrate` to adopt multi-PRD.'
+charter_content=""
+
+# Resolve charter_root: explicit config key first, else detect by existence (.claude before .github).
+charter_root=$(grep -E '^charter_root:' "$CONFIG_FILE" 2>/dev/null \
+  | sed -E 's/^charter_root:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]+$//' \
+  | tr -d "\"'" | head -n1 || true)
+if [ -z "$charter_root" ]; then
+  if ls .claude/skills/charter-*/SKILL.md >/dev/null 2>&1; then
+    charter_root=".claude"
+  elif ls .github/skills/charter-*/SKILL.md >/dev/null 2>&1; then
+    charter_root=".github"
   fi
 fi
 
-charter_content=""
-charter_dir="${docs_root}/charter"
-
-# Detect layout_version
-current_layout=$(grep -E '^layout_version:' "$CONFIG_FILE" 2>/dev/null \
-  | sed -E 's/^layout_version:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]+$//' \
-  | tr -d "\"'" | head -n1 || true)
-current_layout="${current_layout:-3}"
-
-if [ "$current_layout" = "4" ]; then
-  # v4: load only doctrine_load-listed charter skills from .github/skills/charter-<domain>/SKILL.md.
-  # Other charter domains are available as on-demand skills (description-triggered by the host).
-  # If doctrine_load is absent or empty, nothing is injected — rely entirely on skill triggering.
-  skills_dir=".github/skills"
-  doctrine_line=$(grep -E '^[[:space:]]+doctrine_load:' "$CONFIG_FILE" 2>/dev/null | head -n1 || true)
-  doctrine_list=""
-  if [ -n "$doctrine_line" ]; then
-    doctrine_list=$(printf '%s' "$doctrine_line" | sed -E 's/.*\[([^]]*)\].*/\1/' | tr ',' '\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
-  fi
-  if [ -n "$doctrine_list" ] && [ -d "$skills_dir" ]; then
-    while IFS= read -r name; do
-      [ -z "$name" ] && continue
-      skill_file="${skills_dir}/charter-${name}/SKILL.md"
-      if [ -f "$skill_file" ]; then
-        charter_content+=$'\n\n--- charter/'"${name}"$' ---\n'"$(cat "$skill_file")"
-      fi
-    done <<< "$doctrine_list"
-  fi
-elif [ -d "$charter_dir" ]; then
-  # v3: check if charter exists but skills aren't published — emit migration notice
-  if ! ls .github/skills/charter-*/SKILL.md >/dev/null 2>&1; then
-    charter_content+=$'\n\n💡 Charter skills not yet published. Run `/spec-flow:migrate` to publish charter constraints as project-level skills (enables enforcement in all tools).'
-  fi
-  # v3 fallback: load via doctrine_load list
+# Inject only the doctrine_load-listed domains; other domains load on demand by description.
+if [ -n "$charter_root" ] && [ -d "${charter_root}/skills" ]; then
   doctrine_line=$(grep -E '^[[:space:]]+doctrine_load:' "$CONFIG_FILE" 2>/dev/null | head -n1 || true)
   doctrine_list=""
   if [ -n "$doctrine_line" ]; then
@@ -75,9 +43,9 @@ elif [ -d "$charter_dir" ]; then
   if [ -n "$doctrine_list" ]; then
     while IFS= read -r name; do
       [ -z "$name" ] && continue
-      file="${charter_dir}/${name}.md"
-      if [ -f "$file" ]; then
-        charter_content+=$'\n\n--- charter/'"${name}.md"$' ---\n'"$(cat "$file")"
+      skill_file="${charter_root}/skills/charter-${name}/SKILL.md"
+      if [ -f "$skill_file" ]; then
+        charter_content+=$'\n\n--- charter/'"${name}"$' ---\n'"$(cat "$skill_file")"
       fi
     done <<< "$doctrine_list"
   fi
@@ -115,7 +83,7 @@ if command -v git >/dev/null 2>&1; then
         ;;
       branch\ refs/heads/*)
         in_branch="${line#branch refs/heads/}"
-        if [ -n "$in_worktree" ] && echo "$in_branch" | grep -qE '^(spec|plan|execute)/'; then
+        if [ -n "$in_worktree" ] && echo "$in_branch" | grep -qE '^(piece|change|spec|plan|execute)/'; then
           wt_escaped=$(escape_for_json "$in_worktree")
           br_escaped=$(escape_for_json "$in_branch")
           worktree_context="${worktree_context}\n\n⚡ ACTIVE SPEC-FLOW WORKTREE:\n  Path:   ${wt_escaped}\n  Branch: ${br_escaped}\n  REQUIRED before any file operation: cd ${wt_escaped}\n  All reads and edits must resolve from this root — not the main repo."
@@ -127,11 +95,6 @@ if command -v git >/dev/null 2>&1; then
   done < <(git worktree list --porcelain 2>/dev/null || true)
 fi
 
-layout_warning_escaped=""
-if [ -n "$layout_warning" ]; then
-  layout_warning_escaped=$(escape_for_json "$layout_warning")
-fi
-
 plugin_root_escaped=$(escape_for_json "$PLUGIN_ROOT")
 
 worktree_context_escaped=""
@@ -139,7 +102,7 @@ if [ -n "$worktree_context" ]; then
   worktree_context_escaped=$(escape_for_json "$worktree_context")
 fi
 
-session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'intake' skill to classify the work, set up the correct working directory, and load the appropriate context. The intake skill calls status internally — invoke intake, not status directly, when beginning any work session.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nPlugin root: ${plugin_root_escaped}\nWhen skill instructions reference \${CLAUDE_PLUGIN_ROOT}, resolve it to: ${plugin_root_escaped}${worktree_context_escaped}\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}${layout_warning_escaped}\n</IMPORTANT>"
+session_context="<IMPORTANT>\nspec-flow plugin is active.\n\nBefore starting work, invoke the 'intake' skill to classify the work, set up the correct working directory, and load the appropriate context. The intake skill calls status internally — invoke intake, not status directly, when beginning any work session.\n\nProject config: \`.spec-flow.yaml\` — read it before any path operations. Use \`docs_root\` in place of \`docs/\` and \`worktrees_root\` in place of \`worktrees/\` for all paths. If the file is missing, default to \`docs\` and \`worktrees\`.\n\nPlugin root: ${plugin_root_escaped}\nWhen skill instructions reference \${CLAUDE_PLUGIN_ROOT}, resolve it to: ${plugin_root_escaped}${worktree_context_escaped}\n\nTDD Doctrine (governs all implementation work):\n\n${doctrine_escaped}${charter_section}\n</IMPORTANT>"
 
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   printf '{\n  "additional_context": "%s"\n}\n' "$session_context"

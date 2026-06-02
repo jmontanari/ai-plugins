@@ -13,7 +13,7 @@ charter_snapshot:
 # Spec: {{piece_name}}
 
 **PRD Sections:** {{prd_sections}}
-**Charter:** docs/charter/ (binding — see Non-Negotiables Honored / Coding Rules Honored below)
+**Charter:** <charter_root>/skills/charter-*/SKILL.md (binding — see Non-Negotiables Honored / Coding Rules Honored below)
 **Status:** draft
 **Dependencies:** {{dependencies}}
 
@@ -38,15 +38,15 @@ charter_snapshot:
 
 Enumerate every charter (`NN-C-xxx`) and product (`NN-P-xxx`) non-negotiable whose scope this piece touches, with a per-entry line on how the piece honors it.
 
-**Project (NN-C — from `docs/charter/non-negotiables.md`):**
+**Project (NN-C — from `<charter_root>/skills/charter-non-negotiables/SKILL.md`):**
 - {{nn_c_id}} ({{short_name}}): {{how_this_piece_honors_it}}
 
-**Product (NN-P — from `docs/prd/prd.md`):**
+**Product (NN-P — from `docs/prds/<prd-slug>/prd.md`):**
 - {{nn_p_id}} ({{short_name}}): {{how_this_piece_honors_it}}
 
 ### Coding Rules Honored
 
-Cite relevant `CR-xxx` entries from `docs/charter/coding-rules.md` whose scope this piece touches, with how each is honored.
+Cite relevant `CR-xxx` entries from `<charter_root>/skills/charter-coding-rules/SKILL.md` whose scope this piece touches, with how each is honored.
 
 - {{cr_id}} ({{short_name}}): {{how_this_piece_honors_it}}
 
