@@ -42,6 +42,12 @@ You **stage** your tests with `git add` but **do not commit**. The implementer a
 8. **Zero passing tests among the ones you authored.** Every test ID listed in `## Tests Written` MUST appear in the `FAILED` (or `SKIPPED` with an explicit reason) list of your `## Oracle block`. The runner summary for the paths you created or modified must report `0 passed`. If any of your new tests passes on first run, STOP and report — do not stage a Red phase with passing new tests. A passing test in Red means one of two things, both errors:
    - The feature already exists → this test belongs in a Verify regression check, not in this phase's Red. Escalate so the plan can be corrected.
    - The assertion is tautological or over-mocked → the test doesn't exercise the missing behavior. Rewrite the assertion to bind to the feature that doesn't exist yet.
+
+   **`[integration]` carve-out:** An outer `[integration]` test authored up front for a later phase is **expected-red until its completing phase** — exempt from the "0 passed / fail-now" rule for the current phase (the orchestrator's M4 invariant (d) tracks it). Rules:
+   - List every expected-red `[integration]` test with its `completes_in_phase` value in `## Tests Written`.
+   - A test whose `completes_in_phase` is a future phase must remain red now and must NOT be greened in this phase.
+   - Ordinary unit tests keep the strict fail-now rule unchanged.
+   - An authored `[integration]` test must exercise **one wired path** with **nothing in-boundary doubled** (only true externals stubbed/faked); do not mock in-boundary components in an integration test.
 9. **Emit a `## Staged test manifest` with SHA-256 hashes.** For every path in `## Tests Written`, compute the content hash of the staged file and list it as `<path>: <sha256>`. The orchestrator snapshots this manifest before dispatching qa-tdd-red and the implementer. After the implementer's unified commit lands, the orchestrator re-hashes each of your test files at HEAD and rejects the commit if any hash drifted — that's the anti-tampering safeguard that replaces the old Red-commit-SHA diff. Compute the hashes with whatever tool is standard in your environment (`sha256sum`, `shasum -a 256`, `git hash-object` plus a content-only hash — `git hash-object` adds a header so prefer `sha256sum`).
 
 ## Rule: literal file list when staging

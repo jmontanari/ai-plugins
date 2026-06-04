@@ -3,7 +3,7 @@ name: review-board
 description: >-
   Run spec-flow's end-of-piece review board on ANY target, out of band — decoupled from the
   pipeline merge gate. Points the same adversarial reviewers (blind, edge-case, security,
-  ground-truth, architecture, and — when a spec/PRD is supplied — spec-compliance, prd-alignment)
+  ground-truth, architecture, integration, and — when a spec/PRD is supplied — spec-compliance, prd-alignment)
   at a PR, a branch, working-tree changes, or a set of files. Use when the user says "run the
   review board", "board-review this", "adversarial review of this PR/branch/diff", "review these
   changes", "what would the review board say", or wants the merge-gate review without running
@@ -41,9 +41,10 @@ Record the changed-file set (`git diff --name-only` on the resolved range, or th
 
 ## Step 2: Resolve context and select lenses
 
-**Default lens set (no spec/PRD needed):** `blind`, `edge-case`, `security`, `ground-truth`, `architecture`.
+**Default lens set (no spec/PRD needed):** `blind`, `edge-case`, `security`, `ground-truth`, `architecture`, `integration`.
 - `architecture` runs by default because layering, coupling, and dependency-direction judgments apply to almost any code. Discover the charter skills at the resolved charter root (`.github/skills/charter-*/SKILL.md` or `.claude/skills/charter-*/SKILL.md`, per `plugins/spec-flow/reference/charter-location.md`) and pass whatever exists; if none, tell the architecture reviewer to apply general architecture principles (no charter available) rather than skip.
 - `ground-truth` always runs — its oracle/correctness lens is the one most likely to catch defects that survive functional tests, and it needs only the diff (plus any worked examples from a spec, if supplied).
+- `integration` runs by default — why default: path coverage applies to almost any wired change; it needs only the diff to enumerate integration boundaries.
 
 **Context-bound lenses — add only when their input is available:**
 - `spec-compliance` — add when `--spec PATH` is given, or a spec is unambiguously discoverable for the target (e.g. the branch maps to `<docs_root>/prds/*/specs/<slug>/spec.md`). Pass the spec (and plan if present).
@@ -65,6 +66,7 @@ Agent({ description: "Edge case review",    prompt: <review-board-edge-case.md  
 Agent({ description: "Security review",      prompt: <review-board-security.md     + Input Mode: Full + diff (+ spec for trust-boundary context if available)>, model: "opus" })
 Agent({ description: "Ground-truth review", prompt: <review-board-ground-truth.md + Input Mode: Full + diff (+ spec known/expected results if available)>, model: "opus" })
 Agent({ description: "Architecture review", prompt: <review-board-architecture.md + Input Mode: Full + diff + charter-if-present-else-general-arch-note>, model: "opus" })
+Agent({ description: "Integration review",  prompt: <review-board-integration.md  + Input Mode: Full + diff + "read beyond the diff to enumerate every wired path across an integration boundary">, model: "opus" })
 # Added only when their context was resolved in Step 2:
 Agent({ description: "Spec compliance review", prompt: <review-board-spec-compliance.md + Input Mode: Full + diff + spec + plan>, model: "opus" })
 Agent({ description: "PRD alignment review",   prompt: <review-board-prd-alignment.md   + Input Mode: Full + diff + PRD + manifest>, model: "opus" })
@@ -87,7 +89,7 @@ Present a consolidated report:
 ```
 ## Review Board — <target description>
 
-Lenses run: blind, edge-case, security, ground-truth, architecture[, spec-compliance][, prd-alignment]
+Lenses run: blind, edge-case, security, ground-truth, architecture, integration[, spec-compliance][, prd-alignment]
 Files reviewed: <n>   |   Findings: X must-fix, Y should-fix, Z deferred/dismissed
 
 ### Must-fix
@@ -107,7 +109,7 @@ If neither `--fix` nor `--comment` was passed, stop here.
 
 ## Step 5: `--fix` (optional) — remediate via the small-change flow
 
-This skill does **not** patch code itself. Findings found out of band still deserve the same discipline as any other change: a test-first (or Implement-track) fix, a per-phase QA gate, and a re-review by the board. So `--fix` does not call a raw fix agent — it **routes the findings into `/spec-flow:small-change`**, which turns them into a change brief + plan and hands off to `execute`. The fix then passes through the change-track review board (6 members, including `ground-truth`) before it can merge — i.e. the remediation is itself reviewed, closing the loop.
+This skill does **not** patch code itself. Findings found out of band still deserve the same discipline as any other change: a test-first (or Implement-track) fix, a per-phase QA gate, and a re-review by the board. So `--fix` does not call a raw fix agent — it **routes the findings into `/spec-flow:small-change`**, which turns them into a change brief + plan and hands off to `execute`. The fix then passes through the change-track review board (7 members, including `ground-truth` and `integration`) before it can merge — i.e. the remediation is itself reviewed, closing the loop.
 
 Only when `--fix` is present and must-fix (or operator-selected should-fix) findings exist:
 

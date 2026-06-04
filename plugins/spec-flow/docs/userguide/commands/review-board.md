@@ -1,114 +1,117 @@
 # /spec-flow:review-board
 
-Run the end-of-piece Final Review board on any target, out of band. Points the same adversarial reviewers at a PR, a branch, working-tree changes, or files — decoupled from the merge gate.
+Run the Final Review board out of band on any PR, branch, working-tree changes, or files — decoupled from the end-of-piece merge gate. Reports adversarial findings by severity. Optionally applies fixes (`--fix`) or posts inline PR comments (`--comment`). Never merges, amends, forks, or signs off.
 
 ## What it does
 
-The board that `execute` runs before merge is the strongest gate in spec-flow. `review-board` lets you point it at anything, any time, without running the pipeline. It reuses the existing review-board agents — it adds no new reviewers — minus all the pipeline machinery: **no merge, no plan/spec amendment, no fork, no backlog write, no human sign-off gate.**
+Points the same adversarial reviewers that `/spec-flow:execute` runs at end-of-piece at any target you name — running the 6-lens default set (blind, edge-case, security, ground-truth, architecture, integration), or up to 8 when a spec/PRD context is supplied. Reviewers run in parallel and return in roughly the time of the slowest (about one Opus round-trip). Findings are consolidated by severity and returned to you in the main window.
 
-It reviews, reports findings by severity, and (only if you ask) routes them into `/spec-flow:small-change` so any fix gets the full TDD/QA/board discipline. It never patches code itself.
-
-This skill is standalone — it does not require an active piece, a manifest, or even a spec-flow project layout. It only needs a git repository to compute a diff.
+Use it when you want adversarial review without going through the full pipeline: a PR from another contributor, a branch you want to sanity-check before opening a PR, files you're about to merge manually, or a working-tree diff you want reviewed before committing.
 
 ## When to run it
 
-- "Run the review board", "board-review this", "adversarial review of this PR/branch/diff", "review these changes", "what would the review board say".
-- You want the merge-gate-quality review without running `execute`.
-- Pre-merge sanity on a PR, a feature branch, your working tree, or a specific set of files.
+- You want a board-level review of a PR without running a full piece through the pipeline.
+- You have a branch you want reviewed before opening a PR.
+- You want to check a diff or a set of files for correctness, architecture drift, or security issues.
+- You want to apply the integration lens specifically to a set of wired paths.
+- You're using the `--fix` path to get a planned, QA-gated, board-reviewed fix without a full PRD pipeline entry.
 
-## The flow
+It does **not** require a manifest entry or a piece in any state. It is fully out-of-band.
 
-1. **Load config** (best-effort) — reads `.spec-flow.yaml` for `docs_root` if present; confirms you're inside a git repo (else it stops).
-2. **Resolve the target → a diff + file set:**
-   - All digits (`412`) → a PR number (`gh pr diff`).
-   - A ref/branch name → diff against the merge-base with the default branch.
-   - One or more paths → their uncommitted/branch changes, or — if unchanged — the full file contents reviewed as existing code.
-   - Blank → working-tree changes (`git diff HEAD`), falling back to `default-branch..HEAD`.
-3. **Resolve context and select lenses.**
-4. **Dispatch the board** — all selected lenses run concurrently, each a fresh Opus agent that sees only its prompt.
-5. **Collect, dedupe, classify, report** — by severity.
-6. **`--fix`** (optional) — route findings into `/spec-flow:small-change`.
-7. **`--comment`** (optional) — post inline PR comments.
-
-## The lenses
-
-**Default set (no spec/PRD needed):** `blind`, `edge-case`, `security`, `ground-truth`, `architecture`.
-
-- `architecture` runs by default — layering and dependency-direction judgments apply to almost any code; it uses your charter if present, else general principles.
-- `ground-truth` always runs — its oracle/correctness lens catches defects that survive functional tests.
-
-**Context-bound lenses — added only when their input is available:**
-
-- `spec-compliance` — when `--spec PATH` is given, or a spec is discoverable for the target.
-- `prd-alignment` — when `--prd PATH` is given, or a PRD + manifest are discoverable.
-
-So a bare run uses 5 lenses; with a spec and PRD supplied, all 7. The resolved lens set and the reason each context-bound lens was included or skipped is logged — no silent omissions.
-
-**Overrides:** `--lenses a,b,c` runs exactly that set; `--spec PATH` / `--prd PATH` force-include the corresponding lens.
-
-## Loops
-
-None. It dispatches the board once, consolidates, and reports. (Iterative fix-and-re-review happens downstream in `execute`, if you route findings there with `--fix`.)
-
-## What you get
-
-A consolidated report, deduped across lenses, with each finding classified `must-fix` / `should-fix` / `defer` / `dismiss`:
+## Usage
 
 ```
-## Review Board — PR #412
-
-Lenses run: blind, edge-case, security, ground-truth, architecture
-Files reviewed: 6   |   Findings: 2 must-fix, 3 should-fix, 1 deferred/dismissed
-
-### Must-fix
-- [security] api/export.py:88 — unparameterized query on `filter` param  →  use bound params
-- [ground-truth] api/export.py:140 — CSV writer drops the final row on odd counts  →  fix loop bound
-
-### Should-fix
-- [edge-case] api/export.py:54 — no guard for empty result set  →  return 204
-...
-
-### Per-lens summary
-| Lens | Verdict | Findings |
-|------|---------|----------|
-| blind | clean | 0 |
-| security | concerns | 1 |
-...
+/spec-flow:review-board [target] [--fix] [--comment] [--fast]
 ```
 
-No code is modified unless you pass `--fix` or `--comment`.
+**`target`** — what to review. One of:
+- A PR number: `123` or `#123`
+- A branch name: `feature/my-branch`
+- A diff spec: `main..HEAD` or `HEAD~3..HEAD`
+- One or more file paths: `src/foo.py src/bar.py`
+- Omit to review uncommitted working-tree changes
 
-## Flags
+**`--fix`** — route must-fix findings into `/spec-flow:small-change` for a planned, QA-gated, board-reviewed fix. Does **not** patch the tree directly. Produces a `docs/changes/<slug>/change-brief.md` + `plan.md` and routes to `execute`.
 
-- **`--fix`** — does not patch the tree. It compiles a findings digest (marked `source: review-board`) and hands it to `/spec-flow:small-change`, which writes a `brief.md` + `plan.md` and creates a `change/<slug>` worktree. The fix is then built, QA-gated, and re-reviewed by the change-track board when you run `execute` separately. An ownership check applies — it won't push onto a third-party PR's branch; for those, use `--comment`.
-- **`--comment`** — when the target is a PR, posts each `file:line` finding as an inline review comment via `gh`, with off-diff findings collected into one summary comment, and echoes back the posted URLs. Warns and skips if the target isn't a PR.
+**`--comment`** — post findings as inline PR comments (requires a PR number target and appropriate GitHub permissions). Findings are posted at the nearest relevant line.
 
-## What it never does
+**`--fast`** — add a 9th reviewer (`verify` Mode: Piece Full) for the full theater-pattern catalog and AC binding check across the target's test surface.
 
-No merge. No pipeline mutation (never amends a plan/spec, forks, writes the backlog, or touches a manifest). No sign-off gate — findings are advisory. No direct code edits.
+**`--context <path>`** — supply a spec.md or prd.md to unlock the spec-compliance and prd-alignment lenses (they are omitted without context).
 
-## Worked example
+## The lens set
 
-A teammate's PR is up and you want the board's read before approving:
+Six reviewers run in parallel by default (blind, edge-case, security, ground-truth, architecture, integration). Two additional lenses — spec-compliance and prd-alignment — are added when a spec/PRD context is supplied via `--context` or discovery, bringing the total to up to 8:
 
-```
-/spec-flow:review-board 412 --comment
+| Reviewer | Focus |
+|---|---|
+| **blind** | Just the diff. Bugs, dead references, broken claims — no context. |
+| **edge-case** | Failure modes, stale caches, version floors, boundary conditions. |
+| **security** | CWE Top 25, injection, crypto, auth/authz, supply chain, language-specific anti-patterns. |
+| **ground-truth** | Do computed/measured outputs reproduce an independently-derived correct answer? Degenerate results, lookahead leakage, scope contamination, parity mismatch, silent truncation. |
+| **architecture** | Layer boundaries, charter compliance, CR-xxx drift. Requires charter context to be loaded. |
+| **integration** | Real wired path across each boundary; path coverage; mock-avalanche detection (over-mocked paths that suppress true integration failures). |
+| **spec-compliance** | Every AC honored? *(added when `--context` supplies a spec.md)* |
+| **prd-alignment** | Advances PRD goals? Respects non-negotiables? *(added when `--context` supplies a prd.md)* |
 
-Resolved target: PR #412 (head: feat/csv-export, base: master)
-Lenses: blind, edge-case, security, ground-truth, architecture
-  (spec-compliance skipped — no spec discoverable; prd-alignment skipped — no PRD)
+In `--fast` mode, a 9th reviewer (`verify` Mode: Piece Full) is added — it applies the full theater-pattern catalog and AC binding check across the target's test surface.
 
-Dispatching 5 reviewers (parallel, opus)...
+## What it does NOT do
 
-Findings: 2 must-fix, 3 should-fix.
-Posted 4 inline comments + 1 summary comment to PR #412:
-  https://github.com/org/repo/pull/412#discussion_r...
-```
+- **Never merges.** The board reports findings; you decide what to do with them.
+- **Never patches the tree directly.** Even with `--fix`, changes go through `/spec-flow:small-change` — a planned, QA-gated, board-reviewed track. No direct edits.
+- **Never amends, forks, or signs off.** It is purely advisory unless you explicitly route findings through `--fix`.
+- **No piece state required.** You do not need a manifest entry, a spec, or a plan to run it.
 
-You drop the must-fix comments on the PR; the author fixes them on their own branch.
+## Finding severity
+
+Findings are returned in three tiers:
+
+- **must-fix** — correctness bugs, security vulnerabilities, broken contracts, spec violations (when context supplied).
+- **should-fix** — non-breaking but high-risk issues; architecture drift; patterns likely to cause future bugs.
+- **nit** — style, naming, or clarity issues that have no behavioral impact.
+
+With `--fix`, only `must-fix` and `should-fix` findings are routed into the fix track. Nits are reported but not actioned unless you explicitly ask.
+
+## The `--fix` path
+
+When you pass `--fix`, the skill:
+
+1. Consolidates must-fix and should-fix findings into a structured report.
+2. Asks you to confirm which findings to act on.
+3. Calls `/spec-flow:small-change` with the confirmed findings as the change brief — a focused brainstorm, scoped plan, and worktree on `change/<slug>`.
+4. Routes to `/spec-flow:execute` for the standard TDD/Implement loop with QA gates and a final board review.
+
+This means every `--fix` outcome has the same quality bar as a piece that went through the full pipeline. There are no direct-to-tree patches.
+
+## The `--comment` path
+
+When you pass `--comment` with a PR number target, the skill posts each finding as an inline PR comment at the nearest relevant line. Findings without a file:line anchor are posted as top-level PR comments.
+
+Requires:
+- A PR number target (`/spec-flow:review-board 123 --comment`)
+- GitHub CLI (`gh`) available in the session
+
+## Circuit breakers
+
+The review board itself has no iteration loop — it reports what it finds in one pass. If you use `--fix` and route findings through `/spec-flow:small-change`, the standard QA circuit breakers apply (3 iterations per QA gate, 2 build attempts, 3 board-review iterations). The board itself does not re-run after fixes unless you invoke it again.
+
+## Comparison with the end-of-piece board
+
+| Property | End-of-piece board (inside execute) | `/spec-flow:review-board` |
+|---|---|---|
+| Triggered by | Final phase of a piece completing | You, directly |
+| Target | The piece's full diff against merge target | Any PR / branch / diff / files |
+| Piece required | Yes (manifest entry, `in-progress` state) | No |
+| Spec/PRD context | Loaded from the piece's spec/plan | Optional via `--context` |
+| Blocks merge | Yes — must clear before execute advances | No — purely advisory |
+| Fix path | `fix-code`/`fix-doc` inline in execute | `--fix` → `/spec-flow:small-change` |
+
+Both boards draw from the same pool of reviewer agents, but the end-of-piece execute board runs all 8 lenses unconditionally (spec and PRD context are always present), whereas the review-board command runs the 6-lens default subset unless a spec/PRD context is supplied via `--context`. The end-of-piece board is the mandatory merge gate; this command is the on-demand version you can run at any time.
 
 ## Where to go next
 
-- [/spec-flow:execute](./execute.md) — the pipeline-integrated board with merge gating and discovery triage.
-- [/spec-flow:small-change](./small-change.md) — where `--fix` findings are remediated.
-- [QA loop concepts](../concepts/qa-loop.md) — how findings get classified and resolved.
+- [/spec-flow:execute](./execute.md) — the full pipeline including the mandatory end-of-piece board.
+- [/spec-flow:small-change](./small-change.md) — the fix track that `--fix` routes into.
+- [QA loop concepts](../concepts/qa-loop.md) — how findings get resolved iteratively.
+- [/spec-flow:defer](./defer.md) — record a non-blocking finding to a backlog instead of fixing it now.

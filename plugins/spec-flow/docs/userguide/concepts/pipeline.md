@@ -36,7 +36,7 @@ Each stage produces a concrete file you can read and sign off on. No artifact is
 - **PRD + manifest** → `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml`. A project can have one or more PRDs — each gets its own slug and directory. The PRD captures intent; the manifest enumerates *pieces* — independently-shippable units of work — with status, dependencies, and pointers to their spec and plan once those exist.
 - **Spec** → `docs/prds/<prd-slug>/specs/<piece-name>/spec.md`. Detailed requirements for one piece: acceptance criteria, functional requirements, non-negotiables cited by ID.
 - **Plan** → `docs/prds/<prd-slug>/specs/<piece-name>/plan.md`. File-level implementation plan with Red/Build/Verify/Refactor phases, an AC Coverage Matrix, Contracts, and Change Specification Blocks, ordered by dependency.
-- **Executed code** → committed to the piece branch `piece/<prd-slug>-<piece-name>`, merged to `master` only after the 7-agent final review board (8 in fast mode) clears the diff.
+- **Executed code** → committed to the piece branch `piece/<prd-slug>-<piece-name>`, merged to `master` only after the 8-agent final review board (9 in fast mode) clears the diff.
 
 ## Reviewers at every boundary
 
@@ -47,7 +47,7 @@ Every artifact passes through an adversarial reviewer before you see the sign-of
 - **qa-spec** reviews each spec before plan authoring
 - **qa-plan** reviews each plan before execute begins
 - **qa-phase** reviews each executed phase before the next starts
-- **review-board** (7 reviewers in parallel: blind, edge-case, spec-compliance, prd-alignment, architecture, security, ground-truth) reviews the cumulative merge diff before the piece lands. Fast mode adds an 8th member (`verify` Mode: Piece Full) to compensate for the skipped per-phase QA gates.
+- **review-board** (8 reviewers in parallel: blind, edge-case, spec-compliance, prd-alignment, architecture, security, ground-truth, integration) reviews the cumulative merge diff before the piece lands. Fast mode adds a 9th member (`verify` Mode: Piece Full) to compensate for the skipped per-phase QA gates.
 
 Reviewers have no context from the conversation that produced the artifact. They see only the artifact, the binding context (PRD, charter, spec), and the review criteria. This is deliberate — fresh context means the reviewer finds problems rather than confirming the hunches that shaped the artifact.
 

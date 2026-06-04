@@ -95,7 +95,7 @@ Otherwise, the default is the single unified commit. Per-file commits are not th
 
 **Ratios (guideline, not rigid):**
 - ~60% unit tests (behavior of individual components)
-- ~30% integration tests (component interaction, data flow)
+- ~30% integration tests (component interaction, data flow) — the `[integration]`-tagged tests defined in the section below; this tier follows the trophy/honeycomb "mostly integration" lineage
 - ~10% E2E / acceptance tests (critical paths from spec ACs)
 
 **Test doubles hierarchy (preferred order):**
@@ -104,7 +104,34 @@ Otherwise, the default is the single unified commit. Per-file commits are not th
 3. Stub (returns predetermined values)
 4. Mock (tracks interactions — only when verifying side effects)
 
+**Mocking policy:** Real components *inside* the integration boundary; stub/fake (Meszaros — not "mock") only for *true externals* outside it. **Never mock inside the boundary** — doubles inside the boundary undermine the wired-path guarantee that integration tests provide. Every doubled true external must be backed by a passing **contract test** that verifies the stub/fake stays faithful to the real external's contract.
+
 **Approach:** Outside-in specification (spec ACs define behavior from user perspective), inside-out execution (plan builds components bottom-up per dependency order).
+
+## Integration Tests & Path Coverage
+
+**Integration boundary** — the set of real components a wired path crosses. "Inside the boundary" = those components; "outside the boundary" = true externals (network services, filesystems, third-party APIs, etc.).
+
+**Integration test** — a test that exercises the real wired path across an integration boundary: real components inside; stub/fake for true externals outside. This is the *sociable / narrow integration test* of the classical (Detroit) lineage. It explicitly **excludes** the broad "live everything" (full-system / end-to-end) reading: an integration test may use fakes for externals, and still counts as an integration test as long as the in-boundary path is real and wired.
+
+**Path coverage** — does a test exercise the real wired path across a boundary? Tracked orthogonally to AC coverage. An AC can be covered by a unit test yet lack path coverage; path coverage requires at least one `[integration]`-tagged test that traverses the wired path.
+
+**`[integration]` tag** — the marker placed on an integration test (e.g. `@pytest.mark.integration`, `// [integration]`). Keys the M2 suite split, the M3 edit window, and every QA/RBVR path-coverage check.
+
+**Contract test** — a test that verifies a stub or fake of a true external stays faithful to the real external's contract. Required for every doubled true external.
+
+**Policy: never mock inside the boundary.** Real components inside the integration boundary must be wired for real. Doubles inside the boundary defeat the wired-path guarantee.
+
+**R1 — one wired path per integration test.** Each integration test exercises exactly one wired path across the boundary — a direct sibling of "one behavior per unit test." (Note: "one assert per test" is folklore, not a Beck law; R1 is about path scope, not assertion count.)
+
+**R3 — Double-loop.** The integration test is **authored up front** in the plan's Red step, drives the unit cycles across phases, and is greened in the integration-completing phase. This double-loop / outside-in pattern keeps the outer test as the north star across all inner unit cycles. By the completing phase, the in-boundary components already exist, so greening the outer test is just minimal **wiring glue** — no new behavior, only connecting the already-implemented pieces.
+
+**Mechanics — M1 through M4:**
+
+- **M1 — Cross-phase integration-test registry.** A table in `plan.md`, built during plan authoring and updated from plan + Red steps. Build (Implement) agents never write to it. Tracks each integration test's path, boundary, doubled externals, AC, `registered_in_phase` (the phase where Red authors the skeleton), and `completes_in_phase` target. The `skeleton_sha256` and `completed_sha256` hash fields are runtime-populated into orchestrator state — they are left blank in `plan.md` at authoring time and cannot be known before Red writes the skeleton.
+- **M2 — Tag-separated suites.** The per-phase gate runs the non-integration suite (marker exclusion, e.g. `-m 'not integration'`); the completing-phase gate runs the integration suite. A **path-dir fallback** is used for runners lacking markers (separate directory, e.g. `tests/integration/`). Exclusions are always stated explicitly, never silent.
+- **M3 — Immutability-gate edit window.** An integration test file has a single plan-authorized edit window: skeleton authored by Red (phase it is registered) → completed by Build in `completes_in_phase`. The edit window is path-confined (including fixture/helper closure) and phase-gated. Outside the window, the file is immutable to Build agents.
+- **M4 — Oracle split + completing-phase `[Integration-Test]` sub-cycle.** The completing phase's `[Verify]` block is split into a non-integration oracle (per-phase gate) and an integration oracle (runs `[integration]`-tagged tests). The `[Integration-Test]` sub-cycle in the completing phase confirms the wired path is green before advancing.
 
 ## Verification Checklist
 
@@ -114,8 +141,9 @@ Used by QA agents and the orchestrator before marking any phase complete:
 - [ ] Each test was watched failing before implementation
 - [ ] Each test failed for expected reason (feature missing, not typo)
 - [ ] Minimal code written to pass each test
-- [ ] All tests pass, output clean (no warnings)
+- [ ] All non-integration tests pass, output clean (no warnings); every due `[integration]` test (`completes_in_phase ≤ current` by phase ordinal — see execute skill Step 3.7a for ordinal mapping) is green; each doubled external has a passing contract test
 - [ ] Tests use real code (mocks justified where used)
+- [ ] Path coverage: each integration-bearing AC has a real-wired-path `[integration]` test (not unit-only)
 - [ ] Edge cases and error paths covered
 - [ ] No over-engineering beyond test requirements
 - [ ] Refactoring stayed within phase scope

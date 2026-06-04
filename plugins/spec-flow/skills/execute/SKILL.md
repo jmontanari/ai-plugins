@@ -2,13 +2,13 @@
 name: execute
 description: >-
   Implement an approved plan phase-by-phase. Dispatches TDD or Implement track agents per phase,
-  QA gates between phases, final review board (7-8 agents) before merge. Main window writes zero
+  QA gates between phases, final review board (8-9 agents) before merge. Main window writes zero
   code. Triggers: "execute", "implement", "run the plan".
 ---
 
 # Execute — Orchestrate Plan Implementation
 
-Execute an approved plan phase by phase using dedicated agents for each step. Each phase runs in Mode: TDD or Mode: Implement based on the plan's chosen track, with QA gates at every boundary and a final review board (7 agents in standard mode; 8 in fast mode) before merge.
+Execute an approved plan phase by phase using dedicated agents for each step. Each phase runs in Mode: TDD or Mode: Implement based on the plan's chosen track, with QA gates at every boundary and a final review board (8 agents in standard mode; 9 in fast mode) before merge.
 
 ## Pre-flight: Model Check
 
@@ -36,7 +36,7 @@ If the active model name does **not** contain `sonnet` (case-insensitive):
 
 If the model already contains `sonnet` → proceed to Step 0 immediately with no prompt.
 
-**Why Sonnet.** Execute orchestrates multi-agent, multi-phase work: it builds task lists, manages QA gates, routes discoveries, tracks SHA-256 manifests, and dispatches up to 8 review-board agents in sequence (7 standard; 8 in fast mode). Opus adds latency and cost with no orchestration benefit (Opus is dispatched by sub-agents when deep review is warranted). Haiku or mini-class models lack the reasoning capacity to reliably evaluate agent reports, parse AC matrices, and route findings through the Step 6c discovery tree.
+**Why Sonnet.** Execute orchestrates multi-agent, multi-phase work: it builds task lists, manages QA gates, routes discoveries, tracks SHA-256 manifests, and dispatches up to 9 review-board agents in sequence (8 standard; 9 in fast mode). Opus adds latency and cost with no orchestration benefit (Opus is dispatched by sub-agents when deep review is warranted). Haiku or mini-class models lack the reasoning capacity to reliably evaluate agent reports, parse AC matrices, and route findings through the Step 6c discovery tree.
 
 ## Step 0: Load Config
 
@@ -199,6 +199,19 @@ For both statuses, refuse even when `--ignore-deps` is passed, with: `dep <ref> 
 
 These refusals fire BEFORE the status-based 1c check and are NOT bypassable via `--ignore-deps`.
 
+### 1e. Integration-Test Registry — M1 load/carry (ADR-3)
+
+After the plan has been loaded (1b) and before any phase is dispatched, read the `## Integration-Test Registry` table from `plan.md` (if present). Hold its rows in orchestrator state as `integration_registry` — a list of records with fields: `path`, `boundary`, `doubled_externals`, `ac`, `registered_in_phase`, `completes_in_phase`. Carry `integration_registry` across every phase unchanged — no phase agent may add, remove, or mutate rows.
+
+**Field origins (M1 doctrine).** Every field in a registry row has one of two origins:
+
+- **Plan-authored (present in `plan.md` at plan-authoring time):** `path`, `boundary`, `doubled_externals`, `ac`, `registered_in_phase`, `completes_in_phase`. These are written by the plan author and are present in the table as authored — the orchestrator reads them verbatim at load time.
+- **Runtime-populated (recorded into orchestrator state, NOT plan-authored):** `skeleton_sha256` and `completed_sha256`. The plan author cannot know test-file hashes before Red writes the skeleton. These fields are left blank (or `—`) in the `plan.md` table and are filled by the orchestrator at runtime: `skeleton_sha256` is recorded when Red authors the skeleton in its `registered_in_phase`; `completed_sha256` is recorded by the orchestrator at the `completes_in_phase` window (per the M3 "closure hashes live in orchestrator state" paragraph in Step 3.7a). The orchestrator holds both hashes in per-row orchestrator state, NOT in the `plan.md` table.
+
+**M1 invariant (ADR-3):** `integration_registry` rows are built from plan + Red only, never written from Build. This invariant is the foundation for Phase 6's anti-cheat assertion. Any orchestrator step that reads the registry must source it from the plan-load snapshot recorded here; Build agents never write to it.
+
+**Absent-table degradation (NFR-INT-02):** If `plan.md` contains no `## Integration-Test Registry` table, set `integration_registry = []`. When `integration_registry` is empty, all integration-test gates in later steps are skipped silently — no error, no warning. This ensures pieces that predate the integration-test registry continue to execute without modification.
+
 ## Phase Scheduler — detection
 
 The orchestrator begins each piece by scanning plan.md for Phase Group headings (`## Phase Group <letter>:`). For each top-level unit in plan.md, determine whether it is a flat phase or a phase group:
@@ -345,7 +358,7 @@ Before dispatching Red or Implement, the orchestrator collects facts the agents 
    - "if <file/symbol> exists, reuse; otherwise create ..." — evaluate using symbol presence.
    Resolve each into a bullet under `## Orchestrator pre-decisions`. Other conditional phrasings (runtime-state conditions, fuzzy natural-language conditionals) pass through unchanged — the orchestrator is not a general-purpose plan interpreter.
 
-7. **Fast mode flag** — check the plan's front-matter `fast:` field. If `fast: true`, record `orchestrator_fast_mode: true` in session state. Fast mode skips all per-phase inline QA agent dispatches (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`, Group Deep QA) and replaces per-phase verify agent dispatch with a direct test-command shell invocation. The end-of-piece Final Review board gains an 8th member (`verify Mode: Piece Full`) to compensate. Log once: `"Fast mode: ENABLED — inline QA skipped, end-of-piece board +1 (verify-piece-full)"`. If `fast:` is absent or `false`, record `orchestrator_fast_mode: false` and proceed normally.
+7. **Fast mode flag** — check the plan's front-matter `fast:` field. If `fast: true`, record `orchestrator_fast_mode: true` in session state. Fast mode skips all per-phase inline QA agent dispatches (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`, Group Deep QA) and replaces per-phase verify agent dispatch with a direct test-command shell invocation. The end-of-piece Final Review board gains a 9th member (`verify Mode: Piece Full`) to compensate. Log once: `"Fast mode: ENABLED — inline QA skipped, end-of-piece board +1 (verify-piece-full)"`. If `fast:` is absent or `false`, record `orchestrator_fast_mode: false` and proceed normally.
 
 8. **Introspection context** — if `introspection.md` exists in the piece's working directory (alongside plan.md), read it. For the current phase's declared file scope, extract the Dependency Map and Test Landscape sections from the relevant cluster(s). Match phase file paths against the File Inventory entries in each cluster's H2 section. Append matching sections to `## Pre-flight snapshot` as `### Codebase context`. Skip the File Inventory and Pattern Catalog — the plan's Change Specification Blocks already embed their verbatim code from those sections. If `introspection.md` is absent (pre-v4.10 plans or CREATE-only phases), skip silently — no warning, no error.
 
@@ -483,10 +496,13 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    ```
 5. **Validate oracle:** Run the mode's oracle.
    - Mode: TDD — three invariants, all required:
-     - **(a) Full suite green** — `0 failed` across the whole test suite.
+     - **(a) Non-integration suite green** — `0 failed` across the **non-integration suite**. The run behavior depends on whether `integration_registry` is non-empty (M2 tag-separation, per ADR-3):
+       - **`integration_registry` is non-empty:** log the exclusion before running (e.g. `"Oracle: running non-integration suite (-m 'not integration'); [integration] tests gated by M4 sub-cycle"`) — never silent (NN-C-005) — then run the suite with an explicit `[integration]` marker exclusion: `-m 'not integration'` (pytest) or the project's equivalent marker convention. For runners that lack marker support, fall back to the path-dir fallback: exclude the integration test directory if one exists; if no integration test directory exists, exclude the registry's declared `path` values by name (log the exclusion explicitly per NN-C-005 — never run unmodified when registry rows exist). An `[integration]` test registered in `integration_registry` with a future `completes_in_phase` is NOT part of the per-phase non-integration oracle until that completing phase runs. (The due-integration invariant that checks completed rows is added in Phase 6's M4 oracle split.)
+       - **`integration_registry` is empty** (pre-4.12 piece / no integration tests, per NFR-INT-02): run the bare test command with no `-m 'not integration'` flag and no exclusion log line — the suite runs exactly as it did before M2 was introduced.
      - **(b) Every Red ID is in PASSED** — parse the current run's PASSED set and diff against the FAILED IDs captured in `phase_N_oracle_block` from Step 2.5. Every Red test ID must appear in the PASSED set. Missing IDs (collection errors, empty parameterize, deleted tests) are a rejection signal.
      - **(c) Zero Red IDs in SKIPPED** — any Red ID marked `@pytest.mark.skip`, `.skip()`, `t.Skip()`, `xfail`, or otherwise non-run is a rejection signal. This catches silent skip decorators added during Build.
-     - On violation of (b) or (c): retry within the 2-attempt budget with the specific offending IDs surfaced to the agent (e.g. "tests X, Y were SKIPPED in your run; you cannot pass Red tests by skipping them"). Escalate on second failure — a Red test that cannot go green without skipping means the plan or the Red tests themselves are wrong.
+     - **(d) Every due `[integration]` test green** — for every `integration_registry` row with `completes_in_phase ≤ current_phase` (compared by ordinal — see phase ordinal mapping in Step 3.7a; `completes_in_phase` is always authored as a top-level integer ordinal), that `[integration]` test (and its contract tests) must be in PASSED. Rows with `completes_in_phase > current_phase` are expected absent/red and are NOT a violation. (Per-phase invariants (a)–(c) apply to the non-integration suite per Phase 5's M2 split; this (d) is the integration half of the M4 oracle split per ADR-3.)
+     - On violation of (b) or (c): retry within the 2-attempt budget with the specific offending IDs surfaced to the agent (e.g. "tests X, Y were SKIPPED in your run; you cannot pass Red tests by skipping them"). Escalate on second failure — a Red test that cannot go green without skipping means the plan or the Red tests themselves are wrong. On violation of (d): escalate immediately — a due `[integration]` test that is not green means the completing-phase `[Integration-Test]` sub-cycle did not run or failed.
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
 6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
 7. **Post-commit integrity and reconciliation gates (Mode: TDD + Implement, v3.1.1+).** After the implementer's commit lands (HEAD now points to it), run cheap checks before accepting the phase. Gate (a) is TDD-only (uses Red's manifest); gate (b) is HARD FAIL on BOTH modes — strays or missings reject the phase. The Implement-track extension was added in v3.1.1 per pi-009-hardening's Phase Group A contamination event, where A.2 silently swept in A.4's staged files because the gate was previously gated `Mode: TDD only`.
@@ -501,7 +517,77 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      ```
      Any mismatch means the implementer modified one of Red's tests — the anti-cheat safeguard replacing pre-v2.7.0's `git diff tests/` check. Reject the phase and retry within the 2-attempt budget (the retry must recreate the commit without touching Red's tests). Escalate on second failure.
 
-     For Mode: Implement, this gate is skipped (no Red manifest exists); proceed directly to (b).
+     **M3 edit window for registered `[integration]` paths.** In addition to Red's manifest, the orchestrator enforces immutability on all paths listed in `integration_registry` (and their declared fixture/helper dependency-closure):
+
+     - **Before `registered_in_phase`** (i.e. `current_phase < registered_in_phase`): the skeleton does not yet exist in HEAD — `git show HEAD:"$path"` would error; this is "not yet authored", NOT an integrity failure. Skip this registry row entirely for M3 checks this phase.
+     - **From `registered_in_phase` to before `completes_in_phase`** (i.e. `registered_in_phase ≤ current_phase < completes_in_phase`): the path is immutable at `skeleton_sha256`. Re-hash against `skeleton_sha256`; any deviation is rejected.
+     - **At `completes_in_phase`** (i.e. `current_phase == completes_in_phase`): exactly **one** plan-authorized edit is permitted — the skeleton→completed transition. The window is single-shot, plan-authorized (derived from the registry's `skeleton_sha256` / `completed_sha256` fields), path-confined (incl. fixture/helper closure), and phase-gated to `completes_in_phase` (NFR-INT-01). The orchestrator records `completed_sha256` after the edit; the path (and its declared fixture/helper closure) is immutable at `completed_sha256` from this point forward. **When `registered_in_phase == completes_in_phase` (same-phase register+complete):** Red authors the skeleton in this phase (the M3 window opens) and the Step 4.5 completing-phase sub-cycle greens it in the same phase (the M3 window closes). In this case: the orchestrator checks the Red commit against `skeleton_sha256` (intra-phase, after Red stages and the unified commit lands) and then checks the Step 4.5 completing edit against `completed_sha256` — both within the single phase, in that order.
+     - **After `completes_in_phase`**: the path is immutable at `completed_sha256`. Re-hash against `completed_sha256`; any deviation is rejected.
+
+     **Phase ordinal comparison.** The comparisons above (`<`, `≤`, `==`, `>`) compare phase ordinals, not raw IDs. Map every phase/sub-phase/amendment ID to a monotonic top-level ordinal: a sub-phase inherits its group's ordinal; amendment phases (`phase_N_amend_K`, `phase_final_amend_K`) take the ordinal of the phase they extend. `completes_in_phase` and `registered_in_phase` are authored as top-level integers and serve directly as ordinals.
+
+     Hash the declared fixture/helper closure for each registered path (closes the refactor real→double blind spot — Refactor cannot swap a real in-boundary dependency for a test double in a helper file).
+
+     **Closure hashes live in orchestrator state — not as registry columns.** At skeleton time (when the Red snapshot is captured and `skeleton_sha256` is recorded), the orchestrator also hashes each declared closure file and stores those hashes in orchestrator state, keyed to the registry row (e.g. as a `fixture_helper_skeleton_hashes` map per row). At the `completes_in_phase` window (when `completed_sha256` is recorded), the orchestrator likewise records the closure files' completed hashes in orchestrator state (e.g. `fixture_helper_completed_hashes` per row). The registry table schema (`path`, `boundary`, `doubled_externals`, `ac`, `registered_in_phase`, `completes_in_phase`) is unchanged from the plan.md columns — `skeleton_sha256` and `completed_sha256` are runtime orchestrator state only, never plan.md columns.
+
+     ```bash
+     for entry in <integration_registry entries>; do
+       path=<entry.path>
+       current_ord=<monotonic ordinal for current_phase>
+       registered_ord=<monotonic ordinal for entry.registered_in_phase>
+       completing_ord=<monotonic ordinal for entry.completes_in_phase>
+
+       # Skip entirely if skeleton has not been authored yet
+       if [ "$current_ord" -lt "$registered_ord" ]; then
+         continue
+       fi
+
+       # Determine expected hash based on phase window.
+       # N2: In the same-phase case (registered_in_phase == completes_in_phase), current_ord
+       # equals completing_ord at BOTH the post-Red checkpoint and the Step 4.5 completing-edit
+       # checkpoint. The else-branch (completed_sha256) is only correct once completed_sha256
+       # has been recorded (i.e. after the Step 4.5 edit lands). At the post-Red checkpoint in
+       # the same phase, the skeleton is still the current file and expected_hash must be
+       # skeleton_sha256. See prose above ("When registered_in_phase == completes_in_phase")
+       # and Step 4.5 for the intra-phase ordering: post-Red → check skeleton_sha256; after
+       # Step 4.5 completing edit recorded → check completed_sha256.
+       if [ "$current_ord" -lt "$completing_ord" ]; then
+         expected_hash=<state: skeleton_sha256 for this entry>
+       else
+         # current_ord == completing_ord: use completed_sha256 only after Step 4.5 edit has
+         # landed and completed_sha256 has been recorded; use skeleton_sha256 at the earlier
+         # post-Red checkpoint within the same phase (see prose for intra-phase ordering).
+         expected_hash=<state: completed_sha256 for this entry>
+       fi
+
+       # N1: Use git cat-file -e to check presence before hashing. Piping git show into
+       # sha256sum always produces a non-empty hash (SHA-256 of empty input for absent paths),
+       # so [ -z "$commit_hash" ] is dead code with the pipe form. Check presence separately.
+       if ! git cat-file -e HEAD:"$path" 2>/dev/null; then
+         echo "M3 integrity fail: $path absent in HEAD at phase $current_ord (expected after registered phase $registered_ord)"
+       else
+         commit_hash=$(git show HEAD:"$path" | sha256sum | cut -d' ' -f1)
+         [ "$commit_hash" = "$expected_hash" ] || echo "M3 integrity fail: $path"
+       fi
+
+       # Also hash declared fixture/helper closure paths for this entry
+       for helper in <entry.fixture_helper_closure>; do
+         # N1: Use git cat-file -e for presence check (same reason as above — piped sha256sum
+         # never produces an empty string, so the old [ -z "$helper_hash" ] was dead code).
+         if ! git cat-file -e HEAD:"$helper" 2>/dev/null; then
+           echo "M3 fixture/helper closure integrity fail: $helper absent in HEAD"
+         else
+           helper_hash=$(git show HEAD:"$helper" | sha256sum | cut -d' ' -f1)
+           expected_helper_hash=<state: fixture_helper expected hash for helper, skeleton-or-completed by ordinal>
+           [ "$helper_hash" = "$expected_helper_hash" ] || echo "M3 fixture/helper closure integrity fail: $helper"
+         fi
+       done
+     done
+     ```
+
+     Any out-of-window edit, or an edit not matching the recorded `completed_sha256`, is rejected. This is an anti-cheat gate: **Build cannot self-authorize an integration edit.** The implementer may NOT create a registry row, move a `completes_in_phase` or `registered_in_phase` marker, or edit a registered `[integration]` test outside its single plan-authorized window — registry rows come only from plan + Red (M1 invariant), and the edit window is plan-derived, qa-plan-reviewed, single-shot, path-confined, and phase-gated (NFR-INT-01). Any such attempt is rejected. The M3 window is a gate *tightening* mechanism, never a merge path (NN-P-002). Build cannot self-authorize — the orchestrator enforces this invariant and will reject any phase where these rules are violated.
+
+     For Mode: Implement, the Red-manifest half of this gate is skipped (no Red manifest exists); the M3 integration-registry sub-check still applies if `integration_registry` is non-empty. Proceed directly to (b).
 
    - **(b) Unified commit reconciliation (Mode: TDD AND Mode: Implement).** The commit's file list must equal the **expected file set**:
      - **Mode: TDD:** `expected = Red's manifest paths ∪ Build's `## Files Created/Modified` paths`.
@@ -545,14 +631,21 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
 
 ### Step 4: Verify — Confirm Correctness
 
-**Fast mode — direct test execution (no agent dispatch):** if `orchestrator_fast_mode: true`, skip the verify agent dispatch entirely. Instead, run the project test command directly:
+**Fast mode — direct test execution (no agent dispatch):** if `orchestrator_fast_mode: true`, skip the verify agent dispatch entirely. Instead, run the project test command directly. The run behavior depends on whether `integration_registry` is non-empty (M2 tag-separation, per ADR-3):
 
-```bash
-# Use the [Verify] command from the plan's current phase block, or fall back to CLAUDE.md test command
-<test command>
-```
+- **`integration_registry` is non-empty:** log the exclusion before running (e.g. `"Fast mode: running non-integration suite (-m 'not integration'); [integration] tests gated by M4 sub-cycle"`) — never silent (NN-C-005) — then scope the run to the **non-integration suite** via an explicit `[integration]` marker exclusion:
 
-Check exit code. If `0`: log `"Phase N tests: GREEN"` and proceed to Step 5 (Refactor). If non-zero: surface the failure output, dispatch a `fix-code` agent scoped to the failing test paths, re-run the test command. Repeat up to 2 attempts. If still failing after 2 attempts: escalate to human. Do NOT dispatch a verify agent in fast mode.
+  ```bash
+  # Use the [Verify] command from the plan's current phase block, or fall back to CLAUDE.md test command
+  # Log exclusion before running (NN-C-005); path-dir fallback when marker support is unavailable
+  <test command> -m 'not integration'   # pytest example; adapt to project marker convention
+  ```
+
+  For runners that lack marker support, fall back to the path-dir fallback: exclude the integration test directory if one exists; if no integration test directory exists, exclude the registry's declared `path` values by name (log the exclusion explicitly per NN-C-005 — never run unmodified when registry rows exist). Due `[integration]` tests registered in `integration_registry` are NOT checked by this raw exit-code run — they are gated by the M4 sub-cycle (Phase 6), not by fast-mode.
+
+- **`integration_registry` is empty** (pre-4.12 piece / no integration tests, per NFR-INT-02): run the bare test command with no `-m 'not integration'` flag and no exclusion log line — the suite runs exactly as it did before M2 was introduced.
+
+Check exit code. If `0`: log `"Phase N tests: GREEN"` and proceed to Step 4.5 (completing-phase [Integration-Test] sub-cycle) if the current phase completes any registry row, then Step 5 (Refactor). If non-zero: surface the failure output, dispatch a `fix-code` agent scoped to the failing test paths, re-run the test command. Repeat up to 2 attempts. If still failing after 2 attempts: escalate to human. Do NOT dispatch a verify agent in fast mode.
 
 ---
 
@@ -577,12 +670,37 @@ Check exit code. If `0`: log `"Phase N tests: GREEN"` and proceed to Step 5 (Ref
      model: "sonnet"
    })
    ```
-5. **Test integrity (Mode: TDD only; non-TDD mode: no-op).** As of v2.7.0, the primary anti-tampering safeguard runs at Step 3.7a (content-hash check of Red's staged test manifest against Red's test files in HEAD). By the time Step 4 runs, that gate has already passed — so no additional diff is needed here. In non-TDD mode (`tdd: false`), there is no Red manifest, so this check is a no-op. If the phase produces a Refactor commit in Step 5, re-run the content-hash check against HEAD after Refactor lands (Refactor is phase-scoped and must not touch test files the Red agent authored; re-hashing catches drift). If any hash drifts at Refactor time: REJECT, revert the refactor commit, and flag the Refactor agent for re-dispatch with the offending paths surfaced.
+5. **Test integrity (Mode: TDD only; non-TDD mode: no-op).** As of v2.7.0, the primary anti-tampering safeguard runs at Step 3.7a (content-hash check of Red's staged test manifest against Red's test files in HEAD). By the time Step 4 runs, that gate has already passed — so no additional diff is needed here. In non-TDD mode (`tdd: false`), there is no Red manifest, so this check is a no-op. If the phase produces a Refactor commit in Step 5, re-run the content-hash check against HEAD after Refactor lands (Refactor is phase-scoped and must not touch test files the Red agent authored; re-hashing catches drift). For registered `[integration]` paths, re-hash against `skeleton_sha256` (for phases before `completes_in_phase`) or `completed_sha256` (at/after `completes_in_phase`) — AND re-hash their declared fixture/helper closure — so that Refactor cannot swap a real in-boundary dependency for a test double in a helper file after Refactor (the integration-preservation backstop for Phase 7's refactor.md rule). If any hash drifts at Refactor time: REJECT, revert the refactor commit, and flag the Refactor agent for re-dispatch with the offending paths surfaced.
 6. Parse verify report.
    - **Audit Mode returned PASS** — proceed to Refactor (Step 5).
    - **Audit Mode returned FAIL** with `Recommend: Full mode re-verify` — re-dispatch as Mode: Full, treat that result as authoritative.
-   - **Full Mode returned PASS** — proceed to Refactor.
+   - **Full Mode returned PASS** — proceed to the `[Integration-Test]` sub-cycle (below) if applicable, then Refactor.
    - **Full Mode returned FAIL** — if gaps: Mode: TDD can loop back to Red (add tests); Mode: Implement can loop back to Step 3 with gaps as context. Otherwise escalate.
+
+### Step 4.5: Completing-phase [Integration-Test] sub-cycle
+
+*(Runs only when the current phase is a `completes_in_phase` for at least one `integration_registry` row — i.e., some row has `completes_in_phase == current_phase` (by ordinal comparison; see phase ordinal mapping in Step 3.7a). This sub-cycle is positioned between [Verify] and [Refactor], running after Step 4 Verify passes and before Step 5 Refactor begins. Non-completing phases skip it entirely and proceed directly to Step 5.)*
+
+This sub-cycle is the sole execution path for the M3 skeleton→completed edit window. It is additive — it does not replace any prior step, and it does not bypass per-phase QA or the end-of-piece review-board sign-off (NN-P-002).
+
+**Same-phase register+complete (`registered_in_phase == completes_in_phase`).** When a registry row's `registered_in_phase` equals its `completes_in_phase`, both the skeleton authoring (Red in `registered_in_phase`) and the skeleton→completed transition (this sub-cycle) occur within the same phase. Intra-phase ordering: (1) Red authors and stages the skeleton; the orchestrator records `skeleton_sha256` and verifies the unified commit against it; (2) this Step 4.5 sub-cycle applies the completing edit and records `completed_sha256`; (3) the M3 integrity re-check in sub-step 4 below verifies the completed state. The `==` case is not a special code path — the standard sub-cycle below applies; the sole difference is that `skeleton_sha256` was just recorded this same phase rather than a prior one.
+
+**Check:** does any `integration_registry` row have `completes_in_phase == current_phase` (by ordinal)?
+
+- **No:** skip this step. Proceed to Step 5 (Refactor).
+- **Yes:** for each such row, run the following sub-cycle:
+
+  1. **Apply the M3 single-shot edit window.** The implementer (or the non-TDD `[Integration-Test]` block's agent) may edit the registered `[integration]` test path (and its declared fixture/helper dependency-closure) from `skeleton_sha256` to `completed_sha256`. This is the only authorized edit: single-shot, plan-authorized (derived from the registry's `completed_sha256`), path-confined (incl. fixture/helper closure), and phase-gated to `completes_in_phase` (NFR-INT-01). The orchestrator records `completed_sha256` after the edit; the path is immutable at `completed_sha256` from this point forward.
+
+     **Non-TDD-mode dispatch path:** when the current phase is non-TDD (`tdd: false`), the completing-phase `[Write-Tests]`/`[Integration-Test]` block's agent authors and greens the outer integration test in its turn. The M3 window still applies — the edit must match `completed_sha256` and the fixture/helper closure is hashed.
+
+  2. **Run the outer `[integration]` test.** Execute the completing test (and its contract tests) in isolation. It must pass. If it fails: dispatch a `fix-code` agent scoped to the integration test path, re-run. Up to 2 attempts; escalate on second failure.
+
+  3. **Gate on M4 invariant (d).** Re-run the oracle with both suites: the non-integration suite (invariant (a)) and the due-integration rows (invariant (d)). Every registry row with `completes_in_phase ≤ current_phase` (by ordinal) must be in PASSED. Any violation escalates.
+
+  4. **M3 integrity re-check.** Re-hash the edited path and its declared fixture/helper closure against `completed_sha256`. Any mismatch rejects the sub-cycle.
+
+  5. **Proceed to Step 5 (Refactor).** The sub-cycle is complete. The completing-phase `[integration]` test is now locked at `completed_sha256`.
 
 ### Step 5: Refactor — Clean Up
 
@@ -590,7 +708,7 @@ Check exit code. If `0`: log `"Phase N tests: GREEN"` and proceed to Step 5 (Ref
 
 **Conditional skip.** Read the `refactor` key from `.spec-flow.yaml` (valid values: `auto`, `always`, `never`; default `auto`). If the key is absent, default to `auto`.
 
-- `never` — skip this step unconditionally. Proceed to Step 6.
+- `never` — skip this step unconditionally. Proceed to Step 5.7.
 - `always` — run this step unconditionally.
 - `auto` — inspect the Build agent's report. Skip this step if **all** of:
   - `## Oracle Outcome` reports `Oracle ran clean on first attempt: yes`
@@ -601,7 +719,7 @@ Check exit code. If `0`: log `"Phase N tests: GREEN"` and proceed to Step 5 (Ref
 
 Log the skip decision (`refactor_skipped: auto|never` with the reason) for the session summary. Observed yield from Phases 5a–11: 8 Refactor passes produced only comment cleanups / −3 to −48 LOC dedup and fixed zero correctness defects. Skipping when Build is clean reclaims 10–15 min per phase with no observed quality loss.
 
-If skipped, proceed directly to Step 6. Otherwise:
+If skipped, proceed directly to Step 5.7. Otherwise:
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/refactor.md`
 2. Compose prompt with: list of phase files, the mode's verification command (full test suite for Mode: TDD, plan's `[Verify]` command for Mode: Implement), quality principles
@@ -617,6 +735,22 @@ If skipped, proceed directly to Step 6. Otherwise:
    - Re-run the phase's verification command: still passing?
    - Check scope: `git diff --name-only` shows only phase files changed?
    - If out-of-scope files modified: reject the refactor, revert.
+
+### Step 5.7: Verify-scope union before QA dispatch (AC-14 — pi-014 Phase 11 rationale)
+
+**This step runs unconditionally** — whether Refactor was run or skipped, and including in `orchestrator_fast_mode`. In fast mode (where Step 6 QA dispatch is skipped), the union check runs here before **Step 6b** (the hook sweep) instead of before QA dispatch; it is a mandatory gate regardless of mode.
+
+Before dispatching QA (Step 6), the orchestrator MUST verify the phase oracle and phase-level sweep against the **union** of two file sets:
+
+1. **Implementer's actual-modified file list** — the complete list of files the implementer actually touched or modified during this phase, as reported in the implementer's `## Files Created/Modified` section and confirmed by `git diff --name-only $phase_N_start_sha..HEAD`.
+2. **Plan's declared scope** for this phase — the file paths listed in the phase's `**In scope:**` block.
+
+**Rationale (ADR-3).** The plan's declared scope is the pre-flight contract; the implementer's actual-modified list is the ground truth of what changed. A file may appear in one set but not the other: an implementer may touch a file the plan did not enumerate (out-of-declared-scope), or the plan may declare a file the implementer left unmodified. Any file in either set that is NOT covered by the phase's `[Verify]` oracle is a **scope-verification gap** — the orchestrator must resolve each gap before dispatching QA:
+
+- **File in actual but not declared scope:** surface to the implementer for confirmation (was this touch intentional? does the plan need amendment?). If the file's change is load-bearing for the phase's ACs, it MUST be added to the `[Verify]` sweep before QA sees the diff.
+- **File in declared scope but not actually modified:** note the absence (the plan may have over-declared scope, or the implementer may have missed a required change). If the plan required the file to be modified and it was not, surface as a plan-adherence gap — do not silently skip it.
+
+**Implementation.** The implementer's agent report includes a `## Files Created/Modified` section listing only the files it authored. The orchestrator computes the **union of actual-modified ∪ declared scope** and runs `git diff --name-only $phase_N_start_sha..HEAD` as the authoritative ground-truth check. Proceed to Step 6 only after all union-gap items are resolved or acknowledged.
 
 ### Step 6: Phase QA
 
@@ -1193,7 +1327,7 @@ One review session handles the whole batch — no per-sub-phase interruptions.
 
 Triggered automatically when the last phase's QA passes.
 
-### Step 1: Iteration 1 — Full Review (7 Parallel Agents; 8 in fast mode)
+### Step 1: Iteration 1 — Full Review (8 Parallel Agents; 9 in fast mode)
 
 Get the full worktree diff:
 
@@ -1214,7 +1348,7 @@ counting phase checkboxes.
 git diff main..HEAD
 ```
 
-Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<role>.md` and dispatch ALL SEVEN concurrently with `Input Mode: Full`:
+Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<role>.md` and dispatch ALL EIGHT concurrently with `Input Mode: Full`:
 
 ```
 Agent({ description: "Blind review (iter 1, full)", prompt: <review-board-blind.md + Input Mode: Full + diff only>, model: "opus" })
@@ -1224,22 +1358,24 @@ Agent({ description: "PRD alignment review (iter 1, full)", prompt: <review-boar
 Agent({ description: "Architecture review (iter 1, full)", prompt: <review-board-architecture.md + Input Mode: Full + diff + charter (all charter skills at the active charter root resolved per plugins/spec-flow/reference/charter-location.md — <charter_root>/skills/charter-*/SKILL.md, <charter_root> ∈ {.github, .claude}, if present) + NN-C + NN-P>, model: "opus" })
 Agent({ description: "Security review (iter 1, full)", prompt: <review-board-security.md + Input Mode: Full + diff + spec (for trust boundary context)>, model: "opus" })
 Agent({ description: "Ground-truth review (iter 1, full)", prompt: <review-board-ground-truth.md + Input Mode: Full + diff + spec (for known/expected results and worked examples)>, model: "opus" })
+Agent({ description: "Integration/path-coverage review (iter 1, full)", prompt: <review-board-integration.md + Input Mode: Full + diff + "read beyond the diff to enumerate every wired path across an integration boundary">, model: "opus" })
 ```
 
 **Change-track Final Review (when `track = "change"`):**
-When `track = "change"`, dispatch exactly **6 agents** (not 7 or 8):
+When `track = "change"`, dispatch exactly **7 agents** (not 8 or 9):
 - `review-board-architecture` (with all charter files)
 - `review-board-blind`
 - `review-board-edge-case`
 - `review-board-security`
 - `review-board-spec-compliance` (with `spec_path` = `brief.md` as the spec reference)
 - `review-board-ground-truth` (with `spec_path` = `brief.md` for any known/expected results)
+- `review-board-integration` (with diff + "read beyond the diff to enumerate every wired path across an integration boundary")
 
 SKIP: `review-board-prd-alignment` — no PRD in change-track; this agent is explicitly excluded for `track = "change"`.
 
-When `track = "piece"`, the existing 7-standard-agent dispatch runs unchanged.
+When `track = "piece"`, the existing 8-standard-agent dispatch runs unchanged.
 
-**Fast mode — 8th board member:** if `orchestrator_fast_mode: true`, additionally dispatch concurrently:
+**Fast mode — 9th board member:** if `orchestrator_fast_mode: true`, additionally dispatch concurrently:
 
 ```
 Agent({
@@ -1249,11 +1385,11 @@ Agent({
 })
 ```
 
-This 8th agent compensates for the per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches that fast mode skips.
+This 9th agent compensates for the per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches that fast mode skips.
 
 ### Step 2: Triage
 
-Collect findings from all board agents (7 in standard mode; 8 in fast mode — the 8th is `verify-piece-full`). Deduplicate (same issue reported by multiple reviewers). Classify:
+Collect findings from all board agents (8 in standard mode; 9 in fast mode — the 9th is `verify-piece-full`). Deduplicate (same issue reported by multiple reviewers). Classify:
 - `must-fix` — blocks merge; amendment-eligible in Step 8 triage
 - `should-fix` — non-blocking improvement; addressed via fix-code loop (same iter loop) if capacity allows, otherwise deferred; NOT amendment-eligible
 - `defer` — pre-existing issue, not introduced by this spec
@@ -1273,21 +1409,39 @@ If must-fix findings exist:
   git commit -m "fix: final-review iter M must-fix"
   ```
   Hooks run normally. If a hook fails, re-dispatch the fix agent with the hook output appended; don't bypass.
-- Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 6-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 7 standard agents. Note: the 8th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
+- Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 7-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth, integration) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 8 standard agents. Note: the 9th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** 3 full review cycles maximum.
 - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
+### Post-CHANGELOG fix re-verification (AC-16 — pi-014 rationale)
+
+**Trigger.** Whenever a fix iteration (Final Review fix loop, Step 3 above) or an amendment phase (`phase_final_amend_<K>` via Step 8) lands AFTER the piece's CHANGELOG/version phase has already run (i.e., the piece contains a phase whose `**In scope:**` includes `CHANGELOG.md` or a `plugin.json` / version file, and that phase's `progress: …` commit is already in HEAD), the orchestrator MUST **re-verify** the CHANGELOG entry before the piece completes.
+
+**What to re-check.** After each such fix commit, verify that:
+
+1. The `## [<version>]` CHANGELOG header accurately describes the shipped artifact as it now stands — not as it stood when the CHANGELOG phase ran.
+2. Any feature, agent, mechanic, or behavior that the fix **adds, removes, or materially alters** is reflected (or intentionally omitted with rationale) in the CHANGELOG entry. A fix that changes a shipped artifact without a corresponding CHANGELOG update is a **must-fix** — the CHANGELOG is a contract with downstream users.
+3. The version number in `CHANGELOG.md` still matches the version fields in `plugin.json` and any other version-bearing files the piece declared. A fix that bumps a file without updating the CHANGELOG version header is also a must-fix.
+
+**How.** After the fix commit lands, run:
+```bash
+git diff main..HEAD -- CHANGELOG.md
+```
+Compare the CHANGELOG diff against the full cumulative piece diff (`git diff main..HEAD`) to identify any artifact-level change not reflected in the CHANGELOG. If a discrepancy is found, dispatch a targeted fix-code agent scoped to `CHANGELOG.md` with the discrepancy listed as its sole finding. The fix does NOT count against the `[Verify]` oracle for the phase that originally authored the CHANGELOG — it is a separate targeted correction. After the CHANGELOG fix lands, re-run the version-sync check (`grep -h '"version"'` across version-bearing files) to confirm all version strings still agree.
+
+**Scope.** This rule applies to every post-CHANGELOG fix path: Final Review Step 3 fix iterations, Step 8 amendment phases (`phase_final_amend_<K>`), and any human-directed rework via Step 4 (Human Sign-Off) that touches behavior after the CHANGELOG phase. It does NOT apply to fixes that land before the CHANGELOG phase runs — those are covered by the normal phase `[Verify]` oracle and CHANGELOG-phase QA gate.
+
 ### Step 8: Final Review Triage
 
-**Trigger.** When Final Review's iter-loop (Steps 1–3) terminates with must-fix findings remaining (the iter-loop's circuit breaker fired or the operator has chosen to triage residual must-fix items rather than continue iterating), the orchestrator invokes Step 8 once before any merge action — i.e., before Step 4 (Human Sign-Off), Step 4.5 (Reflection), Step 5 (Capture Learnings), or Step 6 (Merge). Step 8 also fires when Final Review surfaces non-must-fix discoveries that nonetheless require triage (`requires-amendment`, `requires-fork`, `does-not-block-goal-deferred`, or `qa-deferred-to-reflection` markers from any of the end-of-piece reviewers — blind, spec-compliance, architecture, edge-case, prd-alignment, security, ground-truth, and in fast mode also verify-piece-full — even when the iter-loop returned must-fix=None overall). If Final Review returns clean across all board reviewers AND no triage-eligible discoveries surfaced, Step 8 is a no-op and execution proceeds to Step 4.
+**Trigger.** When Final Review's iter-loop (Steps 1–3) terminates with must-fix findings remaining (the iter-loop's circuit breaker fired or the operator has chosen to triage residual must-fix items rather than continue iterating), the orchestrator invokes Step 8 once before any merge action — i.e., before Step 4 (Human Sign-Off), Step 4.5 (Reflection), Step 5 (Capture Learnings), or Step 6 (Merge). Step 8 also fires when Final Review surfaces non-must-fix discoveries that nonetheless require triage (`requires-amendment`, `requires-fork`, `does-not-block-goal-deferred`, or `qa-deferred-to-reflection` markers from any of the end-of-piece reviewers — blind, spec-compliance, architecture, edge-case, prd-alignment, security, ground-truth, integration, and in fast mode also verify-piece-full — even when the iter-loop returned must-fix=None overall). If Final Review returns clean across all board reviewers AND no triage-eligible discoveries surfaced, Step 8 is a no-op and execution proceeds to Step 4.
 
 **Per-finding routing.** For each finding emerging from Final Review, the orchestrator routes by severity before dispatching Step 6c:
 
 - **`must-fix` and `should-fix`:** dispatches the Step 6c triage flow with the full options menu — `(a) amend`, `(s) amend-spec` (where spec-eligible), `(f) fork`, `(d) defer`. The finding's severity label is surfaced in the triage prompt so the operator can weigh whether a should-fix warrants reopening the piece. Amendment budget applies to any amend choice regardless of severity.
 - **`defer` and `dismiss`:** no Step 6c invocation; the finding is either discarded (`dismiss`) or written directly to the backlog without operator triage (`defer` — pre-existing issues require no new rationale).
 
-Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, `security`, `ground-truth`, or (in fast mode) `verify-piece-full` — matching the active end-of-piece reviewer roles.
+Each finding is processed as a separate Step 6c invocation (one Step 6c invocation = one triage event per the Recursion semantics defined under Step 6c). The triage prompt's source-phase column for `.discovery-log.md` rows is set to the literal token `final-review` (NOT a numeric phase ID — there is no specific upstream phase in Final Review). The source-agent column names which reviewer flagged the finding: `blind`, `spec-compliance`, `architecture`, `edge-case`, `prd-alignment`, `security`, `ground-truth`, `integration`, or (in fast mode) `verify-piece-full` — matching the active end-of-piece reviewer roles.
 
 **Amendment phase IDs.** Amendment phases inserted via Step 8 use the suffix-form IDs `phase_final_amend_<K>` where `<K>` is the 1-indexed amendment counter for the Final Review triage event (`phase_final_amend_1`, `phase_final_amend_2`, etc.). The originating phase token is the literal string `final` since there is no specific upstream phase. This naming distinguishes Step 8-induced amendment phases from per-phase Step 6c-induced amendment phases (`phase_<N>_amend_<K>` with `<N>` a numeric phase ID per FR-13).
 
@@ -1295,7 +1449,7 @@ Each finding is processed as a separate Step 6c invocation (one Step 6c invocati
 
 **Per-choice flow.**
 
-- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 on the new cumulative diff `git diff main..HEAD`. For `track = "change"` pieces: re-dispatch the same 6-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 7 standard agents (blind, edge-case, spec-compliance, prd-alignment, architecture, security, ground-truth, and verify-piece-full in fast mode). The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
+- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 on the new cumulative diff `git diff main..HEAD`. For `track = "change"` pieces: re-dispatch the same 7-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth, integration) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 8 standard agents (blind, edge-case, spec-compliance, prd-alignment, architecture, security, ground-truth, integration, and verify-piece-full in fast mode). The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
 
 - **On `fork`:** a follow-up piece is written to `docs/prds/<prd-slug>/manifest.yaml` with `depends_on: [<current-piece-slug>]`, exactly as Step 6c's Fork dispatch specifies. The current piece **merges as-is** with the discovery deferred to the new piece — Step 8's fork choice does NOT re-open the piece and does NOT re-run Final Review. Execution proceeds to Step 4 (Human Sign-Off) once all Step 8 findings have been routed. The current piece's status remains `executing` (or whatever its pre-Step-8 status was); the operator's sign-off at Step 4 is on the merge-as-is artifact with the forked discovery noted.
 

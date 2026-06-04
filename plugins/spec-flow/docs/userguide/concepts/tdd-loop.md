@@ -140,13 +140,65 @@ Non-TDD mode is a piece-level decision, declared in the plan's front-matter as `
 
 **What stays the same:**
 - Phase QA (`qa-phase`) runs on every phase.
-- Final Review (7-agent board; 8 in fast mode) runs after all phases.
+- Final Review (8-agent board; 9 in fast mode) runs after all phases.
 - Reflection (Step 4.5) runs normally.
 - Circuit breakers, escape hatches, and escalation rules are identical.
 - The `implementer` agent still runs, but in `Mode: Implement`.
 - The `refactor` agent still runs when the phase has a `[Refactor]` checkbox.
 
-Non-TDD mode is a valid, complete choice. It is not a "reduced" version of TDD -- it is a different strategy with different trade-offs. The pipeline remains rigorous: every phase still gets adversarial QA review and the final piece still gets a 7-agent review board (8 in fast mode).
+Non-TDD mode is a valid, complete choice. It is not a "reduced" version of TDD -- it is a different strategy with different trade-offs. The pipeline remains rigorous: every phase still gets adversarial QA review and the final piece still gets an 8-agent review board (9 in fast mode).
+
+## Integration tests & the double-loop
+
+Unit tests verify isolated behavior. Integration tests verify that the wired paths between units — across module boundaries, service seams, and external dependencies — actually work together. spec-flow has first-class support for integration tests via the `[integration]` **test tag** and the `[Integration-Test]` block.
+
+### The `[integration]` test tag and `[Integration-Test]` block
+
+`[integration]` is a **test tag** — a marker applied to individual test cases (e.g., `@pytest.mark.integration` in Python) that signals the test exercises a real wired path rather than mocked-out collaborators. The test tag is distinct from the phase-level concept: the phase-level structure is the `[Integration-Test]` block in `plan.md` combined with the `completes_in_phase` registry annotation, which declares which phase delivers the completing wiring.
+
+The `[Integration-Test]` block is the plan-author's explicit call-out of which integration assertions a phase must satisfy:
+
+```
+### Phase N: <name>
+- [ ] [Integration-Test] completes_in_phase: N
+  <behavior verified across real boundary>
+```
+
+The `[integration]` test tag on the test itself (not the phase heading) is what keys the M2 suite split (`-m 'not integration'` / `-m 'integration'`) and the M3 edit-window enforcement. Integration tests follow the same Red → Build → Verify cycle as unit tests. The oracle difference: integration tests are not allowed to mock the true external (the thing being integrated), only the infrastructure around it (clocks, randomness, network transport). An integration test that mocks the external it claims to test is theater — the `qa-tdd-red` and `review-board-integration` reviewers both flag this pattern.
+
+### The R3 double-loop
+
+When a spec includes cross-phase integration behavior — a behavior that spans multiple implementation phases — the integration test that proves it is authored up front (in the earliest phase where the test can be written) but greens only in the completing phase. This is the **double-loop**:
+
+- **Outer loop:** the integration test is authored in Phase M (the first phase that can express the assertion). It stays red through Phases M+1, M+2, … until the completing phase.
+- **Inner loop:** each inner phase runs its own unit-level TDD cycle normally.
+- **Completing phase:** Phase N (the phase that delivers the last piece of the integrated behavior) turns the outer integration test green. The Build agent for Phase N inherits the staged integration test from Phase M's Red step.
+
+The double-loop ensures cross-phase integrations have a test proving they work before the piece is declared done, rather than discovering the gap only at the merge-time board.
+
+### Contract tests for true externals
+
+When a phase integrates with a doubled true external (a database, a message broker, a third-party API), a **contract test** records the behavior the external actually exhibits at integration time:
+
+- The contract is expressed as an `[Integration-Test]` assertion against a live or in-process instance of the external.
+- If the external later changes its behavior (schema migration, API version bump), the contract test fails — surfacing the break before it reaches production.
+- Contract tests live alongside unit tests; they are tagged so the CI pipeline can run them separately when the external is available.
+
+### Path coverage as a peer of AC coverage
+
+The AC Coverage Matrix tracks which acceptance criteria are covered by which tests. Integration tests (tests carrying the `[integration]` test tag) extend this with **path coverage**: for each cross-boundary path named in the spec, at least one `[Integration-Test]` entry must exist that exercises the full path end-to-end.
+
+The `review-board-integration` reviewer (part of the standard 8-agent board) checks path coverage at merge time:
+
+- Are all cross-boundary paths named in the spec exercised by at least one integration test?
+- Are any of those integration tests over-mocked (mock-avalanche) to the point of not testing the real path?
+- Are there integration-only failure modes (network partition, serialization mismatch, schema drift) that no test exercises?
+
+Findings from `review-board-integration` follow the same fix-code / fix-doc loop as any other board finding, up to 3 iterations.
+
+### Reference
+
+See `plugins/spec-flow/reference/spec-flow-doctrine.md` for the canonical definitions of integration test, contract test, path coverage, double-loop, and mock-avalanche.
 
 ## Where to go next
 

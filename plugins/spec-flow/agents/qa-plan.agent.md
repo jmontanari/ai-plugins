@@ -144,6 +144,8 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 
    Evidence: cite the phase's change count and quote the `[Verify]` block showing only phase-level verification. **Should-fix.**
 
+26. **Integration allocation (activate only when the spec declares an Integration Coverage block; skip if absent — not an error per NFR-INT-02):** For each declared integration: (a) exactly one phase contains an `[Integration-Test]` block with a concrete real-path `[Verify]` command and a `completes_in_phase` marker no earlier than the completing component's phase; (b) each doubled true external has a contract test named in that block; (c) the block states its boundary (nothing inside the boundary is doubled); (d) the `## Integration-Test Registry` table is well-formed (one row per `[integration]` test; required columns present, including `registered_in_phase`); (e) for every registry row, `registered_in_phase ≤ completes_in_phase` — a row where `registered_in_phase > completes_in_phase` is a must-fix (the skeleton cannot be authored after the completing phase). When `registered_in_phase == completes_in_phase`, verify the phase's plan block includes both a `[TDD-Red]`/`[Write-Tests]` skeleton step AND an `[Integration-Test]` completing step (the intra-phase ordering the execute skill enforces). Any missing (a)/(b)/(c)/(d)/(e) → must-fix. Evidence: quote the integration and the phase block.
+
 ## Output Format
 
 Same structure: must-fix and acceptable sections. Every must-fix must cite a criterion and explain what's wrong.

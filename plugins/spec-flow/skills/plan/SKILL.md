@@ -117,6 +117,12 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
    - Define a clear exit gate for each phase
    - Order phases by dependency (inside-out execution)
 
+   **Integration-driven phase ordering.** When the spec's `## Integration Coverage` block declares one or more integrations (see `plugins/spec-flow/reference/spec-flow-doctrine.md` for definitions), apply the following ordering discipline:
+   - Declare the outer `[integration]` test up front — at the time you author the phase that introduces the **last in-boundary component** (the completing phase). Do not defer it to a later cleanup phase.
+   - Mark that phase with a `completes_in_phase: <phase-number>` annotation on the `[Integration-Test]` block so the execute skill and QA agents can locate the outer test without scanning all phases.
+   - For each **doubled true external** in the integration's boundary, allocate a contract test named in that same `[Integration-Test]` block (one contract test per doubled external).
+   - Phase ordering consequence: any in-boundary component that the outer integration test exercises must be introduced in an earlier phase than the completing phase — the completing phase is never Phase 1 unless the entire integration fits in one phase.
+
 1a. **Verb alignment check** — extract the primary action verb from each spec AC and verify the covering plan phase PERFORMS that action. Action verbs to check: run, execute, validate, generate, create, modify, delete, deploy, test, migrate, configure, verify.
 
     A phase description must contain a concrete step that PERFORMS the verb — not documents, reviews, inspects, or scaffolds it.
@@ -193,12 +199,19 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
 
    Pick the track that matches reality. Don't force TDD onto a YAML file; don't skip TDD for a business rule.
 
+   **`[Integration-Test]` block on TDD or Implement track.** An integration test is a real-path wiring verification — it is not inherently TDD or non-TDD. The completing phase may use either track:
+   - **TDD-track completing phase:** the outer `[integration]` test is authored in the `[TDD-Red]` step alongside any unit tests for that phase; it is a failing test like any other Red test. The `[Integration-Test]` block documents it as the outer wiring test and carries the `completes_in_phase` marker.
+   - **Implement-track completing phase:** the outer `[integration]` test is authored in a dedicated `[Integration-Test]` step (between `[Implement]` and `[Verify]`), which writes and immediately runs the test. The `[Verify]` block confirms the test passes.
+   In both cases the `[Integration-Test]` block must declare its boundary (the set of components exercised end-to-end) and list any contract tests for doubled true externals.
+
    **Non-TDD mode override.** If the plan front-matter declares `tdd: false`:
    - Generate ALL phases with non-TDD structure: `[Implement]` → `[Write-Tests]` → `[Verify]` → `[Refactor]` (optional) → `[QA]`.
    - No `[TDD-Red]`, no `[QA-Red]`, no `[Build]` markers.
    - `[Implement]`: same structure as Implement track (exact file paths, signatures, patterns).
    - `[Write-Tests]`: write tests for what was implemented. No "fail first" requirement. No theater-pattern review. No SHA-256 manifest. Just write tests that verify the implementation is correct, with reasonable coverage of the phase's ACs.
    - Update the Overview section to state: "Non-TDD mode: all phases use Implement track + Write-Tests; AC Coverage Matrix is not required; QA and Final Review remain intact."
+
+   **Non-TDD integration double-loop.** In `tdd: false` mode, the outer `[integration]` test for an integration is authored and greened within its completing phase's `[Write-Tests]`/`[Integration-Test]` step — there is no cross-phase Red step. The completing phase's step sequence is: `[Implement]` → `[Write-Tests]` (unit tests) → `[Integration-Test]` (outer integration test authored and run inline) → `[Verify]` (confirms both unit and integration tests pass). The `completes_in_phase` marker is still required on the `[Integration-Test]` block for the execute skill and QA agents.
 
 2a. **Phase-sizing check (FR-11; v3.1.1+ filter rules).** After defining each phase's or sub-phase's `[Implement]` (or `[Build]`) block, count the **behavioral-prose lines** inside it — the actionable bullets and ordered-list items that prescribe what the implementer agent does. If the count exceeds 150 for any single phase or sub-phase, emit a warning:
 
@@ -236,6 +249,25 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     2. A `[Verify]` assertion that confirms the worked example is present in the committed file.
 
     Without a concrete trace, each fix cycle on algorithm prose exposes adjacent latent ambiguity in the surrounding prose — as observed when the contract-injection paragraph in execute/SKILL.md required three sequential revision cycles (NM-1 → NM-B → NM-C) within a single piece.
+
+2d. **Cross-phase schema-consistency oracle (FR-PROC-01, ADR-3).** When a plan declares ≥2 phases that each reference or mutate the same **schema-bearing file** — a file whose internal shape (field names, required keys, structural invariants) is established in one phase and consumed or enforced in another — insert a dedicated **cross-phase** consistency `[Verify]` step after the last schema-touching phase. That `[Verify]` step must:
+    1. Name every overlapping schema-bearing file explicitly.
+    2. State the invariants each file must satisfy (required keys present, field names match, structural constraints hold).
+    3. Provide a concrete verification command (grep, diff, or LLM-agent-step) that confirms the schema consistency holds across all touching phases.
+
+    **Rationale:** per-phase QA is scoped to one phase's file changes and cannot catch contradictions introduced by a later phase that silently redefines a field name or drops a required key. A cross-phase consistency `[Verify]` step makes the schema contract explicit and greppable, catching schema drift that per-phase review misses. Reference `plugins/spec-flow/reference/spec-flow-doctrine.md` for definitions — do not redefine schema terms here.
+
+    **Example trigger:** Phase 2 defines a registry table with columns `path`, `boundary`, `completes_in_phase`; Phase 6 reads those columns. A cross-phase `[Verify]` step in Phase 6 (or a dedicated schema-check phase) should confirm: `grep -E "path.*boundary.*completes_in_phase" plan.md` returns the expected header row, proving the schema is consistent with what Phase 2 declared.
+
+2e. **Superseded-ordinal anti-drift sweep (FR-PROC-03).** When a phase mutates a list-length or count invariant — for example, a board-member count, a numbered-step ordinal, or a "Nth member" reference that appears in prose or comments across multiple files — the anti-drift sweep for that phase MUST enumerate both the **superseded** (prior) ordinal/count strings and the new target pattern. Sweeping only the new target leaves prior-value references silently intact.
+
+    **Required sweep form:** list the **superseded** count/ordinal strings (the values true prior to this phase) alongside the new target, and grep every in-scope file for each superseded token. Any hit on a superseded ordinal/count string in an in-scope file is a must-fix.
+
+    **Example:** A phase changes a board from 7 to 8 members. The anti-drift `[Verify]` block must include:
+    - Sweep for superseded count: `grep -rn "7th board member\|7 members\|board.*7" <in-scope files>` — Expected: 0 hits (no prior-count references remain).
+    - Sweep for new target: `grep -rn "8th board member\|8 members" <in-scope files>` — Expected: the expected hit count.
+
+    Without enumerating the superseded values, a drift sweep that finds only the new pattern cannot distinguish "already updated" from "never referenced" — it gives a false green on files that still carry the old ordinal.
 
 3. **Self-contained Change Specification Blocks.** Every file change inside a [Build]/[Implement] block must be a complete, self-contained specification the executor can implement without reading surrounding context or chasing pattern pointers. Use BOTH semantic anchors AND line ranges. Number each change sequentially within the phase (T-1, T-2, ...) to create a task inventory the executor iterates.
 
@@ -459,6 +491,12 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     5. **Reference contract IDs in [TDD-Red] blocks (AC-12).** After the Contracts section is written, go back and add a contract reference line to each [TDD-Red] block that has a corresponding contract. Append to the [TDD-Red] block: `Contract references: C-N (and C-M if applicable). Write tests against these contract signatures.`
 
     6. Place `## Contracts` immediately after `## Executable AC Binding` in plan.md (which itself follows `## AC Coverage Matrix`).
+
+    **Contracts-vs-integration-boundary distinction (ADR-3).** The `## Contracts` section and the `[Integration-Test]` block are related but distinct concepts — do not conflate them:
+    - **`## Contracts`** captures **boundary-crossing API interfaces**: exported function signatures, shared data schemas, event contracts, and API endpoint shapes that code *outside* the defining phase consumes. A contract is a surface — it describes *what* components expose to each other.
+    - **Integration boundary** (as defined in `plugins/spec-flow/reference/spec-flow-doctrine.md`) is the **real wired path** that an `[integration]` test exercises end-to-end. A boundary is a scope — it describes *which* components are exercised together by the outer test.
+    - A phase may have: a contract but no integration boundary (exports an interface, but no integration test covers it); an integration boundary but no contract (the wired path exercises internal components only); both; or neither. All four combinations are valid.
+    - When authoring a completing phase, do not add contracts for internal helpers just because they participate in an integration boundary. Only boundary-crossing interfaces — those consumed by code outside the defining phase — belong in `## Contracts`.
 
 11. **Architectural Decisions section generation (FR-PLAN-008 / FR-PLAN-009 / FR-PLAN-010).** Generate the `## Architectural Decisions` section using ADR format. Steps:
 

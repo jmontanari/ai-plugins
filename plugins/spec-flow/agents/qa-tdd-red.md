@@ -60,6 +60,11 @@ Flag any test matching one or more of these patterns. The examples are Python/py
 - Test covers AC-3 ("rejects negative amounts with ValidationError") but only asserts `result is None` — would pass for any error including KeyError.
 - Test covers AC-5 ("computes weighted average") but asserts `result > 0` — would pass for a stub that returns 1.
 
+**Boundary-authenticity + contract + `completes_in_phase` check (separate from the 11 above):** for each `[integration]` test, apply three sub-checks. See `reference/spec-flow-doctrine.md` for the boundary and seam definitions.
+- **Nothing inside the boundary is doubled.** Flag any mock, stub, or fake of a real in-boundary component. Authentic integration tests exercise real collaborators inside the seam; only true externals (third-party services, network, filesystem, or OS primitives that cannot be instantiated in the test process) may be doubled.
+- **Each doubled external has a contract test.** For every true external that IS doubled, confirm a corresponding contract test exists (or is planned in this phase). If a doubled external has no contract test and the plan does not justify the omission, flag it.
+- **`completes_in_phase` is present and valid.** Every `[integration]` test must carry a `completes_in_phase` marker. Flag tests that are missing the marker, and flag markers that reference a phase outside the current piece's scope.
+
 ## Output Format
 
 ```

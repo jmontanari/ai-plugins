@@ -72,7 +72,7 @@ Beyond the phases, every plan carries four sections the qa-plan agent checks for
 
 ### Fast mode (`fast:` front-matter)
 
-The plan front-matter records `fast: true` or `fast: false` (default `false`, or inherited from `.spec-flow.yaml`). **`fast: true`** drops the per-phase inline QA agents (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`) and replaces the per-phase verify-agent dispatch with a direct test-command shell call; to compensate, the end-of-piece Final Review board gains an 8th member (`verify Mode: Piece Full`). It saves roughly 60% of QA token cost and suits config/infra/moderate-complexity pieces ≤12 phases — not security-critical, compliance, or cross-phase-dependent work.
+The plan front-matter records `fast: true` or `fast: false` (default `false`, or inherited from `.spec-flow.yaml`). **`fast: true`** drops the per-phase inline QA agents (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`) and replaces the per-phase verify-agent dispatch with a direct test-command shell call; to compensate, the end-of-piece Final Review board gains a 9th member (`verify Mode: Piece Full`). It saves roughly 60% of QA token cost and suits config/infra/moderate-complexity pieces ≤12 phases — not security-critical, compliance, or cross-phase-dependent work.
 
 
 ### Choosing TDD vs. Implement

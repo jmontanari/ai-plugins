@@ -13,7 +13,7 @@ Every artifact in the pipeline hits at least one QA gate:
 | Plan authoring | qa-plan | Phase boundaries, TDD structure, semantic anchors, charter allocation |
 | Phase execution | qa-phase (Opus) | Phase diff vs mapped ACs, regression risk, spec deviation |
 | Sub-phase execution | qa-phase-lite (Sonnet) | Narrow spot-check for sub-phase boundaries inside Phase Groups |
-| End-of-piece merge | review-board (7 agents in parallel) | Blind / edge-case / spec-compliance / prd-alignment / architecture / security / ground-truth |
+| End-of-piece merge | review-board (8 agents in parallel) | Blind / edge-case / spec-compliance / prd-alignment / architecture / security / ground-truth / integration |
 | End-of-pipeline | qa-prd-review | Whole PRD fulfillment across all completed specs |
 
 Every reviewer is spawned fresh — no conversation history, no prior-iteration context. They see only the artifact, the binding references (PRD, charter), and their review criteria. Fresh context is deliberate: it prevents the reviewer from rationalizing away problems they saw the author work through.
@@ -79,7 +79,7 @@ The circuit breaker exists because AI agents will *cheerfully loop on the same f
 
 ## The end-of-piece review board
 
-At merge time, spec-flow runs a different kind of QA — seven reviewers **in parallel**, each with a specialized lens:
+At merge time, spec-flow runs a different kind of QA — eight reviewers **in parallel**, each with a specialized lens:
 
 | Reviewer | Sees | Asks |
 |---|---|---|
@@ -90,10 +90,11 @@ At merge time, spec-flow runs a different kind of QA — seven reviewers **in pa
 | **architecture** | Diff + charter + coding rules | Layer boundaries respected? CR-xxx rules obeyed? |
 | **security** | Diff + spec | CWE Top 25 covered? Injection, crypto, auth/authz, supply chain, language anti-patterns? |
 | **ground-truth** | Diff + spec | Do computed/measured outputs reproduce an *independently-derived* correct answer — not just match the plan or a self-captured golden file? Degenerate results, lookahead leakage, scope contamination, parity mismatch, silent truncation? |
+| **integration** | Diff + spec | Real wired path across each boundary; path coverage; mock-avalanche detection (over-mocked paths that suppress true integration failures). |
 
-Parallel dispatch means all seven return in roughly the time of the slowest — about one Opus round-trip. Catches problems that a single reviewer would rationalize away because each lens has a different priority.
+Parallel dispatch means all eight return in roughly the time of the slowest — about one Opus round-trip. Catches problems that a single reviewer would rationalize away because each lens has a different priority.
 
-**Fast mode** trades per-phase rigor for speed: when the plan declares `fast: true`, execute skips the per-phase inline QA gates (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`) and runs the phase test command directly instead of dispatching `verify`. To compensate for the skipped gates, the end-of-piece board gains an **8th member — `verify` Mode: Piece Full** — which runs the full verification pass over the whole piece at merge time. So standard mode = 7 board members; fast mode = 8.
+**Fast mode** trades per-phase rigor for speed: when the plan declares `fast: true`, execute skips the per-phase inline QA gates (`qa-tdd-red`, `qa-phase`, `qa-phase-lite`) and runs the phase test command directly instead of dispatching `verify`. To compensate for the skipped gates, the end-of-piece board gains a **9th member — `verify` Mode: Piece Full** — which runs the full verification pass over the whole piece at merge time. So standard mode = 8 board members; fast mode = 9.
 
 Must-fix findings from the board are resolved the same way as any other QA boundary: fix-doc or fix-code makes targeted fixes (or plan-amend/spec-amend via Step 6c when the finding is structural), the affected reviewers re-review, up to 3 iterations.
 

@@ -52,7 +52,7 @@ Cite relevant `CR-xxx` entries from `<charter_root>/skills/charter-coding-rules/
 
 ## Acceptance Criteria
 AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}}
-  Independent Test: {{how_to_verify_in_isolation}}
+  Independent Test: {{how_to_verify_in_isolation}} (for an integration-bearing AC, the Independent Test may assert the real wired path, not isolation)
 
 ## Technical Approach
 {{architecture_decisions_patterns_data_flow}}
@@ -61,6 +61,10 @@ AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}}
 - Unit test focus areas
 - Integration test boundaries
 - Edge cases to cover
+
+## Integration Coverage
+- Integration: {{A}}→{{B}} — inside:{{components}}; doubled externals:{{ext}}(contract-tested); AC-{{id}}; completes phase {{N}}
+- (A piece with no cross-component wiring writes "None in scope.")
 
 ## Open Questions
 - OQ-1: {{question}} (Default: {{assumed_answer}})

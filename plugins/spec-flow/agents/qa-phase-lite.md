@@ -42,6 +42,7 @@ You are NOT handed: full piece spec, PRD sections, other sub-phases' diffs, full
 2. **AC matrix spot-check.** Pick 2–3 AC rows from the Build matrix and verify the claimed test/assertion actually exercises the AC as specified. Flag rows where the test is superficial, mocks away the behavior, or asserts on implementation details instead.
 3. **Structural sanity.** Obvious smells — broad `except` clauses swallowing assertions, mutable default args, dead branches, wrong-parameter mocks (e.g. missing `self` on patched class methods), silent conversions that drop data.
 4. **Scope discipline.** Did the sub-phase touch only the files declared in its scope block? Flag any out-of-scope file edits as must-fix.
+5. **boundary-authenticity spot-check (sub-phase scope only).** If this sub-phase wires a real dependency across a boundary, spot-check that its `[integration]` test does not double anything inside the boundary. Stay within the sub-phase diff — do NOT review cross-phase integrations or mock-avalanche patterns; those are the piece-scoped group-level board's job (see "What NOT to do" below).
 
 ## What NOT to do
 

@@ -20,7 +20,7 @@ One consequence: the orchestrator (the main conversation) writes **zero** implem
 
 ## How it's structured
 
-The plugin ships ten skills, a pool of 25 specialized agents, reusable templates, and a doctrine document loaded on every session.
+The plugin ships ten skills, a pool of 26 specialized agents, reusable templates, and a doctrine document loaded on every session.
 
 ```
 plugins/spec-flow/
@@ -36,7 +36,7 @@ plugins/spec-flow/
 │   ├── small-change/  # Single-session combined flow: brainstorm, scope-gate, plan, and hand off to execute
 │   └── review-board/  # On-demand: run the Final Review board on any PR/branch/diff, out of band
 │
-├── agents/          # 25 subagent templates dispatched by the skills above
+├── agents/          # 26 subagent templates dispatched by the skills above
 │   ├── tdd-red.md           # Writes failing tests (TDD mode only)
 │   ├── qa-tdd-red.md        # Reviews Red's tests for theater patterns before Build (TDD mode only)
 │   ├── implementer.md       # Unified code-writer; runs in Mode: TDD or Mode: Implement
@@ -60,6 +60,7 @@ plugins/spec-flow/
 │   ├── review-board-architecture.md     # Final Review — architecture + charter
 │   ├── review-board-security.md         # Final Review — security audit (SAST + semantic)
 │   ├── review-board-ground-truth.md     # Final Review — ground-truth / oracle correctness
+│   ├── review-board-integration.md      # Final Review — integration / path-coverage
 │   ├── reflection-process-retro.md      # End-of-piece — orchestration retro
 │   └── reflection-future-opportunities.md  # End-of-piece — forward-looking ideas
 │
@@ -200,10 +201,10 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
                    │                qa-phase                           │
                    └───────────────────────────────────────────────────┘
                                                 ▼
-                   final review:   7 parallel reviewers (Opus); 8 in fast mode
+                   final review:   8 parallel reviewers (Opus); 9 in fast mode
                    ─────────────   blind, edge-case, spec-compliance,
                                    prd-alignment, architecture, security,
-                                   ground-truth
+                                   ground-truth, integration
                                    (+ verify Piece Full in fast mode)
                                                 ▼
                                    learnings.md, squash-merge to main
@@ -220,9 +221,9 @@ A piece of work flows through the pipeline linearly. Each stage has an output, a
 | **prd** | Existing requirements docs (BMad, speckit, `.md`, etc.) or a from-scratch interview | Normalized `docs/prds/<prd-slug>/prd.md` + `docs/prds/<prd-slug>/manifest.yaml` with numbered FR/NFR/NN-P/SC, branching fields, and a piece list | `qa-prd` (Opus, up to 3 fix loops) | — |
 | **spec** | One `open` piece + PRD sections mapped to it + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md` with acceptance criteria, cited NN-C/NN-P/CR, and any `[PENDING-DECISION]` markers | `qa-spec` (Opus, up to 3 fix loops) | — |
 | **plan** | Approved spec + charter | `docs/prds/<prd-slug>/specs/<piece-slug>/plan.md` with per-phase TDD or Implement tracks, AC Coverage Matrix, Contracts, Architectural Decisions, Executable AC Binding, and Change Specification Blocks | `qa-plan` (Opus, up to 3 fix loops) | — |
-| **execute** | Approved plan | Working code on `piece/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. Synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) routes discoveries to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (5 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + final review board (7 agents; 8 in fast mode) | `implementer` (Sonnet, Mode: TDD or Implement) |
+| **execute** | Approved plan | Working code on `piece/<prd-slug>-<piece-slug>` branch, phase-by-phase, with commits. Synchronous discovery triage at end-of-phase (Step 6c) and end-of-piece (Step 8: Final Review Triage) routes discoveries to plan-amend / spec-amend / fork / defer per the per-piece amendment budget (5 total, max 1 spec). | `qa-tdd-red` between Red and Build (TDD phases only) + `qa-phase` per phase + final review board (8 agents; 9 in fast mode) | `implementer` (Sonnet, Mode: TDD or Implement) |
 | **small-change** | User description of a small focused change | `docs/changes/<slug>/change-brief.md` + `plan.md` on `change/<slug>` branch; worktree ready for `/spec-flow:execute change/<slug>`. Use when the change fits in 1–3 implementation phases and doesn't require the full PRD → spec → plan pipeline. | scoped brainstorm (5–8 questions) + scope gate | — |
-| **review-board** | A PR #, branch, path(s), or working-tree changes (out of band — no piece required) | Consolidated adversarial findings by severity; `--fix` routes findings into `/spec-flow:small-change` for a planned, QA-gated, board-reviewed fix (never patches the tree directly); `--comment` posts inline PR comments. Never merges, amends, forks, or signs off. | the Final Review board itself (blind, edge-case, security, ground-truth, architecture; +spec-compliance/prd-alignment when context supplied) | routes to `/spec-flow:small-change` (with `--fix`) |
+| **review-board** | A PR #, branch, path(s), or working-tree changes (out of band — no piece required) | Consolidated adversarial findings by severity; `--fix` routes findings into `/spec-flow:small-change` for a planned, QA-gated, board-reviewed fix (never patches the tree directly); `--comment` posts inline PR comments. Never merges, amends, forks, or signs off. | the Final Review board itself (blind, edge-case, security, ground-truth, architecture, integration; +spec-compliance/prd-alignment when context supplied) | routes to `/spec-flow:small-change` (with `--fix`) |
 | **merge** | Clean final review | Squash-merge to `main`, manifest updated to `done`, `learnings.md` | — | — |
 
 ### Synchronous discovery triage
@@ -236,7 +237,7 @@ The execution that finds the work also fixes it. Discoveries surfaced during a p
   - **spec-amend** — the spec was wrong within the piece's stated goals; rewrite affected sections via the `spec-amend` agent (max 1 per piece).
   - **fork** — the discovery exceeds the piece's goals; spawn a new piece in the manifest.
   - **defer** — the discovery does not block the piece's goals; record to a backlog via `/spec-flow:defer` with provenance.
-- **Step 8: Final Review Triage** — applies the same Step 6c routing to findings surfaced by the final review board (7 agents standard; 8 in fast mode) at end-of-piece, before merge.
+- **Step 8: Final Review Triage** — applies the same Step 6c routing to findings surfaced by the final review board (8 agents standard; 9 in fast mode) at end-of-piece, before merge.
 
 **Per-piece amendment budget.** A piece may take at most **5 amendments total** (combined plan-amend + spec-amend), with **at most 1 spec-amend**. Hitting the budget forces fork-or-defer for any further discovery — the piece is either done as scoped or the work belongs in another piece. The budget is the load-bearing safeguard against a piece amending itself indefinitely.
 
@@ -359,7 +360,7 @@ Edit if your project uses different layouts (e.g., `docs_root: repo/docs`) or wa
 
 > **Deprecated keys.** `qa_iter2` and `charter.doctrine_load` are still parsed for backward compatibility but no longer drive behavior: QA iter-2 re-dispatch is always on, and v4 loads charter via the charter-skill scan (always-on for `non-negotiables` + `architecture`, on-demand for the rest).
 
-**Fast mode** is a per-plan toggle, not a `.spec-flow.yaml` key. Set `fast: true` in a plan's front-matter to skip the per-phase `qa-tdd-red` and `qa-phase` gates and compensate with an 8th end-of-piece reviewer (`verify` Mode: Piece Full). See [/plan](./docs/userguide/commands/plan.md).
+**Fast mode** is a per-plan toggle, not a `.spec-flow.yaml` key. Set `fast: true` in a plan's front-matter to skip the per-phase `qa-tdd-red` and `qa-phase` gates and compensate with a 9th end-of-piece reviewer (`verify` Mode: Piece Full). See [/plan](./docs/userguide/commands/plan.md).
 
 The `phase_groups` key controls the Phase Scheduler. In `auto` (default), plans that use Phase Group headings (`## Phase Group <letter>:`) dispatch their Sub-Phases concurrently; plans using only flat phases (`### Phase <N>`) run serially as before. Set to `off` to disable the scheduler entirely (treats groups as flat serial phases) — useful for rollback if you hit scheduler bugs in a new release. Set to `always` to have the orchestrator warn when a plan has only flat phases in a piece that looks parallelizable — catches over-flat plans during doctrine adoption.
 
@@ -450,7 +451,7 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 
 **Why the implementer is a single agent with a mode flag** (not two agents). The rules of good implementation — follow the plan, respect architecture, stay in scope, don't guess — are identical regardless of whether the oracle is failing tests or a lint command. Splitting them created drift. One file, one flag, shared doctrine.
 
-**Why seven parallel reviewers at merge time (eight in fast mode).** Each reviewer has a lens: blind (no context, just the diff), edge-case, spec-compliance, PRD-alignment, architecture, security (CWE Top 25, injection, crypto, auth/authz, supply chain), and ground-truth (do computed outputs reproduce an independently-derived correct answer?). Running them in parallel with fresh context is cheap (one round-trip) and catches the things a single reviewer would rationalize away. In fast mode, an 8th reviewer (`verify Mode: Piece Full`) is added — it applies the full theater-pattern catalog and AC binding check across the entire piece's test surface, compensating for the per-phase `qa-tdd-red` and `qa-phase` gates that fast mode skips.
+**Why eight parallel reviewers at merge time (nine in fast mode).** Each reviewer has a lens: blind (no context, just the diff), edge-case, spec-compliance, PRD-alignment, architecture, security (CWE Top 25, injection, crypto, auth/authz, supply chain), ground-truth (do computed outputs reproduce an independently-derived correct answer?), and integration (real wired paths across each boundary; path coverage; mock-avalanche detection). Running them in parallel with fresh context is cheap (one round-trip) and catches the things a single reviewer would rationalize away. In fast mode, a 9th reviewer (`verify Mode: Piece Full`) is added — it applies the full theater-pattern catalog and AC binding check across the entire piece's test surface, compensating for the per-phase `qa-tdd-red` and `qa-phase` gates that fast mode skips.
 
 **Why circuit breakers everywhere.** AI coding agents will cheerfully loop on the same failure forever. 2 build attempts, 3 QA cycles, 3 review cycles — then escalate. If the pipeline can't make progress, the human is the right solver, not another retry.
 

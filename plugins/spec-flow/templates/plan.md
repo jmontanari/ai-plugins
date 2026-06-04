@@ -9,7 +9,7 @@ charter_snapshot:
 legacy_deferred_rows: false  # OPT-IN: set to true to preserve pre-3.2.0 AC matrix behavior (silent acceptance of bare deferral rows). Deprecated — to be retired in v3.3.0.
 fast: false                  # true = fast mode: skips per-phase QA agents (qa-tdd-red, qa-phase, qa-phase-lite),
                              # replaces per-phase verify agent with direct test-command shell run, adds
-                             # verify Mode: Piece Full as 7th board member at Final Review.
+                             # verify Mode: Piece Full as 9th board member at Final Review.
                              # Use for: config/infra/scaffolding, moderate-complexity, non-security-critical work.
                              # Do NOT use for: auth, payments, compliance, or pieces > 12 phases.
 ---
@@ -45,6 +45,16 @@ Each phase uses exactly ONE of two tracks:
 - **Non-TDD mode** — the plan's front-matter declares `tdd: false`. ALL phases use `[Implement]` + `[Write-Tests]` structure. AC Coverage Matrix is not required. QA and Final Review remain fully intact.
 
 A phase must have exactly one of these markers. The executor branches mechanically on the checkbox it finds.
+
+## Integration-Test Registry (M1)
+
+Built from plan + Red authoring (never from Build); carried across phases by execute; absent ⇒ no integrations declared (NFR-INT-02).
+
+Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Columns `skeleton_sha256` and `completed_sha256` are **runtime-populated** — left blank (`—`) at plan-authoring time; the orchestrator fills them into its own state (not into this table) when Red authors the skeleton and when the completing phase edit lands.
+
+| ID | Path | Boundary (inside) | Doubled externals (contract test) | AC | registered_in_phase | completes_in_phase | skeleton_sha256 | completed_sha256 |
+|----|------|-------------------|-----------------------------------|----|--------------------|---------------------|-----------------|------------------|
+| {{int_id}} | {{test_path}} | {{inside_components}} | {{doubled_ext}}({{contract_test}}) | {{ac_id}} | {{registered_N}} | {{completing_N}} | — | — |
 
 ### Phase 1 (TDD track example): {{phase_name}}
 **Exit Gate:** {{exit_criteria}}
@@ -94,6 +104,13 @@ A phase must have exactly one of these markers. The executor branches mechanical
   - Failure: any test failure output or unexpected warnings
   - Verify: no test files modified since TDD-Red step
 
+- [ ] **[Integration-Test]** (completing-phase only) Complete + green the outer `[integration]` test
+  - Boundary: {{which components are inside; which true externals are doubled}}
+  - completes_in_phase: {{N}}
+  - Contract tests: {{one per doubled true external}}
+  - Run: {{real-wired-path test command}} — Expected: {{specific pass output}}
+  - Note: omit this block on non-completing phases; the registered test stays skeleton-red until N.
+
 - [ ] **[Refactor]** Clean up (scope: Phase 1 files only)
   - Check for: duplication, naming, extract helpers
   - Constraint: only modify files created/changed in this phase
@@ -141,6 +158,13 @@ A phase must have exactly one of these markers. The executor branches mechanical
   - Run: {{exact_verification_command}}  (e.g. `ruff check .`, `tsc --noEmit`, `terraform validate`, `make build`, `pytest tests/integration/...`) — For YAML/JSON validation: use LLM-agent-step framing (e.g., "Read the file at <path> and confirm it parses as valid YAML/JSON; report any error inline") rather than yq/jq/language-specific runtime shell-outs. For other validations (lint, type check, build, smoke run): standard shell commands are fine.
   - Expected: {{specific_expected_output_with_values}}
   - Failure: {{what_output_means_failure}}
+
+- [ ] **[Integration-Test]** (completing-phase only) Complete + green the outer `[integration]` test
+  - Boundary: {{which components are inside; which true externals are doubled}}
+  - completes_in_phase: {{N}}
+  - Contract tests: {{one per doubled true external}}
+  - Run: {{real-wired-path test command}} — Expected: {{specific pass output}}
+  - Note: omit this block on non-completing phases; the registered test stays skeleton-red until N.
 
 - [ ] **[Refactor]** (optional — include only if cleanup is likely needed) Clean up (scope: Phase 2 files only)
   - Check for: duplication, naming, extract helpers
@@ -194,6 +218,13 @@ A phase must have exactly one of these markers. The executor branches mechanical
     - Run: {{exact_verification_command}}     (e.g. `ruff check .`, `tsc --noEmit`, `terraform validate`, `make build`, `pytest tests/integration/...`)
     - Expected: {{specific_expected_output_with_values}}
     - Failure: {{what_output_means_failure}}
+
+- [ ] **[Integration-Test]** (completing-phase only) Complete + green the outer `[integration]` test
+    - Boundary: {{which components are inside; which true externals are doubled}}
+    - completes_in_phase: {{N}}
+    - Contract tests: {{one per doubled true external}}
+    - Run: {{real-wired-path test command}} — Expected: {{specific pass output}}
+    - Note: omit this block on non-completing phases; the registered test stays skeleton-red until N.
 
 - [ ] **[Refactor]** (optional — include only if cleanup is likely needed) Clean up (scope: Phase N files only)
     - Check for: duplication, naming, extract helpers

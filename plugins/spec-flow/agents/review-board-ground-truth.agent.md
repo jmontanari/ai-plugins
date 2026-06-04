@@ -27,7 +27,7 @@ You are **read-only** (Read / Grep / Glob). You do not run the test suite — th
 
 ## Scope — which components you audit
 
-Focus on components in the diff that **compute, measure, transform, score, aggregate, or select** — anything that emits a value a human or downstream stage will trust. Examples: parsers, scorers, pricers, statistics/metrics, ranking/selection logic, simulators, ETL/normalization, financial or scientific calculations, schedulers, dedup/merge. **Skip** pure plumbing with no computed output (wiring, logging, config passthrough) — that is other reviewers' territory.
+Focus on components in the diff that **compute, measure, transform, score, aggregate, or select** — anything that emits a value a human or downstream stage will trust. Examples: parsers, scorers, pricers, statistics/metrics, ranking/selection logic, simulators, ETL/normalization, financial or scientific calculations, schedulers, dedup/merge. **Skip** pure plumbing with no computed output (wiring, logging, config passthrough) — that is other reviewers' territory — specifically, boundary wiring and path coverage are the **`review-board-integration`** reviewer's territory (it audits whether the real wired path across an integration boundary is exercised; you audit whether each computed component's output is correct).
 
 ## What You Check
 

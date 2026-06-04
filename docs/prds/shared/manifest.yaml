@@ -204,6 +204,30 @@ pieces:
     status: merged
     merged_at: 2026-05-14
 
+  - name: pi-014-integ-tests
+    slug: pi-014-integ-tests
+    description: |
+      v4.12.0 — Integration tests as a first-class pipeline primitive (path coverage as a peer of AC
+      coverage). Adds the `[integration]` test tag, the `[Integration-Test]` phase block, mandated
+      contract tests for doubled true externals, and a new `review-board-integration` reviewer (two
+      axes: boundary correctness + path coverage incl. mock-avalanche) default everywhere — piece board
+      7→8 (fast 8→9), change-track 6→7. Ordering is true double-loop (R1 + R3): the outer integration
+      test is authored up front, drives the unit cycles, and is greened in the integration-completing
+      phase, implemented via M1–M4 machinery — M1 cross-phase integration-test registry (table in
+      plan.md, built from plan+Red, never Build), M2 tag-separated suites (per-phase gate + fast mode
+      run the non-integration suite), M3 immutability-gate edit window (single plan-authorized,
+      path-confined, phase-gated skeleton→completed edit — the one anti-cheat-gate change), M4 oracle
+      split. Threads through the doctrine (single source of truth for the definitions), spec/plan
+      authoring + qa-spec/qa-plan, the RBVR agents (tdd-red/implementer/verify/refactor), the QA gates,
+      execute orchestration + integrity gate, and the review board wiring. Inspired by the prop_firm
+      calibration-2 adversarial audit (integration-boundary defects survived a green unit suite).
+      Design fully drafted in plugins/spec-flow/proposals/review-board-integration/ (spec, plan,
+      concerns map, testing-foundations, alignment-findings). Minor bump (NN-C-009, NN-C-003 additive).
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-002, NN-P-003]
+    dependencies: []
+    status: merged
+    merged_at: 2026-06-04
+
 coverage:
   total_prd_sections: 15
   covered_sections: 8

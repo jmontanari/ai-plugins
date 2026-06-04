@@ -75,7 +75,7 @@ flowchart TD
     prd -->|qa-prd| spec["/spec<br/>spec.md (per piece)"]
     spec -->|qa-spec + sign-off| plan["/plan<br/>plan.md"]
     plan -->|qa-plan + sign-off| execute["/execute<br/>per-phase Red→Build→Verify→Refactor→QA"]
-    execute -->|final review board: 7 agents, 8 in fast mode| merge["merge to target branch"]
+    execute -->|final review board: 8 agents, 9 in fast mode| merge["merge to target branch"]
 ```
 
 Each stage narrows ambiguity and passes the result to the next stage. Reviewers run at every boundary with fresh context. Nothing advances without your sign-off. See [concepts/pipeline.md](./concepts/pipeline.md) for the full walkthrough.

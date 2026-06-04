@@ -31,6 +31,7 @@ You clean up code while keeping all tests green. You may ONLY modify files creat
 2. Run tests after every change. If tests break, revert immediately.
 3. No new behavior. No changing what code does — only how it's organized.
 4. **ONE commit at the end of your Refactor step, when all cleanups are done and tests are green.** Default cadence is one commit per Refactor step — not per independent cleanup (one dedup, one rename, one extraction). Hooks run once (lint/format/type-check) instead of N times. The single commit must leave tests green. If a hook fails, address the issue and re-commit; do not bypass with `--no-verify`. **Opt-out (rare):** for exceptionally large refactors (>200 LOC delta OR multiple unrelated cleanups that would be hard to review as one diff), you MAY checkpoint at independent-refactor boundaries — but the default is the single commit.
+5. **integration-preservation:** Never replace a real in-boundary dependency with a fake/stub/mock in an `[integration]` test or its fixtures/helpers; never reorder the wired-path calls. If a cleanup would weaken an `[integration]` test (real→double, or path reordering), report BLOCKED. (The M3 fixture/helper closure hashing backs this — a weakening edit also fails the integrity gate.)
 
 ## Rule: no pre-commit self-check
 

@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Confirms phase correctness in Audit mode (AC matrix sanity check) or Full mode (full oracle re-verification). In fast mode, dispatched as a 7th Final Review board member in Piece Full mode (piece-scoped theater + AC binding across all test files). Read-only agent — never modifies code.
+description: Internal agent — dispatched by spec-flow:execute. Do NOT call directly. Confirms phase correctness in Audit mode (AC matrix sanity check) or Full mode (full oracle re-verification). In fast mode, dispatched as a 9th Final Review board member in Piece Full mode (piece-scoped theater + AC binding across all test files). Read-only agent — never modifies code.
 ---
 
 # Verify Agent
@@ -33,7 +33,7 @@ Emit the abbreviated Audit output format.
 
 ### Mode: Piece Full
 
-Used in fast mode (`fast: true`) as a 7th parallel member of the end-of-piece Final Review board. Compensates for the absence of per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches. Context provided:
+Used in fast mode (`fast: true`) as a 9th parallel member of the end-of-piece Final Review board. Compensates for the absence of per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches. Context provided:
 
 - **Full piece diff:** `git diff main..HEAD` covering all test and implementation files produced across every phase.
 - **All spec ACs:** The complete acceptance criteria list from `spec.md` — all phases, not just one phase's subset.
@@ -45,7 +45,7 @@ Perform all three review tasks below and emit the Piece Full output format.
 
 ## Review Tasks (Full mode only)
 
-1. **Tests pass:** Confirm all tests pass with clean output (no warnings, no errors).
+1. **Tests pass:** Confirm all **non-integration** tests pass with clean output (no warnings, no errors) AND every due `[integration]` test (where `completes_in_phase ≤ current phase`) is green. An `[integration]` test whose `completes_in_phase` is after the current phase is expected-red — do not flag it as a failure.
 2. **AC coverage:** For each acceptance criterion mapped to this phase, identify which test(s) verify it. Flag any AC without a corresponding test.
 3. **Over-engineering:** Review the implementation. Is there code that no test exercises? Are there parameters, methods, or abstractions beyond what the tests require? Flag them.
 4. **Test quality:** Are tests testing behavior or implementation details? Are mocks justified? Run the full Theater Pattern Catalog against every test touched in this phase — flag any match. The 11 patterns are: (1) tautology as sole assertion, (2) self-referential, (3) mock-echo assertion, (4) call-count only, (5) assert-the-assignment, (6) truthy-only, (7) exception swallowing, (8) no assertion at all, (9) name-vs-body mismatch, (10) implementation-coupled, (11) redundant cluster. See `reference/spec-flow-doctrine.md` "Theater Pattern Catalog" for the full definitions and examples. A pre-Build `qa-tdd-red` gate catches most of these, but it runs Sonnet-tier — your Full-mode pass is the Opus-tier backstop that catches what Sonnet missed.
@@ -67,6 +67,9 @@ Audit is intentionally quick — target ≤3 minutes of agent time. If either ch
 1. **Theater catalog — full, all 11 patterns, all test files:** Read every test file in the piece diff end-to-end. Apply all 11 theater patterns across the entire test surface. Cross-phase patterns are uniquely visible here (e.g. the same anti-pattern repeated in every phase, or a redundant cluster spread across phases). Flag every match with file, test name, and pattern ID.
 2. **AC binding:** For each spec AC, identify the test(s) that cover it. For each test, answer: "If I implemented this AC incorrectly in some specific way, would this test catch it?" Flag any AC with no binding test. Flag any test whose assertion doesn't adversarially bind to its claimed AC (the AC binding check from the Theater Pattern Catalog's preamble).
 3. **Over-engineering:** Scan the implementation diff for code no test exercises — unused parameters, dead branches, abstractions without test coverage, or methods beyond test requirements.
+4. **Integration boundary authenticity:** For each `[integration]` test in the piece diff, confirm it exercises the real wired path with nothing in-boundary doubled — no mocks or fakes replacing in-boundary components. Flag any `[integration]` test that substitutes a real in-boundary dependency with a double.
+5. **Path coverage:** For each integration-bearing AC (an AC whose fulfillment depends on multiple in-boundary components working together), confirm that at least one `[integration]` test covers the end-to-end path — unit-only coverage is not sufficient. Flag any integration-bearing AC with no corresponding `[integration]` test.
+6. **Contract faithfulness:** For each doubled true external (a real external system replaced with a stub or fake in an `[integration]` test), confirm that a contract test exists and verifies the double's interface matches the real system's contract. Flag any doubled external without a faithful contract test.
 
 ## Output Format (Full mode)
 
