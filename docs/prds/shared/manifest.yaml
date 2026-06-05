@@ -1,6 +1,6 @@
 schema_version: 1
 generated: 2026-04-21
-last_updated: 2026-04-26
+last_updated: 2026-06-05
 prd_source: "docs/prd/prd.md"
 
 pieces:
@@ -227,6 +227,49 @@ pieces:
     dependencies: []
     status: merged
     merged_at: 2026-06-04
+
+  - name: pi-015-defer-commit
+    slug: pi-015-defer-commit
+    description: |
+      Deferred-commit / git-free parallel TDD section + journal-based resume. Fixes the
+      shared-index races that force Phase Group sub-phases (e.g. B.2–B.7) to run serially.
+      Two races identified during the 2026-06-05 research session:
+        - Race 1 (commit): a bare `git commit` commits the whole shared index, sweeping
+          siblings' staged files; `git add` itself also collides on `.git/index.lock`. Both
+          empirically confirmed. Real hit in pi-009 (A.4's commit attribution lost to the A.2
+          staging race). Current mitigation is detect-after-the-fact (Step 3.7b reconciliation),
+          which thrashes at fan-out.
+        - Race 2 (oracle, previously undocumented anywhere in the repo): the per-phase oracle
+          invariant (a) "0 failed across the suite" sees siblings' red tests on the shared
+          working tree and fails spuriously. Not fixed by any commit-side change.
+      Approach — Option D (chosen over A=per-sub-phase worktrees, rejected by operator; B=pathspec
+      commit + mutex; C=batch followers): keep the parallel section git-free — sub-phases do pure
+      file I/O + a per-sub-phase-SCOPED oracle, and recovery is plain rm/rewrite (no git, no ref,
+      no lock). Commit ONCE per Phase Group at the G5 barrier after a whole-suite green check. This
+      eliminates Race 1 + the index.lock contention outright; Race 2 is handled by scoping each
+      sub-phase oracle to its own test IDs and restoring the whole-suite-green guarantee at the
+      barrier. The one cost — coarser crash recovery, since a commit is today's only durable
+      checkpoint — is mitigated by a resume JOURNAL recording group_start_sha (the starting point)
+      + per-sub-phase status (where we are), aligned with the existing .orchestra-state.json
+      precedent. Tier 1 = journal only (content rides the surviving working tree). Tier 2
+      (config-gated) = + dangling `commit-tree` checkpoints via a private GIT_INDEX_FILE — no ref
+      advance, no index.lock contention, survives a working-tree wipe (confirmed recoverable via
+      `git checkout <sha> -- .`).
+      Touch-point map (deep-dived): execute/SKILL.md (Phase Group Loop G4 git-free / G5 barrier
+      full-suite + single commit / G10, per-phase Steps 2–3 commit semantics, post-commit gates
+      3.7b → working-tree-hash, oracle Race-2 scoping composed with pi-014's M2/M4 non-integration
+      split, auto-triage matrix → file-scoped `git restore`, Session Resumability → journal),
+      agents/implementer.md (Rule 8 unified-commit contract), agents/tdd-red.md (staging contract),
+      reference/spec-flow-doctrine.md (commit-cadence section), .spec-flow.yaml +
+      templates/pipeline-config.yaml (new `deferred_commit` / `journal_tier` knobs), and a new
+      reference/deferred-commit-journal.md (journal schema + resume algorithm + Tier-1/2 mechanics).
+      Backward-compatible default preserves today's per-phase-commit behavior (NFR-003) — likely a
+      config-gated minor bump (NN-C-009 additive); major only if the default flips to deferred.
+      Two decisions deferred to spec: (1) Tier-1-only vs Tier-1+Tier-2 in v1; (2) whether the
+      Race-2 scoped-oracle change rides this piece or carves into its own.
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
+    dependencies: [pi-014-integ-tests]
+    status: open
 
 coverage:
   total_prd_sections: 15
