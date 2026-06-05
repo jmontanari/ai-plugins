@@ -52,13 +52,19 @@ if [ -n "$charter_root" ] && [ -d "${charter_root}/skills" ]; then
 fi
 
 escape_for_json() {
-    local s="$1"
-    s="${s//\\/\\\\}"
-    s="${s//\"/\\\"}"
-    s="${s//$'\n'/\\n}"
-    s="${s//$'\r'/\\r}"
-    s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
+    local s="$1" py_out
+    if command -v python3 >/dev/null 2>&1 && \
+       py_out=$(printf '%s' "$s" | python3 -c \
+         "import json,sys; s=sys.stdin.read(); print(json.dumps(s,ensure_ascii=False)[1:-1],end='')" 2>/dev/null); then
+        printf '%s' "$py_out"
+    else
+        s="${s//\\/\\\\}"
+        s="${s//\"/\\\"}"
+        s="${s//$'\n'/\\n}"
+        s="${s//$'\r'/\\r}"
+        s="${s//$'\t'/\\t}"
+        printf '%s' "$s"
+    fi
 }
 
 doctrine_escaped=$(escape_for_json "$doctrine_content")

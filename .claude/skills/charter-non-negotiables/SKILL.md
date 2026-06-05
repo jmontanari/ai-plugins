@@ -16,7 +16,7 @@ description: "Read before any plugin release, version bump, or change under plug
 
 ### NN-C-002: Plugins are markdown + config only — no runtime code dependencies
 - **Type:** Rule
-- **Statement:** A plugin must work on a fresh machine with nothing installed beyond Claude Code, `git`, and a POSIX shell. No `node_modules`, no `pip install`, no Docker, no compiled binaries. Bash scripts in `hooks/` are allowed; anything heavier than bash requires an explicit exception documented in this file.
+- **Statement:** A plugin must work on a fresh machine with nothing installed beyond Claude Code, `git`, and a POSIX shell. No `node_modules`, no `pip install`, no Docker, no compiled binaries. Bash scripts in `hooks/` are allowed; anything heavier than bash requires an explicit exception documented in this file. **Exception:** `hooks/` scripts may invoke `python3` as an optional fast path (e.g., for JSON encoding of large strings) provided a pure-bash fallback is present and the hook exits 0 when `python3` is absent.
 - **Scope:** Any file committed under `plugins/<plugin>/`
 - **Rationale:** The appeal of Claude Code plugins is zero-install. Adding runtime dependencies breaks that promise and fragments adoption.
 - **How QA verifies:** Review-board architecture reviewer inspects the diff for `package.json`, `requirements.txt`, `Dockerfile`, `Makefile`, or binary artifacts. Any of these require a documented exception.

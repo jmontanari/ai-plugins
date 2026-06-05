@@ -4,6 +4,11 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.1.1] — 2026-06-05
+
+### Fixed
+- `escape_for_json()` in `hooks/session-start` now delegates to `python3 json.dumps(ensure_ascii=False)` when Python3 is available, reducing escaping time from >2s to ~1ms on large charter content (125KB+). Pure-bash fallback retained for machines without Python3 or when Python3 fails. Also fixes a subtle issue where the Python3 path could abort the hook under `set -euo pipefail` when Python3 was present but non-functional.
+
 ## [5.1.0] — 2026-06-05
 
 ### Added
