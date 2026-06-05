@@ -433,6 +433,33 @@ Disable the stage with `reflection: off` in `.spec-flow.yaml` if you prefer the 
 
 ---
 
+## Coherence linter
+
+`hooks/lint-skill-coherence` is a deterministic bash linter that checks cross-references *within* a `skills/*/SKILL.md` file stay internally consistent. It enforces four invariants:
+
+1. **Step-reference integrity** (BLOCKING) — every `Step <id>` referenced in prose resolves, in the same file, to a heading, a `**Step <id>:**` bold marker, or a **bold-labeled** top-level ordered-list item (`N. **Label:**`). A bare prose enumeration (`5. some text`) is not a step target. Cross-skill references (`<skill>/SKILL.md Step N`, `Step N belongs to <skill>`) are out of scope and skipped.
+2. **Pointer / cross-ref integrity** (BLOCKING) — every `§<heading>` resolves to an anchor in the same file, and every `reference/<doc>.md §<heading>` resolves to an anchor in that target reference doc.
+3. **Config-branch parity** (BLOCKING) — a region documenting ≥2 distinct enum values of a `pipeline-config.yaml` key (e.g. `refactor`, `phase_groups`, `tdd`) must not silently omit another documented value of that key.
+4. **State-field producer→consumer** (WARNING, non-blocking) — a state field written but never read (orphan producer), or read but never written (orphan consumer), emits a `WARNING:` on stdout and never affects the exit code.
+
+The linter exits non-zero iff there is at least one invariant-1–3 finding; invariant-4 warnings never change the exit code.
+
+**Standalone invocation.** Pass one or more files, or a directory (which expands to its `SKILL.md` files):
+
+```bash
+plugins/spec-flow/hooks/lint-skill-coherence <file|dir> [<file|dir> ...]
+```
+
+**Execute pre-Final-Review self-check.** During `/spec-flow:execute`, before the Final Review board is dispatched, the orchestrator automatically runs the linter over the piece's edited `SKILL.md` files. A blocking finding (invariant 1–3) is routed through the existing Final-Review fix-code loop until it clears; warnings are surfaced advisorily. This is a mechanical gate that runs *before* — and never replaces — the human review board.
+
+**Wire it as a pre-commit hook or CI check.** Run it over the `SKILL.md` files in a diff:
+
+```bash
+git diff --name-only | grep 'skills/.*/SKILL.md' | xargs -r plugins/spec-flow/hooks/lint-skill-coherence
+```
+
+---
+
 ## Extending
 
 - **Templates** — edit `templates/prd.md`, `spec.md`, `plan.md`, `manifest.yaml` to match your team's shape.

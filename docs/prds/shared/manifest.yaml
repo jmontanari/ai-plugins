@@ -317,6 +317,21 @@ pieces:
       (the mechanized form of P1). Source: pi-015 reflection P1/P2/P3 + F2 (fix-as-found, not deferred).
     prd_sections: [G-2, FR-004, NN-P-002]
     dependencies: []
+    status: merged
+
+  - name: pi-023-base-ref
+    slug: pi-023-base-ref
+    description: |
+      Parameterize the merge-base ref across execute/SKILL.md. The skill hardcodes
+      `git diff main..HEAD` in ~5 sites (final-review-pending marker, Step 1a scope detection,
+      and the iter-1/amend diff captures), but a repo whose default branch is `master` (this one)
+      makes `main..HEAD` fail to resolve — the Final Review diff capture and the pi-021 coherence
+      self-check both break on such repos. Resolve the base ref once (default-branch detection, or
+      a `.spec-flow.yaml` key) and thread it through every `git diff <base>..HEAD` site. Source:
+      pi-021 Final Review integration reviewer (flagged pre-existing, out of pi-021 scope);
+      routed to a tracked piece per the fix-as-found / no-backlog-defer policy.
+    prd_sections: [FR-004, NN-P-002]
+    dependencies: []
     status: open
 
   - name: pi-022-vsync-ci

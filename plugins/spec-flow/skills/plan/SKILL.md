@@ -455,6 +455,13 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
 
     An executor discovering that implementing a spec AC requires changes to files NOT listed in "In scope" must escalate via the discovery protocol (Step 6c of execute) rather than silently expanding scope.
 
+9c. **P2/P3 cross-step authoring discipline (pi-021).** When a phase edits a *multi-step orchestration file*, the plan author must reason about the steps the change traverses and the agent-dispatch sites it touches, and record that reasoning in the phase header. This defends against changes that introduce a new path through an existing loop/state-machine, or alter an agent-dispatch contract, without accounting for every pre-existing step/site the change interacts with.
+
+    - **Definition (multi-step orchestration file):** a `skills/*/SKILL.md` is a *multi-step orchestration file* if it contains ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`.
+    - **P2 (steps traversed):** a phase introducing a new conditional path through an existing multi-step loop/state-machine must enumerate, in a `**Steps traversed (P2):**` header field, every pre-existing step the new path traverses or invalidates.
+    - **P3 (dispatch sites):** a piece changing a cross-cutting agent-dispatch contract must enumerate, in a `**Dispatch sites (P3):**` header field, every (re-)dispatch site of the affected agents; if none, state "none."
+    - Both header fields are REQUIRED only when the edited file is a multi-step orchestration file (per the Definition above); otherwise they may be omitted.
+
 10. **Contracts section generation (FR-PLAN-004 / FR-PLAN-005 / FR-PLAN-006 / FR-PLAN-007).** After all phases are drafted, generate the `## Contracts` section. Steps:
 
     1. Scan every `[TDD-Red]` (or `[Build]`) block in the plan for boundary-crossing interfaces. A boundary-crossing interface is one consumed by code *outside* the defining phase — public API endpoints, exported functions, shared data schemas, event contracts. Internal helpers and private functions are not contracts.

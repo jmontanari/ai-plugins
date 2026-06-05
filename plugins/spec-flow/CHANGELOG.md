@@ -4,6 +4,13 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.1.0] — 2026-06-05
+
+### Added
+- **`lint-skill-coherence` coherence linter (`hooks/lint-skill-coherence`):** A deterministic bash linter that checks cross-references within a `skills/*/SKILL.md` file stay internally consistent. Four invariants: (1) step-reference integrity, (2) pointer/cross-ref integrity, and (3) config-branch parity are **BLOCKING** (non-zero exit); (4) state-field producer→consumer is a non-blocking **WARNING**. Runs standalone over a file or directory, and is documented as a pre-commit / CI check in the README.
+- **execute pre-Final-Review self-check:** `/spec-flow:execute` now runs the coherence linter automatically over a piece's edited `SKILL.md` files before dispatching the Final Review board. Blocking findings route through the existing fix-code loop until they clear; warnings are advisory. The linter is a mechanical gate placed before — never replacing — the human review board (NN-P-002).
+- **P2/P3 plan-authoring discipline + qa-plan criterion 27:** The `plan` skill defines a multi-step orchestration file and requires a `**Steps traversed (P2):**` enumeration when a phase introduces a new conditional path through an existing multi-step loop, plus a `**Dispatch sites (P3):**` field when a piece changes a cross-cutting agent-dispatch contract. The `plan.md` template carries both optional header fields, and `qa-plan` criterion 27 enforces their presence on multi-step-orchestration-file phases.
+
 ## [5.0.0] — 2026-06-05
 
 ### Changed

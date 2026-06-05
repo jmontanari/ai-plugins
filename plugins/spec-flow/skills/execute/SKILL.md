@@ -1460,6 +1460,22 @@ counting phase checkboxes.
 git diff main..HEAD
 ```
 
+### Step 1a: Pre-board coherence linter self-check
+
+Before dispatching the review board, run a mechanical coherence self-check over any `SKILL.md` this piece touched. This is a deterministic gate that runs **BEFORE** — and never replaces — the human review board (NN-P-002); it mechanizes detection of step-reference, pointer/cross-ref, and config-branch-parity defects so the board's human read isn't spent on issues a linter can catch.
+
+1. **Scope detection.** Compute the changed-file set:
+   ```bash
+   git diff main..HEAD --name-only
+   ```
+   Filter it for paths matching `skills/*/SKILL.md` (any `skills/<name>/SKILL.md` path, whatever the leading directory). When the piece's diff touches **no** `SKILL.md`, this self-check is a **silent no-op** — skip directly to the board dispatch below.
+2. **Run the linter** over exactly those changed `SKILL.md` paths:
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/hooks/lint-skill-coherence" <the changed SKILL.md paths>
+   ```
+3. **Non-zero exit (invariant-1–3 violation) is must-fix.** This self-check runs **before** the board, so it does not reuse Step 3's board-reviewer re-dispatch loop — it reuses only the **`fix-code` dispatch + 3-iteration circuit-breaker mechanics** that Step 3's fix loop uses, driven by the **linter** rather than by board findings: dispatch `fix-code` (Sonnet, `agents/fix-code.md`) with the linter findings, commit the fix, then **re-run the linter** over the changed `SKILL.md` paths. Repeat until the linter exits `0` or the same **3-iteration circuit breaker** fires (escalate to a human on the 3rd cycle without a clean exit). Do not dispatch the board while the linter is still red.
+4. **`WARNING:` lines (invariant-4, state-field producer→consumer) are advisory only** — surface them for visibility, but they do NOT change the exit code and do NOT block the board.
+
 Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<role>.md` and dispatch ALL EIGHT concurrently with `Input Mode: Full`:
 
 ```

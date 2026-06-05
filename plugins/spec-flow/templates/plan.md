@@ -61,6 +61,9 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 **ACs Covered:** {{ac_list}}
 **In scope:** {{explicit_scope_list}}
 **NOT in scope:** {{explicit_exclusions_with_forward_phase_references}}
+<!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
+**Steps traversed (P2):** {{steps_or_na}}
+**Dispatch sites (P3):** {{sites_or_none}}
 **Charter constraints honored in this phase:**
 - {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 
@@ -124,6 +127,9 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 **ACs Covered:** {{ac_list}}
 **In scope:** {{explicit_scope_list}}
 **NOT in scope:** {{explicit_exclusions_with_forward_phase_references}}
+<!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
+**Steps traversed (P2):** {{steps_or_na}}
+**Dispatch sites (P3):** {{sites_or_none}}
 **Charter constraints honored in this phase:**
 - {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 
@@ -179,6 +185,9 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 **ACs Covered:** {{ac_list}}
 **In scope:** {{explicit_scope_list}}
 **NOT in scope:** {{explicit_exclusions_with_forward_phase_references}}
+<!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
+**Steps traversed (P2):** {{steps_or_na}}
+**Dispatch sites (P3):** {{sites_or_none}}
 **Charter constraints honored in this phase:**
 - {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 

@@ -1,0 +1,507 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# lint-skill-coherence — deterministic coherence linter over skills/*/SKILL.md.
+#
+# Four invariants:
+#   1. step-reference integrity   (BLOCK)   — every `Step <id>` in prose resolves to a heading
+#   2. pointer / cross-ref        (BLOCK)   — every `§<heading>` (and `reference/<doc>.md §<heading>`)
+#                                              resolves to a heading anchor in the right file
+#   3. config-branch parity       (BLOCK)   — a region mentioning one enum value of a config key
+#                                              must mention every other enum value of that key
+#   4. state-field producer→consumer (WARNING) — a field token written-but-never-read
+#                                              (orphan producer) OR read-but-never-written
+#                                              (orphan consumer) → WARNING
+#
+# Findings (blocking) print to stdout as:  <file>:<line> — invariant-<N> — <detail>
+# Warnings print as:                       WARNING: <file>:<line> — <detail>
+# Exit non-zero iff ≥1 invariant-1–3 finding; warnings never affect exit.
+#
+# This is a CLI tool, NOT a harness hook (see plan ADR-1): it is invoked manually, by the
+# orchestrator's pre-Final-Review self-check, or in CI. It is not registered in any hooks.json
+# and the NN-C-005 silent-no-op / JSON-on-stdout hook contract does not apply.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+CONFIG_YAML="${PLUGIN_ROOT}/templates/pipeline-config.yaml"
+REFERENCE_DIR="${PLUGIN_ROOT}/reference"
+
+# ---------------------------------------------------------------------------
+# Arg handling: accept one or more paths; a directory expands to its SKILL.md
+# files (its own *SKILL.md plus skills/*/SKILL.md when given a skills root).
+# ---------------------------------------------------------------------------
+if [ "$#" -lt 1 ]; then
+  echo "usage: lint-skill-coherence <file|dir> [more...]" >&2
+  exit 2
+fi
+
+TARGET_FILES=()
+for arg in "$@"; do
+  if [ -d "$arg" ]; then
+    # Option-injection guard: a directory arg whose name begins with a dash
+    # (e.g. `-delete`, `-name`) would be parsed by `find` as an OPTION rather
+    # than a starting path — `find -delete` defaults its start path to `.` and
+    # recursively deletes the working tree. Prefix `./` so a dash-leading name
+    # is unambiguously a path. Absolute paths (leading `/`) and ordinary names
+    # are passed through unchanged, so absolute pathspecs are NOT corrupted.
+    # (BSD find treats `--` as a path, not an end-of-options marker, so the
+    # `./` prefix — applied only to dash-leading names — is the portable fix.)
+    case "$arg" in -*) find_dir="./$arg" ;; *) find_dir="$arg" ;; esac
+    while IFS= read -r f; do
+      [ -n "$f" ] && TARGET_FILES+=("$f")
+    done < <(find "$find_dir" -type f -name '*SKILL.md' 2>/dev/null | sort)
+  elif [ -f "$arg" ]; then
+    TARGET_FILES+=("$arg")
+  else
+    echo "lint-skill-coherence: no such file or directory: ${arg}" >&2
+    exit 2
+  fi
+done
+
+if [ "${#TARGET_FILES[@]}" -eq 0 ]; then
+  # A directory with no matching files is not an error; nothing to lint.
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Build the config key → enum-value map from pipeline-config.yaml.
+#
+# Format (per ADR-2): each key has a `# <key>: ...` caption comment, then one
+# or more `#   <value> — ...` enum-value comment lines, then a `<key>: <def>`
+# assignment line. The enum-value comments PRECEDE the assignment. We collect,
+# for each managed key, the set of values appearing on `#   <value> — ...`
+# lines inside that key's captioned comment block.
+# ---------------------------------------------------------------------------
+MANAGED_KEYS="refactor merge_strategy tdd phase_groups deferred_commit reflection"
+
+# Build the key→enum map ONCE (config is identical for every target file).
+# Emit one line per managed key:  <key>\t<v1> <v2> ...
+# Parsed once here, reused for every file's invariant-3 pass.
+CONFIG_MAP="$(awk -v keys="$MANAGED_KEYS" '
+  BEGIN { kn = split(keys, kl, " "); for (i = 1; i <= kn; i++) managed[kl[i]] = 1 }
+  # caption line: "# <key>: ..."  (single leading #, space, key, colon)
+  /^# [a-z_]+:/ {
+    cap = $0; sub(/^# /, "", cap); sub(/:.*$/, "", cap); curkey = cap; next
+  }
+  # enum value line: "#   <value> — ..."  (>=2 spaces of indent after #)
+  /^#[[:space:]][[:space:]]+[A-Za-z_]+/ {
+    if (curkey in managed) {
+      line = $0; sub(/^#[[:space:]]+/, "", line)
+      val = line; sub(/[[:space:]].*$/, "", val)
+      if (val ~ /^[A-Za-z_]+$/ && !((curkey SUBSEP val) in seen)) {
+        seen[curkey SUBSEP val] = 1
+        out[curkey] = (out[curkey] == "" ? "" : out[curkey] " ") val
+      }
+    }
+    next
+  }
+  # assignment line "<key>: <default>" ends the current caption block
+  /^[a-z_]+:/ { curkey = "" }
+  # Emit a single line: key=v1 v2;key2=v1 v2;...  (no literal newlines, so it is
+  # safe to pass through `awk -v` on BSD awk, which rejects newlines in -v values).
+  END {
+    s = ""
+    for (k in out) s = s (s == "" ? "" : ";") k "=" out[k]
+    print s
+  }
+' "$CONFIG_YAML" 2>/dev/null || true)"
+
+# ---------------------------------------------------------------------------
+# Per-file lint. Sets BLOCKING_FOUND=1 globally if any invariant-1–3 finding.
+#
+# Known limitation (by design): every invariant scans LINE BY LINE. Constructs
+# that span a source-line boundary are not joined — e.g. a step-list whose shared
+# ownership phrase wraps to the next line (`(Step 6c / Step 8)\n belongs to
+# execute`) will not suppress the earlier steps, producing a false positive. This
+# is a false-positive (self-correcting: the author rewraps the line), never a
+# masked-defect, so it is accepted rather than incurring the cost of a multi-line
+# join. Keep cross-reference + ownership constructs on a single line.
+# ---------------------------------------------------------------------------
+BLOCKING_FOUND=0
+
+lint_file() {
+  local file="$1"
+
+  # ----- Invariant 1: step-reference integrity (BLOCK) -----
+  # Single awk pass: first build the set of resolution targets, then on the
+  # second sweep flag every `Step <id>` reference in prose that no target
+  # resolves. id forms: G?<digits><opt letter>, or <digits>. Self-contained so
+  # `set -e` and grep-no-match cannot abort the run.
+  #
+  # Per amended FR-1(1), a `Step <id>` reference resolves to EITHER an actual
+  # `^#{2,4} ` heading OR a `**Step <id>:**` bold-marker step definition in the
+  # SAME file (some skills, e.g. prd/SKILL.md, define their steps as bold
+  # markers, not headings). The real corpus also defines a skill's workflow as a
+  # top-level BOLD-LABELED ORDERED LIST (`0. **Load config:**`, `1. **Worktree
+  # scan:**`, … — e.g. status/SKILL.md, defer/SKILL.md); a prose `Step N` then
+  # resolves to the ordered-list item numbered N. ONLY bold-labeled items count
+  # as step targets — a bare `5. some prose` enumeration is NOT a step (see the
+  # registration block below). A reference qualified with ANOTHER skill's path
+  # (`<skill>/SKILL.md Step N`, `Step N of <skill>`, `... belongs to <skill>`,
+  # `<skill>:Step N`) is an out-of-scope CROSS-SKILL reference and is NOT flagged
+  # — the linter cannot resolve another file's step inventory. Cross-skill
+  # scoping is decided per-reference (see ref_is_cross_skill).
+  local out1
+  out1="$(awk -v file="$file" '
+    function norm(s) {
+      sub(/^#+[[:space:]]*/, "", s); sub(/[[:space:]]+$/, "", s)
+      s = tolower(s); gsub(/[[:space:]]+/, " ", s); return s
+    }
+    # Cross-skill scoping is evaluated PER REFERENCE, not per line: a `Step N`
+    # is out of scope only when ITS OWN immediate context cites another skill.
+    # A per-LINE test let an unrelated `<skill>/SKILL.md` token elsewhere on the
+    # same line suppress a legitimate SAME-file self-reference (gate-bypass: a
+    # dangling `Step 1b` self-ref on a line that also names a charter SKILL.md
+    # path would be silently masked). A ref is cross-skill when EITHER:
+    #   (A) the text immediately BEFORE it ends with a skill-path token
+    #       (`<skill>/SKILL.md`) or a known-skill qualifier (`<skill>:`); OR
+    #   (B) the text immediately AFTER it is an ownership phrase naming a known
+    #       skill (`of|from|belongs to <skill>`).
+    # The loose `in <skill>` form is intentionally DROPPED — it over-matched
+    # ordinary prose ("the step in execute mode") and is not a real citation.
+    function known_skill_re() { return "(execute|plan|prd|spec|charter|intake|status|defer|review-board|small-change)" }
+    function ref_is_cross_skill(before, after) {
+      if (before ~ /[a-z][a-z-]*\/SKILL\.md[`)]?[[:space:]]*$/) return 1
+      if (before ~ ("(^|[^A-Za-z-])" known_skill_re() ":[[:space:]]*$")) return 1
+      # The ownership phrase may govern a step-LIST: `(Step 6c / Step 8) belongs
+      # to execute` — `belongs to` immediately follows only the LAST step, so for
+      # the earlier steps we tolerate an intervening run of step-list connectives
+      # (whitespace, `/`, `,`, `)`, backtick, `and`/`or`, additional `Step <id>`
+      # tokens) before the ownership phrase. Anything else between the ref and
+      # the phrase means it does not govern this ref (no suppression).
+      if (after ~ ("^([[:space:]/,)`]|and|or|Step[[:space:]]+(G?[0-9]+[a-z]?|[0-9]+))*[[:space:]]*(of|from|belongs[[:space:]]+to)[[:space:]]+`?" known_skill_re())) return 1
+      return 0
+    }
+    # Record headings AND `**Step <id>:**` bold-marker step definitions as
+    # resolution targets. Both go into the same normalized target set.
+    /^#{2,4} / { headtext[norm($0)] = 1; next }
+    {
+      line = $0
+      # Bold-marker step definitions: `**Step <id>: ...**` → target "step <id>".
+      bs = line
+      while (match(bs, /\*\*Step (G?[0-9]+[a-z]?|[0-9]+):/)) {
+        bm = substr(bs, RSTART, RLENGTH)
+        bs = substr(bs, RSTART + RLENGTH)
+        bid = bm; sub(/^\*\*Step[[:space:]]+/, "", bid); sub(/:.*$/, "", bid)
+        headtext["step " tolower(bid)] = 1
+      }
+      # Ordered-list step definitions: ONLY a BOLD-LABELED top-level list item
+      # `N. **Label:**` (or `N.M **...**`) defines a step — that is the corpus
+      # convention for a skill workflow (`0. **Load config:**`). A BARE numbered
+      # line (`5. We ship.`) is an ordinary prose enumeration, NOT a step target.
+      # Registering bare items made every integer 0..N phantom-resolve, which
+      # MASKED genuinely-dangling `Step N` references (ground-truth defect: the
+      # headline invariant went half-blind on the very execute/plan files this
+      # piece protects). The resolving anchor is the list NUMBER, so register the
+      # integer / dotted sub-number — but only when a `**` bold label follows.
+      if (match(line, /^[[:space:]]*[0-9]+(\.[0-9]+)?\.?[[:space:]]+\*\*/)) {
+        num = substr(line, RSTART, RLENGTH)
+        sub(/^[[:space:]]*/, "", num); sub(/\.?[[:space:]]+\*\*$/, "", num)
+        headtext["step " num] = 1
+      }
+    }
+    {
+      line = $0
+      n = NR
+      L = length(line)
+      pos = 1
+      # Walk every `Step <id>` on the line by absolute position so each
+      # reference uses its OWN before/after context for the cross-skill
+      # decision (per-reference, not per-line — closes the gate-bypass).
+      while (pos <= L) {
+        rest = substr(line, pos)
+        if (!match(rest, /Step (G?[0-9]+[a-z]?|[0-9]+)/)) break
+        refstart = pos + RSTART - 1
+        reflen = RLENGTH
+        ref = substr(line, refstart, reflen)
+        before = substr(line, 1, refstart - 1)
+        after = substr(line, refstart + reflen)
+        pos = refstart + reflen
+        if (ref_is_cross_skill(before, after)) continue
+        id = ref; sub(/^Step[[:space:]]+/, "", id)
+        reflines[++rc] = n
+        refids[rc] = id
+      }
+    }
+    END {
+      for (i = 1; i <= rc; i++) {
+        needle = "step " tolower(refids[i])
+        found = 0
+        for (h in headtext) {
+          if (index(h, needle) > 0) {
+            # word-boundary: char after needle in h must be non-alnum or end
+            p = index(h, needle)
+            after = substr(h, p + length(needle), 1)
+            before = (p == 1) ? "" : substr(h, p - 1, 1)
+            if ((after == "" || after !~ /[a-z0-9]/) && (before == "" || before !~ /[a-z0-9]/)) { found = 1; break }
+          }
+        }
+        if (!found)
+          printf "%s:%d — invariant-1 — unresolved step reference \"Step %s\" (no matching heading)\n", file, reflines[i], refids[i]
+      }
+    }
+  ' "$file")" || true
+  if [ -n "$out1" ]; then
+    printf '%s\n' "$out1"
+    BLOCKING_FOUND=1
+  fi
+
+  # ----- Invariant 2: pointer / cross-ref integrity (BLOCK) -----
+  # Two forms:
+  #   reference/<doc>.md §<heading>   → resolve in that target file
+  #   §<heading>                      → resolve in this same file
+  # Same-file headings come from this file; cross-file targets are read on demand
+  # from PLUGIN_ROOT/reference/. Self-contained awk pass, then a bash resolve of
+  # any cross-file pointers (which need to read other files).
+  local out2
+  out2="$(awk -v file="$file" -v refdir="$REFERENCE_DIR" '
+    function norm(s) {
+      sub(/^#+[[:space:]]*/, "", s); sub(/[[:space:]]+$/, "", s)
+      s = tolower(s); gsub(/[[:space:]]+/, " ", s); return s
+    }
+    # Word-boundary-guarded prefix match: a heading h is a prefix of needle ONLY
+    # when the char in needle immediately after the prefix is end-of-string or a
+    # non-alphanumeric (whitespace/punctuation). This is the same boundary
+    # discipline invariant-1 uses. The legitimate over-capture (`§Resume
+    # algorithm — …`) has a boundary after the heading words; a genuinely-broken
+    # pointer whose first word merely shares a character prefix with a real
+    # heading (`§Purposeful …` vs `## Purpose`) continues with alnum (`ful`) and
+    # is correctly rejected.
+    function prefix_boundary_ok(needle, h,    after) {
+      if (length(h) == 0 || substr(needle, 1, length(h)) != h) return 0
+      after = substr(needle, length(h) + 1, 1)
+      return (after == "" || after !~ /[A-Za-z0-9]/)
+    }
+    function resolve_in_file(target, needle,    line, h, ok) {
+      ok = 0
+      while ((getline line < target) > 0) {
+        if (line ~ /^#{2,4} /) {
+          h = norm(line)
+          # Resolve if the needle text is contained in a heading, OR a heading is
+          # a prefix of the needle (prose continues past the heading words — e.g.
+          # `§Resume algorithm — the path ...`, where only "resume algorithm" is
+          # the heading and the rest is sentence prose captured by the §-scan).
+          # The prefix branch is word-boundary-guarded so a broken pointer that
+          # merely shares a character prefix with a heading is NOT resolved.
+          if (index(h, needle) > 0) ok = 1
+          else if (prefix_boundary_ok(needle, h)) ok = 1
+        }
+      }
+      close(target)
+      return ok
+    }
+    /^#{2,4} / { headtext[norm($0)] = 1; next }
+    {
+      line = $0; n = NR; s = line
+      # Cross-file pointers: reference/<doc>.md §<heading...>
+      # The reference path is COMMONLY wrapped in inline-code backticks in the
+      # real corpus: `` `reference/<doc>.md` §<heading> ``. Tolerate an optional
+      # leading backtick before `reference/` and an optional trailing backtick
+      # after `.md` (then optional whitespace) before the `§`. Without this the
+      # bytes between `.md` and `§` are a backtick + space and this whole branch
+      # is dead code (the pointer falls through to the same-file check and
+      # false-positives as an unresolved §heading).
+      tmp = s
+      while (match(tmp, /`?reference\/[A-Za-z0-9_-]+\.md`?[[:space:]]*§[^`*_)|§]+/)) {
+        ptr = substr(tmp, RSTART, RLENGTH)
+        tmp = substr(tmp, RSTART + RLENGTH)
+        doc = ptr; sub(/^`?reference\//, "", doc); sub(/\.md.*$/, ".md", doc)
+        head = ptr; sub(/^`?reference\/[A-Za-z0-9_-]+\.md`?[[:space:]]*§/, "", head); sub(/[[:space:]]+$/, "", head)
+        needle = norm("x " head); sub(/^x /, "", needle)
+        target = refdir "/" doc
+        if ((getline probe < target) < 0) {
+          printf "%s:%d — invariant-2 — cross-ref target not found: reference/%s\n", file, n, doc
+          close(target); continue
+        }
+        close(target)
+        if (!resolve_in_file(target, needle))
+          printf "%s:%d — invariant-2 — unresolved cross-ref pointer \"reference/%s §%s\"\n", file, n, doc, head
+      }
+      # Same-file pointers: §<heading...>  (strip the cross-file form first,
+      # including the backtick-wrapped variant, so it is not re-flagged here).
+      s2 = s
+      gsub(/`?reference\/[A-Za-z0-9_-]+\.md`?[[:space:]]*§[^`*_)|§]+/, "", s2)
+      while (match(s2, /§[^`*_)|§]+/)) {
+        ptr = substr(s2, RSTART, RLENGTH)
+        s2 = substr(s2, RSTART + RLENGTH)
+        head = ptr; sub(/^§/, "", head); sub(/[[:space:]]+$/, "", head)
+        if (head == "") continue
+        # Skip placeholder pointers: a `§<...>` whose heading text begins with an
+        # angle-bracket metavariable (e.g. `§<section>` inside a documented output
+        # template) is a format placeholder to be substituted at authoring time,
+        # not a literal pointer to a heading in this file. Not a real cross-ref.
+        if (head ~ /^</) continue
+        needle = norm("x " head); sub(/^x /, "", needle)
+        local2[++lc2] = n; localh[lc2] = head; localn[lc2] = needle
+      }
+    }
+    END {
+      for (i = 1; i <= lc2; i++) {
+        found = 0
+        # Resolve if a heading contains the pointer text, OR the pointer text
+        # starts with a heading (prose continues past the heading words).
+        for (h in headtext) {
+          if (index(h, localn[i]) > 0) { found = 1; break }
+          if (prefix_boundary_ok(localn[i], h)) { found = 1; break }
+        }
+        if (!found)
+          printf "%s:%d — invariant-2 — unresolved pointer \"§%s\" (no matching heading in file)\n", file, local2[i], localh[i]
+      }
+    }
+  ' "$file")" || true
+  if [ -n "$out2" ]; then
+    printf '%s\n' "$out2"
+    BLOCKING_FOUND=1
+  fi
+
+  # ----- Invariant 3: config-branch parity (BLOCK) -----
+  # Single awk pass over the file for ALL managed keys (CONFIG_MAP is precomputed
+  # once at startup). A "branch region" = nearest heading at/above a mention to
+  # the next same-or-higher heading (here: heading-to-next-heading).
+  #
+  # Per amended FR-1(3), a region is a *branch-documentation region* for a key
+  # ONLY when it mentions >= 2 DISTINCT enum values of that key as `<key>: <value>`
+  # config-branch mentions. A region mentioning only a single value is an
+  # INCIDENTAL prose reference (e.g. "non-TDD mode (`tdd: false`)") and is NEVER a
+  # parity violation. When (and only when) >= 2 distinct values are present, every
+  # OTHER documented enum value of that key must also appear somewhere in the
+  # region (in prose or code, as a bare word); a missing value is the finding.
+  # (Consequence: a 2-value key can never violate — a region either mentions 1 of
+  # its 2 values (incidental, no trigger) or both (parity already satisfied). Only
+  # >= 3-value keys — refactor/tdd/phase_groups — can produce a finding.)
+  local out3
+  out3="$(awk -v file="$file" -v cfgmap="$CONFIG_MAP" '
+    BEGIN {
+      # cfgmap is "key=v1 v2;key2=v1 v2;..." (one line, ; between keys).
+      nk = split(cfgmap, lines, ";")
+      for (li = 1; li <= nk; li++) {
+        if (lines[li] == "") continue
+        eq = index(lines[li], "=")
+        if (eq == 0) continue
+        k = substr(lines[li], 1, eq - 1)
+        vlist = substr(lines[li], eq + 1)
+        keyname[++KN] = k
+        nv[k] = split(vlist, tmp, " ")
+        for (vi = 1; vi <= nv[k]; vi++) ev[k, vi] = tmp[vi]
+      }
+    }
+    function region_flush(   ki, k, i, j, m, words, present, distinct, missing, only_bool) {
+      for (ki = 1; ki <= KN; ki++) {
+        k = keyname[ki]
+        # Trigger gate: count DISTINCT enum values mentioned as `<key>: <value>`
+        # config-branch mentions in this region. < 2 => not a branch-doc region.
+        distinct = 0
+        only_bool = 1
+        for (i = 1; i <= nv[k]; i++) {
+          if ((k SUBSEP ev[k, i]) in branch_seen) {
+            distinct++
+            if (ev[k, i] != "true" && ev[k, i] != "false") only_bool = 0
+          }
+        }
+        if (distinct < 2) continue
+        # Boolean-pair guard: a region whose ONLY mentioned values are exactly the
+        # `true`/`false` pair is documenting a resolved BOOLEAN front-matter field
+        # (e.g. the plan records `tdd: true`/`tdd: false`), not the 3-value config
+        # branch. `auto` is the resolve-at-runtime sentinel that collapses to one
+        # of the two and is never written as a front-matter value, so its absence
+        # here is correct — not a parity violation. (Real-corpus FP guard, AC-9.)
+        if (distinct == 2 && only_bool) continue
+        # Parity: every documented value must appear as a bare word somewhere in
+        # the region (in prose or code), not only as a `<key>: <value>` mention.
+        for (i = 1; i <= nv[k]; i++) present[ev[k, i]] = 0
+        m = split(region_text, words, /[^A-Za-z_]+/)
+        for (j = 1; j <= m; j++)
+          for (i = 1; i <= nv[k]; i++)
+            if (words[j] == ev[k, i]) present[ev[k, i]] = 1
+        missing = ""
+        for (i = 1; i <= nv[k]; i++)
+          if (!present[ev[k, i]]) missing = missing (missing == "" ? "" : ", ") ev[k, i]
+        if (missing != "")
+          printf "%s:%d — invariant-3 — config-branch parity: key \"%s\" region mentions some enum values but is missing: %s\n", file, region_line, k, missing
+      }
+    }
+    {
+      line = $0
+      if (line ~ /^#{2,4} /) {
+        region_flush()
+        region_text = ""
+        delete branch_seen
+        region_line = NR
+      }
+      region_text = region_text "\n" line
+      # Branch mention: "<key>: <enumvalue>" where the value is a known enum.
+      # Record EACH distinct (key,value) `<key>: <value>` mention so region_flush
+      # can gate on the >= 2-distinct-values trigger. Scan all mentions on the line.
+      for (ki = 1; ki <= KN; ki++) {
+        k = keyname[ki]
+        scan = line
+        while (match(scan, ("(^|[^A-Za-z_])" k ":[[:space:]]*[A-Za-z_]+"))) {
+          frag = substr(scan, RSTART, RLENGTH)
+          scan = substr(scan, RSTART + RLENGTH)
+          vtmp = frag
+          sub(".*" k ":[[:space:]]*", "", vtmp)
+          sub(/[^A-Za-z_].*$/, "", vtmp)
+          for (i = 1; i <= nv[k]; i++) if (vtmp == ev[k, i]) branch_seen[k SUBSEP vtmp] = 1
+        }
+      }
+    }
+    END { region_flush() }
+  ' "$file")" || true
+  if [ -n "$out3" ]; then
+    printf '%s\n' "$out3"
+    BLOCKING_FOUND=1
+  fi
+
+  # ----- Invariant 4: state-field producer→consumer (WARNING only) -----
+  # Heuristic: candidate field tokens are snake_case identifiers ending in a
+  # state-ish suffix (_sha | _hashes | _manifest | _state). For each candidate,
+  # classify each occurrence's line as "write"-shaped (written/produced/records/
+  # emit/set/stage) or "read"-shaped (read/consume/reads/loads/verify/check).
+  # Per FR-2 the orphan is symmetric — BOTH directions are a coherence defect:
+  #   - written but NEVER read  → orphan PRODUCER (a field nothing consumes)
+  #   - read but NEVER written  → orphan CONSUMER (a field nothing produces)
+  # Either way → WARNING (never affects exit). A token that is both written and
+  # read, or that only appears in neutral lines, is fine.
+  local out4
+  out4="$(awk -v file="$file" '
+    {
+      line = $0
+      lc = tolower(line)
+      # find candidate tokens on this line
+      s = line
+      while (match(s, /[a-z][a-z_]*(_sha|_hashes|_manifest|_state)/)) {
+        tok = substr(s, RSTART, RLENGTH)
+        s = substr(s, RSTART + RLENGTH)
+        # classify line shape
+        is_write = (lc ~ /write|written|produc|record|emit|stage|persist|append|set /)
+        is_read  = (lc ~ /read|consum|load|verif|check|reconcil|compare|pars/)
+        if (is_write && !is_read) { wrote[tok] = 1; if (!(tok in firstline)) firstline[tok]=NR; wl[tok]=NR }
+        else if (is_read)         { readd[tok] = 1; if (!(tok in rl)) rl[tok]=NR }
+        else                      { if (!(tok in firstline)) firstline[tok]=NR }
+        seen[tok] = 1
+      }
+    }
+    END {
+      for (t in seen) {
+        if ((t in wrote) && !(t in readd)) {
+          printf "WARNING: %s:%d — invariant-4 — state field \"%s\" is written but never read (orphan producer)\n", file, (t in wl ? wl[t] : firstline[t]), t
+        } else if ((t in readd) && !(t in wrote)) {
+          printf "WARNING: %s:%d — invariant-4 — state field \"%s\" is read but never written (orphan consumer)\n", file, (t in rl ? rl[t] : firstline[t]), t
+        }
+      }
+    }
+  ' "$file")" || true
+  if [ -n "$out4" ]; then
+    printf '%s\n' "$out4"
+  fi
+}
+
+for f in "${TARGET_FILES[@]}"; do
+  lint_file "$f"
+done
+
+if [ "$BLOCKING_FOUND" -ne 0 ]; then
+  exit 1
+fi
+exit 0
