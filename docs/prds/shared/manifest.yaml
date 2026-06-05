@@ -277,9 +277,11 @@ pieces:
   - name: pi-020-dc-harden
     slug: pi-020-dc-harden
     description: |
-      Combines the two pi-015 deferred-commit follow-ons (supersedes pi-016 + pi-017) — same surface
-      (execute Phase Group Loop + reference/deferred-commit-journal.md + agent contracts), so one
-      codebase exploration and one review board cover both. Sequenced HARDENING-FIRST:
+      Execute-robustness hardening. Combines the two pi-015 deferred-commit follow-ons
+      (supersedes pi-016 + pi-017) AND the pi-021 base-ref finding (supersedes pi-023) — all on the
+      execute/SKILL.md surface (Phase Group Loop + reference/deferred-commit-journal.md + agent
+      contracts + the `git diff <base>..HEAD` sites), so one codebase exploration and one review
+      board cover all three. Sequenced HARDENING-FIRST:
       (1) Anti-cheat hash-object anchoring (was pi-017, reflection F1): at `red-done`, `git hash-object -w`
       each Red test file and store the immutable git blob SHA in the journal `red_manifest_hashes`
       (alongside/instead of the bare sha256sum); at the G9b barrier verify the working-tree file hashes
@@ -293,6 +295,12 @@ pieces:
       whole-suite-green guarantee at the barrier; plus INV-9 lightweight runtime isolation (TMPDIR/port/DB
       injection + parallel-safety contract + serial-replay-on-failure backstop → slower-never-wrong).
       Runtime model validated by the pi-015 9-invariant harness (specs/pi-015-defer-commit/VALIDATION.md).
+      (3) Base-ref parameterization (was pi-023, pi-021 Final Review integration finding): the skill
+      hardcodes `git diff main..HEAD` in ~5 sites (final-review-pending marker, Step 1a scope detection,
+      iter-1/amend diff captures), so a repo whose default branch is `master` (this one) makes
+      `main..HEAD` fail to resolve — breaking the Final Review diff capture and the pi-021 coherence
+      self-check. Resolve the base ref once (default-branch detection, or a `.spec-flow.yaml` key) and
+      thread it through every `git diff <base>..HEAD` site. Low-risk; independent of (1)/(2).
     prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
     dependencies: [pi-015-defer-commit]
     status: open
@@ -322,17 +330,13 @@ pieces:
   - name: pi-023-base-ref
     slug: pi-023-base-ref
     description: |
-      Parameterize the merge-base ref across execute/SKILL.md. The skill hardcodes
-      `git diff main..HEAD` in ~5 sites (final-review-pending marker, Step 1a scope detection,
-      and the iter-1/amend diff captures), but a repo whose default branch is `master` (this one)
-      makes `main..HEAD` fail to resolve — the Final Review diff capture and the pi-021 coherence
-      self-check both break on such repos. Resolve the base ref once (default-branch detection, or
-      a `.spec-flow.yaml` key) and thread it through every `git diff <base>..HEAD` site. Source:
-      pi-021 Final Review integration reviewer (flagged pre-existing, out of pi-021 scope);
-      routed to a tracked piece per the fix-as-found / no-backlog-defer policy.
+      Parameterize the merge-base ref across execute/SKILL.md. SUPERSEDED — folded into
+      pi-020-dc-harden item (3): same execute/SKILL.md surface, amortized under one exploration +
+      one review board. See pi-020-dc-harden.
     prd_sections: [FR-004, NN-P-002]
     dependencies: []
-    status: open
+    status: superseded
+    superseded_by: pi-020-dc-harden
 
   - name: pi-022-vsync-ci
     slug: pi-022-vsync-ci
