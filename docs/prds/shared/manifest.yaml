@@ -35,14 +35,14 @@ pieces:
     prd_sections: [FR-001, NFR-003, NN-C-001]
     dependencies: [PI-001-marketplace-version-sync]
     status: superseded
-    superseded_by: pi-022-version-sync-ci-and-retro
+    superseded_by: pi-022-vsync-ci
 
   - name: PI-003-charter-dogfood-lessons
     description: After using charter on a few real pieces of work (PI-001 and PI-002 themselves are good candidates), capture what worked and what didn't. Feed findings into spec-flow's improvement backlog — likely some are backlog items that land in a future spec-flow release.
     prd_sections: [G-4, NN-P-003, SC-003]
     dependencies: [PI-001-marketplace-version-sync, PI-002-version-sync-ci]
     status: superseded
-    superseded_by: pi-022-version-sync-ci-and-retro
+    superseded_by: pi-022-vsync-ci
 
   - name: PI-004-second-plugin-pilot
     description: Pilot a second, intentionally-small plugin in this marketplace to validate that the extension mechanism generalizes and that plugin isolation (the no-cross-plugin-references rule from charter/architecture.md) holds up in practice. Candidate plugins are intentionally undecided — the point is to pick something small enough to ship without a full spec-flow cycle.
@@ -274,8 +274,8 @@ pieces:
     status: merged
     merged_at: 2026-06-05
 
-  - name: pi-020-deferred-commit-hardening
-    slug: pi-020-deferred-commit-hardening
+  - name: pi-020-dc-harden
+    slug: pi-020-dc-harden
     description: |
       Combines the two pi-015 deferred-commit follow-ons (supersedes pi-016 + pi-017) — same surface
       (execute Phase Group Loop + reference/deferred-commit-journal.md + agent contracts), so one
@@ -297,8 +297,8 @@ pieces:
     dependencies: [pi-015-defer-commit]
     status: open
 
-  - name: pi-021-cross-step-coherence
-    slug: pi-021-cross-step-coherence
+  - name: pi-021-coherence
+    slug: pi-021-coherence
     description: |
       Combines the two pi-015 review-process follow-ons (supersedes pi-018 + pi-019) — same surface
       (execute + plan + qa-plan skills), both targeting the cross-step wiring gaps pi-015 exposed (every
@@ -319,8 +319,8 @@ pieces:
     dependencies: []
     status: open
 
-  - name: pi-022-version-sync-ci-and-retro
-    slug: pi-022-version-sync-ci-and-retro
+  - name: pi-022-vsync-ci
+    slug: pi-022-vsync-ci
     description: |
       Combines PI-002 + PI-003 (PI-003 already depended on PI-002) — same marketplace-tooling surface.
       (CI) a minimal CI job / pre-commit hook (shell + jq only) enforcing NN-C-001 across all marketplace
