@@ -52,6 +52,11 @@ phase_groups: auto
 #          (rollback for one release; see CHANGELOG 5.0.0 migration note)
 deferred_commit: auto
 
+# default_branch: the base branch for `git diff <base>..HEAD` in Final Review (new in v5.2.0)
+#   <unset> — auto-detect: git symbolic-ref refs/remotes/origin/HEAD, then git remote show origin (default)
+#   <name>  — explicit override (e.g. master, trunk) when auto-detect cannot resolve
+# default_branch:
+
 # reflection: controls Step 4.5 end-of-piece reflection (new in v1.5.0)
 #   auto    — dispatch reflection agents (process-retro + future-opportunities); append findings to <docs_root>/improvement-backlog.md (default)
 #   off     — skip Step 4.5; learnings.md authored without reflection-agent input (pre-v1.5 behavior)

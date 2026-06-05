@@ -4,6 +4,16 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.2.0] — 2026-06-05
+
+### Changed
+- **Anti-cheat blob anchor (deferred Phase Groups):** the orchestrator now anchors each Red test file with `git hash-object -w` at red-done (orchestrator-owned, immutable), replacing the Red-agent's self-asserted `sha256sum` manifest (closes CWE-345). Red-test-files only; production stays trusted-by-association.
+- **Phase Group concurrency re-enabled:** under `deferred_commit: auto` + `phase_groups: auto`/`always`, sub-phases dispatch concurrently again on the git-free foundation, with a Race-2 per-sub-phase scoped oracle + a whole-suite green gate at the barrier, plus INV-9 runtime isolation (unique `TMPDIR`/port/DB) and a serial-replay backstop (slower-never-wrong). `deferred_commit: off` remains the rollback.
+- **Default-branch resolution:** Final Review and the verify agent resolve the diff base (`git symbolic-ref` → `git remote show origin` → `.spec-flow.yaml default_branch:` → loud error) instead of hardcoding `git diff main..HEAD`; works on `master`-default repos.
+
+### Migration
+- In-flight journals written by ≤5.1.0 (sha256 `red_manifest_hashes`, no `anchor:` marker) resume without change — they are verified with `sha256sum` as-is. New journals carry `anchor: blob`.
+
 ## [5.1.1] — 2026-06-05
 
 ### Fixed

@@ -35,7 +35,7 @@ Emit the abbreviated Audit output format.
 
 Used in fast mode (`fast: true`) as a 9th parallel member of the end-of-piece Final Review board. Compensates for the absence of per-phase `qa-tdd-red`, `qa-phase`, and `qa-phase-lite` dispatches. Context provided:
 
-- **Full piece diff:** `git diff main..HEAD` covering all test and implementation files produced across every phase.
+- **Full piece diff:** `git diff <resolved default branch>..HEAD` covering all test and implementation files produced across every phase.
 - **All spec ACs:** The complete acceptance criteria list from `spec.md` — all phases, not just one phase's subset.
 - **Confirmation:** "Tests verified per-phase — do NOT re-run the test suite."
 
@@ -138,7 +138,7 @@ PASS | FAIL (with specific findings — each finding cites file, test name or li
    - A `Mode: Audit`, `Mode: Full`, or `Mode: Piece Full` line at the top
    - **Full mode:** the Build agent's full oracle output + spec ACs for this phase + implementation diff
    - **Audit mode:** the Build agent's `## AC Coverage Matrix` + implementation diff + spec ACs for this phase
-   - **Piece Full mode:** the full piece diff (`git diff main..HEAD`) + all spec ACs (all phases) + the confirmation line "Tests verified per-phase — do NOT re-run the test suite."
+   - **Piece Full mode:** the full piece diff (`git diff <resolved default branch>..HEAD`) + all spec ACs (all phases) + the confirmation line "Tests verified per-phase — do NOT re-run the test suite."
 
    If the `Mode:` line is missing, OR the prompt asks you to modify code (Verify is read-only), OR any required block is absent, STOP and report:
 

@@ -23,6 +23,7 @@ The journal is a single JSON object. Tier 1 is the only tier implemented today (
 | `group_start_sha` | string | The commit SHA the Phase Group started from. The file-scoped recovery baseline for every sub-phase in the group. Written once at Step G1, never mutated. |
 | `group_letter` | string | The Phase Group's letter (e.g. `A`). Identifies which group this journal belongs to so a resume binds it to the active group. |
 | `sub_phases` | map | Keyed by sub-phase id `<letter>.<n>` (e.g. `A.1`, `A.2`). Empty `{}` at group start; one entry added/updated per sub-phase as it progresses. Absence of a key means that sub-phase was never started. |
+| `anchor` | string | `blob` for journals written at/after 5.2.0 (red_manifest_hashes are git blob SHAs); ABSENT for ≤5.1.0 journals (red_manifest_hashes are `sha256sum` digests — honored as-is on resume). |
 
 Each value in `sub_phases` is an object:
 
@@ -30,7 +31,7 @@ Each value in `sub_phases` is an object:
 |-------|------|---------|
 | `scope` | string[] | The literal file paths this sub-phase owns (Red manifest paths ∪ Build production paths). Used verbatim as the pathspec for file-scoped recovery and for the barrier commit's union. Literal paths only — never globs. |
 | `status` | string | One of `pending` \| `red-done` \| `green` \| `failed`. `pending` = dispatched, no Red yet; `red-done` = Red's failing tests staged; `green` = Build's oracle passed; `failed` = Build's oracle did not pass (or QA rejected). |
-| `red_manifest_hashes` | map | Map of path → SHA-256 hex digest, one entry per Red test file in this sub-phase's scope. Captured when the sub-phase reaches `red-done`. On resume, a `green` sub-phase's working-tree files are re-hashed against this map and trusted on an exact match. |
+| `red_manifest_hashes` | map | Map of path → git blob SHA (the output of `git hash-object -w`, written by the orchestrator at `red-done`), one entry per Red test file in this sub-phase's scope. On resume, a `green` sub-phase's working-tree files are re-hashed against this map and trusted on an exact match. |
 
 The `status` field is documented as: `status` — one of `pending` | `red-done` | `green` | `failed`.
 
@@ -40,6 +41,7 @@ Concrete example object (a group `A` mid-flight: `A.1` green, `A.2` green, `A.3`
 {
   "group_start_sha": "af57b38c1d2e4f5a6b7c8d9e0f1a2b3c4d5e6f70",
   "group_letter": "A",
+  "anchor": "blob",
   "sub_phases": {
     "A.1": {
       "scope": ["src/parser/tokens.py", "tests/parser/test_tokens.py"],
@@ -65,13 +67,14 @@ Concrete example object (a group `A` mid-flight: `A.1` green, `A.2` green, `A.3`
   }
 }
 ```
+<!-- Note: hash values in red_manifest_hashes are git blob SHAs (output of `git hash-object -w`), not SHA-256 hex digests, when `"anchor": "blob"` is present. -->
 
 ## Lifecycle
 
 The journal's lifetime is bounded by the Phase Group:
 
 1. **Written at Step G1 (group start).** When execute begins a deferred Phase Group, it writes the journal with `group_start_sha` set to the current HEAD, `group_letter` set, and `sub_phases` an empty `{}`.
-2. **Updated at each sub-phase status transition.** As each sub-phase advances, the orchestrator updates that sub-phase's entry in `sub_phases`: adds the entry at `pending`, records `red_manifest_hashes` and flips to `red-done` when Red writes its tests, flips to `green` when Build's oracle passes, or `failed` on an oracle/QA failure. Under `deferred_commit: auto` dispatch is **serial** (one sub-phase mid-cycle at a time — see SKILL.md Step G4), so the journal's value here is **crash-resume durability**, not index-contention avoidance: the serial git-free dispatch is what removes the shared-index race, and the incremental per-sub-phase journal writes are what make the group resumable after an interruption. Writes are incremental — one sub-phase's entry at a time.
+2. **Updated at each sub-phase status transition.** As each sub-phase advances, the orchestrator updates that sub-phase's entry in `sub_phases`: adds the entry at `pending`, records `red_manifest_hashes` and flips to `red-done` when Red writes its tests, flips to `green` when Build's oracle passes, or `failed` on an oracle/QA failure. Under `deferred_commit: auto` dispatch is **concurrent** (git-free; staging deferred to the barrier removes the shared-index race — see SKILL.md Step G4). The journal's value is crash-resume durability AND it records per-sub-phase status for the barrier whole-suite gate; writes are incremental and concurrency-safe (one sub-phase entry at a time).
 3. **Removed after the barrier work-commit.** Once the barrier commit (see Barrier commit recipe) lands the whole group's union, the journal file is deleted. After deletion there is no journal until the next deferred group starts.
 
 The journal is **never committed**. The real, portable guarantee is the **pathspec-only commit discipline**: every commit in a deferred group uses an explicit pathspec listing only sub-phase scope files, and the journal's path is never in any commit pathspec — so no commit can pick it up regardless of `.gitignore`.
@@ -86,7 +89,7 @@ When execute (re)starts, it runs this ordered algorithm before doing any sub-pha
 2. **No journal → fresh group start.** This is not an error — it is the normal case for a group that has not begun. Proceed to Step G1 (write a fresh journal) and run the group from scratch.
 2a. **Stale `group_letter` → treat as no-journal (fresh start).** A journal whose on-disk `group_letter` does NOT equal the active group's letter is STALE — an orphan from a crash between the G9b barrier commit and the journal `rm` (Lifecycle Step 3), or an aborted prior group. Do NOT resume from it: treat it exactly as the no-journal case (Step 2 above), log the orphan (NN-C-006 passive surface), and overwrite it at Step G1. This is what makes the single-fixed-filename safe across groups: the resume binds the journal to the active group by `group_letter`, and a non-matching letter is never trusted.
 3. **Read `group_start_sha`.** This is the file-scoped recovery baseline used in Steps 5–6.
-4. **`green` sub-phases → re-verify by hash, then trust.** For each sub-phase with `status: green`, re-hash **only the Red test files** (the keys of `red_manifest_hashes`) against their stored hashes. The production files listed in `scope` are **trusted by association** and are **NOT independently re-hashed** — a matching Red test hash is taken as proof the whole sub-phase is intact. On an exact match for every Red test file, trust the sub-phase as done and **do not re-run it** and **do not touch its files**. (A mismatch on any Red test file means the working tree drifted since the green checkpoint — treat that sub-phase as incomplete and fall through to Step 5.)
+4. **`green` sub-phases → re-verify by hash, then trust.** For each sub-phase with `status: green`, re-hash **only the Red test files** (the keys of `red_manifest_hashes`) against their stored hashes. If the journal carries `"anchor": "blob"` (written by v5.2.0+), verify with `git hash-object`; if the field is absent (written by ≤5.1.0, FR-4 migration path), verify with `sha256sum` instead. The production files listed in `scope` are **trusted by association** and are **NOT independently re-hashed** — a matching Red test hash is taken as proof the whole sub-phase is intact. On an exact match for every Red test file, trust the sub-phase as done and **do not re-run it** and **do not touch its files**. (A mismatch on any Red test file means the working tree drifted since the green checkpoint — treat that sub-phase as incomplete and fall through to Step 5.)
 5. **Incomplete sub-phases (`pending` / `red-done` / `failed`) → recover, then re-run.** Apply the file-scoped recovery recipe (next section) to the sub-phase's `scope`, resetting just those paths to `group_start_sha`, then re-run the sub-phase from Red. The reset is logged (NN-C-006 passive surface).
 6. **Sub-phases absent from the journal → not started.** A `<letter>.<n>` key that does not appear in `sub_phases` was never dispatched. Run it fresh; no recovery needed (its files were never written).
 
@@ -94,11 +97,11 @@ When execute (re)starts, it runs this ordered algorithm before doing any sub-pha
 
 Resuming the example journal above (group `A`: `A.1` green, `A.2` green, `A.3` failed):
 
-- **`A.1` (green):** re-hash **only the Red test file** `tests/parser/test_tokens.py` (the sole key of `red_manifest_hashes`) → matches `9f2c…1e2f`. Trusted. The production file `src/parser/tokens.py` is **not independently re-hashed** — it rides on the matching test hash. Not re-run; its files are left **byte-identical** — untouched.
-- **`A.2` (green):** re-hash **only the Red test file** `tests/parser/test_ast.py` → matches `3e4f…3e4f`. Trusted; `src/parser/ast.py` rides on that match (not independently re-hashed). Not re-run; files left byte-identical.
+- **`A.1` (green):** re-hash **only the Red test file** `tests/parser/test_tokens.py` (the sole key of `red_manifest_hashes`) via `git hash-object` → matches `9f2c…1e2f`. Trusted. The production file `src/parser/tokens.py` is **not independently re-hashed** — it rides on the matching test hash. Not re-run; its files are left **byte-identical** — untouched.
+- **`A.2` (green):** re-hash **only the Red test file** `tests/parser/test_ast.py` via `git hash-object` → matches `3e4f…3e4f`. Trusted; `src/parser/ast.py` rides on that match (not independently re-hashed). Not re-run; files left byte-identical.
 - **`A.3` (failed):** file-scoped recovery on `["src/parser/eval.py", "tests/parser/test_eval.py"]` against `group_start_sha`, then re-run from Red.
 
-Net effect: **only the failed sub-phase re-runs**; the two green sub-phases are verified by re-hashing **their Red test files** alone (the only files we re-hash — production files are trusted by association, NOT independently verified), and because we leave trusted sub-phases untouched their files remain byte-identical to before the interruption. They consume zero agent turns. Note "byte-identical" here describes the files we leave untouched, not a verification claim over all of them — only the Red test files we re-hashed are actually checked; production-file drift is not detected (a known Tier-1 limitation). This is the durability the journal buys without committing between sub-phases.
+Net effect: **only the failed sub-phase re-runs**; the two green sub-phases are verified by re-hashing **their Red test files** alone via `git hash-object` (the only files we re-hash — production files are trusted by association, NOT independently verified), and because we leave trusted sub-phases untouched their files remain byte-identical to before the interruption. They consume zero agent turns. Note "byte-identical" here describes the files we leave untouched, not a verification claim over all of them — only the Red test files we re-hashed are actually checked; production-file drift is not detected (a known Tier-1 limitation). This is the durability the journal buys without committing between sub-phases.
 
 ## File-scoped recovery recipe
 
