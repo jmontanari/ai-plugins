@@ -303,7 +303,8 @@ pieces:
       thread it through every `git diff <base>..HEAD` site. Low-risk; independent of (1)/(2).
     prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
     dependencies: [pi-015-defer-commit]
-    status: in-progress
+    status: merged
+    merged_at: 2026-06-05
 
   - name: pi-021-coherence
     slug: pi-021-coherence
