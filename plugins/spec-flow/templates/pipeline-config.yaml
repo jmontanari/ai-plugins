@@ -45,6 +45,13 @@ qa_iter2: auto
 #   off     — treat Phase Groups as if they were flat serial phases (disable new scheduler; useful for rollback)
 phase_groups: auto
 
+# deferred_commit: controls Phase Group commit model (new in v5.0.0)
+#   auto — serial git-free section + ONE deferred work-commit at the group barrier;
+#          journal-based resume; file-scoped recovery (default; replaces pre-5.0.0 behavior)
+#   off  — pre-5.0.0 behavior: concurrent sub-phase dispatch + per-sub-phase unified commits
+#          (rollback for one release; see CHANGELOG 5.0.0 migration note)
+deferred_commit: auto
+
 # reflection: controls Step 4.5 end-of-piece reflection (new in v1.5.0)
 #   auto    — dispatch reflection agents (process-retro + future-opportunities); append findings to <docs_root>/improvement-backlog.md (default)
 #   off     — skip Step 4.5; learnings.md authored without reflection-agent input (pre-v1.5 behavior)

@@ -225,6 +225,13 @@ Read the `phase_groups` key from `.spec-flow.yaml` (valid values: `auto`, `alway
 - `always` — recognize Phase Groups and error if the plan has only flat phases when the piece has multiple obviously-parallelizable files. Used to catch over-flat plans during v1.4.0 rollout.
 - `off` — treat every top-level unit as a flat phase, ignoring Phase Group headings. Escape hatch for rollback or for plans authored before v1.4.0.
 
+Read the `deferred_commit` key from `.spec-flow.yaml` in the SAME pass (valid values: `auto`, `off`; default `auto` when the key is absent or unset — per NN-C-003 backward-compat). Hold it in orchestrator state alongside `phase_groups`; the Phase Group Loop (Step G1 onward) branches on it:
+
+- `auto` — Phase Groups run the serial git-free section (Step G4) and barrier work-commit (Step G9b); the journal is written.
+- `off` — Phase Groups run the legacy concurrent dispatch (each sub-phase commits its own work); no journal, no barrier work-commit.
+
+`deferred_commit` only governs how a recognized Phase Group is executed; whether a unit is recognized as a Phase Group at all is governed by `phase_groups` above.
+
 Scope validation before dispatching any sub-phases in a group: parse each sub-phase's `**Scope:**` declaration (literal file paths only, no globs) and check for pairwise overlap. If two sibling sub-phases declare overlapping files, fall back to serial execution for that group (each sub-phase runs as a flat phase in declaration order) and log a warning naming the overlap.
 
 ## Pre-Loop: Build Task List
@@ -411,7 +418,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    **Defensive re-hash at capture time.** Before trusting Red's self-reported manifest, re-hash each listed file in the working tree (where the staged content lives) and compare:
    ```bash
    for path in <paths from manifest>; do
-     actual=$(sha256sum "$path" | cut -d' ' -f1)
+     actual=$(sha256sum -- "$path" | cut -d' ' -f1)
      reported=<hash from Red's manifest for this path>
      [ "$actual" = "$reported" ] || echo "manifest mismatch: $path"
    done
@@ -506,6 +513,8 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
 6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
 7. **Post-commit integrity and reconciliation gates (Mode: TDD + Implement, v3.1.1+).** After the implementer's commit lands (HEAD now points to it), run cheap checks before accepting the phase. Gate (a) is TDD-only (uses Red's manifest); gate (b) is HARD FAIL on BOTH modes — strays or missings reject the phase. The Implement-track extension was added in v3.1.1 per pi-009-hardening's Phase Group A contamination event, where A.2 silently swept in A.4's staged files because the gate was previously gated `Mode: TDD only`.
+
+   > **Deferred Phase Group note (`deferred_commit: auto`).** The HEAD-hash form of both gates below — gate (a) content-hash integrity and gate (b) reconciliation — applies to flat phases and to `deferred_commit: off`, where each phase/sub-phase makes its own commit and HEAD points at that work. Under `deferred_commit: auto` the sub-phases do NOT commit individually, so these gates do NOT run per sub-phase. Instead they run ONCE at the group barrier (Step G9b: Barrier work-commit), evaluated against the **working tree** (gate (a): re-hash each sub-phase's Red tests in the working tree against the journal `red_manifest_hashes`) and the **barrier work-commit** (gate (b): reconcile the work-commit `--name-only` against the union of all sub-phase scopes). The per-sub-phase HEAD-hash form does not apply under `auto` because there is no per-sub-phase HEAD commit to hash.
 
    - **(a) Content-hash integrity (Mode: TDD only).** For every path in `phase_N_red_stage_manifest`, re-hash the file AS COMMITTED in HEAD and compare against the manifest:
      ```bash
@@ -1155,6 +1164,8 @@ When Phase Scheduler detects a Phase Group:
 
 Record the current HEAD as `group_start_sha` in orchestrator state. Used later as the diff baseline for group-level Refactor and Opus QA.
 
+Under `deferred_commit: auto` (read at Step 0 / Phase Scheduler), initialize the Phase Group journal — the durable, git-free checkpoint defined in `reference/deferred-commit-journal.md` (schema Tier 1). Write the journal with `group_start_sha` set to this HEAD, `group_letter` set to the active group's letter, and an empty `sub_phases` map (`{}`). The journal is then updated incrementally as each sub-phase transitions — its `sub_phases` entry records the per-sub-phase status `pending` → `red-done` → `green` / `failed` (and, at `red-done`, the sub-phase's `red_manifest_hashes`). The journal is never committed and is removed after the barrier work-commit (see `reference/deferred-commit-journal.md` Lifecycle). Under `deferred_commit: off` no journal is written — the legacy concurrent path (Step G4) does not use one.
+
 ### Step G2: Validate sub-phase disjointness
 
 For each Sub-Phase in the group, parse its `**Scope:**` block. Cross-check for pairwise file-path overlap. If overlap exists, log a warning and fall back to serial execution (each sub-phase runs as a flat phase through the Per-Phase Loop).
@@ -1163,7 +1174,37 @@ For each Sub-Phase in the group, parse its `**Scope:**` block. Cross-check for p
 
 For each sub-phase (in parallel — pre-flight is read-only and cheap), run the existing Step 1b pre-flight against the sub-phase's scope. Produce per-sub-phase `## Pre-flight snapshot` and `## Orchestrator pre-decisions` attachments. These are scoped to the sub-phase only — a Phase Group's pre-flight is not a union.
 
-### Step G4: Dispatch sub-phase pipelines concurrently
+### Step G4: Dispatch sub-phase pipelines (serial git-free by default)
+
+Branch on the `deferred_commit` knob the orchestrator read at Step 0 / Phase Scheduler (declared in `templates/pipeline-config.yaml`). `deferred_commit: auto` is the **default** and selects the serial git-free section immediately below; `deferred_commit: off` selects the legacy concurrent dispatch (gated further down).
+
+#### Serial git-free section (`deferred_commit: auto` — default)
+
+Dispatch the group's sub-phases **serially**: one sub-phase's full Red → Build cycle completes — green, working-tree only, with **NO `git add` and NO `git commit`** — before the next sub-phase dispatches. Only one sub-phase is mid-cycle at any moment, so there is no shared git index to race (no `git add` happens until the group barrier).
+
+**Deferred-group flag injection (REQUIRED — NN-C-008 self-contained prompts).** `agents/tdd-red.md` and `agents/implementer.md` gate their git-free behavior on a deferred-group flag the orchestrator passes in their prompt; without it they fall back to their normal `git add` / `git commit`, which would defeat the git-free constraint. The orchestrator MUST inject an explicit deferred-group flag — a `Deferred Phase Group: yes` line, placed alongside the existing `Mode:` flag on/near line 1 — into BOTH the sub-phase's Red (tdd-red) prompt and its Build (implementer) prompt. This tells Red to write-without-staging (no `git add`) and tells Build to write-without-staging-or-committing (no `git add`, no `git commit`); all staging/commit is deferred to the barrier (Step G9b). Under `deferred_commit: off` (the legacy concurrent section below) this flag is NOT set — those agents stage/commit per sub-phase as before.
+
+**This rule is cross-cutting — it applies to EVERY (re-)dispatch of `tdd-red` / `implementer` for a sub-phase of a group running under `deferred_commit: auto`, not just the initial dispatch here.** Concretely, the `Deferred Phase Group: yes` flag MUST be re-injected on ALL of the following dispatch sites alike: (1) the initial G4 sub-phase dispatch in this section; (2) the Step G6 auto-triage recovery re-dispatches (the Contamination and Scope-violation matrix rows' re-run-from-Red, and the G9b barrier anti-cheat reject path's "re-dispatch the offending sub-phase's Build"); (3) the Session-Resumability mid-group resume re-run (the incomplete-sub-phase "re-run from Red"); and (4) the Step G6 auto-triage "BLOCKED — pre-decision mismatch" recovery re-dispatch (re-run Step 1b pre-flight, then re-dispatch with fresh pre-decisions). A flagless re-dispatch makes the agent fall back to per-sub-phase `git add` / `git commit`, reintroducing the shared-index race and breaking the G9b barrier (the path would already be committed, so the union `git add` and the working-tree anti-cheat would operate on already-committed state). Treat the flag as mandatory on every (re-)dispatch for the lifetime of the deferred group, never only on first dispatch.
+
+For each sub-phase, in plan order:
+
+- **Red** writes its failing tests to the working tree and emits its SHA-256 manifest, but does **not** stage them (no `git add`). The orchestrator records that manifest in the journal and flips the sub-phase to `red-done` (transitioning it from `pending`).
+- **Build** writes the production code and runs its oracle **against the working tree** — Red's unstaged tests plus Build's unstaged code are both picked up by the runner from the tree. The oracle is the **existing whole-non-integration-suite invariant (Step 5 / line 499, invariant (a) "0 failed across the non-integration suite") — UNCHANGED by this phase.** Because dispatch is serial, only one sub-phase's files are in the tree mid-cycle, so the suite-wide oracle has no sibling-in-progress interference: there is **no Race-2**. Build does **not** commit (no `git commit`).
+- The orchestrator flips the sub-phase to `green` on oracle pass, or `failed` on oracle/QA failure, writing the transition to the journal (`reference/deferred-commit-journal.md` Lifecycle Step 2) before dispatching the next sub-phase.
+
+Each sub-phase runs the **same Verify (Step 4, Audit/Full selection) and QA-lite checks as the legacy per-sub-phase internal flow below** — including the `orchestrator_fast_mode: true` skip of the `qa-phase-lite` dispatch. The Verify/QA-lite gates are NOT removed here; only the commit timing differs (every `git add`/`git commit` is deferred to the barrier, per the git-free constraint above).
+
+No sub-phase stages or commits anything; all staging is deferred to the group barrier (Step G5), where the union of all sub-phase scopes is committed once (see `reference/deferred-commit-journal.md` Barrier commit recipe).
+
+**Worked example (3-sub-phase serial trace).** Group `A` with sub-phases `A.1`, `A.2`, `A.3`. Journal initialized at G1 with empty `sub_phases`. Serial dispatch — **one-mid-cycle-at-a-time**:
+
+1. `A.1` dispatched → entry added at `pending`. Red writes `tests/.../test_a1.py` (unstaged), emits manifest → journal records `red_manifest_hashes`, status `red-done`. Build writes `src/.../a1.py` (unstaged), oracle green against the working tree → status `green`. **No `git add`, no `git commit`.**
+2. `A.2` dispatched (only after `A.1` is green) → `pending` → Red unstaged + manifest → `red-done` → Build unstaged, oracle green → `green`. **No commit.**
+3. `A.3` dispatched (only after `A.2` is green) → `pending` → Red → `red-done` → Build, oracle green → `green`. **No commit.**
+
+Net: **one sub-phase mid-cycle at a time, zero per-sub-phase commits**, journal status transitions `pending` → `red-done` → `green` recorded per sub-phase. All staging/commit happens once at the barrier (Step G5). Contrast with `deferred_commit: off` below, which fires all sub-phases concurrently and commits per sub-phase.
+
+#### Legacy concurrent section (`deferred_commit: off`)
 
 For each `[P]`-marked sub-phase in the group, launch its full internal pipeline concurrently. Each pipeline runs independently through its own Red → Build → Verify → QA-lite cycle, anchored at its own `sub_phase_start_sha`.
 
@@ -1178,7 +1219,9 @@ Per-sub-phase internal flow — each sub-phase runs the same checks as the Per-P
 - QA-lite step — **fast mode skip:** if `orchestrator_fast_mode: true`, skip the `qa-phase-lite` dispatch for this sub-phase. Proceed to the next sub-phase pipeline step. Otherwise: dispatch `qa-phase-lite.md`, Sonnet. Iter-until-clean per `plugins/spec-flow/reference/qa-iteration-loop.md` — full review on iter-1, focused re-review on iter-2+, 3-iter circuit breaker.
 - Sub-phase Progress is implicit (no separate progress commit per sub-phase — the group progress commit covers all)
 
-**Shared staging area safety (v2.7.0).** Parallel sub-phases share the same git index, but scope disjointness is enforced at Step G2 (pairwise literal-path check) and literal-path staging discipline in Rule 6 (tdd-red) + Rule 8 (implementer) means each sub-phase's `git add` + `git commit` references only its own paths. A sibling sub-phase's staged-but-uncommitted tests remain in the index but are NOT swept into another sub-phase's unified commit because the implementer commits by literal path. The orchestrator's Step 3.7b reconciliation (commit file list = sub-phase's Red manifest ∪ sub-phase's Build reported files) catches any cross-contamination.
+**Shared staging area safety — `deferred_commit: off` only (v2.7.0).** This paragraph describes the legacy concurrent shared-index path and applies only under `deferred_commit: off`. Parallel sub-phases share the same git index, but scope disjointness is enforced at Step G2 (pairwise literal-path check) and literal-path staging discipline in Rule 6 (tdd-red) + Rule 8 (implementer) means each sub-phase's `git add` + `git commit` references only its own paths. A sibling sub-phase's staged-but-uncommitted tests remain in the index but are NOT swept into another sub-phase's unified commit because the implementer commits by literal path. The orchestrator's Step 3.7b reconciliation (commit file list = sub-phase's Red manifest ∪ sub-phase's Build reported files) catches any cross-contamination.
+
+Under `deferred_commit: auto` the section is git-free and serial — there is no shared-index staging race; see `reference/deferred-commit-journal.md`.
 
 ### Step G5: Barrier — wait for all sub-phases
 
@@ -1203,7 +1246,7 @@ When dispatching the Refactor agent at group level:
 - Scope: union of all sub-phase scope declarations
 - Prompt notes that "phase files" for this dispatch means the union (see `agents/refactor.md` Rule 1's group-level clarification)
 
-Validate post-Refactor: tests still green (run oracle once over the union), no files outside the union modified.
+Validate post-Refactor: tests still green (run oracle once over the union), no files outside the union modified. **Under `deferred_commit: auto`** the sub-phase files are untracked (nothing committed until Step G9b), so a committed `git diff` would show nothing — compute "modified" against the **working tree** over the journal `sub_phases` scope union per `reference/deferred-commit-journal.md` §Working-tree enumeration over an untracked union (deferred_commit: auto). Reject any working-tree path outside the union.
 
 ### Step G8: Group Deep QA (Opus)
 
@@ -1213,7 +1256,7 @@ Validate post-Refactor: tests still green (run oracle once over the union), no f
 
 Dispatch the `qa-phase.md` agent at Opus tier. Compose the prompt using the existing Step 6 surface-map composition, but scoped to the group:
 
-- `## Files changed` — from `git diff --numstat $group_start_sha..HEAD`
+- `## Files changed` — from `git diff --numstat $group_start_sha..HEAD`. **Under `deferred_commit: auto`** the sub-phase files are untracked until the Step G9b work-commit, so `git diff --numstat $group_start_sha..HEAD` is empty pre-barrier; in that case derive the file list (and numstat) from the **journal `sub_phases` scope union** read against the **working tree**, computed per `reference/deferred-commit-journal.md` §Working-tree enumeration over an untracked union (deferred_commit: auto).
 - `## Public symbols added or modified` — union across all sub-phase impl files
 - `## Integration callers` — resolved for the union of public symbols
 - `## Diff` — collapsed per-sub-phase if total > 500 LOC
@@ -1226,6 +1269,65 @@ If Group Deep QA returns must-fix: run the iter-until-clean loop per plugins/spe
 ### Step G9: Step 6b hook sweep over the group diff
 
 Run `pre-commit run --files $(git diff --name-only $group_start_sha..HEAD)`. Same autofix-or-fix-code recovery as the flat-phase Step 6b, once across the group.
+
+> **Coherence note (`deferred_commit: auto`).** Under `deferred_commit: auto` the sub-phase files are untracked until the Step G9b work-commit lands, so `git diff $group_start_sha..HEAD` is empty pre-commit; in that case the hook-sweep file list is the working-tree union (the journal `sub_phases` scope) rather than the committed group diff — enumerate it per `reference/deferred-commit-journal.md` §Working-tree enumeration over an untracked union (deferred_commit: auto).
+
+### Step G9b: Barrier work-commit (deferred_commit: auto)
+
+This step runs ONLY under `deferred_commit: auto`. Under `deferred_commit: off` (and for flat phases) there is no barrier work-commit — each phase commits its own work, and this step is skipped. See `plugins/spec-flow/reference/deferred-commit-journal.md` `## Barrier commit recipe` for the canonical recipe; this step is its orchestration in the group barrier.
+
+At the barrier every sub-phase is `green` in the journal. The deferred commits now collapse into a single work-commit covering the union of every sub-phase's scope:
+
+> **Ordering guard (hook-autofix vs anti-cheat — SF3).** The Step G9 hook sweep runs BEFORE this G9b re-hash. If a formatter hook (the trusted sweep) autofixes a Red test file during G9, the working-tree content will no longer match the journal `red_manifest_hashes` captured at `red-done`, and this re-hash would FALSELY trip the anti-cheat. Guard: **after the G9 sweep applies any autofix, re-capture `red_manifest_hashes` for every Red test file the (trusted) sweep modified** — updating the journal — so this re-hash compares against the post-sweep baseline. (The sweep is trusted by construction; the anti-cheat targets Build-agent tampering, not formatter autofixes.) Equivalent alternative: run this G9b anti-cheat re-hash BEFORE the G9 sweep. The pipeline uses the re-capture-after-sweep guard.
+
+1. **Re-hash each sub-phase's Red tests in the working tree against the journal `red_manifest_hashes`.** For every sub-phase entry in the journal `sub_phases`, re-hash each Red test file (the keys of that sub-phase's `red_manifest_hashes`) **as it sits in the working tree** (not as committed in HEAD — there is no per-sub-phase HEAD commit) and compare against the stored hash:
+
+   ```bash
+   for path in <this sub-phase's red_manifest_hashes keys>; do
+     wt_hash=$(sha256sum -- "$path" | cut -d' ' -f1)
+     manifest_hash=<journal red_manifest_hashes[path]>
+     [ "$wt_hash" = "$manifest_hash" ] || echo "barrier integrity fail: $path"
+   done
+   ```
+
+   Any mismatch means a Build agent modified one of Red's tests to make it pass. This gate re-hashes the Red **test files only** — production files in each sub-phase's scope are **trusted by association** (NOT re-hashed — ADR-2), the same trust model the flat-phase gate uses for production code. It detects test-file tampering during Build; it does NOT detect production-file drift across a resume (a known limitation — deeper integrity anchoring is deferred to the Tier-2 / `journal_tier` future in `reference/deferred-commit-journal.md`). It is the working-tree analogue of the flat-phase content-hash gate (evaluated against the working tree instead of HEAD because there is no per-sub-phase HEAD commit), not a strictly stronger check. Reject within the 2-attempt budget (re-dispatch the offending sub-phase's Build without touching Red's tests — re-inject the `Deferred Phase Group: yes` flag on this re-dispatch, see the G4 flag-injection rule); escalate on second failure.
+
+2. **Compute the union.** Union = ⋃ sub-phases of (Red manifest paths ∪ Build files), read from the journal `sub_phases` `scope` arrays (each `scope` is already Red manifest ∪ Build production paths, literal paths only).
+
+   **Empty-union precondition.** If the computed union is empty, do NOT run `git add` / `git commit` — an empty pathspec is unsafe and meaningless (`git add` with no paths is a no-op or stages everything depending on form; `git commit -- ` with no paths errors). An empty union at the barrier when every sub-phase is `green` is a logic error (a green sub-phase must have produced files): skip the work-commit and log/escalate to human rather than committing.
+
+3. **Stage then commit the union.** A bare `git commit -- <union>` fails with `did not match any file(s) known to git`, because the git-free sub-phase files were never staged — they are untracked. So `git add` first, then commit with the same pathspec:
+
+   ```bash
+   git add -- <union>
+   git commit -m "<work msg>" -- <union>
+   ```
+
+   The explicit `git add -- <union>` is required (it tracks the previously-untracked files); the pathspec on `git commit` keeps the commit scoped to exactly the union and keeps the journal — never in `<union>` — out of the commit.
+
+4. **Reconcile the work-commit against the union.** `git show --name-only --pretty= HEAD | sort` must equal the sorted union; reject any stray (in commit but not in union) or missing (in union but not in commit):
+
+   ```bash
+   git show --name-only --pretty= HEAD | sort > /tmp/work_commit_files.txt
+   # write the sorted union to /tmp/union_files.txt
+   diff /tmp/work_commit_files.txt /tmp/union_files.txt
+   ```
+
+5. **Remove the journal.** Once the work-commit lands and reconciles clean, remove the journal file (`rm .phase-group-journal.json`) — Lifecycle Step 3. After deletion there is no journal until the next deferred group starts.
+
+**Worked example (guard 2c — 3 sub-phases → ONE work-commit = exact union, journal excluded).** Group `A` with three green sub-phases whose journal `scope` arrays are `A.1 = [src/parser/tokens.py, tests/parser/test_tokens.py]`, `A.2 = [src/parser/ast.py, tests/parser/test_ast.py]`, `A.3 = [src/parser/eval.py, tests/parser/test_eval.py]`. The union is the six files concatenated:
+
+```bash
+git add -- src/parser/tokens.py tests/parser/test_tokens.py \
+           src/parser/ast.py tests/parser/test_ast.py \
+           src/parser/eval.py tests/parser/test_eval.py
+git commit -m "feat(parser): group A — tokens, ast, eval" -- \
+           src/parser/tokens.py tests/parser/test_tokens.py \
+           src/parser/ast.py tests/parser/test_ast.py \
+           src/parser/eval.py tests/parser/test_eval.py
+```
+
+These 3 sub-phases produce exactly ONE work-commit whose `--name-only` file list equals the exact union of all six files; the journal `.phase-group-journal.json` is excluded from the commit (it is never in the pathspec) and is removed afterward.
 
 ### Step G9c: Group Discovery Triage (v3.2.0+)
 
@@ -1252,6 +1354,8 @@ git add docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
 git commit -m "progress: Phase Group <letter> complete"
 ```
 
+Under `deferred_commit: auto` this plan.md progress commit is the **second, separate commit** of the group — it lands AFTER the Step G9b barrier work-commit, for a net of 2 commits per group (one work-commit covering the sub-phase union, then this progress commit). The barrier work-commit is NOT folded into G10: the pathspec here stays `plan.md` only, and the sub-phase code/test files belong to the G9b work-commit, never to this commit. (Under `deferred_commit: off` and for flat phases there is no G9b work-commit; G10 is the sole group commit.)
+
 Advance to next top-level unit in plan.md (another group, or a flat phase, or end-of-piece → Final Review).
 
 ## Auto-triage decision matrix (used by Step G6)
@@ -1265,24 +1369,26 @@ When Step G5 ends with any failed sub-phases, the orchestrator auto-triages each
 | Oracle defect — one file, one function, clear error | Test output names a single file + function; fix-code trial stays < 50 LOC | Dispatch fix-code targeting the implementation | 1 |
 | Oracle defect — multi-file or repeated-pattern failure | Multiple impl files implicated OR fix-code attempted 2× without progress during the original Build | Dispatch Refactor at sub-phase scope to restructure the approach | 1 |
 | Hook failure — lint/format/type-check | Pre-commit output names tool + rule; diff < 20 LOC | Inline autofix if ruff/mypy suggest a concrete patch; otherwise fix-code | 1 |
-| Contamination — implementer modified test files during Build (Mode: TDD) | Orchestrator's test-file diff check flagged modified tests | Reset sub-phase to `sub_phase_start_sha`; re-dispatch Build with explicit "do not modify tests" reminder | 1 |
-| Scope violation — Build touched files outside declared `**Scope:**` | `git diff --name-only` shows paths outside the sub-phase scope block | Reset sub-phase to `sub_phase_start_sha`; re-dispatch Build with explicit scope violation called out in the prompt | 1 |
+| Contamination — implementer modified test files during Build (Mode: TDD) | Orchestrator's test-file diff check flagged modified tests | File-scoped reset (SPLIT form — see recovery note below): `git restore --source=$group_start_sha --worktree -- <MODIFIED paths only>` (files that existed at `group_start_sha`) AND, separately, `rm -f -- <CREATED paths>` + `git rm --cached --ignore-unmatch -- <CREATED paths>` for files the sub-phase created. NEVER a single `git restore` over the mixed full scope. Then reset the sub-phase's journal entry to `status: pending` (clear stale `red_manifest_hashes`) and re-run the sub-phase from Red with the explicit "do not modify tests" reminder (re-inject the `Deferred Phase Group: yes` flag on this re-dispatch under `deferred_commit: auto` — see the G4 flag-injection rule), advancing the journal entry through `red-done`/`green` as the re-run progresses | 1 |
+| Scope violation — Build touched files outside declared `**Scope:**` | `git diff --name-only` shows paths outside the sub-phase scope block | File-scoped reset (SPLIT form — see recovery note below): `git restore --source=$group_start_sha --worktree -- <MODIFIED paths only>` (files that existed at `group_start_sha`) AND, separately, `rm -f -- <CREATED paths>` + `git rm --cached --ignore-unmatch -- <CREATED paths>` for files the sub-phase created. NEVER a single `git restore` over the mixed full scope. Then reset the sub-phase's journal entry to `status: pending` (clear stale `red_manifest_hashes`) and re-run the sub-phase from Red with the scope violation called out in the prompt (re-inject the `Deferred Phase Group: yes` flag on this re-dispatch under `deferred_commit: auto` — see the G4 flag-injection rule), advancing the journal entry through `red-done`/`green` as the re-run progresses | 1 |
 | QA-lite must-fix — plan misalignment or local defect | QA-lite `### must-fix` names file:line inside the sub-phase | Dispatch fix-code targeting the finding | 1 |
 | QA-lite must-fix — cross-sub-phase concern | QA-lite finding names files in another sub-phase | Escalate immediately — group decomposition is wrong | — |
 | BLOCKED — plan ambiguity | Agent returned BLOCKED with ambiguity reason | Escalate immediately | — |
 | BLOCKED — architecture conflict | Agent returned BLOCKED citing non-negotiable | Escalate immediately | — |
-| BLOCKED — pre-decision mismatch | LOC estimate or symbol-presence pre-decision contradicted by filesystem | Re-run Step 1b pre-flight for this sub-phase; re-dispatch with fresh pre-decisions | 1 |
+| BLOCKED — pre-decision mismatch | LOC estimate or symbol-presence pre-decision contradicted by filesystem | Re-run Step 1b pre-flight for this sub-phase; re-dispatch with fresh pre-decisions (under `deferred_commit: auto`, re-inject the `Deferred Phase Group: yes` flag on this re-dispatch — see the G4 flag-injection rule) | 1 |
 | All sub-phases in group failed | Pass 1 has zero successes | Escalate immediately — likely spec or plan problem | — |
 | Majority share a root cause | ≥50% of failures share a common error signature (same missing type, same fixture path issue) | Escalate immediately — group-level structural issue | — |
 
 Recovery actions for different sub-phases run in parallel when their scopes remain disjoint. Reset-and-re-dispatch (contamination, scope violation) runs serially with the sub-phase's re-dispatched Build.
 
+> **File-scoped recovery note (split form + re-entrancy + journal write-back).** The Contamination and Scope-violation rows above use the SPLIT recovery form from `reference/deferred-commit-journal.md` §File-scoped recovery recipe. This is mandatory, not stylistic: `git restore --source=<sha> --worktree -- <pathspec>` ABORTS the entire operation (restores nothing) if the pathspec includes a path that did not exist at `<sha>` — i.e. any file the sub-phase CREATED (a Red sub-phase almost always creates its test file). So the restore pathspec must be the **modified subset only** (paths that existed at `group_start_sha`); created files are removed separately. Recovery must be **re-entrant / idempotent** (a crash between the `rm` and the re-run must not hard-error on re-entry): use `rm -f -- <created paths>` and `git rm --cached --ignore-unmatch -- <created paths>`, never bare `rm` / `git rm --cached`. **Scope-path sanitization (defense for interpolated paths):** before using any journal `scope` entry in an `rm` / `git restore` pathspec, reject any entry that is empty, `.`, `/`, absolute, or contains a `..` segment. **Journal write-back (closes the recovery→resume loop):** before re-running, reset the recovering sub-phase's journal entry to `status: pending` and clear its stale `red_manifest_hashes`; then advance it through `red-done` (Red re-stages, new manifest recorded) → `green` (Build oracle passes) as the re-run progresses. Without this, the entry stays `failed`, and a later mid-group resume (Session Resumability) re-resets the now-good sub-phase and re-runs it — wasting work and clobbering any G7 refactor.
+
 ### Pass 2 — focused re-check on recovered sub-phases only
 
 After pass-1 recovery actions complete:
 
-1. Capture `pass1_end_sha` at the moment pass 2 begins (HEAD after recovery fixes landed).
-2. For each sub-phase that had a recovery action, dispatch QA-lite with `Input Mode: Focused re-review` and the fix delta (`git diff $pass1_end_sha..HEAD -- <sub-phase scope>`).
+1. Capture `pass1_end_sha` at the moment pass 2 begins (HEAD after recovery fixes landed). **Under `deferred_commit: auto`** there is no recovery commit (recovery re-dispatches Build git-free; nothing lands until the Step G9b barrier), so `pass1_end_sha` equals `group_start_sha` and the commit-range delta below is empty — see the working-tree fallback in step 2.
+2. For each sub-phase that had a recovery action, dispatch QA-lite with `Input Mode: Focused re-review` and the fix delta (`git diff $pass1_end_sha..HEAD -- <sub-phase scope>`). **Under `deferred_commit: auto`** there is no recovery commit, so the focused re-review delta is the **working-tree change over the sub-phase scope** — NOT a commit-range diff; compute it (scoped to the single sub-phase's scope) per `reference/deferred-commit-journal.md` §Working-tree enumeration over an untracked union (deferred_commit: auto), or pass the re-dispatched Build's reported file list verbatim.
 3. Successful sub-phases from pass 1 are NOT re-reviewed — they are locked in.
 4. Fix-code within pass 2 still respects the standard 2-attempt orchestrator circuit breaker per sub-phase.
 
@@ -1292,10 +1398,16 @@ After pass-1 recovery actions complete:
 
 ### What stays committed during failures
 
+**Under `deferred_commit: off` (legacy concurrent path — per-sub-phase commits exist):**
 - Successful sub-phases' commits stay live
 - Pass-1 recovery commits stay live (each runs hooks and passes before landing)
 - If the group ultimately escalates to human, the human inspects the worktree's partial state
-- `git reset $group_start_sha` cleanly rolls back the whole group if the human decides to abort
+
+**Under `deferred_commit: auto` (serial git-free — NO per-sub-phase or per-recovery commits exist until the Step G9b barrier):**
+- There are no sub-phase commits and no recovery commits to "stay live" — all sub-phase/recovery work is **uncommitted in the working tree** until the barrier work-commit lands. On abort, the working tree holds the partial state and the **journal** records per-sub-phase progress (`green` / `failed` / etc.), so a resume knows what to trust and what to recover (see Session Resumability + `reference/deferred-commit-journal.md` §Resume algorithm).
+- If the group escalates to human, the human inspects the worktree's partial state plus the journal.
+
+**Whole-group human-abort (both modes):** `git reset $group_start_sha` cleanly rolls back the whole group if the human decides to abort. This SHA-targeted `git reset` is used ONLY for a whole-group human-abort (tearing down the entire group); it is NEVER used for in-group sub-phase recovery — sub-phase recovery is always file-scoped, in the SPLIT form: `git restore --source=$group_start_sha --worktree -- <MODIFIED paths only>` for files that existed at the baseline, plus `rm -f -- <created paths>` + `git rm --cached --ignore-unmatch -- <created paths>` for files the sub-phase created (never a single `git restore` over the mixed full scope, which aborts on created paths) per the Contamination and Scope-violation rows above, so a recovered sub-phase never clobbers its green siblings' work.
 
 ### Escalation report format
 
@@ -1666,10 +1778,17 @@ Progress tracked via [x] checkboxes in plan.md:
 - Phase-start SHA is recovered on resume via `git rev-parse HEAD` — phases do not commit internally, so HEAD stays anchored at phase start until Step 7 runs. For phase 1, the phase-start SHA equals the HEAD when execute began (also the current HEAD on resume). Progress commits from prior phases advance HEAD, so each resumed phase still sees its own phase-start SHA at HEAD.
 - Mid-QA-iteration state (fix diffs from prior iterations) is NOT persisted. On resume inside a QA loop, restart at iteration 1 (full review) rather than reconstructing.
 - Pre-flight snapshot and pre-decisions are NOT persisted. On resume before Step 2 or 3, re-run Step 1b — it's cheap and ensures LOC/symbol facts aren't stale from earlier in the session.
+- **Mid-group resume (`deferred_commit: auto`).** When the interrupted phase is a deferred Phase Group, the deferred commits never landed, so HEAD alone cannot tell which sub-phases finished. Resume from the group journal instead, per `reference/deferred-commit-journal.md` §Resume algorithm:
+  - **Read the journal** for the active group (matched by `group_letter`) and take `group_start_sha` as the file-scoped recovery baseline.
+  - **No journal → fresh group start** (NN-C-005). This is not an error — it is the normal case for a group that never began. Proceed to Step G1 (write a fresh journal) and run the group from scratch.
+  - **Stale `group_letter` → treat as no-journal.** A journal whose on-disk `group_letter` does NOT equal the active group's letter is STALE (an orphan from a crash between the G9b barrier commit and the journal `rm`, or an aborted prior group). Do NOT resume from it: treat it as no-journal (fresh start per the bullet above), log the orphan (NN-C-006 passive surface, e.g. `NN-C-006: orphaned journal for group <on-disk letter> ignored; active group is <active letter>`), and overwrite it at Step G1. This preserves the single-fixed-filename safety: a resume only ever trusts a journal that matches the active group.
+  - **`green` sub-phases → trust after a hash re-check.** For each sub-phase with `status: green`, re-hash ONLY its Red test files (the keys of its `red_manifest_hashes`) against the stored digests. The production files in that sub-phase's `scope` are trusted by association and are NOT independently re-hashed — a matching Red-test hash is taken as proof the whole sub-phase is intact. On an exact match for every Red test file, trust the sub-phase as done: do not re-run it and do not touch its files. (A mismatch demotes it to incomplete — fall through to the next bullet.)
+  - **Incomplete sub-phases (`pending` / `red-done` / `failed`) → file-scoped reset, then re-run from Red.** Apply the FR-6 file-scoped recovery recipe to that sub-phase's recorded `scope` in the SPLIT form: `git restore --source=$group_start_sha --worktree -- <MODIFIED paths only>` to restore files that existed at the baseline, plus `rm -f -- <created paths>` + `git rm --cached --ignore-unmatch -- <created paths>` for files the sub-phase created (`git restore --source` does not remove created files, and aborts the whole operation if the pathspec includes a created path — so the restore pathspec is the modified subset only). The `-f` / `--ignore-unmatch` flags keep recovery re-entrant/idempotent across a crash-and-resume. The reset touches ONLY the incomplete sub-phase's recorded `scope` — sibling `green` sub-phases' files stay byte-identical — and the reset is logged (NN-C-006 passive surface). Re-inject the `Deferred Phase Group: yes` flag on this resume re-dispatch — see the G4 flag-injection rule — so the re-run stays git-free like the initial dispatch.
+  - **Sub-phases absent from the journal → not started.** A `<letter>.<n>` key missing from `sub_phases` was never dispatched; run it fresh, no recovery needed (its files were never written).
 
 ## Measurement
 
-At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), **Refactor skipped** (auto-skip predicate matched), **QA iteration count** (iter-1 / iter-2 / iter-3 mix per phase), **Step 6b outcome** (pass / autofix / fix-code dispatched), **mid_piece_opus_pass** (`dispatched` with iteration count / `not-triggered` / `escalated`), and **deferred_findings_recorded** (count of `Deferred to reflection:` stubs written to backlog across all QA iterations for this piece). Observable properties:
+At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), **Refactor skipped** (auto-skip predicate matched), **QA iteration count** (iter-1 / iter-2 / iter-3 mix per phase), **Step 6b outcome** (pass / autofix / fix-code dispatched), **mid_piece_opus_pass** (`dispatched` with iteration count / `not-triggered` / `escalated`), and **deferred_findings_recorded** (count of `Deferred to reflection:` stubs written to backlog across all QA iterations for this piece). For a deferred Phase Group (`deferred_commit: auto`), also emit the **Phase Group commit model** (`deferred` vs the legacy per-phase model), the **group wall-clock duration** (Red→Build→barrier across all sub-phases), and the **group commit count** (`2` under `deferred` — one barrier work-commit covering the group's Red∪Build union plus one separate plan.md progress commit — vs the `N+1` commits a flat / `deferred_commit: off` run of the same N sub-phases produces). Observable properties:
 
 1. Build token count is materially lower than a comparable-scope phase would have been without pre-flight digests and scoped QA prompts — pre-flight facts + pitfall checklist reduce agent rediscovery and self-iteration.
 2. Build tool-use count drops commensurately.

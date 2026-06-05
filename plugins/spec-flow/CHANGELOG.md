@@ -4,6 +4,14 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.0.0] — 2026-06-05
+
+### Changed
+- **BREAKING — deferred-commit is now the default Phase Group commit model (`deferred_commit: auto`):** Under the new default, a Phase Group runs **serial and git-free** (no per-sub-phase `git add`/`commit` while the group is executing, eliminating the shared-index races that concurrent per-sub-phase commits hit under parallel TDD). At the group barrier the orchestrator lands exactly **two commits**: (1) ONE barrier work-commit containing the union of Red's staged tests and Build's production code (Red∪Build), staged via an add-then-commit pathspec; and (2) a separate `plan.md` progress commit. This is **2 commits per group** versus the legacy **N+1** (one per sub-phase plus a progress commit). The Red-test anti-cheat is now a **working-tree-hash** check — Red's test files are re-hashed in the **working tree** against the journal manifest (not against HEAD), so tampering is caught before the barrier commit exists rather than after. Mid-group failures resume from a **journal**: journal-based mid-group resume plus file-scoped recovery restore the group's in-progress state without replaying completed sub-phases.
+
+### Migration
+- **Rollback knob — `deferred_commit: off` (one release only):** Set `deferred_commit: off` to restore the pre-5.0.0 behavior — **concurrent** Phase Group execution with **per-sub-phase commits** (the legacy N+1 commit model). This rollback is supported for **one release** to ease migration; plan to move to the `auto` default before the next major version, after which `off` is removed.
+
 ## [4.12.0] — 2026-06-03
 
 ### Added

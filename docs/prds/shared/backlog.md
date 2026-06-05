@@ -4,22 +4,6 @@ Capability-scoped deferred work for the shared-plugins PRD. Items here are surfa
 
 ---
 
-## Phase Group parallelism — empirical timing measurement
-
-**Status:** v3.1.0+ candidate (data-gathering, not blocking)
-**Type:** process-improvement
-**Captured:** 2026-04-25 (PI-008 reflection — future opportunity)
-
-### Problem
-
-PI-008 was first piece using Phase Groups (Group A: 5 parallel SKILL.md sub-phases; Group B: 4 parallel agent buckets). Plan has no explicit measurement of wall-clock savings vs. sequential baseline. Group A's Opus dispatch returned 529 Overloaded and fell back to Sonnet — a real-world data point that group-level QA dependency on Opus is a single point of failure, but no timing data to weigh against alternatives.
-
-### Proposed direction
-
-Lightweight telemetry: capture timing in `[Implement]` / `[Verify]` / `[QA]` steps in the next 2 pieces using Phase Groups; report findings here before deciding whether to systematize.
-
----
-
 ## Cross-PRD dependency orchestration (deferred to v4.0)
 
 **Status:** deferred to v4.x

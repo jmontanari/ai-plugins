@@ -269,6 +269,68 @@ pieces:
       Race-2 scoped-oracle change rides this piece or carves into its own.
     prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
     dependencies: [pi-014-integ-tests]
+    status: merged
+    merged_at: 2026-06-05
+
+  - name: pi-016-concurrency
+    slug: pi-016-concurrency
+    description: |
+      Re-enable SAFE concurrent Phase Group dispatch on top of the pi-015 deferred-commit foundation,
+      plus the Race-2 scoped oracle. pi-015 made the default serial + git-free + single deferred barrier
+      commit; pi-016 restores concurrency without reintroducing the shared-index race (Race-1, fixed by
+      the git-free section) and fixes Race-2 — the per-phase oracle invariant "0 failed across the suite"
+      spuriously failing when it sees a sibling sub-phase's still-red tests on the shared working tree —
+      by scoping each sub-phase's oracle to its own test IDs and restoring the whole-suite-green guarantee
+      at the barrier. Carved out of pi-015 (ADR-1 deferred concurrency to a follow-up). Likely minor bump.
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
+    dependencies: [pi-015-defer-commit]
+    status: open
+
+  - name: pi-017-anticheat-hash-object
+    slug: pi-017-anticheat-hash-object
+    description: |
+      Harden the deferred-commit working-tree-hash anti-cheat by anchoring Red-test manifests in git's
+      object database. At `red-done`, run `git hash-object -w` on each Red test file and store the
+      returned immutable blob SHA in the journal `red_manifest_hashes` (alongside/instead of the bare
+      sha256sum); at the G9b barrier verify the working-tree file hashes to the same git object — a digest
+      the Build agent cannot forge by editing the journal. Closes the "manifest self-asserted by the
+      policed actor" hole the pi-015 Final Review board flagged (Security CWE-345). Materially smaller than
+      full Tier-2 dangling-commit-tree machinery; should land before pi-016 widens the tamper window via
+      concurrency. Touches reference/deferred-commit-journal.md (schema), execute G4 write + G9b re-hash,
+      agents/tdd-red.md. Source: pi-015 reflection F1 (fix-as-found, not deferred).
+    prd_sections: [G-2, FR-004, NN-P-002]
+    dependencies: [pi-015-defer-commit]
+    status: open
+
+  - name: pi-018-review-process-hardening
+    slug: pi-018-review-process-hardening
+    description: |
+      Spec-flow review-process hardening surfaced by the pi-015 retrospective (every per-phase QA passed
+      clean, yet the end-of-piece board found ~6 cross-step wiring must-fix gaps). Three changes:
+      (P1) a mandatory whole-file coherence pass for single-file multi-phase pieces (≥3 phases all editing
+      one orchestration file), dispatched between the last such phase's QA and end-of-piece Final Review;
+      (P2) a plan-authoring requirement that a phase introducing a new conditional path through an existing
+      loop/state-machine enumerate EVERY pre-existing step the new path traverses or invalidates, not just
+      the steps it edits; (P3) a dispatch-site census — when a piece changes a cross-cutting agent-dispatch
+      contract, the plan must list every (re-)dispatch site of the affected agents. Touches execute + plan
+      skills (and qa-plan). Source: pi-015 reflection P1/P2/P3 (fix-as-found, not deferred).
+    prd_sections: [G-2, FR-004, NN-P-002]
+    dependencies: []
+    status: open
+
+  - name: pi-019-skill-coherence-linter
+    slug: pi-019-skill-coherence-linter
+    description: |
+      A structural coherence linter (bash + grep/awk, charter-tools-compliant — no runtime deps) over
+      skills/*/SKILL.md that mechanically asserts cross-step invariants: every `Step G<n>` referenced in
+      prose actually exists; every `deferred_commit: auto` branch has a paired `off` branch (and vice
+      versa); every journal/state field written in one step is read by the step that consumes it. Run as a
+      qa-plan gate or an execute self-check. Motivated by the recurring pattern that single-file
+      multi-phase orchestration pieces (pi-009/010/012/013/014/015) accrue cross-step wiring gaps a linter
+      would catch automatically. Complements pi-018's human-process gates with a tooling gate. Source:
+      pi-015 reflection F2 (fix-as-found, not deferred).
+    prd_sections: [G-2, FR-004]
+    dependencies: []
     status: open
 
 coverage:
