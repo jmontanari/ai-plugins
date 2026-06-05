@@ -34,13 +34,15 @@ pieces:
     description: Minimal CI job (or pre-commit hook) that enforces NN-C-001 across all plugins in the marketplace. Compares `plugin.json` version to the matching `marketplace.json` entry. Fails if any plugin drifts. Shell + `jq` only.
     prd_sections: [FR-001, NFR-003, NN-C-001]
     dependencies: [PI-001-marketplace-version-sync]
-    status: open
+    status: superseded
+    superseded_by: pi-022-version-sync-ci-and-retro
 
   - name: PI-003-charter-dogfood-lessons
     description: After using charter on a few real pieces of work (PI-001 and PI-002 themselves are good candidates), capture what worked and what didn't. Feed findings into spec-flow's improvement backlog — likely some are backlog items that land in a future spec-flow release.
     prd_sections: [G-4, NN-P-003, SC-003]
     dependencies: [PI-001-marketplace-version-sync, PI-002-version-sync-ci]
-    status: open
+    status: superseded
+    superseded_by: pi-022-version-sync-ci-and-retro
 
   - name: PI-004-second-plugin-pilot
     description: Pilot a second, intentionally-small plugin in this marketplace to validate that the extension mechanism generalizes and that plugin isolation (the no-cross-plugin-references rule from charter/architecture.md) holds up in practice. Candidate plugins are intentionally undecided — the point is to pick something small enough to ship without a full spec-flow cycle.
@@ -272,65 +274,62 @@ pieces:
     status: merged
     merged_at: 2026-06-05
 
-  - name: pi-016-concurrency
-    slug: pi-016-concurrency
+  - name: pi-020-deferred-commit-hardening
+    slug: pi-020-deferred-commit-hardening
     description: |
-      Re-enable SAFE concurrent Phase Group dispatch on top of the pi-015 deferred-commit foundation,
-      plus the Race-2 scoped oracle. pi-015 made the default serial + git-free + single deferred barrier
-      commit; pi-016 restores concurrency without reintroducing the shared-index race (Race-1, fixed by
-      the git-free section) and fixes Race-2 — the per-phase oracle invariant "0 failed across the suite"
-      spuriously failing when it sees a sibling sub-phase's still-red tests on the shared working tree —
-      by scoping each sub-phase's oracle to its own test IDs and restoring the whole-suite-green guarantee
-      at the barrier. Carved out of pi-015 (ADR-1 deferred concurrency to a follow-up). Likely minor bump.
+      Combines the two pi-015 deferred-commit follow-ons (supersedes pi-016 + pi-017) — same surface
+      (execute Phase Group Loop + reference/deferred-commit-journal.md + agent contracts), so one
+      codebase exploration and one review board cover both. Sequenced HARDENING-FIRST:
+      (1) Anti-cheat hash-object anchoring (was pi-017, reflection F1): at `red-done`, `git hash-object -w`
+      each Red test file and store the immutable git blob SHA in the journal `red_manifest_hashes`
+      (alongside/instead of the bare sha256sum); at the G9b barrier verify the working-tree file hashes
+      to the same git object — a digest the Build agent cannot forge by editing the journal. Closes the
+      "manifest self-asserted by the policed actor" hole the pi-015 Final Review board flagged (Security
+      CWE-345). MUST precede (2) because concurrency widens the tamper window.
+      (2) Safe concurrency re-enable + Race-2 scoped oracle (was pi-016, ADR-1 carve-out): restore
+      concurrent Phase Group dispatch on the git-free foundation without reintroducing the shared-index
+      race (Race-1, already removed); fix Race-2 (per-phase "0 failed across the suite" spuriously failing
+      on a sibling's still-red tests) by scoping each sub-phase oracle to its own test IDs + restoring the
+      whole-suite-green guarantee at the barrier; plus INV-9 lightweight runtime isolation (TMPDIR/port/DB
+      injection + parallel-safety contract + serial-replay-on-failure backstop → slower-never-wrong).
+      Runtime model validated by the pi-015 9-invariant harness (specs/pi-015-defer-commit/VALIDATION.md).
     prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
     dependencies: [pi-015-defer-commit]
     status: open
 
-  - name: pi-017-anticheat-hash-object
-    slug: pi-017-anticheat-hash-object
+  - name: pi-021-cross-step-coherence
+    slug: pi-021-cross-step-coherence
     description: |
-      Harden the deferred-commit working-tree-hash anti-cheat by anchoring Red-test manifests in git's
-      object database. At `red-done`, run `git hash-object -w` on each Red test file and store the
-      returned immutable blob SHA in the journal `red_manifest_hashes` (alongside/instead of the bare
-      sha256sum); at the G9b barrier verify the working-tree file hashes to the same git object — a digest
-      the Build agent cannot forge by editing the journal. Closes the "manifest self-asserted by the
-      policed actor" hole the pi-015 Final Review board flagged (Security CWE-345). Materially smaller than
-      full Tier-2 dangling-commit-tree machinery; should land before pi-016 widens the tamper window via
-      concurrency. Touches reference/deferred-commit-journal.md (schema), execute G4 write + G9b re-hash,
-      agents/tdd-red.md. Source: pi-015 reflection F1 (fix-as-found, not deferred).
-    prd_sections: [G-2, FR-004, NN-P-002]
-    dependencies: [pi-015-defer-commit]
-    status: open
-
-  - name: pi-018-review-process-hardening
-    slug: pi-018-review-process-hardening
-    description: |
-      Spec-flow review-process hardening surfaced by the pi-015 retrospective (every per-phase QA passed
-      clean, yet the end-of-piece board found ~6 cross-step wiring must-fix gaps). Three changes:
+      Combines the two pi-015 review-process follow-ons (supersedes pi-018 + pi-019) — same surface
+      (execute + plan + qa-plan skills), both targeting the cross-step wiring gaps pi-015 exposed (every
+      per-phase QA passed clean, yet the end-of-piece board found ~6 must-fix gaps). Human gates + a
+      tooling gate:
       (P1) a mandatory whole-file coherence pass for single-file multi-phase pieces (≥3 phases all editing
       one orchestration file), dispatched between the last such phase's QA and end-of-piece Final Review;
       (P2) a plan-authoring requirement that a phase introducing a new conditional path through an existing
-      loop/state-machine enumerate EVERY pre-existing step the new path traverses or invalidates, not just
-      the steps it edits; (P3) a dispatch-site census — when a piece changes a cross-cutting agent-dispatch
-      contract, the plan must list every (re-)dispatch site of the affected agents. Touches execute + plan
-      skills (and qa-plan). Source: pi-015 reflection P1/P2/P3 (fix-as-found, not deferred).
+      loop/state-machine enumerate EVERY pre-existing step the new path traverses/invalidates, not just the
+      steps it edits;
+      (P3) a dispatch-site census — when a piece changes a cross-cutting agent-dispatch contract, the plan
+      must list every (re-)dispatch site of the affected agents;
+      (LINT) a charter-tools-compliant structural linter (bash + grep/awk, no runtime deps) over
+      skills/*/SKILL.md asserting cross-step invariants — referenced `Step G<n>` exist, `auto`/`off` branch
+      parity, journal/state field producer↔consumer matching — run as a qa-plan gate / execute self-check
+      (the mechanized form of P1). Source: pi-015 reflection P1/P2/P3 + F2 (fix-as-found, not deferred).
     prd_sections: [G-2, FR-004, NN-P-002]
     dependencies: []
     status: open
 
-  - name: pi-019-skill-coherence-linter
-    slug: pi-019-skill-coherence-linter
+  - name: pi-022-version-sync-ci-and-retro
+    slug: pi-022-version-sync-ci-and-retro
     description: |
-      A structural coherence linter (bash + grep/awk, charter-tools-compliant — no runtime deps) over
-      skills/*/SKILL.md that mechanically asserts cross-step invariants: every `Step G<n>` referenced in
-      prose actually exists; every `deferred_commit: auto` branch has a paired `off` branch (and vice
-      versa); every journal/state field written in one step is read by the step that consumes it. Run as a
-      qa-plan gate or an execute self-check. Motivated by the recurring pattern that single-file
-      multi-phase orchestration pieces (pi-009/010/012/013/014/015) accrue cross-step wiring gaps a linter
-      would catch automatically. Complements pi-018's human-process gates with a tooling gate. Source:
-      pi-015 reflection F2 (fix-as-found, not deferred).
-    prd_sections: [G-2, FR-004]
-    dependencies: []
+      Combines PI-002 + PI-003 (PI-003 already depended on PI-002) — same marketplace-tooling surface.
+      (CI) a minimal CI job / pre-commit hook (shell + jq only) enforcing NN-C-001 across all marketplace
+      plugins: compare each plugin.json version to its matching marketplace.json entry, fail on drift.
+      (RETRO) after using charter on real pieces (PI-001/PI-002 themselves are candidates), capture what
+      worked / didn't with charter; actionable findings become tracked spec-flow improvements
+      (fix-as-found per the no-defer-in-ai-plugins policy, not backlog rot).
+    prd_sections: [FR-001, NFR-003, NN-C-001, G-4, NN-P-003, SC-003]
+    dependencies: [PI-001-marketplace-version-sync]
     status: open
 
 coverage:
