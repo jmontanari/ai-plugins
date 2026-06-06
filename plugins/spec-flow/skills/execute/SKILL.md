@@ -23,16 +23,24 @@ If the active model name does **not** contain `sonnet` (case-insensitive):
 
 1. Use `ask_user` to block and prompt the user:
 
-   > ⚠️ **Model mismatch.** Execute requires a Sonnet-class model for reliable multi-agent orchestration, but the active model appears to be **[model-name]**. Please switch to a Claude Sonnet model before continuing.
+   > ⚠️ **Model mismatch.** Execute is tuned for a Sonnet-class model for reliable multi-agent orchestration, but the active model appears to be **[model-name]**.
 
    Choices:
-   - "I've switched to Sonnet — continue"
+   - "Override — proceed on [model-name]"
+   - "Change now — I'll switch models"
    - "Cancel execute"
 
 2. If the user selects **"Cancel execute"** → stop immediately and emit:
    `Execute cancelled. Re-run after switching to a Claude Sonnet model.`
 
-3. If the user selects **"I've switched to Sonnet — continue"** → proceed to Step 0.
+3. If the user selects **"Override — proceed on [model-name]"** → proceed to Step 0 immediately on the current model. Emit a one-line acknowledgment first:
+   `Overriding model check — proceeding on [model-name]. Orchestration reliability may be reduced.`
+
+4. If the user selects **"Change now — I'll switch models"** → **close the prompt and return control to the user.** The model cannot be switched while an `ask_user` prompt is blocking, and there is no programmatic model-change event to listen for — so leave the dialog and wait for the user to signal. Emit:
+   `Switch to a Claude Sonnet model now. When ready, type "proceed" to resume, or "cancel" to stop.`
+   Then wait for the user's free-text reply:
+   - On `proceed` (or any "I've switched / continue" phrasing) → re-run this model check (re-introspect your model identity on Claude Code, or re-read the `<model_information>` tag on Copilot CLI). If the model now contains `sonnet`, proceed to Step 0. If it still does not, re-present the three choices above.
+   - On `cancel` → stop and emit the cancellation line from step 2.
 
 If the model already contains `sonnet` → proceed to Step 0 immediately with no prompt.
 

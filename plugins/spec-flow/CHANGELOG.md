@@ -4,6 +4,11 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.2.1] — 2026-06-06
+
+### Changed
+- **Execute pre-flight model check — Override / Change now / Cancel:** when the active model is not Sonnet-class, the mismatch prompt now offers three choices. **Override** proceeds immediately on the current model with a reduced-reliability acknowledgment; **Change now** closes the (modal) `ask_user` dialog and returns control so the user can switch models, then resumes on a free-text `proceed` signal and re-runs the check (no programmatic model-change event exists to listen for); **Cancel** is unchanged. Replaces the prior two-choice "I've switched / Cancel" prompt.
+
 ## [5.2.0] — 2026-06-05
 
 ### Changed
