@@ -1,0 +1,110 @@
+schema_version: 1
+generated: 2026-06-06
+last_updated: 2026-06-06
+prd_source: "docs/prds/exec-loop/prd.md"
+
+feature_branch: null
+merge_target: master
+pr_required: true
+
+pieces:
+  - name: research-artifact
+    slug: research-artifact
+    description: |
+      New research sub-agent (agents/researcher.md) that runs in a fresh context before
+      spec brainstorm, reads relevant codebase files, charter rules, backlog items, and
+      past learnings, then returns a schema-bounded brief (≤2K tokens) to main context.
+      Output is committed as research.md at docs/prds/<prd>/specs/<piece>/research.md
+      before the first spec Q&A question. Covers artifact production only (FR-001, NFR-001,
+      NFR-002). New template: templates/research.md. Spec skill gains the research dispatch
+      call and the [RESEARCH-UNAVAILABLE] fallback path.
+    prd_sections: [FR-001, NFR-001, NFR-002, G-1]
+    dependencies: []
+    status: open
+
+  - name: research-consume
+    slug: research-consume
+    description: |
+      Spec and plan skill updates to consume research.md. Spec skill reads research.md at
+      brainstorm start and presents proposed answers from research findings before asking
+      each question ("Based on [finding], I propose [answer] — confirm or correct?"). Plan
+      skill checks for research.md at plan start; if present and non-empty, emits
+      [RESEARCH-CONSUMED: N files] and skips file-discovery sweep; if absent, emits
+      [RESEARCH-ABSENT: running full exploration] and runs sweep normally. Staleness check
+      (>7 days): plan emits notice and supplements with current exploration. Covers FR-002,
+      FR-003.
+    prd_sections: [FR-002, FR-003, G-1]
+    dependencies: [research-artifact]
+    status: open
+
+  - name: exec-self-resolve
+    slug: exec-self-resolve
+    description: |
+      Execute ambiguity self-resolution. When the implementer encounters a case not covered
+      by the spec, it dispatches a mini research step (reads spec, charter, research.md,
+      related existing code) before escalating. Documents autonomous decisions in decisions.md
+      (new artifact at docs/prds/<prd>/specs/<piece>/decisions.md) with: what was ambiguous,
+      what was found, what was decided, why. Escalates only for direct spec contradictions or
+      genuinely undecidable cases after research. Final Review gate gains a decisions.md review
+      prompt before merge (NFR-004). Covers FR-004, NFR-004, NN-P-002, G-2.
+    prd_sections: [FR-004, NFR-004, G-2]
+    dependencies: [research-artifact]
+    status: open
+
+  - name: ctx-discipline
+    slug: ctx-discipline
+    description: |
+      Sonnet-optimized orchestrator context discipline. Adds reference/context-discipline.md
+      documenting budget rules and context-safe tools. Skills updated to emit [CTX-LOAD:
+      <filename> <kb>] for each file read into main context; files >10KB trigger [CTX-OVERSIZED]
+      and route to a summarizing sub-agent. All sub-agent return values schema-bounded to ≤2K
+      tokens. Configurable token budget via .spec-flow.yaml key `ctx_budget` (default 80K).
+      [CONTEXT-BUDGET-WARNING] emitted when main context approaches the limit. Covers FR-006,
+      NFR-003 (backward compat: new behavior additive, existing invocations unchanged), G-5.
+    prd_sections: [FR-006, NFR-003, G-5]
+    dependencies: [exec-self-resolve]
+    status: open
+
+  - name: exec-loop
+    slug: exec-loop
+    description: |
+      Execute loop driver. Canonical loop prompt at docs/exec-loop/loop-driver.md. On each
+      iteration: reads manifest fresh from disk, selects highest-priority piece with
+      status=planned and all deps merged/done, invokes /spec-flow:execute, records one-line
+      result, schedules next wakeup via ScheduleWakeup. Execute output summarized to ≤200
+      tokens before storing in main context. On BLOCKED piece: logs failure to loop-run.log,
+      skips piece, continues. Stops cleanly when no executable work remains. Re-entrant:
+      interrupted session re-reads manifest from current state. decisions.md review prompt
+      included in the loop's post-execute gate before advancing to next piece. Covers FR-005,
+      NN-P-003, G-3.
+    prd_sections: [FR-005, G-3]
+    dependencies: [exec-self-resolve, ctx-discipline]
+    status: open
+
+  - name: learn-flywheel
+    slug: learn-flywheel
+    description: |
+      Learning flywheel. Post-execute step added to execute's reflection phase. Scans all
+      learnings.md files for the current PRD, clusters semantically similar findings, proposes
+      charter amendments (draft NN-C entries) for project-level findings appearing in ≥2 pieces,
+      and proposes spec-flow shared manifest pieces for pipeline process gaps. Operator reviews
+      all proposals in one batched session. Approved charter amendments committed to
+      .claude/skills/charter-non-negotiables/SKILL.md. Approved spec-flow pieces appended to
+      docs/prds/shared/manifest.yaml. Rejected proposals recorded in exec-loop backlog.md.
+      Non-blocking: execute result unaffected if step fails. Configurable threshold via
+      .spec-flow.yaml key `flywheel_threshold` (default 2). Covers FR-007, NN-P-004, G-4.
+    prd_sections: [FR-007, G-4]
+    dependencies: [exec-loop]
+    status: open
+
+coverage:
+  total_prd_sections: 10
+  covered_sections: 10
+  uncovered_sections: []
+  percentage: 100
+  notes: |
+    All FRs, NFRs, and Goals covered across 6 pieces. Piece splits applied per qa-prd
+    findings: research-phase split into research-artifact (FR-001) + research-consume
+    (FR-002/003); exec-loop split into ctx-discipline (FR-006) + exec-loop (FR-005).
+    NFR-003 backward-compat covered in ctx-discipline (additive changes). NN-Ps enforced
+    via spec/plan QA gates and review-board spec-compliance reviewer.
