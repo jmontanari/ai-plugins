@@ -11,7 +11,7 @@ These are the PRD's Open Questions; resolve each during the relevant piece's spe
 
 - **Plugin-registry path** — `~/.claude/spec-flow/patterns.yaml` is the proposal; confirm path and update-stability (must survive plugin reinstall, must not collide) during `flywheel` spec.
 - **Pattern occurrence granularity** — one occurrence per piece where the pattern appeared, or one per reflection finding? Resolve during `flywheel` spec.
-- **`.spec-flow.yaml` keys** — finalize `flywheel_threshold`, `circuit_breaker.docs`, and `model_policy` shape during `sonnet-coord` / `flywheel` specs.
+- **`.spec-flow.yaml` keys** — finalize `flywheel_threshold` shape during `flywheel` spec. (`model_policy` and the doc-as-code circuit-breaker were resolved in the `sonnet-coord` spec, 2026-06-07: `model_policy: auto|off`; `qa_max_iterations: auto` = 5 doc-as-code / 3 TDD.)
 
 ---
 

@@ -4,6 +4,19 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.6.0] — 2026-06-07
+
+### Added
+- **`model_policy` config key (auto|off):** execute reads `model_policy` from `.spec-flow.yaml` at Step 0. Under `auto` (the default), after the Sonnet-class pre-flight check passes, the coordinator emits a per-stage model-assignment report from the canonical table in `reference/coordinator-contract.md` `## Model Policy`, flagging only the two sanctioned exceptions (spike phase → Opus; operator override → Opus). Under `off`, the report is skipped and only the legacy Pre-flight Model Check prompt runs (backward-compatible).
+- **`qa_max_iterations` config key (auto|`<int>`):** execute reads `qa_max_iterations` from `.spec-flow.yaml` at Step 0 and resolves `auto` from the plan front-matter `tdd:` field (`tdd: false` → 5 for doc-as-code, `tdd: true` → 3 for TDD). The resolved integer `L` governs the circuit-breaker limit for all five QA-agent fix-loops (per-phase qa-phase, mid-piece Opus pass, Group QA-lite, Group Deep QA, Final Review fix-up); absent key behaves as `auto`. The oracle 2-attempt budget and the mechanical SKILL self-lint loop are explicitly excluded.
+- **`reference/coordinator-contract.md`:** new canonical reference doc holding three execute-wide contracts — (1) model policy dispatch table (stage → model, with sanctioned exceptions); (2) coordinator return discipline (bounded-summary rule + dispatch audit table); (3) resume-critical field-tier table (tier-1 escalate, tier-2 recompute, tier-3 valid absence) with "group in flight" predicate and worked STATE-INCOMPLETE trace.
+- **`[STATE-INCOMPLETE: <field>]` resume escalation:** mid-group resume now classifies missing/corrupt journal by the "in-flight" predicate — group in flight + no journal → emit `[STATE-INCOMPLETE: journal]` and escalate (tier-1); group not in flight + no journal → fresh start as before (tier-3 valid absence). The Escalation Rules section gains a `[STATE-INCOMPLETE: <field>]` bullet citing the coordinator-contract field-tier table.
+- **Coordinator return-discipline section + audit table:** `## The Orchestrator Role` gains a `### Coordinator Return Discipline` subsection citing `coordinator-contract.md` and an audit table classifying every in-execute dispatch by return shape (all current dispatches are bounded-summary compliant).
+
+### Changed
+- **QA circuit-breaker parameterized across all five sites:** the previously hard-coded 3-iteration limit at the per-phase, mid-piece, Group QA-lite, Group Deep QA, and Final Review breaker sites in `execute/SKILL.md` now reads `qa_max_iterations` (`L`). The pi-011 doc-as-code default (`L` = 5) is now the out-of-the-box behavior for `tdd: false` pieces; TDD pieces retain `L` = 3. `reference/qa-iteration-loop.md` is updated to use the parameterized `qa_max_iterations` variable in all four limit statements (Purpose, Iteration Numbering, Iteration Termination, Migration note).
+- **Mid-group resume refined (in-flight predicate):** the "No journal → fresh group start" bullet is qualified — it now applies only when no group is in flight (tier-3 valid absence). The new tier-1 bullet (see Added above) precedes it and handles the in-flight case.
+
 ## [5.5.0] — 2026-06-07
 
 ### Added

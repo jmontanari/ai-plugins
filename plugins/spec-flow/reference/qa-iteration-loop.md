@@ -4,7 +4,7 @@ This document specifies the iter-until-clean pattern that every QA gate in spec-
 
 ## Purpose
 
-Every QA gate in the pipeline iterates until the reviewing agent returns must-fix=None. The 3-iter circuit breaker is the escalation guard — it fires when iteration 3 still has must-fix findings and the orchestrator cannot resolve them automatically. The circuit breaker is NOT a normal stopping condition; it escalates to the human rather than auto-advancing. A gate that finishes in 2 iterations did not "succeed at iter-2" — it succeeded when must-fix became None, which happened to occur at iter-2.
+Every QA gate in the pipeline iterates until the reviewing agent returns must-fix=None. The circuit breaker is the escalation guard — its limit is `qa_max_iterations` from `.spec-flow.yaml` (default 3; `auto` resolves to 5 for doc-as-code/`tdd: false` pieces and 3 for TDD/`tdd: true` pieces). It fires when iteration `qa_max_iterations` still has must-fix findings and the orchestrator cannot resolve them automatically. The circuit breaker is NOT a normal stopping condition; it escalates to the human rather than auto-advancing. A gate that finishes in 2 iterations did not "succeed at iter-2" — it succeeded when must-fix became None, which happened to occur at iter-2.
 
 ## Iteration numbering
 
@@ -12,7 +12,7 @@ Every QA gate in the pipeline iterates until the reviewing agent returns must-fi
 - Between iter-N and iter-(N+1), the orchestrator performs one fix-doc dispatch (for spec/plan/charter QA gates — the artifact is a document) or one fix-code dispatch (for `/spec-flow:execute` per-phase QA / Step 6, group QA / Step G8, mid-piece QA / Step 0a, and Final Review fix-up / Step 3). This is the fix-doc dispatch or fix-code dispatch that resolves findings before the focused re-review at iter-N+1.
 - The fix agent does NOT commit; it returns a `## Diff of changes` section. The orchestrator applies the diff and commits before the next QA iteration.
 - After the fix is committed, the orchestrator re-dispatches the QA agent with `Input Mode: Focused re-review` (iter-N+1). This focused re-review receives the prior iteration's must-fix findings and the fix diff — not the full artifact.
-- The **3-iter circuit breaker** fires when iter-3 returns ≥ 1 must-fix finding. At that point the orchestrator escalates to the human with the iter-3 must-fix list intact and does NOT dispatch iter-4.
+- The **circuit breaker** fires when iter-`L` returns ≥ 1 must-fix finding, where `L = qa_max_iterations` (default 3; `auto` → 5 for `tdd: false`, 3 for `tdd: true`). At that point the orchestrator escalates to the human with the iter-`L` must-fix list intact and does NOT dispatch iter-`L+1`.
 
 ## Input modes
 
@@ -23,7 +23,7 @@ Every QA gate in the pipeline iterates until the reviewing agent returns must-fi
 ## Iteration termination
 
 - **must-fix=None terminates the loop.** The orchestrator proceeds to the next pipeline stage. A gate terminates cleanly regardless of which iteration number produced the clean result.
-- **Circuit-breaker termination escalates to human.** When iter-3 returns ≥ 1 must-fix finding, the orchestrator surfaces the iter-3 must-fix list to the human and halts. The only forward paths are: (a) the human amends the artifact directly and re-runs the QA gate from iter-1, or (b) the human overrides the finding as out-of-scope with an explicit rationale.
+- **Circuit-breaker termination escalates to human.** When iter-`L` (`L = qa_max_iterations`, default 3) returns ≥ 1 must-fix finding, the orchestrator surfaces the iter-`L` must-fix list to the human and halts. The only forward paths are: (a) the human amends the artifact directly and re-runs the QA gate from iter-1, or (b) the human overrides the finding as out-of-scope with an explicit rationale.
 - **Fix-agent "no diff" escalation.** If the fix agent returns `Diff of changes: (none)` (all findings were blocked or unaddressable), the orchestrator escalates immediately — no point dispatching another QA iteration against an unchanged artifact.
 
 ## Where this pattern is invoked
@@ -37,7 +37,7 @@ Every QA gate in the pipeline iterates until the reviewing agent returns must-fi
 
 In v3.0.x, the `qa_iter2` config key in `.spec-flow.yaml` controlled whether the orchestrator skipped iter-2 re-dispatch after a fix-code commit. In `auto` mode (the default), the orchestrator skipped the iter-2 re-dispatch when the fix diff was small AND the fix-code agent self-verified all findings resolved AND the oracle was green.
 
-v3.1.0 retires this skip. The iter-until-clean pattern is now the default for all QA gates — every must-fix finding routes to a fix agent and then back to the QA reviewer, regardless of diff size or self-verification. The 3-iter circuit breaker provides the only automatic exit short of must-fix=None.
+v3.1.0 retires this skip. The iter-until-clean pattern is now the default for all QA gates — every must-fix finding routes to a fix agent and then back to the QA reviewer, regardless of diff size or self-verification. The circuit breaker (`qa_max_iterations`, default 3; configurable since v5.6.0) provides the only automatic exit short of must-fix=None.
 
 The `qa_iter2` config key is retained in `plugins/spec-flow/templates/pipeline-config.yaml` (and is valid in user `.spec-flow.yaml` files) for backwards-compatibility: existing user configs that set `qa_iter2: auto` or `qa_iter2: always` continue to parse without error or warning. The orchestrator-side logic that read and acted on this key is removed; the key is silently ignored on read.
 

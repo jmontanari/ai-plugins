@@ -65,7 +65,7 @@ pieces:
       first touched. Covers FR-004, NFR-002, NFR-003, NFR-004.
     prd_sections: [FR-004, NFR-002, NFR-003, NFR-004, G-3, G-4]
     dependencies: [plan-concrete]
-    status: open
+    status: merged
 
   - name: spike-agent
     slug: spike-agent

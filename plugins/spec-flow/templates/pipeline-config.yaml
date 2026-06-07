@@ -52,6 +52,23 @@ phase_groups: auto
 #          (rollback for one release; see CHANGELOG 5.0.0 migration note)
 deferred_commit: auto
 
+# model_policy: controls the execute per-stage model report (new in v5.6.0)
+#   auto — coordinator reports the per-stage model assignment at execute start and flags only
+#          the two sanctioned exceptions (spike phase / operator override); see
+#          plugins/spec-flow/reference/coordinator-contract.md (default)
+#   off  — run only the legacy Pre-flight Model Check prompt; emit no per-stage report
+model_policy: auto
+
+# qa_max_iterations: configurable QA fix-loop circuit-breaker limit (new in v5.6.0)
+#   auto  — resolve per piece track: 5 for doc-as-code/Implement pieces (tdd: false),
+#           3 for TDD pieces (tdd: true). Codifies the pi-011 finding that a hard 3 is
+#           wrong for doc-as-code Final Review (default)
+#   <int> — explicit cap applied uniformly to all five QA-agent fix-loops
+#   Governs: Final Review fix loop, per-phase qa-phase, mid-piece Opus pass, Group Deep QA,
+#   qa-phase-lite. Does NOT govern the oracle 2-attempt build budget or the mechanical
+#   SKILL self-lint loop.
+qa_max_iterations: auto
+
 # default_branch: the base branch for `git diff <base>..HEAD` in Final Review (new in v5.2.0)
 #   <unset> — auto-detect: git symbolic-ref refs/remotes/origin/HEAD, then git remote show origin (default)
 #   <name>  — explicit override (e.g. master, trunk) when auto-detect cannot resolve

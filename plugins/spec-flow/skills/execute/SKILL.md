@@ -44,6 +44,12 @@ If the active model name does **not** contain `sonnet` (case-insensitive):
 
 If the model already contains `sonnet` → proceed to Step 0 immediately with no prompt.
 
+### Per-stage model policy report
+
+When `model_policy: auto` (the default), after the Sonnet-class check passes, emit a per-stage model-assignment report from the table in `plugins/spec-flow/reference/coordinator-contract.md` `## Model Policy`. The report lists each in-execute stage → its model and **flags only the two sanctioned exceptions** (spike phase → Opus; operator override → Opus). It never upgrades a non-`[SPIKE]` stage to Opus (NN-P-005).
+
+When `model_policy: off`, skip the report entirely — only the Pre-flight Model Check prompt above runs (legacy behavior).
+
 **Why Sonnet.** Execute orchestrates multi-agent, multi-phase work: it builds task lists, manages QA gates, routes discoveries, tracks SHA-256 manifests, and dispatches up to 9 review-board agents in sequence (8 standard; 9 in fast mode). Opus adds latency and cost with no orchestration benefit (Opus is dispatched by sub-agents when deep review is warranted). Haiku or mini-class models lack the reasoning capacity to reliably evaluate agent reports, parse AC matrices, and route findings through the Step 6c discovery tree.
 
 ## Step 0: Load Config
@@ -122,6 +128,25 @@ You (the main window) are a PURE CONDUCTOR. You:
 - Track progress via BOTH plan.md checkboxes AND a harness task list (`TaskCreate` once at start, `TaskUpdate` per phase) — see "Pre-Loop: Build Task List" below. Both are required; neither alone is sufficient.
 
 You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git grep`, reading `.pre-commit-config.yaml`) are explicitly part of the conductor role — they are cheap reads that collapse 5–15 agent tool calls per dispatch. Synthesis and code-writing still come from subagents.
+
+### Coordinator Return Discipline
+
+To stay lean over long pieces (G-4), the coordinator consumes **bounded, structured** agent returns. Every agent return to the coordinator MUST be a bounded summary; raw artifacts — full diffs, full test output, file bodies — live on disk or git and are referenced by path, never pasted into the coordinator's context. See `plugins/spec-flow/reference/coordinator-contract.md` `## Coordinator Return Discipline`.
+
+| Dispatch | Return shape today | Compliant? |
+|----------|--------------------|-----------|
+| research (pre-spec) | ≤2K structured digest; richer artifact on disk | ✓ |
+| tdd-red | staged-test manifest (paths + SHA) + summary | ✓ |
+| qa-tdd-red | theater-pattern verdict list | ✓ |
+| implementer | unified-commit SHA + AC matrix + deviations summary | ✓ |
+| verify | pass/fail + AC coverage summary | ✓ |
+| refactor | changed-files summary | ✓ |
+| qa-phase / qa-phase-lite / mid-piece | must-fix/should-fix finding list | ✓ |
+| fix-code | `## Diff of changes` (bounded diff the orchestrator applies) | ✓ |
+| review-board (×8–9) | per-reviewer finding list by severity | ✓ |
+| reflection (×2) | findings appended to backlog file; short summary returned | ✓ |
+
+Any dispatch that instructs an agent to paste a raw full diff, full test output, or a file body into its return is a defect — convert it to a bounded summary + on-disk reference. (Audit on authoring: all current dispatches return bounded summaries.)
 
 ## Pre-Loop: Mark Piece as In-Progress
 
@@ -240,6 +265,10 @@ Read the `deferred_commit` key from `.spec-flow.yaml` in the SAME pass (valid va
 
 `deferred_commit` only governs how a recognized Phase Group is executed; whether a unit is recognized as a Phase Group at all is governed by `phase_groups` above.
 
+Read the `model_policy` key from `.spec-flow.yaml` in the SAME pass (valid values: `auto`, `off`; default `auto` when absent/unset — NN-C-003 backward-compat). A malformed value emits a one-line warning and falls back to `auto`. Hold it in orchestrator state for the Pre-flight report branch (see `### Per-stage model policy report` above).
+
+Read the `qa_max_iterations` key from `.spec-flow.yaml` in the SAME pass (valid values: `auto`, or a positive integer; default `auto` when absent/unset — NN-C-003; malformed → one-line warning + `auto`). Resolve `auto` from the plan front-matter `tdd:` field: `tdd: false` → 5, `tdd: true` → 3. If the `tdd:` key is absent from the plan front-matter (pre-front-matter plans), treat it as `tdd: true` → `L = 3` (TDD assumed by default, consistent with Step 1b doctrine; emit no warning). Hold the resolved integer `L` in orchestrator state; all five QA-agent fix-loops use `L` as their circuit-breaker limit. This does NOT govern the oracle 2-attempt build budget or the mechanical SKILL self-lint loop.
+
 Scope validation before dispatching any sub-phases in a group: parse each sub-phase's `**Scope:**` declaration (literal file paths only, no globs) and check for pairwise overlap. If two sibling sub-phases declare overlapping files, fall back to serial execution for that group (each sub-phase runs as a flat phase in declaration order) and log a warning naming the overlap.
 
 ## Pre-Loop: Build Task List
@@ -317,7 +346,7 @@ If the trigger does NOT fire, set `mid_piece_opus_pass: not-triggered` for this 
    - Dispatch `fix-code` (Sonnet) with the findings and plan context. The fix agent does NOT commit; it ends with `## Diff of changes`.
    - Commit the fix diff: `git add -- <files>; git commit -m "fix: mid-piece QA iter M"`. Hooks run normally.
    - Re-dispatch `qa-phase.md` with `Input Mode: Focused re-review`, the prior must-fix findings, and the fix diff.
-   - **Circuit breaker:** 3 iterations maximum. On third circuit-breaker hit, surface to human and do NOT auto-resume.
+   - **Circuit breaker:** `qa_max_iterations` (`L`) iterations maximum. On the `L`-th circuit-breaker hit, surface to human and do NOT auto-resume.
 
 4. On clean (must-fix = None): append a marker commit to record the dispatch (enables the resume guard above):
    ```bash
@@ -791,7 +820,7 @@ Worked examples:
 
 Record the decision (`opus_dispatched: true|false (reason)`) for the session summary and for Step 0a's mid-piece trigger evaluation.
 
-Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 3-iter circuit breaker).
+Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; `qa_max_iterations`-limited circuit breaker).
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-phase.md`
 
@@ -843,7 +872,7 @@ Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 
 
    - **Re-dispatch:** QA agent (fresh, Opus) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `iter_M_fix_diff`. No full phase diff, no spec/plan re-sent unless referenced in findings. The agent template's iter-2 rules hard-cap out-of-scope reads (return BLOCKED rather than fetching).
    - **Widened-window rule:** Before dispatching, count the number of times each file:location (file path + hunk context line) appears in the cumulative piece diff (`git diff $piece_start_sha..HEAD -- <phase-scope-files>`). If any file:location has been revised ≥2 times within this piece, add a `Widened context: ±10 lines` directive to the focused re-review dispatch — the QA agent must expand its review window to ±10 lines around each changed line in that location rather than the default narrower context used for first-time focused re-review.
-   - **Circuit breaker:** 3 iterations max, then escalate.
+   - **Circuit breaker:** `qa_max_iterations` (`L`) iterations max, then escalate.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate — no point re-running QA.
 
 ### Step 6a: Deferred-finding tracking (FR-10)
@@ -1227,7 +1256,7 @@ Per-sub-phase internal flow — each sub-phase runs the same checks as the Per-P
 - Red step (Step 2) — stages tests (sub-phase-scoped), emits its own `phase_N_red_stage_manifest` keyed by sub-phase id
 - Build step (Step 3) with Step 3 item 7 AC matrix validation gate + item 8 post-commit integrity + reconciliation gates
 - Verify step (Step 4) with Audit/Full mode selection
-- QA-lite step — **fast mode skip:** if `orchestrator_fast_mode: true`, skip the `qa-phase-lite` dispatch for this sub-phase. Proceed to the next sub-phase pipeline step. Otherwise: dispatch `qa-phase-lite.md`, Sonnet. Iter-until-clean per `plugins/spec-flow/reference/qa-iteration-loop.md` — full review on iter-1, focused re-review on iter-2+, 3-iter circuit breaker.
+- QA-lite step — **fast mode skip:** if `orchestrator_fast_mode: true`, skip the `qa-phase-lite` dispatch for this sub-phase. Proceed to the next sub-phase pipeline step. Otherwise: dispatch `qa-phase-lite.md`, Sonnet. Iter-until-clean per `plugins/spec-flow/reference/qa-iteration-loop.md` — full review on iter-1, focused re-review on iter-2+, `qa_max_iterations`-limited circuit breaker (per qa-iteration-loop.md).
 - Sub-phase Progress is implicit (no separate progress commit per sub-phase — the group progress commit covers all)
 
 **Shared staging area safety — `deferred_commit: off` only (v2.7.0).** This paragraph describes the legacy concurrent shared-index path and applies only under `deferred_commit: off`. Parallel sub-phases share the same git index, but scope disjointness is enforced at Step G2 (pairwise literal-path check) and literal-path staging discipline in Rule 6 (tdd-red) + Rule 8 (implementer) means each sub-phase's `git add` + `git commit` references only its own paths. A sibling sub-phase's staged-but-uncommitted tests remain in the index but are NOT swept into another sub-phase's unified commit because the implementer commits by literal path. The orchestrator's Step 3.7b reconciliation (commit file list = sub-phase's Red manifest ∪ sub-phase's Build reported files) catches any cross-contamination.
@@ -1275,7 +1304,7 @@ Dispatch the `qa-phase.md` agent at Opus tier. Compose the prompt using the exis
 - `## Phase ACs` — union of all sub-phase ACs
 - `## Non-negotiables` — unchanged
 
-If Group Deep QA returns must-fix: run the iter-until-clean loop per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; 3-iter circuit breaker), dispatching fix-code agents for findings. Each fix-code dispatch operates on the specific sub-phase scope the finding points to.
+If Group Deep QA returns must-fix: run the iter-until-clean loop per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; `qa_max_iterations`-limited circuit breaker), dispatching fix-code agents for findings. Each fix-code dispatch operates on the specific sub-phase scope the finding points to.
 
 ### Step G9: Step 6b hook sweep over the group diff
 
@@ -1577,7 +1606,7 @@ If must-fix findings exist:
   Hooks run normally. If a hook fails, re-dispatch the fix agent with the hook output appended; don't bypass.
 - Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 7-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth, integration) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 8 standard agents. Note: the 9th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
 - Re-triage the new findings (still deduplicate across reviewers).
-- **Circuit breaker:** 3 full review cycles maximum.
+- **Circuit breaker:** `qa_max_iterations` (`L`) full review cycles maximum (`L` = the piece-wide resolved value from Step 0; `auto` resolves to 5 for `tdd: false` pieces and 3 for `tdd: true` pieces).
 - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
 ### Post-CHANGELOG fix re-verification (AC-16 — pi-014 rationale)
@@ -1815,7 +1844,8 @@ After the PR merges, run these cleanup commands:
 ## Escalation Rules
 
 - Agent reports BLOCKED → escalate to human
-- 3+ QA loops on same finding → escalate (architectural issue)
+- `qa_max_iterations`+ QA loops on same finding → escalate (architectural issue)
+- Resume-critical state missing/corrupt when expected-present (tier-1 per `reference/coordinator-contract.md`) → emit `[STATE-INCOMPLETE: <field>]` and escalate; do NOT guess. (Valid absences and cosmetic fields do not escalate — see the field-tier table.)
 - Implementer can't pass its oracle (green tests in Mode: TDD, plan `[Verify]` command in Mode: Implement) after 2 attempts → escalate
 - Missing or invalid `Mode:` flag in the implementer's prompt → the orchestrator must not dispatch; fix the composition
 - Phase has both `[TDD-Red]` and `[Implement]` markers, or neither → escalate (malformed plan)
@@ -1834,8 +1864,9 @@ Progress tracked via [x] checkboxes in plan.md:
 - Pre-flight snapshot and pre-decisions are NOT persisted. On resume before Step 2 or 3, re-run Step 1b — it's cheap and ensures LOC/symbol facts aren't stale from earlier in the session.
 - **Mid-group resume (`deferred_commit: auto`).** When the interrupted phase is a deferred Phase Group, the deferred commits never landed, so HEAD alone cannot tell which sub-phases finished. Resume from the group journal instead, per `reference/deferred-commit-journal.md` §Resume algorithm:
   - **Read the journal** for the active group (matched by `group_letter`) and take `group_start_sha` as the file-scoped recovery baseline.
-  - **No journal → fresh group start** (NN-C-005). This is not an error — it is the normal case for a group that never began. Proceed to Step G1 (write a fresh journal) and run the group from scratch.
-  - **Stale `group_letter` → treat as no-journal.** A journal whose on-disk `group_letter` does NOT equal the active group's letter is STALE (an orphan from a crash between the G9b barrier commit and the journal `rm`, or an aborted prior group). Do NOT resume from it: treat it as no-journal (fresh start per the bullet above), log the orphan (NN-C-006 passive surface, e.g. `NN-C-006: orphaned journal for group <on-disk letter> ignored; active group is <active letter>`), and overwrite it at Step G1. This preserves the single-fixed-filename safety: a resume only ever trusts a journal that matches the active group.
+  - **No/corrupt journal WHILE a group is in flight → `[STATE-INCOMPLETE: journal]`, escalate.** Per the field-tier table in `plugins/spec-flow/reference/coordinator-contract.md` `## Resume-Critical State — Field Tiers`, a journal is *expected-present* when the active group is *in flight* — plan.md shows ≥1 checked sub-phase step under the group AND the group-level `[Progress]` checkbox is unchecked. If the journal is then missing or corrupt, the coordinator MUST emit `[STATE-INCOMPLETE: journal]` and escalate to the operator rather than guessing which sub-phases are green. Worked trace: group B with `B.1 [Build] = [x]` and group `[Progress] = [ ]` ⇒ in flight ⇒ missing journal ⇒ escalate; group B with no checked sub-phase steps ⇒ not in flight ⇒ missing journal ⇒ fresh start (next bullet).
+  - **No journal AND no group in flight → fresh group start (tier-3 valid absence)** (NN-C-005). This is not an error — it is the normal case for a group that never began. Proceed to Step G1 (write a fresh journal) and run the group from scratch.
+  - **Stale `group_letter` → depends on whether the active group is in flight.** A journal whose on-disk `group_letter` does NOT equal the active group's letter is STALE. Log the orphan (NN-C-006, e.g. `NN-C-006: orphaned journal for group <on-disk letter> ignored; active group is <active letter>`). Then branch on the active group's in-flight state: (a) if the active group IS in flight (≥1 checked sub-phase step under the active group AND the group `[Progress]` checkbox is unchecked), the active group's own journal is missing — emit `[STATE-INCOMPLETE: journal]` and escalate (tier-1); (b) if the active group is NOT in flight (no checked sub-phase steps), treat it as no-journal and proceed to fresh group start (tier-3 valid absence, per next bullet), overwriting the stale journal at Step G1. This preserves the single-fixed-filename safety: a resume only ever trusts a journal that matches the active group.
   - **`green` sub-phases → trust after a hash re-check.** For each sub-phase with `status: green`, re-hash ONLY its Red test files (the keys of its `red_manifest_hashes`) against the stored digests. The production files in that sub-phase's `scope` are trusted by association and are NOT independently re-hashed — a matching Red-test hash is taken as proof the whole sub-phase is intact. On an exact match for every Red test file, trust the sub-phase as done: do not re-run it and do not touch its files. (A mismatch demotes it to incomplete — fall through to the next bullet.) **FR-4 resume fallback:** if the journal carries `anchor: blob`, re-verify green sub-phases with `git hash-object` (comparing working-tree blob SHAs against the journal's `red_manifest_hashes`); if the `anchor:` marker is ABSENT (journal written by ≤5.1.0), re-verify with `sha256sum` instead and do NOT re-anchor or refuse — honor the old format as-is for this in-flight piece.
   - **Incomplete sub-phases (`pending` / `red-done` / `failed`) → file-scoped reset, then re-run from Red.** Apply the FR-6 file-scoped recovery recipe to that sub-phase's recorded `scope` in the SPLIT form: `git restore --source=$group_start_sha --worktree -- <MODIFIED paths only>` to restore files that existed at the baseline, plus `rm -f -- <created paths>` + `git rm --cached --ignore-unmatch -- <created paths>` for files the sub-phase created (`git restore --source` does not remove created files, and aborts the whole operation if the pathspec includes a created path — so the restore pathspec is the modified subset only). The `-f` / `--ignore-unmatch` flags keep recovery re-entrant/idempotent across a crash-and-resume. The reset touches ONLY the incomplete sub-phase's recorded `scope` — sibling `green` sub-phases' files stay byte-identical — and the reset is logged (NN-C-006 passive surface). Re-inject the `Deferred Phase Group: yes` flag on this resume re-dispatch — see the G4 flag-injection rule — so the re-run stays git-free like the initial dispatch.
   - **Sub-phases absent from the journal → not started.** A `<letter>.<n>` key missing from `sub_phases` was never dispatched; run it fresh, no recovery needed (its files were never written).
@@ -1848,7 +1879,7 @@ At session end, emit a summary with per-phase **Build duration**, **Build token 
 2. Build tool-use count drops commensurately.
 3. Verify: majority of clean-Build phases use Audit mode (3–5 min) rather than Full (10–15 min). Driven by Step 3's AC matrix gate — a clean matrix unlocks Audit.
 4. Step 6b passes cleanly on the majority of phases (no-op), because per-commit hooks caught issues at each intermediate commit rather than letting them accumulate.
-5. Refactor is skipped on clean-Build phases; QA iterations run until reviewer returns must-fix=None or the 3-iter circuit breaker fires.
+5. Refactor is skipped on clean-Build phases; QA iterations run until reviewer returns must-fix=None or the `qa_max_iterations`-limited circuit breaker fires.
 
 If (1)/(2) don't hold on two consecutive large phases, something other than the pre-flight inefficiencies is dominating — re-audit before adding more machinery. If (3) doesn't hold, inspect Implement's AC coverage matrix — the matrix is likely incomplete or inconsistent, forcing Full mode unnecessarily. If Step 6b consistently dispatches fix-code, the project's pre-commit config includes checks that depend on full-repo context (e.g. global mypy or whole-repo type checking); move those to pre-push.
 
