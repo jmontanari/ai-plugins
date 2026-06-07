@@ -30,7 +30,7 @@ version: 1
 
 - G-1: Reduce spec Q&A rounds by front-loading research into a durable artifact that proposes answers before questions are asked
 - G-2: Make execute unattended — Claude researches and commits decisions for spec-unspecified ambiguities; only escalates on genuine spec contradictions
-- G-3: Enable a queue of planned pieces to execute serially without human involvement between pieces
+- G-3: Drive a single piece's implementation to completion via an objective-criteria loop — the loop continues until all phases pass, the oracle is green, and Final Review has zero must-fix findings; it never stops for non-objective reasons
 - G-4: Create a learning flywheel where recurring process findings auto-promote to charter amendments and spec-flow improvement pieces
 - G-5: Optimize all orchestration paths for Sonnet as the main-thread model — context stays lean, heavy work goes to sub-agents
 
@@ -38,8 +38,9 @@ version: 1
 
 - **Automated spec writing** — human approval gate on spec is preserved; research reduces rounds, not the gate itself
 - **Automated plan approval** — same; human reviews the plan artifact before execute begins
-- **Full unattended manifest autonomy** — the loop only runs on pieces already `planned`; it does not spec or plan unattended
-- **Overnight/cloud Routines** — the loop runs locally via `/loop` + `ScheduleWakeup`; scheduled cloud Routines are a future extension
+- **Multi-piece queue orchestration** — driving multiple pieces sequentially from a queue is a future extension; this PRD delivers the single-piece completion loop that a future queue driver would call
+- **Full unattended manifest autonomy** — the loop only runs on a single piece already `planned`; it does not spec or plan unattended
+- **Overnight/cloud Routines** — Routines are a future extension; the loop runs in the current session
 - **Replacing design judgment** — research proposes answers and execute documents decisions; it does not override human architectural direction
 - **Cross-project learning** — the flywheel is scoped to this repo's charter and spec-flow plugin only
 
@@ -136,24 +137,28 @@ version: 1
 
 ---
 
-### FR-005: Execute loop driver runs a queue of planned pieces unattended
-**Statement:** A loop driver reads the manifest, selects the highest-priority piece with `status: planned` and all dependencies `merged/done`, invokes `/spec-flow:execute` for that piece, waits for completion, and schedules the next iteration. Each iteration re-reads the manifest from disk. The main loop context stays bounded — it holds only the current piece's one-line status, not execute's full output.
+### FR-005: Execute completion loop drives a single piece to done via objective stop criteria
+**Statement:** The execute skill drives one piece's implementation as a self-contained loop. Each iteration advances the loop: run the next incomplete phase, run oracle gates, run QA. The loop continues automatically until ALL stop criteria are simultaneously true: (1) all plan phases marked complete, (2) all oracle gates pass (tests green, full AC coverage), (3) Final Review returns zero must-fix findings. The loop never stops for non-objective reasons — the only valid escalations are genuine spec contradictions (FR-004) and hard circuit-breaker limits (max 3 Final Review iterations, existing behavior). Loop state is persisted so an interrupted session re-enters from the last clean checkpoint without re-running passing phases.
+
+A canonical multi-piece driver prompt (in `docs/exec-loop/loop-driver.md`) shows how to run this loop on successive planned pieces by re-invoking execute after each piece completes — this is a documentation artifact, not a new implementation piece.
 **Priority:** P0
-**Linked metrics:** SC-002, SC-003
+**Linked metrics:** SC-002
 
 #### User Stories
 
-**US-005** — As a queue operator, I want to start a loop, switch to another tab to spec the next piece, and return to find the planned queue executed without any prompting.
+**US-005** — As a queue operator, I want to invoke execute on a planned piece and have it drive itself all the way to Final Review clean without me needing to intervene, so I can work on spec/plan for the next piece in parallel.
 
 **Acceptance Criteria:**
-- [ ] A canonical loop prompt exists (in `docs/exec-loop/loop-driver.md` or as a `/loop` skill template) that operators can paste to start the queue
-- [ ] Each iteration: reads manifest fresh, picks the next planned piece, invokes execute, records a one-line result (piece name + pass/fail), schedules next wakeup via `ScheduleWakeup`
-- [ ] If no planned piece exists (or all have unmet deps), the loop reports "no executable work" and stops cleanly
-- [ ] If execute fails (BLOCKED, Final Review not passing), the loop records the failure, skips that piece, and continues to the next planned piece rather than halting the whole queue
-- [ ] The main loop context accumulation is bounded — each iteration's execute output is summarized to ≤200 tokens before being stored in main context
-- [ ] The loop driver is re-entrant: if the session is interrupted and restarted, it re-reads the manifest and continues from the current manifest state
+- [ ] Execute runs all phases sequentially without stopping between phases for operator input
+- [ ] After each phase completes, execute automatically advances to the next incomplete phase without requiring a separate operator invocation
+- [ ] After all phases complete, execute automatically dispatches Final Review; if must-fix findings are returned, it dispatches fix-code and re-runs review (existing behavior) without stopping for operator input
+- [ ] The loop terminates with `DONE` only when: all phases ✓ AND oracle green AND Final Review returns zero must-fix findings
+- [ ] The loop terminates with `BLOCKED` only when: (a) FR-004 escalation (genuine spec contradiction), (b) circuit-breaker hit (3 Final Review iterations), or (c) unrecoverable tool error
+- [ ] On `DONE`: manifest status is updated to `merged`, loop-run summary written to `docs/exec-loop/loop-run.log` (piece name, phase count, Final Review iterations, result)
+- [ ] On `BLOCKED`: loop-run.log records the blocking reason and the last clean phase checkpoint; re-invoking execute resumes from that checkpoint (journal-based resume, existing pi-015 behavior)
+- [ ] A `docs/exec-loop/loop-driver.md` artifact provides a copy-paste `/loop` prompt for running execute on successive planned pieces
 
-**Failure mode:** Execute exits with BLOCKED — piece is skipped, failure is recorded in a `loop-run.log` artifact, loop continues with next piece.
+**Failure mode:** Unrecoverable tool error mid-phase → loop records checkpoint to journal, emits `BLOCKED: tool error at phase N`, operator re-invokes to resume.
 
 ---
 
@@ -230,9 +235,9 @@ The operator reviews proposed amendments/pieces and approves or rejects; approve
 | Research sub-agent times out or errors | Spec falls back to standard brainstorm with `[RESEARCH-UNAVAILABLE]` notice | FR-001 |
 | research.md is stale (>7 days) | Plan emits staleness notice, proceeds with current codebase exploration as supplement | FR-003 |
 | Execute hits direct spec contradiction during self-resolve | Escalates to operator with: what was ambiguous, what was found, the contradiction | FR-004 |
-| Loop's current piece hits BLOCKED | Skip piece, log failure to `loop-run.log`, continue with next planned piece | FR-005 |
-| All planned pieces have unmet deps | Loop reports "no executable work — N pieces blocked on dependencies" and stops | FR-005 |
-| Loop session interrupted (laptop close, /clear) | Next session re-reads manifest from disk and resumes queue from current manifest state | FR-005 |
+| Execute hits circuit breaker (3 Final Review iterations) | Loop terminates with `BLOCKED`, records blocking reason + last clean phase in journal; operator resolves and re-invokes to resume | FR-005 |
+| Execute session interrupted mid-phase (laptop close, /clear) | Journal records last clean checkpoint; re-invoking execute resumes from that phase without re-running passing phases | FR-005 |
+| All stop criteria simultaneously true | Loop terminates with `DONE`, manifest status updated to `merged`, loop-run.log written | FR-005 |
 | Flywheel scan finds ≥5 simultaneous proposals | Batch-present all proposals in one operator review session (not 5 sequential prompts) | FR-007 |
 | Recurring finding is a spec-flow pipeline bug | Creates spec-flow shared manifest piece with severity HIGH | FR-007 |
 | Main context approaches Sonnet limit mid-piece | Execute checkpoints manifest state, emits `[CONTEXT-BUDGET-WARNING]`, suggests `/compact` | FR-006 |
@@ -240,7 +245,7 @@ The operator reviews proposed amendments/pieces and approves or rejects; approve
 ## Success Metrics
 
 - **SC-001:** Spec Q&A rounds ≤3 per piece on pieces with `research.md` present (current baseline: 5–8 rounds) — Linked to: FR-001, FR-002, FR-003
-- **SC-002:** Execute completes without operator prompting on ≥80% of planned pieces in a queue run — Linked to: FR-004, FR-005
+- **SC-002:** Execute drives a single planned piece to `DONE` (all phases + Final Review clean) without operator prompting on ≥80% of pieces attempted — Linked to: FR-004, FR-005
 - **SC-003:** Recurring findings (≥2 occurrences) are promoted to charter or spec-flow manifest within the same PRD's lifetime — Linked to: FR-007
 - **SC-004:** Main orchestrator context accumulation stays below 80K tokens across a 3-piece queue run — Linked to: FR-006, NFR-001
 
@@ -295,12 +300,12 @@ The operator reviews proposed amendments/pieces and approves or rejects; approve
 - **Rationale:** Operators must be able to audit what Claude decided autonomously. Silent decisions that ship to production violate the operator's oversight contract.
 - **How QA verifies:** Review-board spec-compliance reviewer checks that `decisions.md` exists and is non-empty whenever the implementer self-resolved ≥1 ambiguity.
 
-### NN-P-003: Loop driver is opt-in and operator-started only
+### NN-P-003: Execute loop is operator-invoked only
 - **Type:** Rule
-- **Statement:** No automated mechanism starts the execute loop without explicit operator action. The loop driver is a prompt or skill the operator invokes deliberately. It does not run on a schedule without explicit operator setup via `/schedule`.
+- **Statement:** No automated mechanism starts the execute completion loop without explicit operator action. The operator invokes `/spec-flow:execute <prd>/<piece>` deliberately. The loop then runs unattended to completion (FR-005), but the initial invocation is always manual.
 - **Scope:** FR-005
-- **Rationale:** Unattended execution is powerful; it should never start silently. The operator must consciously choose to hand off a queue.
-- **How QA verifies:** Loop driver documentation and skill (if one exists) must begin with an operator-confirmation step before the first execute dispatch.
+- **Rationale:** Unattended execution is powerful; it should never start silently. The operator reviews the spec and plan, approves them, then deliberately hands off execution.
+- **How QA verifies:** Execute skill must not auto-invoke itself on a piece without an explicit operator invocation in the session. The loop-driver.md prompt makes this explicit — it shows the operator pasting the command, not a silent trigger.
 
 ### NN-P-004: Flywheel proposals require operator one-time approval
 - **Type:** Rule

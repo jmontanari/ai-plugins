@@ -68,15 +68,17 @@ pieces:
   - name: exec-loop
     slug: exec-loop
     description: |
-      Execute loop driver. Canonical loop prompt at docs/exec-loop/loop-driver.md. On each
-      iteration: reads manifest fresh from disk, selects highest-priority piece with
-      status=planned and all deps merged/done, invokes /spec-flow:execute, records one-line
-      result, schedules next wakeup via ScheduleWakeup. Execute output summarized to ≤200
-      tokens before storing in main context. On BLOCKED piece: logs failure to loop-run.log,
-      skips piece, continues. Stops cleanly when no executable work remains. Re-entrant:
-      interrupted session re-reads manifest from current state. decisions.md review prompt
-      included in the loop's post-execute gate before advancing to next piece. Covers FR-005,
-      NN-P-003, G-3.
+      Execute completion loop with objective stop criteria. Drives a single piece's
+      implementation through all phases to DONE without stopping for operator input.
+      Stop criteria: all plan phases complete AND oracle green AND Final Review zero
+      must-fix findings. Explicit DONE/BLOCKED termination states — BLOCKED only on:
+      FR-004 escalation (genuine spec contradiction), circuit-breaker hit (3 Final Review
+      iterations), or unrecoverable tool error. Loop state persisted to journal; interrupted
+      sessions resume from last clean phase checkpoint. On DONE: manifest status updated
+      to merged, loop-run.log written. On BLOCKED: loop-run.log records blocking reason
+      and last clean checkpoint. Also produces docs/exec-loop/loop-driver.md — a
+      copy-paste /loop prompt for running execute on successive planned pieces (docs
+      artifact, not a new skill). Covers FR-005, G-3.
     prd_sections: [FR-005, G-3]
     dependencies: [exec-self-resolve, ctx-discipline]
     status: open
