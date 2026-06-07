@@ -69,6 +69,13 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 
 - [ ] **[TDD-Red]** Write failing tests
   - {{test_details}}
+  <!-- Test Data contract (see plugins/spec-flow/reference/plan-concreteness.md §5): a TDD phase
+  MUST carry a Test Data block — one case per behavior-under-test; tdd-red transcribes it and invents
+  nothing. An unpredictable expected outcome uses a per-case [SPIKE: <unknown>] (reference §2). -->
+
+  **Test Data:**
+  - {{case_id}}: input {{concrete_input}} → expect {{concrete_expected_or_oracle}}
+  - {{case_id_2}}: input {{concrete_input_2}} → [SPIKE: {{unpredictable_outcome}}]   <!-- only if genuinely unpredictable -->
 
 - [ ] **[QA-Red]** Reject theater tests before Build
   - Review Red's authored tests against the theater-pattern catalog (tautology, mock-echo, truthy-only, no-assertion, name/body mismatch, implementation coupling, etc.)
@@ -227,6 +234,12 @@ concreteness defect (qa-plan criterion 30). -->
     - No "fail first" requirement — tests are written for existing code.
     - Aim for reasonable coverage of the phase's ACs.
     - Stage tests via `git add` (do NOT commit) so Verify can run them.
+    <!-- Test Data contract (see plugins/spec-flow/reference/plan-concreteness.md §5): a Write-Tests
+    phase MUST carry a Test Data block — one case per behavior-under-test; the Step 2.7 dispatch
+    transcribes it and invents nothing. Unpredictable outcome → per-case [SPIKE: <unknown>] (reference §2). -->
+
+    **Test Data:**
+    - {{case_id}}: input {{concrete_input}} → expect {{concrete_expected_or_oracle}}
 
 - [ ] **[Verify]** Confirm the implementation is sound
     **Per-change checks:**

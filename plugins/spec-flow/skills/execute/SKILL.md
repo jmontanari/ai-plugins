@@ -638,6 +638,7 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
 
 1. Dispatch an agent to write tests for what was implemented in Step 3. The agent should:
     - Read the phase's `[Implement]` block from plan.md and the implementation diff.
+    - **Transcribe the phase's `Test Data` block — invent nothing** (`plugins/spec-flow/reference/plan-concreteness.md` §5). Author each test's inputs and expected assertions from the phase's `Test Data` block; author no input or expected outcome absent from it. If the block is **present but incomplete** (a named behavior with no covering case, or a case missing its input or expected outcome and not marked `[SPIKE]`), STOP and report `BLOCKED — Test Data gap: <case>` — write no partial test set; the orchestrator routes to plan amendment (Step 6c). If the phase carries **no `Test Data` block at all** (a plan predating this contract), emit `[TEST-DATA-ABSENT: no Test Data block in phase]` and fall back to writing reasonable-coverage tests from the `[Implement]` block as below, without blocking.
     - Write tests that verify the implementation is correct, with reasonable coverage of the phase's ACs.
     - No "fail first" requirement — tests are written for existing code.
     - No theater-pattern review, no SHA-256 manifest.

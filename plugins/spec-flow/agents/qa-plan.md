@@ -178,6 +178,18 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 
     Evidence: quote the branch clause and show the AC list lacks a covering AC. **Must-fix.**
 
+31. **Test Data block presence + completeness (FR-003) (activate per phase containing a `[TDD-Red]` or `[Write-Tests]` step; a phase with neither authors no tests — skip).** Each such phase must carry a complete `Test Data` block per `plugins/spec-flow/reference/plan-concreteness.md` §5: every behavior the test step names maps to a covering case, and every case has both a concrete input and an expected outcome — or a per-case `[SPIKE: <unknown>]` (§2) on an unpredictable case. Read the phase's own `Test Data` block and its `[TDD-Red]`/`[Write-Tests]` test entries (case-id references) — evaluable from plan text alone. Do NOT judge whether an expected value is *correct* (no oracle access); judge only presence + completeness.
+
+    Flag:
+    - A `[TDD-Red]`/`[Write-Tests]` phase with no `Test Data` block at all
+    - A named test behavior with no covering case in the block
+    - A case missing its input, or missing its expected outcome (and not marked `[SPIKE]`)
+    Do NOT flag:
+    - A case whose expected-outcome position is a well-formed `[SPIKE: <description>]` — that is the sanctioned unpredictable-outcome form
+    - A pure `[Implement]` phase with no `[TDD-Red]`/`[Write-Tests]` step — out of scope for this criterion
+
+    Evidence: quote the phase's `Test Data` block (or its absence) and the uncovered/incomplete case. **Must-fix.**
+
 ## Output Format
 
 Same structure: must-fix and acceptable sections. Every must-fix must cite a criterion and explain what's wrong.

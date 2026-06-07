@@ -4,6 +4,11 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.5.0] — 2026-06-07
+
+### Added
+- **Test Data contract (upfront test oracle):** new `reference/plan-concreteness.md` §5 defining the per-case `Test Data` block (case id + concrete input + expected outcome/oracle) required on every test-authoring phase (`[TDD-Red]` and Non-TDD-mode `[Write-Tests]`), its completeness rule, the per-case `[SPIKE: <unknown>]` for unpredictable outcomes (reusing the §2 marker — no new token), and the transcribe-only execution contract. The `plan` skill gains a §2g authoring rule; `qa-plan` gains criterion #31 (must-fixes an absent/incomplete block on a test-authoring phase); `templates/plan.md` gains a `Test Data` slot on the `[TDD-Red]` and `[Write-Tests]` exemplars. `tdd-red` and execute Step 2.7 now transcribe the block and invent nothing — a present-but-incomplete block halts with `BLOCKED` (routed to Step 6c), an absent block falls back to legacy behavior via `[TEST-DATA-ABSENT]` (backward-compatible, NN-C-003).
+
 ## [5.4.0] — 2026-06-07
 
 ### Added

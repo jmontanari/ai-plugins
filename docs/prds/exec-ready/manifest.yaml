@@ -1,6 +1,6 @@
 schema_version: 1
 generated: 2026-06-06
-last_updated: 2026-06-06
+last_updated: 2026-06-07
 prd_source: "docs/prds/exec-ready/prd.md"
 
 feature_branch: null
@@ -48,7 +48,7 @@ pieces:
       Covers FR-003.
     prd_sections: [FR-003, G-1]
     dependencies: [plan-concrete]
-    status: open
+    status: merged
 
   - name: sonnet-coord
     slug: sonnet-coord

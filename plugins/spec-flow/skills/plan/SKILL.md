@@ -299,6 +299,12 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     3. **Enumerate branches.** For Implement-track / Non-TDD phases, every conditional branch in the deliverable (if/when/unless/otherwise/either, or an enumerated case) gets its own numbered AC (reference §3).
     Reference `plugins/spec-flow/reference/plan-concreteness.md` for all definitions — do not restate them here.
 
+2g. **Test Data contract for test-authoring phases (FR-003).** Every phase that authors tests — a phase containing a `[TDD-Red]` step (TDD track) or a `[Write-Tests]` step (Non-TDD mode) — must carry a complete `Test Data` block (one entry per behavior-under-test: case id + concrete input + expected outcome/oracle), defined authoritatively in `plugins/spec-flow/reference/plan-concreteness.md` §5. As you author each such phase:
+    1. **Author the oracle.** Give each behavior a concrete input and expected outcome; the `[TDD-Red]`/`[Write-Tests]` test entries reference cases by id so the oracle is written once (reference §5).
+    2. **Mark unpredictable outcomes.** A case whose expected outcome genuinely cannot be predicted carries a per-case `[SPIKE: <unknown>]` in its expected-outcome position (reference §2 — same marker, no new token); predictable cases keep concrete data.
+    3. **Completeness.** Every named behavior must have a covering case and every case both an input and an expected outcome (or a per-case `[SPIKE]`) — `qa-plan` #31 must-fixes an absent or incomplete block. A pure `[Implement]` phase (no test step) requires no block.
+    Reference `plugins/spec-flow/reference/plan-concreteness.md` for all definitions — do not restate them here.
+
 3. **Self-contained Change Specification Blocks.** Every file change inside a [Build]/[Implement] block must be a complete, self-contained specification the executor can implement without reading surrounding context or chasing pattern pointers. Use BOTH semantic anchors AND line ranges. Number each change sequentially within the phase (T-1, T-2, ...) to create a task inventory the executor iterates.
 
    **MODIFY operations — required fields:**

@@ -1,6 +1,6 @@
 # Plan Concreteness Contract
 
-This document is the single source of truth for the plan-authoring concreteness floor, the `[SPIKE: <unknown>]` marker, and the doc-as-code branch-enumeration-AC rule. It is cited by `plugins/spec-flow/skills/plan/SKILL.md` (Phase-2 authoring rule §2f, §9d, and the Phase-4 finalize spike-scan), `plugins/spec-flow/agents/qa-plan.md` (review criteria #28, #29, #30), and `plugins/spec-flow/templates/plan.md` (Implement-track exemplar slots). Any definition, marker syntax, or rule lives here and nowhere else; the three consuming files cite this document and do not restate its definitions.
+This document is the single source of truth for the plan-authoring concreteness floor, the `[SPIKE: <unknown>]` marker, and the doc-as-code branch-enumeration-AC rule. It is cited by `plugins/spec-flow/skills/plan/SKILL.md` (Phase-2 authoring rule §2f, §9d, and the Phase-4 finalize spike-scan), `plugins/spec-flow/agents/qa-plan.md` (review criteria #28, #29, #30, #31), `plugins/spec-flow/templates/plan.md` (Implement-track exemplar slots), `plugins/spec-flow/agents/tdd-red.md` (Test Data transcription), and `plugins/spec-flow/skills/execute/SKILL.md` Step 2.7 (Write-Tests transcription). Any definition, marker syntax, or rule lives here and nowhere else; the consuming files cite this document and do not restate its definitions.
 
 ## 1. Per-phase concreteness floor
 
@@ -128,3 +128,68 @@ This block is **interim**: it applies until FR-005 (`spike-agent`) ships and the
 **FR-005 / spike-agent forward reference:** FR-005 (`spike-agent`) adds an Opus spike resolver that clears a `[SPIKE]` via a Step 6c **plan amendment** — an in-place targeted amendment to the relevant phase that replaces the spike marker with concrete, verified content. After the plan amendment is applied, the finalize gate is relaxed to a routed-resolution annotation rather than a hard refusal. Until FR-005 ships, the operator must resolve each `[SPIKE:]` marker manually by editing the plan and re-running finalize.
 
 **Silent no-op path:** If no `[SPIKE:]` markers survive in prose after the scan, the finalize spike-scan is a silent no-op and Phase 4 continues without interruption.
+
+## 5. Test Data contract
+
+A phase **requires a `Test Data` block** when it contains a `[TDD-Red]` step (TDD track) or a `[Write-Tests]` step (Non-TDD mode) — i.e. any phase that authors tests. A pure `[Implement]` phase (no test step) requires none.
+
+The block is authored by the plan author (Opus) and transcribed verbatim by the executor; it is never designed or invented at execute time.
+
+### Block schema
+
+The `Test Data` block appears as a `**Test Data:**` block nested under the `[TDD-Red]` or `[Write-Tests]` step, with one entry per behavior-under-test:
+
+```
+**Test Data:**
+- <case-id>: input <concrete input> → expect <concrete expected output/oracle>
+```
+
+Test entries within the `[TDD-Red]` or `[Write-Tests]` step reference cases by ID (e.g., `test_foo → case-id`) so the oracle is authored exactly once and referenced from each test entry.
+
+All test inputs and expected outcomes must use synthetic/placeholder values — never real credentials, tokens, API keys, or production user IDs.
+
+### Completeness rule
+
+A `Test Data` block is **complete** iff:
+
+(a) every behavior the test step names maps to a covering case in the block, and
+(b) every case has both a concrete input AND a concrete expected outcome (or a per-case `[SPIKE:]` — see below).
+
+`plugins/spec-flow/agents/qa-plan.md` criterion #31 checks presence and completeness from the plan text alone. It does **not** check whether the expected value is correct — that is the Opus plan author's judgment.
+
+### Unpredictable outcomes — per-case [SPIKE]
+
+A case whose expected outcome cannot be predicted at plan time carries `[SPIKE: <unknown>]` in its expected-outcome position. Predictable cases in the same phase keep concrete data; only the genuinely unpredictable case is spiked.
+
+The syntax and scan-scoping rules are defined in **§2 — not restated here**. No new marker token is introduced; this is the same `[SPIKE: <unknown>]` defined in §2. A surviving per-case `[SPIKE:]` is caught by the existing §4 finalize spike-scan.
+
+### Transcribe-only execution + backward-compat
+
+`plugins/spec-flow/agents/tdd-red.md` (for `[TDD-Red]`) and `plugins/spec-flow/skills/execute/SKILL.md` Step 2.7 (for `[Write-Tests]`) author tests **from** the `Test Data` block and invent no input or outcome not present in the plan.
+
+Two distinct conditions apply:
+
+- **Block present but incomplete** — the agent emits `BLOCKED` naming the missing or incomplete case, writes no partial test set, and routes to plan amendment (Step 6c).
+- **Block absent** (a plan predating this contract) — the agent emits `[TEST-DATA-ABSENT: <reason>]` and falls back to today's design-from-assertions behavior without blocking.
+
+The distinguishing rule: **absence → legacy fallback; presence-but-incomplete → BLOCKED. Never conflate them.**
+
+`plugins/spec-flow/agents/qa-plan.md` criterion #31 gates new plans on block presence, so a missing block at execute time means the plan predates this contract (legacy).
+
+<!-- Worked example:
+
+**Test Data:**
+- tok-expired: input "expired_token" → expect TokenExpiredError
+- tok-valid: input "valid_token_abc123" → expect {"user_id": 42, "role": "admin"}
+- tok-malformed: input "not_a_jwt" → expect [SPIKE: exact error type needs integration test to determine]
+
+test_expired_token → tok-expired
+test_valid_token → tok-valid
+test_malformed_token → tok-malformed
+
+Complete (tok-expired, tok-valid): both have concrete input and expected output.
+Pending-resolution (blocks finalize-scan): tok-malformed has a concrete input but [SPIKE:] in the expected-outcome position — survives the §4 finalize spike-scan until resolved.
+
+-->
+
+

@@ -11,7 +11,6 @@ These are the PRD's Open Questions; resolve each during the relevant piece's spe
 
 - **Plugin-registry path** — `~/.claude/spec-flow/patterns.yaml` is the proposal; confirm path and update-stability (must survive plugin reinstall, must not collide) during `flywheel` spec.
 - **Pattern occurrence granularity** — one occurrence per piece where the pattern appeared, or one per reflection finding? Resolve during `flywheel` spec.
-- **Test-data-upfront for non-deterministic phases** — confirm the `[SPIKE]`-then-record fallback is sufficient for integration/real-external phases during `test-data-up` spec.
 - **`.spec-flow.yaml` keys** — finalize `flywheel_threshold`, `circuit_breaker.docs`, and `model_policy` shape during `sonnet-coord` / `flywheel` specs.
 
 ---
@@ -41,11 +40,4 @@ The original `exec-loop` PRD was re-scoped after a capability audit + fresh Bori
 **Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
 **Finding (verbatim):** plan-concrete's stated outcome goal ("a passing plan yields zero unmarked execute-time discoveries") has no measurement surface. The flywheel-repo piece (FR-006, status: open) is the natural recording surface. During flywheel-repo spec brainstorm, propose adding "unmarked execute-time discovery" as a first-class flywheel pattern-type: each Step 6c discovery event that was NOT a [SPIKE]-routed resolution increments a per-plan-quality counter in docs/patterns.yaml. This is a scope amendment for flywheel-repo, not a new piece. Deps: spike-agent (FR-005) must land first (Step 6c plan amendments must exist).
 **Why this does not block plan-concrete's goals:** The measurement surface is downstream of multiple open pieces; plan-concrete's enforcement layer is complete and correct without it.
-**Captured:** 2026-06-07
-
-### [Deferred via /spec-flow:defer] test-data-up spec must cite reference/plan-concreteness.md §2 for [SPIKE] syntax — 2026-06-07
-
-**Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
-**Finding (verbatim):** reference/plan-concreteness.md §2 is the authoritative home for [SPIKE: <unknown>] syntax. test-data-up (FR-003, status: open) will use [SPIKE] for unpredictable TDD outcomes and must cite §2 rather than re-specifying the marker syntax. If the test-data-up spec brainstorm doesn't surface this dependency, it may inadvertently introduce a [SPIKE-DATA] variant or re-define the marker, causing marker-token drift. Action: inject reference/plan-concreteness.md §2 as a required input during test-data-up spec brainstorm; add an AC that test-data-up cites §2 for the syntax.
-**Why this does not block plan-concrete's goals:** test-data-up is a future open piece; this is a spec-authoring constraint to inject at its spec stage, not a gap in plan-concrete's deliverables.
 **Captured:** 2026-06-07
