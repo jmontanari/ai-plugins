@@ -18,7 +18,7 @@ docs/
 │           └── <piece-slug>/
 │               ├── spec.md
 │               ├── plan.md
-│               ├── research/
+│               ├── research.md
 │               ├── learnings.md
 │               └── ac-matrix.md
 └── improvement-backlog.md   # global — cross-PRD + process retros

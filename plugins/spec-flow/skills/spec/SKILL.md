@@ -83,12 +83,33 @@ Socratic dialogue with the user, one question at a time. **Prefer multiple-choic
 
 **Before the first question — scope check.** Assess whether the piece as described covers multiple independent subsystems (e.g., "vault integration, CI pipeline changes, and a new CLI command" is three pieces). If so, flag immediately: don't spend questions refining details of work that needs to be decomposed first. Propose the decomposition, let the user confirm the sub-piece ordering, and brainstorm only the first sub-piece.
 
+**[Pre-brainstorm setup — worktree + research]** *(runs after the scope-check, before any question)*:
+
+1. **gitignore check** — Check if `worktrees/` is in `.gitignore` — add it if missing.
+2. **Slug validation** — Run both `<prd-slug>` and `<piece-slug>` through the rules in `plugins/spec-flow/reference/slug-validator.md` (max 20 chars, charset `[a-z0-9-]`, no leading/trailing `-`, total branch length ≤ 50 chars). On any violation, refuse with the exact error contract from that reference doc — name which slug is offending, its actual value, the current length or offending character, and the limit. There is no silent truncation, no auto-fix; the user must edit `docs/prds/<prd-slug>/manifest.yaml` (or rename the PRD) and re-run.
+3. **Worktree/branch creation** — Create worktree before writing, so all work lives on the feature branch. Worktree path and branch name follow `plugins/spec-flow/reference/v3-path-conventions.md`. First read `feature_branch:` from `<docs_root>/prds/<prd-slug>/manifest.yaml`:
+   - **`feature_branch:` is set (non-null)** — use it as the base so the piece branch tracks the PRD accumulator, not `master`:
+     ```bash
+     git worktree add {{worktree_root}} -b piece/<prd-slug>-<piece-slug> <feature_branch>
+     ```
+     Fail with an explicit error if `<feature_branch>` does not exist locally — do NOT silently fall back to `master`. The user must create or fetch the feature branch first.
+   - **`feature_branch:` is absent or null** — the PRD develops directly on the default branch; omit the base argument:
+     ```bash
+     git worktree add {{worktree_root}} -b piece/<prd-slug>-<piece-slug>
+     ```
+4. **Research dispatch** — Dispatch the `research` agent into the worktree (self-contained prompt: this piece's PRD sections + the manifest piece description + the resolved charter). The schema, markers, return contract, and ≤2K bound are defined in `plugins/spec-flow/reference/research-artifact.md` — cite it; do not restate it.
+5. **OK path** — if the agent returns `STATUS: OK` and `research.md` is present and non-empty: commit it on the piece branch BEFORE any spec write:
+   ```bash
+   git add docs/prds/<prd-slug>/specs/<piece-slug>/research.md
+   git commit -m "research: add <prd-slug>/<piece-slug> codebase research"
+   ```
+   If `git add` stages zero files (path not found) or `git commit` exits non-zero, treat this as trigger (d) of the UNAVAILABLE path below.
+   The brainstorm then leads with the digest's inferences (seeding step 3's "lead with your understanding" pattern), and the Charter Constraint Identification Protocol's Conventions Block consumes `research.md`'s `## Codebase Conventions` (per `plugins/spec-flow/reference/brainstorm-procedure.md`).
+6. **UNAVAILABLE path** — surface `[RESEARCH-UNAVAILABLE: <reason>]` to the user (include it in your response so the operator sees it) and fall back **non-blocking** when ANY of these four triggers holds: (a) the agent returns `STATUS: BLOCKED`; (b) the dispatch errors; (c) `research.md` is missing or zero-length after dispatch; (d) the `git add`/`git commit` of `research.md` fails (zero files staged or non-zero exit). On this path commit NO `research.md`, and run the standalone L-10 convention scan below (whose output the Conventions Block then consumes). See `plugins/spec-flow/reference/research-artifact.md` for the marker definition.
+
 **YAGNI throughout.** Remove anything the mapped PRD sections don't ask for. If a brainstorm question surfaces a feature not in the piece's PRD sections, name it out-of-scope before discussing it. Don't add behavior the user didn't request. When the agent proposes an approach, explicitly flag any scope it introduces that the PRD didn't ask for.
 
-**[Convention context]** *(L-10 — runs before any questions)*: Run the L-10 Convention Context Scan
-specified in `plugins/spec-flow/reference/brainstorm-procedure.md` per the reference doc's
-"## Core Brainstorm Building Blocks" section ("### L-10: Convention Context Scan"). Outputs:
-conventions list surfaced in step 1a.
+**[Convention context]** *(L-10 — runs only on the `[RESEARCH-UNAVAILABLE]` path)*: On the OK path, the conventions list comes from `research.md`'s `## Codebase Conventions` section (written by the pre-brainstorm research pass above), and the standalone L-10 scan is skipped. Only on the `[RESEARCH-UNAVAILABLE]` path, run the L-10 Convention Context Scan specified in `plugins/spec-flow/reference/brainstorm-procedure.md` per the reference doc's "## Core Brainstorm Building Blocks" section ("### L-10: Convention Context Scan"). Outputs: conventions list surfaced in step 1a.
 
 **[PRD assumption audit]** *(C-1 — runs before step 1)*: Read the PRD section mapped to this piece and probe explicitly for dimensions the PRD doesn't mention: security/auth model, data sensitivity, backward compatibility, rate limiting/quotas, operational readiness. For each gap, ask as a multiple-choice: *"The PRD doesn't mention [X]. Is this: (a) intentionally absent — inherited from charter NNs; (b) intentionally N/A for this piece; (c) an open question that needs to be answered in this spec?"* Any `(c)` answers become required open questions for step 3.
 
@@ -135,26 +156,16 @@ Emit `[PENDING-DECISION: <decision area>]` inline at the exact location in spec.
 
 **[Deferred scope close-out]** *(M-9)*: Present the full list of items the user marked `deferred` during step 2 (backlog) and any deferred items from the [PRD assumption audit]. For each, ask: *"Which future piece should own this?"* — multiple-choice based on manifest pieces, or "new piece TBD." These items appear in spec.md under a new section `## Explicitly Out of Scope / Deferred` with rationale. Also note them additively in `docs/prds/<prd-slug>/backlog.md` using the same format as existing backlog entries (Phase 5 step 4 handles final pruning of the same file).
 
-### Phase 3: Create Worktree and Write Spec
+### Phase 3: Write Spec
 
-1. Check if `worktrees/` is in `.gitignore` — add it if missing
-2. **Validate slugs before any branch or worktree creation.** Run both `<prd-slug>` and `<piece-slug>` through the rules in `plugins/spec-flow/reference/slug-validator.md` (max 20 chars, charset `[a-z0-9-]`, no leading/trailing `-`, total branch length ≤ 50 chars). On any violation, refuse with the exact error contract from that reference doc — name which slug is offending, its actual value, the current length or offending character, and the limit. There is no silent truncation, no auto-fix; the user must edit `docs/prds/<prd-slug>/manifest.yaml` (or rename the PRD) and re-run.
-3. Create worktree (before writing, so all work lives on the feature branch). Worktree path and branch name follow `plugins/spec-flow/reference/v3-path-conventions.md`. First read `feature_branch:` from `<docs_root>/prds/<prd-slug>/manifest.yaml`:
-   - **`feature_branch:` is set (non-null)** — use it as the base so the piece branch tracks the PRD accumulator, not `master`:
-     ```bash
-     git worktree add {{worktree_root}} -b piece/<prd-slug>-<piece-slug> <feature_branch>
-     ```
-     Fail with an explicit error if `<feature_branch>` does not exist locally — do NOT silently fall back to `master`. The user must create or fetch the feature branch first.
-   - **`feature_branch:` is absent or null** — the PRD develops directly on the default branch; omit the base argument:
-     ```bash
-     git worktree add {{worktree_root}} -b piece/<prd-slug>-<piece-slug>
-     ```
-4. Write `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` in the worktree directory. Read the dependency-triage choice recorded by Phase 1 step 6a from orchestrator state and branch as follows (per FR-6 of pi-010-discovery and the `## Dependency Triage` section format in `plugins/spec-flow/reference/depends-on-precondition.md`):
+The worktree/branch already exist (created pre-brainstorm in Phase 2); this phase only writes `spec.md`.
+
+1. Write `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` in the worktree directory. Read the dependency-triage choice recorded by Phase 1 step 6a from orchestrator state and branch as follows (per FR-6 of pi-010-discovery and the `## Dependency Triage` section format in `plugins/spec-flow/reference/depends-on-precondition.md`):
    - **No unmet deps recorded** (every dep was already `merged`/`done` at the time of step 6a, or the piece had no `depends_on:` entries): write spec.md normally with no `## Dependency Triage` section. The section is required only when at least one dep was unmet at the moment of authoring.
    - **Operator chose `(1) pull-deps-in`:** write spec.md and append a `## Dependency Triage` section using the format from the reference doc — one bullet per unmet dep, each rendered as ``- `<ref>` (status: `<status>` at <YYYY-MM-DD>) — Operator chose pull-deps-in; spec covers prerequisite behavior in §<section>.`` (or the Phase 0 variant per the reference doc's "Resolution values" list, depending on whether the absorption is documented in the spec body or deferred to plan-time Phase 0). The Goal / Scope / FR / AC sections of spec.md must be authored to also cover the dep's behavior — the unmet-dep entry should only be removed from `depends_on:` once the prerequisite is actually covered in this spec.
-   - **Operator chose `(2) fork`:** halt the skill immediately with the exact refusal string `Refused — fork chosen; spec the prerequisite piece <ref> first.` (substituting each unmet dep's `<ref>` if more than one is unmet, one refusal line per dep). Write NO spec.md, create NO commits, do not advance to Phase 4. The operator's next action is to switch to the prerequisite piece and run `/spec-flow:spec` on it.
+   - **Operator chose `(2) fork`:** halt the skill immediately with the exact refusal string `Refused — fork chosen; spec the prerequisite piece <ref> first.` (substituting each unmet dep's `<ref>` if more than one is unmet, one refusal line per dep). Write NO spec.md and do not advance to Phase 4. Note: the pre-brainstorm setup in Phase 2 may have already created a worktree and branch, and if the research agent returned OK a `research:` commit will exist on the piece branch — this is an accepted recoverable orphan. The operator may clean up the orphaned branch/worktree if desired, but no spec.md is written and execution stops here. The operator's next action is to switch to the prerequisite piece and run `/spec-flow:spec` on it.
    - **Operator chose `(3) proceed --ignore-deps`:** write spec.md and append a `## Dependency Triage` section with one bullet per unmet dep rendered as ``- `<ref>` (status: `<status>` at <YYYY-MM-DD>) — Operator override; deps remain unmet at spec time.`` Recall that `(3) proceed` is refused for structural-failure statuses (`superseded`, `blocked`) at step 6a — if execution reaches this branch, every unmet dep is in a transient-status class.
-5. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/spec.md` as the structural guide. Populate the `charter_snapshot:` front-matter with the charter dates captured in Phase 1 step 3: `git log` last-commit date per domain (charter skills carry no `last_updated:` front-matter). If a charter domain is absent, omit its key from the snapshot block (do not write a blank/null value).
+2. Use the template at `${CLAUDE_PLUGIN_ROOT}/templates/spec.md` as the structural guide. Populate the `charter_snapshot:` front-matter with the charter dates captured in Phase 1 step 3: `git log` last-commit date per domain (charter skills carry no `last_updated:` front-matter). If a charter domain is absent, omit its key from the snapshot block (do not write a blank/null value).
 
 ### Phase 4: QA Loop
 

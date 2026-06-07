@@ -90,6 +90,30 @@ Gather:
 
 Phase 1 writes exploration findings incrementally to `introspection.md` in the piece's working directory (alongside plan.md). The file is a working artifact — not committed, not gitignored, just untracked.
 
+**Research-source branch.** Before running the per-cluster sweep, check whether `docs/prds/<prd-slug>/specs/<piece-slug>/research.md` exists on the piece branch (per `plugins/spec-flow/reference/research-artifact.md`, `## Location`):
+
+**CONSUMED path (`research.md` exists on the piece branch):**
+
+1. **Seed `introspection.md` by structural copy** of `research.md`'s cluster-grouped sections into `introspection.md`. Do not run the full per-cluster sweep below when `research.md` is present; the seed replaces it.
+2. For each spec target file that is **not a covered file** (per the covered-file definition in `plugins/spec-flow/reference/research-artifact.md`), perform a **narrow targeted read** and append its four-block entry to `introspection.md`.
+3. Resolve the research commit: `git log -1 --format=%H -- docs/prds/<prd-slug>/specs/<piece-slug>/research.md`; for each covered file changed since that commit (`git diff <commit>..HEAD -- <file>` non-empty), re-read it and update its `introspection.md` entry.
+4. Define the counts: `N` = covered files; `M` = files processed in steps 2 + 3.
+5. Emit `[RESEARCH-CONSUMED: <N> files, <M> re-read]`.
+
+<!-- Example: spec targets = [a.md, b.md, c.md, d.md]. research.md File Inventory blocks cover
+[a.md, b.md, c.md] (N=3). d.md is not covered → targeted read of d.md, append its four-block entry.
+`git log -1 --format=%H -- docs/prds/<prd-slug>/specs/<piece-slug>/research.md` = e4f1a2c;
+`git diff e4f1a2c..HEAD -- a.md` is non-empty (a.md changed since research) → re-read a.md, update its entry.
+b.md, c.md unchanged → skipped. Re-reads = {d.md (top-up), a.md (staleness)} → M=2.
+Emit: [RESEARCH-CONSUMED: 3 files, 2 re-read]. -->
+
+**ABSENT path (`research.md` does not exist on the piece branch):**
+
+1. Emit `[RESEARCH-ABSENT: running full exploration]`.
+2. Run the existing per-cluster sweep (the "Cluster identification" + "Per-cluster exploration loop" below) unchanged.
+
+On both paths, **Phase 2 then reads the resulting `introspection.md` section-by-section with no change to its reader.**
+
 **Cluster identification.** Before exploring, group the spec's target files by functional cohesion (files that share callers, imports, or data types). Each cluster contains ≤ 5 files. If the spec touches ≤ 3 files total, treat the entire scope as a single cluster (no grouping overhead).
 
 **Per-cluster exploration loop.** For each cluster, in dependency order (inner-most first):

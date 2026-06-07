@@ -21,7 +21,7 @@ pieces:
       may be richer. Covers FR-001, NFR-001.
     prd_sections: [FR-001, NFR-001, NFR-003, G-1]
     dependencies: []
-    status: open
+    status: merged
 
   - name: plan-concrete
     slug: plan-concrete

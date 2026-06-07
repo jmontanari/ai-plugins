@@ -2,9 +2,10 @@
 
 Invocation order:
 1. Charter Context Loading Protocol — run first; outputs `charter_root`, `charter_snapshot`, `integration_cfg`
-2. L-10 Convention Context Scan (from Core Brainstorm Building Blocks) — runs before any questions; outputs conventions list
-3. Charter Constraint Identification Protocol — runs after L-10; uses L-10 results for conventions block
-4. Remaining Core Brainstorm Building Blocks (C-2 always-run, C-3, Approach+Tradeoffs) — run during brainstorm session
+2. Research pass — the spec skill creates the worktree and dispatches the research agent before any questions; on `STATUS: OK` its `## Codebase Conventions` section supplies conventions; emits `[RESEARCH-UNAVAILABLE: <reason>]` if the agent returns `STATUS: BLOCKED`, errors, or `research.md` is missing or zero-length
+3. L-10 Convention Context Scan — runs only on the `[RESEARCH-UNAVAILABLE]` path (fallback when research did not produce conventions)
+4. Charter Constraint Identification Protocol — its Conventions Block consumes `research.md`'s `## Codebase Conventions` on the OK path, or L-10's output on the `[RESEARCH-UNAVAILABLE]` path
+5. Remaining Core Brainstorm Building Blocks (C-2 always-run, C-3, Approach+Tradeoffs) — run during brainstorm session
 
 ## Charter Context Loading Protocol
 
@@ -48,7 +49,7 @@ Invocation order:
 1. [shared] Record the confirmed constraints into `### Non-Negotiables Honored` and `### Coding Rules Honored` in the output artifact (`spec.md` or `brief.md`), placing confirmed `NN-C` and any spec-only `NN-P` entries in the first section and confirmed `CR` entries in the second.
 
 ### Conventions Block
-1. [shared] Surface the L-10 convention scan results before confirmation closes, ask the user whether those empirical conventions should be required, and record confirmed conventions in `### Codebase Conventions`; this protocol assumes L-10 has already run.
+1. [shared] Surface the convention scan results before confirmation closes — on the research OK path these come from `research.md`'s `## Codebase Conventions` section; on the `[RESEARCH-UNAVAILABLE]` path they come from the standalone L-10 scan. Ask the user whether those empirical conventions should be required, and record confirmed conventions in `### Codebase Conventions`.
 
 ### Fallback Behavior
 - If charter files are absent, infer from session context alone; present any entries that are clearly applicable and ask "Anything to add?" rather than presenting an empty list.
@@ -58,7 +59,7 @@ Invocation order:
 ## Core Brainstorm Building Blocks
 
 ### L-10: Convention Context Scan
-[shared] Before the first brainstorm question, dispatch an explore agent to scan 2–3 peer components of the same type and extract empirical conventions such as file structure, wrappers, naming patterns, and shared config idioms. Surface the resulting conventions list during charter-constraint confirmation. If no peer component exists, skip L-10 silently.
+**Runs only on the `[RESEARCH-UNAVAILABLE]` path** — when the research agent produced no `research.md` (its `## Codebase Conventions` section is the OK-path source). On the `[RESEARCH-UNAVAILABLE]` path: before the first brainstorm question, dispatch an explore agent to scan 2–3 peer components of the same type and extract empirical conventions such as file structure, wrappers, naming patterns, and shared config idioms. Surface the resulting conventions list during charter-constraint confirmation. If no peer component exists, skip L-10 silently.
 
 ### C-2: Security Sub-Block (always-run)
 [shared] This is an always-run sub-block: never silently skip it, and treat its five prompts as additive — they run after coverage is established and do not count toward or affect the completion criteria for either track.

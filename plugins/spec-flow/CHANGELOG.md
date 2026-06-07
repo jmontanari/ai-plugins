@@ -4,6 +4,17 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.3.0] — 2026-06-07
+
+### Added
+- **Research agent + artifact contract:** new isolated Opus `research` agent (`agents/research.md`) and `reference/research-artifact.md` (the `research.md` schema, the `[RESEARCH-CONSUMED/ABSENT/UNAVAILABLE]` marker contract, the ≤2K return contract, and the covered-file definition).
+
+### Changed
+- **One gathering pass per piece:** the `spec` skill now creates the worktree and dispatches the research agent before brainstorm (committing `research.md` before `spec.md`); L-10 becomes the `[RESEARCH-UNAVAILABLE]` fallback. The `plan` skill Phase 1 seeds `introspection.md` from `research.md` on the `[RESEARCH-CONSUMED]` path (skipping the full sweep) and falls back to the legacy sweep on `[RESEARCH-ABSENT]`. `v3-path-conventions.md` now lists `research.md` (file) not `research/` (directory).
+
+### Fixed
+- **Version-bearing file sync:** the root `plugins/spec-flow/plugin.json` (Copilot descriptor) was at 5.2.0 while the other descriptors were 5.2.1; this release brings all four files to 5.3.0 (NN-C-009).
+
 ## [5.2.1] — 2026-06-06
 
 ### Changed
