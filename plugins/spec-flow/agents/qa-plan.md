@@ -150,6 +150,34 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 
    Evidence: quote the phase header (showing the missing or empty field) and name the in-scope multi-step orchestration `SKILL.md` that triggers the requirement. **Must-fix.**
 
+28. **Per-phase concreteness floor (FR-002a) (activate when the plan contains `[Implement]` or `[Build]` blocks; a plan with neither has no deliverables to floor-check — skip; the floor applies to the numbered Change Specification Blocks — the T-N entries — within those blocks, not to narrative prose that may precede them).** Each phase's Change Specification Blocks must satisfy the concreteness floor in `plugins/spec-flow/reference/plan-concreteness.md` §1: a target file (exact path), a location/anchor, and concrete content/signatures. The primary test is presence of that triple. Treat vague action verbs ("implement", "handle", "add support for", "wire up", "support") as an illustrative signal of a missing triple ONLY within deliverable / TARGET prose — never a standalone match (do NOT flag "the `[Implement]` block" or "implementer agent").
+
+    Flag:
+    - A deliverable that names no target file, or only a directory/glob
+    - A MODIFY deliverable with a file but no location/anchor; a CREATE deliverable with no structure outline
+    - A deliverable whose content is a bare verb-phrase ("implement the validator") with no concrete signature/prose/structure
+
+    Evidence: quote the phase's deliverable showing the missing element of the triple. **Must-fix.**
+
+29. **Unmarked unknown (FR-002b).** A decision the plan defers or hedges but cannot resolve must be an explicit `[SPIKE: <unknown>]` marker (`plugins/spec-flow/reference/plan-concreteness.md` §2). A correctly-marked `[SPIKE]` is acceptable — do NOT flag it on that basis. A hedged/deferred unknown in ordinary prose with no marker is a must-fix.
+
+    Flag:
+    - Prose that defers a decision ("the exact threshold depends on profiling", "to be determined during implementation", "the right value will emerge") with no `[SPIKE:` marker
+    Do NOT flag:
+    - A deliverable carrying a `[SPIKE: <description>]` marker on the unknown — that is the sanctioned form
+
+    Evidence: quote the hedged sentence and note the absent marker. **Must-fix.**
+
+30. **Doc-as-code branch-enumeration AC (FR-002c) (activate only for Implement-track / Non-TDD phases — a phase with `[Implement]` and no `[TDD-Red]`; skip TDD-track phases).** For each such phase, every conditional branch in the deliverable prose (a clause introduced by if/when/unless/otherwise/either, or an enumerated case) must have a matching numbered AC (`plugins/spec-flow/reference/plan-concreteness.md` §3). Read the phase's own enumerated branches and its `**ACs Covered:**` / AC list — evaluable from plan text alone.
+
+    Flag:
+    - A conditional branch in the deliverable with no corresponding numbered AC, naming the un-AC'd branch
+    Do NOT flag:
+    - A phase whose every branch has a matching AC, or a phase with no conditional branches
+    - A TDD-track phase (one that contains `[TDD-Red]`); note: a Non-TDD mode phase (`tdd: false`) uses `[Implement]` + `[Write-Tests]` with no `[TDD-Red]` — the presence of `[Write-Tests]` does NOT reclassify it as TDD-track; Non-TDD mode phases ARE subject to this criterion
+
+    Evidence: quote the branch clause and show the AC list lacks a covering AC. **Must-fix.**
+
 ## Output Format
 
 Same structure: must-fix and acceptable sections. Every must-fix must cite a criterion and explain what's wrong.

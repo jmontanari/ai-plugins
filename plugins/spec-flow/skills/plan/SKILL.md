@@ -293,6 +293,12 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
 
     Without enumerating the superseded values, a drift sweep that finds only the new pattern cannot distinguish "already updated" from "never referenced" — it gives a false green on files that still carry the old ordinal.
 
+2f. **Plan concreteness contract (FR-002).** Every phase deliverable must satisfy the per-phase concreteness floor, every genuine unknown must be an explicit `[SPIKE: <unknown>]` marker, and every doc-as-code conditional branch must be a numbered AC — all three defined authoritatively in `plugins/spec-flow/reference/plan-concreteness.md`. As you author each phase:
+    1. **Concreteness floor.** Make each Change Specification Block name its target file, its location/anchor, and its concrete content/signatures (reference §1). Do not let a vague verb stand in for the content.
+    2. **Mark unknowns.** Any decision you cannot resolve from spec + `research.md`/codebase is written as `[SPIKE: <unknown>]` (reference §2), never hedged in prose.
+    3. **Enumerate branches.** For Implement-track / Non-TDD phases, every conditional branch in the deliverable (if/when/unless/otherwise/either, or an enumerated case) gets its own numbered AC (reference §3).
+    Reference `plugins/spec-flow/reference/plan-concreteness.md` for all definitions — do not restate them here.
+
 3. **Self-contained Change Specification Blocks.** Every file change inside a [Build]/[Implement] block must be a complete, self-contained specification the executor can implement without reading surrounding context or chasing pattern pointers. Use BOTH semantic anchors AND line ranges. Number each change sequentially within the phase (T-1, T-2, ...) to create a task inventory the executor iterates.
 
    **MODIFY operations — required fields:**
@@ -486,6 +492,8 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     - **P3 (dispatch sites):** a piece changing a cross-cutting agent-dispatch contract must enumerate, in a `**Dispatch sites (P3):**` header field, every (re-)dispatch site of the affected agents; if none, state "none."
     - Both header fields are REQUIRED only when the edited file is a multi-step orchestration file (per the Definition above); otherwise they may be omitted.
 
+9d. **Doc-as-code branch-enumeration ACs (FR-002c).** For each Implement-track / Non-TDD phase, before finalizing the AC Coverage Matrix, scan the phase's deliverable prose for conditional branches (if/when/unless/otherwise/either, or an enumerated case) and confirm each has a matching numbered AC. See §3 of `plugins/spec-flow/reference/plan-concreteness.md`. A conditional branch with no covering AC is a concreteness defect the author must fix before the Phase 3 QA dispatch.
+
 10. **Contracts section generation (FR-PLAN-004 / FR-PLAN-005 / FR-PLAN-006 / FR-PLAN-007).** After all phases are drafted, generate the `## Contracts` section. Steps:
 
     1. Scan every `[TDD-Red]` (or `[Build]`) block in the plan for boundary-crossing interfaces. A boundary-crossing interface is one consumed by code *outside* the defining phase — public API endpoints, exported functions, shared data schemas, event contracts. Internal helpers and private functions are not contracts.
@@ -593,6 +601,19 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 ### Phase 4: Finalize
 
 1. User approves → continue
+
+**Finalize spike-scan (FR-002e).** Before the commits below, scan plan.md for any surviving `[SPIKE:` marker in prose. When scanning, skip lines inside fenced code blocks (between opening ``` and closing ``` fences) and skip lines inside HTML comments (between `<!--` and `-->`). For multi-line HTML comments (where `<!--` and `-->` appear on different lines), skip every line between and including the opening and closing lines. HTML-comment exclusion takes precedence: a triple-backtick encountered while inside an HTML comment does not open a fenced code block. Only raw marker text in prose counts. If any survive, REFUSE to finalize and list each offending phase:
+
+    Plan finalize refused — N surviving [SPIKE:] marker(s) must be resolved before the plan is approved:
+      1. [SPIKE: <description>] — found in Phase <N>: <surrounding sentence>
+      ...
+    Resolve each marker by either: (a) replacing it with concrete content if the unknown is now
+    resolved, or (b) awaiting FR-005 spike-agent resolution, which will issue a plan amendment.
+
+This finalize-block is **interim** per `plugins/spec-flow/reference/plan-concreteness.md` §4: once FR-005 (`spike-agent`) lands, a `[SPIKE]` is resolved by an Opus spike agent emitting a Step 6c plan amendment and this hard block is relaxed. If no markers survive in prose, this scan is a silent no-op and finalize proceeds.
+
+<!-- Worked example: plan.md carries `[SPIKE: real throughput ceiling]` in Phase 3's deliverable sentence (prose) and a second `[SPIKE: x]` inside a ``` fence demonstrating the syntax. Scan result: 1 surviving marker (the prose one) → refuse, listing Phase 3 only; the fenced occurrence is skipped. A marker appearing only inside `<!-- ... -->` is likewise skipped → finalize proceeds. -->
+
 2. Ensure the plan's front-matter includes `tdd: true` or `tdd: false` recording the mode decision for this piece (set during TDD Preference Resolution above; if missing, infer from phase structure: any `[TDD-Red]` → `true`, all `[Implement]` → `false`). Also ensure `fast: true` or `fast: false` is present (default: `fast: false` if absent).
 3. **Integration — create per-phase issues (if `integration_cfg != null` and `auto_create_tasks: true`):**
    Run the capability check for operation `create_phase_issue`. If available:

@@ -35,7 +35,7 @@ pieces:
       discoveries. Covers FR-002.
     prd_sections: [FR-002, G-1, G-2]
     dependencies: [research-unify]
-    status: open
+    status: merged
 
   - name: test-data-up
     slug: test-data-up

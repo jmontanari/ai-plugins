@@ -11,7 +11,6 @@ These are the PRD's Open Questions; resolve each during the relevant piece's spe
 
 - **Plugin-registry path** — `~/.claude/spec-flow/patterns.yaml` is the proposal; confirm path and update-stability (must survive plugin reinstall, must not collide) during `flywheel` spec.
 - **Pattern occurrence granularity** — one occurrence per piece where the pattern appeared, or one per reflection finding? Resolve during `flywheel` spec.
-- **Doc-as-code concreteness bar** — how "exact prose" is enforceable by `qa-plan` without becoming brittle. Resolve during `plan-concrete` spec.
 - **Test-data-upfront for non-deterministic phases** — confirm the `[SPIKE]`-then-record fallback is sufficient for integration/real-external phases during `test-data-up` spec.
 - **`.spec-flow.yaml` keys** — finalize `flywheel_threshold`, `circuit_breaker.docs`, and `model_policy` shape during `sonnet-coord` / `flywheel` specs.
 

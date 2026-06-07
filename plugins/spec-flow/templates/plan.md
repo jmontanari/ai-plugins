@@ -125,6 +125,10 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 ### Phase 2 (Implement track example): {{phase_name}}
 **Exit Gate:** {{exit_criteria}}
 **ACs Covered:** {{ac_list}}
+<!-- Branch-enumeration ACs (doc-as-code; see plugins/spec-flow/reference/plan-concreteness.md §3):
+every conditional branch in this phase's deliverable (if/when/unless/otherwise/either, or an
+enumerated case) MUST have its own numbered AC listed above. A branch without a covering AC is a
+concreteness defect (qa-plan criterion 30). -->
 **In scope:** {{explicit_scope_list}}
 **NOT in scope:** {{explicit_exclusions_with_forward_phase_references}}
 <!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
@@ -136,6 +140,11 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 - [ ] **[Implement]** Write code per the plan
   - Order tasks in checkpoint progression (schema/types → core wiring → wrappers/adapters → edge paths). The implementer commits at each logical checkpoint; good ordering gives it natural boundaries.
   - Architecture constraints this phase must honor: {{arch_constraints}}
+  <!-- Concreteness contract (see plugins/spec-flow/reference/plan-concreteness.md): each Change
+  Specification Block below must name its target file + location/anchor + concrete content (the floor).
+  Any decision you cannot resolve from spec + research.md/codebase → write it as an explicit
+  [SPIKE: <unknown>] marker (reference §2), never hedged in prose; a surviving prose [SPIKE] blocks
+  plan finalize (interim, until FR-005). -->
 
   **Change Specifications:**
 

@@ -4,6 +4,11 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.4.0] — 2026-06-07
+
+### Added
+- **Plan concreteness contract:** new `reference/plan-concreteness.md` defining the per-phase concreteness floor (target file + location/anchor + concrete content), the `[SPIKE: <unknown>]` marker (syntax, accept-marked/reject-hedged semantics, fenced-code + HTML-comment scan scoping), and the doc-as-code branch-enumeration-AC rule (codifying the pi-011 Edge-A–Edge-F finding). The `plan` skill gains a Phase-2 authoring rule (§2f), a §9d branch-AC note, and a Phase-4 finalize spike-scan that refuses to advance a plan while a `[SPIKE]` survives in prose. `qa-plan` gains criteria #28 (concreteness floor), #29 (unmarked unknown), and #30 (branch-AC), each guarded for backward-compat. `templates/plan.md` gains the `[SPIKE]` marker convention + branch-AC slot on the Implement-track exemplar. The finalize-block is interim — FR-005 (`spike-agent`) will resolve `[SPIKE]` markers via a Step 6c plan amendment.
+
 ## [5.3.0] — 2026-06-07
 
 ### Added
