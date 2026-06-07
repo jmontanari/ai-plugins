@@ -1,315 +1,300 @@
 ---
-slug: exec-loop
+slug: exec-ready
 status: drafting
 version: 1
 ---
 
-# Product Requirements Document — Autonomy & Self-Improving Pipeline
+# Product Requirements Document — Execution-Ready Plans
 
-**Project:** spec-flow autonomy — research-first pipeline + unattended execute loop + learning flywheel
+**Project:** spec-flow — make spec/plan dense enough that execution is mechanical, run the mechanics on a cheap model, and let a learning flywheel drive the cost curve down over time.
 **Date:** 2026-06-06
 **Status:** draft
 **Charter:** .claude/skills/charter-*/SKILL.md (NN-C namespace — project-wide binding rules)
 
 ## Problem Statement
 
-**Current situation:** The spec-flow pipeline requires the operator's attention at every stage. Spec brainstorm asks questions from a blank slate. Plan authoring repeats codebase exploration that spec already partially covered. Execute stops to ask whenever it hits an ambiguity not explicitly covered by the spec. When a piece finishes, the operator must manually start the next one. Learnings from completed pieces sit in `improvement-backlog.md` and `learnings.md` but don't automatically reduce future iteration or improve the pipeline itself.
+**Current situation:** spec-flow's stated philosophy is *progressive narrowing* — "by the time code is written, the model is a Sonnet-tier executor; all design decisions are already made." In practice the pipeline does not deliver this. The plan is not dense enough to be a complete script, so execute still has to *think*: it infers where code goes, designs test data live (in `tdd-red`), and resolves ambiguities the spec/plan never settled. Thinking means discovering, and discovery at execute time means surprises — the exact thing the pipeline was built to prevent. Worse, every surprise is invisible feedback: the operator's own backlog (`docs/improvement-backlog.md`) shows the *same* pipeline weaknesses recurring across pi-009, pi-011, and pi-013 (sibling-branch fix misses, too-loose QA-skip predicates, missing branch-enumeration ACs) with no mechanism to detect the recurrence and harden against it.
 
-**Problem:** Human attention is consumed by work the pipeline could do itself:
-1. Gathering context that should have been gathered before questions were asked
-2. Answering questions the pipeline could have researched and pre-answered
-3. Babysitting execute while it waits for ambiguity resolution
-4. Manually starting the next piece when the prior one finishes
-5. Deciding which recurring process findings should become permanent rules
+**Problem:** Effort and cost sit in the wrong places.
+1. The plan is under-specified, so execute discovers work that should have been resolved upstream — and an execute-time "discovery" is really evidence the plan was incomplete, not an execution defect.
+2. Because execute must think, it must run on an expensive model (Opus), purely to keep long-running state in a large context window — paying for a thinking model to do mechanical work.
+3. `tdd-red` *designs* tests at execute time; test data and expected outcomes are a design decision that belongs in the plan.
+4. Recurring pipeline defects are rediscovered piece after piece because nothing counts occurrences or routes the fix to where it belongs.
+5. spec-flow is installed across many repos; a plugin-level defect that appears once per repo never crosses a local recurrence threshold, so the plugin never learns from its own field failures.
 
-**Who is affected:** Any operator running multiple pieces through the spec-flow pipeline — specifically during spec Q&A rounds, execute supervision, and post-piece follow-up.
+**Who is affected:** the pipeline operator running spec-flow pieces (paying for Opus on mechanical work, babysitting execute surprises) and the plugin maintainer (whose plugin cannot self-harden from defects spread thin across installations).
 
-**Why now:** Boris Cherny's 2026 workflow (verified research, Jan–Jun 2026) demonstrates that the research → plan → implement separation with CLAUDE.md flywheel feedback is the current state of the art for agentic pipelines. The primitives exist in this install (`/loop`, `ScheduleWakeup`, `Agent`, `Workflow`). The pattern is proven. The gap is spec-flow-specific wiring.
+**Why now:** Verified 2026 research on Boris Cherny's workflow shows the real leverage is *not* a heavyweight autonomy subsystem (he keeps tooling "surprisingly vanilla") — it is resolving ambiguity at the plan gate with a human, then running a locked plan with aggressive self-verification, and folding recurring lessons back into durable rules. spec-flow already ships the execute loop, journal resume, auto Final Review, and reflection agents (capability audit, 2026-06-06). The gap is not autonomy — it is *plan density*, *model placement*, and *cross-install learning*.
 
 ## Goals
 
-- G-1: Reduce spec Q&A rounds by front-loading research into a durable artifact that proposes answers before questions are asked
-- G-2: Make execute unattended — Claude researches and commits decisions for spec-unspecified ambiguities; only escalates on genuine spec contradictions
-- G-3: Drive a single piece's implementation to completion via an objective-criteria loop — the loop continues until all phases pass, the oracle is green, and Final Review has zero must-fix findings; it never stops for non-objective reasons
-- G-4: Create a learning flywheel where recurring process findings auto-promote to charter amendments and spec-flow improvement pieces
-- G-5: Optimize all orchestration paths for Sonnet as the main-thread model — context stays lean, heavy work goes to sub-agents
+- **G-1: Execution-ready plans.** Every decision knowable from the spec + codebase is resolved at plan time — exact file, location, content, signatures, and (for TDD) concrete test data with expected outcomes. Execute transcribes; it does not design.
+- **G-2: No unplanned discovery.** Genuine unknowns (real external behavior that cannot be predicted) are explicit `[SPIKE]` markers in the plan, resolved by an isolated thinking agent — never silent execute-time discovery. The bar is *zero avoidable discovery*.
+- **G-3: Right model in the right place.** Opus does the thinking (spec, plan, all adversarial gates, spikes); Sonnet runs the mechanics (coordinator, implementer, test transcription). Execute never silently upgrades to Opus to mask an under-specified plan.
+- **G-4: File-based, re-derivable state.** All coordinator state needed to resume lives on disk; a fresh, cheap context re-derives the pipeline from disk. The transcript is disposable, so the large-context-window crutch (and its cost) is removed.
+- **G-5: A self-hardening flywheel.** Recurring avoidable-discovery patterns are counted against a durable registry and routed to the right hardening home — repo (charter/project/PRD) or plugin (machine-global) — operator-gated, driving spikes and Opus cost down piece over piece.
 
 ## Non-Goals
 
-- **Automated spec writing** — human approval gate on spec is preserved; research reduces rounds, not the gate itself
-- **Automated plan approval** — same; human reviews the plan artifact before execute begins
-- **Multi-piece queue orchestration** — driving multiple pieces sequentially from a queue is a future extension; this PRD delivers the single-piece completion loop that a future queue driver would call
-- **Full unattended manifest autonomy** — the loop only runs on a single piece already `planned`; it does not spec or plan unattended
-- **Overnight/cloud Routines** — Routines are a future extension; the loop runs in the current session
-- **Replacing design judgment** — research proposes answers and execute documents decisions; it does not override human architectural direction
-- **Cross-project learning** — the flywheel is scoped to this repo's charter and spec-flow plugin only
+- **Automated spec/plan approval** — the human review-and-sign-off gate on spec and plan is preserved. Density reduces rounds; it does not remove the gate.
+- **Execute self-resolving ambiguity** — explicitly cut. An execute-time ambiguity is a plan-incompleteness signal; it routes to plan amendment (Step 6c) or a `[SPIKE]`, never a silent in-execute decision log.
+- **Autonomous multi-piece queue orchestration** — driving a backlog of pieces unattended is out of scope; the single-piece execute loop already ships and is sufficient.
+- **Cross-machine plugin-pattern correlation** — the plugin pattern registry is machine-global (`~/`), not cross-machine. Solving cross-machine correlation requires a shared remote backend, deliberately not built here.
+- **Token micro-budgeting for its own sake** — the objective is file-based statelessness (G-4), not counting tokens. A token ceiling is not a requirement.
+- **Replacing design judgment** — research and spikes inform decisions; the human still owns architectural direction at the spec/plan gate.
 
 ## Personas
 
-### The Queue Operator
-- **Role:** Has 3–5 planned pieces ready. Wants to start the loop, context-switch to spec/plan work on the next piece, and return to completed results.
-- **Goals:** Zero babysitting of execute; parallel spec/plan work without blocking on execution completion; clear audit trail of decisions made autonomously.
-- **Pain points today:** Execute stops to ask questions mid-run. Must manually restart after each piece completes. Learnings don't carry forward automatically.
-- **Behaviors:** Approves spec + plan artifacts, then delegates execution. Reviews completed piece results and decisions.md before marking merged.
+### The Pipeline Operator
+- **Role:** Runs spec-flow pieces through spec → plan → execute. Wants the thinking concentrated at plan time so execution is predictable and cheap.
+- **Goals:** Execute runs on Sonnet without surprises; no babysitting; pay for Opus only where judgment actually happens.
+- **Pain points today:** Execute discovers work the plan missed and stops or improvises; `tdd-red` designs tests live; Opus drives execution purely for its context window.
+- **Behaviors:** Invests in a dense plan, approves it, hands a locked plan to a cheap executor, reviews the result.
 
-### The Focused Operator
-- **Role:** Running a single piece. Wants spec Q&A to take 2-3 rounds instead of 6-8. Wants execute to resolve the common cases itself.
-- **Goals:** Faster spec → approved artifact. Execute that surfaces only genuine blockers.
-- **Pain points today:** Answers the same type of questions across every piece (charter patterns, existing code conventions) because the spec skill starts blind each time.
-- **Behaviors:** Engages in spec brainstorm, approves plan, checks decisions.md after execute. Does not want to explain context Claude could have found itself.
+### The Plugin Maintainer
+- **Role:** Maintains the spec-flow plugin, which is installed across many repos and machines.
+- **Goals:** Recurring *pipeline* defects (not project-specific ones) surface globally so the plugin self-hardens, rather than being rediscovered in every repo.
+- **Pain points today:** A plugin defect that appears once per repo never crosses a per-repo recurrence threshold; the plugin's own field failures are invisible in aggregate. Reflection findings append to per-repo backlogs and stay there.
+- **Behaviors:** Reviews batched hardening proposals; promotes confirmed plugin patterns into spec-flow self-improvement pieces in the plugin's home repo.
 
 ## Functional Requirements
 
-### FR-001: Research sub-agent produces a durable research.md artifact
-**Statement:** Before any spec brainstorm Q&A begins, a dedicated research sub-agent runs in its own context, reads the codebase (relevant files, related skill implementations, charter rules, backlog items, and past learnings), and writes a structured `research.md` artifact to the piece's spec directory. The artifact is committed to disk before the first brainstorm question is asked.
+### FR-001: Unified research artifact feeds both spec and plan
+**Statement:** A single deep codebase-gathering step runs once, before spec brainstorm, in an isolated context, and writes a durable research artifact to the piece's spec directory. Both the spec skill (for proposed answers during brainstorm) and the plan skill (as primary codebase context) consume the same artifact; the plan skill no longer re-derives codebase context from scratch. The artifact folds in what the L-10 convention scan and the plan-stage `introspection.md` gather today, so there is exactly one gathering pass, not three.
 **Priority:** P0
 **Linked metrics:** SC-001
 
 #### User Stories
-
-**US-001** — As a focused operator, I want the spec skill to arrive at brainstorm already knowing the relevant codebase context, so that questions come pre-answered and I confirm rather than explain from scratch.
+**US-001** — As a pipeline operator, I want spec and plan to share one research artifact so codebase context is gathered once and brainstorm questions arrive pre-answered, instead of paying for the same exploration twice.
 
 **Acceptance Criteria:**
-- [ ] A `research.md` artifact exists at `docs/prds/<prd-slug>/specs/<piece-slug>/research.md` before the first spec brainstorm question
-- [ ] `research.md` contains required schema sections: `relevant_files` (list with line refs), `charter_rules` (NN-C IDs + summaries), `backlog_items` (top 3), `proposed_answers` (keyed by topic)
-- [ ] `research.md` is committed to the piece branch before brainstorm begins (verified via `git log --oneline -- research.md` showing a commit before the first spec Q&A commit)
-- [ ] The research sub-agent is dispatched via `Agent(...)` (not inline file reads in main context); its return value is a structured object ≤2K tokens
-- [ ] If research sub-agent errors or returns empty, spec emits `[RESEARCH-UNAVAILABLE: <reason>]` and proceeds without blocking
+- [ ] A research artifact exists at `docs/prds/<prd-slug>/specs/<piece-slug>/research.md` before the first spec brainstorm question, committed to the piece branch (verified via `git log --oneline -- research.md` showing a commit before the first spec Q&A commit).
+- [ ] The research step is dispatched as an isolated sub-agent (Opus); its return value to the main thread is a structured summary ≤2K tokens; the on-disk artifact may be richer.
+- [ ] The plan skill consumes `research.md` as primary context and emits `[RESEARCH-CONSUMED: <N> files]`, skipping the redundant `introspection.md` re-derivation; when the artifact is absent it emits `[RESEARCH-ABSENT: running full exploration]` and runs the legacy sweep.
+- [ ] If the research sub-agent errors or returns empty, the spec skill emits `[RESEARCH-UNAVAILABLE: <reason>]` and falls back to the current L-10 behavior without blocking.
 
-**Failure mode:** Research sub-agent errors or returns empty — spec falls back to current behavior (L-10 scan), emits a `[RESEARCH-UNAVAILABLE]` notice, and continues.
+**Failure mode:** Research sub-agent errors → `[RESEARCH-UNAVAILABLE]`, spec proceeds on the legacy L-10 scan, plan runs its legacy sweep.
 
 ---
 
-### FR-002: Spec skill consumes research.md to reduce brainstorm rounds
-**Statement:** The spec skill reads `research.md` at brainstorm start and uses proposed answers as the default for each question, presenting them as "Based on [finding], I propose [answer] — confirm or correct?" instead of asking from a blank slate. Questions where research found no clear answer are asked normally.
+### FR-002: Plan concreteness contract
+**Statement:** The plan skill produces an execution-ready plan: each phase specifies the exact file, the exact location within it, and the exact content or signatures to add — not "implement X." Genuine unknowns that cannot be resolved from the spec + codebase are recorded as explicit `[SPIKE: <unknown>]` markers, never left implicit. For doc-as-code phases (no test data), concreteness means the exact prose to write plus a branch-enumeration AC for every conditional in the deliverable (codifying the pi-011 finding). `qa-plan` enforces a concreteness floor and rejects vague phases and unmarked unknowns.
 **Priority:** P0
-**Linked metrics:** SC-001
+**Linked metrics:** SC-002, SC-003
 
 #### User Stories
-
-**US-002** — As a focused operator, I want spec brainstorm questions to arrive with a proposed answer derived from codebase research, so that my role is to confirm or correct rather than construct answers from scratch.
+**US-002** — As a pipeline operator, I want the plan to be a complete script so the executor transcribes rather than infers, eliminating avoidable execute-time discovery.
 
 **Acceptance Criteria:**
-- [ ] For each brainstorm question where `research.md` has a relevant finding, the spec skill presents the finding and proposed answer before asking for confirmation
-- [ ] The operator can override any proposed answer; the override is recorded in the spec
-- [ ] Questions with no research coverage are asked normally (no degradation in baseline behavior)
-- [ ] The research source is cited inline ("Based on: `plugins/spec-flow/skills/execute/SKILL.md:L142`")
+- [ ] Each plan phase names the target file, the location/anchor within it, and the concrete content or signature to add; `qa-plan` flags any phase whose deliverable is non-specific ("implement", "handle", "add support for") as must-fix.
+- [ ] Any decision the plan cannot resolve from spec + codebase is written as an explicit `[SPIKE: <unknown>]` marker; `qa-plan` flags an unresolved-but-unmarked ambiguity as must-fix.
+- [ ] For doc-as-code phases, every conditional branch in the deliverable has a corresponding branch-enumeration AC; `qa-plan` flags a missing branch AC as must-fix.
+- [ ] A piece whose plan passes the concreteness floor produces zero unmarked execute-time discoveries (measured: Step 6c discovery events that are *not* attributable to a `[SPIKE]` marker).
 
-**Failure mode:** research.md missing or malformed — spec proceeds with standard brainstorm, no research-feed questions.
+**Failure mode:** Plan cannot reach the concreteness floor for a phase and the unknown is not spike-able → `qa-plan` returns must-fix; the phase is re-planned, not passed downstream.
 
 ---
 
-### FR-003: Plan skill consumes research.md, skips redundant codebase exploration
-**Statement:** The plan skill reads `research.md` as its primary codebase context. It does not re-run a full codebase exploration if `research.md` is present and covers the relevant files. Plan authoring begins from the research artifact, not from scratch.
-**Priority:** P0
-**Linked metrics:** SC-001
-
-#### User Stories
-
-**US-003** — As a queue operator, I want spec and plan to share a single research artifact so that the total spec→plan cycle time is shorter and no codebase context is rediscovered twice.
-
-**Acceptance Criteria:**
-- [ ] Plan skill checks for `research.md` at plan start; if present and non-empty, uses it as primary context instead of running a fresh `find`/`grep` sweep
-- [ ] If `research.md` is absent or stale (> 7 days since commit), plan falls back to current codebase exploration and emits a notice
-- [ ] When research.md is present, the plan skill emits `[RESEARCH-CONSUMED: <N> files]` and skips the file-discovery sweep; when absent, plan emits `[RESEARCH-ABSENT: running full exploration]` and runs the sweep normally
-
-**Failure mode:** research.md absent — plan runs current full exploration without degradation.
-
----
-
-### FR-004: Execute resolves spec-unspecified ambiguities without stopping
-**Statement:** When an implementer agent encounters a case not explicitly covered by the spec, it runs a mini research step (reads spec, charter, research.md, related existing code), documents a decision with evidence in `decisions.md`, and continues. It stops and escalates only when the ambiguity directly contradicts the spec or when the research step produces genuinely undecidable results.
+### FR-003: Test data defined upfront for TDD phases
+**Statement:** For TDD phases, the plan defines the concrete test cases — inputs and expected outcomes — so `tdd-red` transcribes the oracle from the plan instead of designing it at execute time. Test-case design becomes a plan-stage (Opus) decision, not an execute-stage one.
 **Priority:** P0
 **Linked metrics:** SC-002
 
 #### User Stories
-
-**US-004** — As a queue operator running execute unattended, I want the implementer to resolve common "spec didn't specify X" cases itself and document what it decided, so that I'm not interrupted for questions the codebase already answers.
+**US-003** — As a pipeline operator, I want expected outcomes defined in the plan so `tdd-red` writes the failing test from a spec, not from its own live judgment about what "correct" means.
 
 **Acceptance Criteria:**
-- [ ] Implementer dispatches a mini research step before any escalation to the operator
-- [ ] A `decisions.md` artifact is written at `docs/prds/<prd-slug>/specs/<piece-slug>/decisions.md` recording each autonomous decision: what was ambiguous, what was found, what was decided, and why
-- [ ] `decisions.md` is committed alongside each phase that used self-resolution
-- [ ] Escalation to operator is reserved for: (a) direct spec contradiction, (b) research step returns ≥2 equally valid interpretations with no charter tiebreaker
-- [ ] The operator reviews `decisions.md` as part of the final review gate before merge
+- [ ] Each TDD phase in the plan includes a `Test Data` block: concrete inputs and expected outputs/oracle for each behavior under test.
+- [ ] `tdd-red` reads the phase's `Test Data` block and authors the failing test from it; it does not invent inputs or expected outcomes not present in the plan.
+- [ ] When a TDD phase's expected outcome genuinely cannot be predicted (non-deterministic / real external behavior), the phase carries a `[SPIKE]` marker instead of fabricated test data.
+- [ ] `qa-plan` flags a TDD phase with no `Test Data` block and no `[SPIKE]` marker as must-fix.
 
-**Failure mode:** Research step finds nothing useful → escalates to operator with context ("I looked at X, Y, Z and found no guidance; here are the options").
+**Failure mode:** Expected outcome is unpredictable → phase marked `[SPIKE]`; the spike agent resolves the real outcome, which is recorded as the test data before the TDD phase runs.
 
 ---
 
-### FR-005: Execute completion loop drives a single piece to done via objective stop criteria
-**Statement:** The execute skill drives one piece's implementation as a self-contained loop. Each iteration advances the loop: run the next incomplete phase, run oracle gates, run QA. The loop continues automatically until ALL stop criteria are simultaneously true: (1) all plan phases marked complete, (2) all oracle gates pass (tests green, full AC coverage), (3) Final Review returns zero must-fix findings. The loop never stops for non-objective reasons — the only valid escalations are genuine spec contradictions (FR-004) and hard circuit-breaker limits (max 3 Final Review iterations, existing behavior). Loop state is persisted so an interrupted session re-enters from the last clean checkpoint without re-running passing phases.
-
-A canonical multi-piece driver prompt (in `docs/exec-loop/loop-driver.md`) shows how to run this loop on successive planned pieces by re-invoking execute after each piece completes — this is a documentation artifact, not a new implementation piece.
+### FR-004: Sonnet-driven coordinator on file-based state
+**Statement:** The execute coordinator runs on Sonnet by default. All state required to resume — phase progress, journal, triage decisions, model assignments — is persisted to disk so a fresh context re-derives the pipeline position from disk without relying on the in-context transcript. The execute pre-flight *already* nudges toward Sonnet — it prompts (Override / Change-now / Cancel) when the active model is **not** Sonnet (`bbcf58c`), so Sonnet-default is already the enforced posture. This piece generalizes that single execute-start prompt into a per-stage **model policy**: coordinator and implementer are assigned Sonnet, and only the exceptions are flagged (the FR-005 spike path and operator override), so an Opus spike inside execute is sanctioned rather than treated as a violation. The Final Review circuit-breaker becomes configurable (default raised for doc-as-code pieces, codifying the pi-011 finding that a hard limit of 3 is wrong for non-TDD pieces).
 **Priority:** P0
-**Linked metrics:** SC-002
+**Linked metrics:** SC-004, SC-002
 
 #### User Stories
-
-**US-005** — As a queue operator, I want to invoke execute on a planned piece and have it drive itself all the way to Final Review clean without me needing to intervene, so I can work on spec/plan for the next piece in parallel.
+**US-004** — As a pipeline operator, I want the coordinator to run on Sonnet and re-derive everything from disk, so I stop paying for Opus's context window just to keep a long-running task in memory.
 
 **Acceptance Criteria:**
-- [ ] Execute runs all phases sequentially without stopping between phases for operator input
-- [ ] After each phase completes, execute automatically advances to the next incomplete phase without requiring a separate operator invocation
-- [ ] After all phases complete, execute automatically dispatches Final Review; if must-fix findings are returned, it dispatches fix-code and re-runs review (existing behavior) without stopping for operator input
-- [ ] The loop terminates with `DONE` only when: all phases ✓ AND oracle green AND Final Review returns zero must-fix findings
-- [ ] The loop terminates with `BLOCKED` only when: (a) FR-004 escalation (genuine spec contradiction), (b) circuit-breaker hit (3 Final Review iterations), or (c) unrecoverable tool error
-- [ ] On `DONE`: manifest status is updated to `merged`, loop-run summary written to `docs/exec-loop/loop-run.log` (piece name, phase count, Final Review iterations, result)
-- [ ] On `BLOCKED`: loop-run.log records the blocking reason and the last clean phase checkpoint; re-invoking execute resumes from that checkpoint (journal-based resume, existing pi-015 behavior)
-- [ ] A `docs/exec-loop/loop-driver.md` artifact provides a copy-paste `/loop` prompt for running execute on successive planned pieces
+- [ ] Execute assigns Sonnet to the coordinator and implementer by default; the model policy reports the per-stage assignment and flags only exceptions (FR-005 spike / operator override), rather than the current single execute-start prompt that fires when the active model is non-Sonnet (`bbcf58c`).
+- [ ] All resume-critical coordinator state is on disk; a coordinator started in a fresh context (after `/clear` or interruption) resumes from the last clean checkpoint using only on-disk state, re-running no passing phase.
+- [ ] The Final Review circuit-breaker limit is read from `.spec-flow.yaml` (configurable; documented default that differs for doc-as-code vs TDD pieces) rather than hard-coded.
+- [ ] No coordinator decision required to resume is held only in the transcript (verified: a forced fresh-context resume mid-piece reaches the same next action).
 
-**Failure mode:** Unrecoverable tool error mid-phase → loop records checkpoint to journal, emits `BLOCKED: tool error at phase N`, operator re-invokes to resume.
+**Failure mode:** Resume-critical state missing from disk → coordinator emits `[STATE-INCOMPLETE: <field>]` and escalates rather than guessing.
 
 ---
 
-### FR-006: Orchestrator context discipline — Sonnet-optimized main thread
-**Statement:** The spec-flow orchestration path enforces three concrete bounds: (1) no file >10KB is read directly into main context — oversized reads are routed to a summarizing sub-agent; (2) all sub-agent results returned to main context are schema-bounded summaries ≤2K tokens; (3) main context accumulation across a full piece execution stays below a configurable token budget (default: 80K tokens).
+### FR-005: Opus spike agent and model policy
+**Statement:** When execute reaches a `[SPIKE]` phase, it dispatches a dedicated spike agent on Opus in an isolated context — the one sanctioned path for "a thinking model infers as it goes" during execution, exactly parallel to why spec/plan are Opus. The spike agent investigates the genuine unknown, returns the resolved answer, and the resolution is recorded to a durable artifact so the unknown becomes known (and feeds FR-003 test data where applicable). An operator override allows forcing Opus for a specific piece/phase at invocation. Execute never silently upgrades a non-`[SPIKE]` phase to Opus to compensate for an under-specified plan.
+**Priority:** P0
+**Linked metrics:** SC-005
+
+#### User Stories
+**US-005** — As a pipeline operator, I want genuine unknowns resolved by an isolated Opus spike agent whose answer is recorded, so the mechanical work proceeds on Sonnet and the unknown never recurs as a surprise.
+
+**Acceptance Criteria:**
+- [ ] A `[SPIKE]` phase dispatches the spike agent on Opus in an isolated context; the agent's return is a structured resolution recorded to a durable artifact in the piece directory.
+- [ ] A non-`[SPIKE]` phase that the implementer cannot complete on Sonnet halts and routes to plan amendment (Step 6c) — it does not silently re-run on Opus.
+- [ ] An operator can force Opus for a named piece/phase at invocation (documented override flag/config).
+- [ ] The spike resolution is consumable downstream (e.g., as FR-003 test data) so the same unknown is not spiked twice within a piece.
+
+**Failure mode:** Spike agent cannot resolve the unknown → it returns `BLOCKED` with what it tried; execute escalates to the operator with the spike's findings (no fabricated resolution).
+
+---
+
+### FR-006: Repo-level self-hardening flywheel
+**Statement:** Recurring patterns are made countable against a durable, stable-ID registry at `docs/patterns.yaml` in the repo. This registry holds **repo-level** patterns (charter/project/PRD concerns) and correlates them across PRDs within that repo. When a finding is recorded, the flywheel proposes a match to an existing pattern ID (or "new"); the operator confirms the match and scope at the Step 6c triage moment (LLM-proposed, human-confirmed) — no silent write. Count = number of dated occurrences. When a pattern reaches the threshold (default 2, configurable), a hardening proposal is surfaced in a single batched operator review and routed to its repo home: a charter amendment, a local QA hardening, or PRD work. All writes and promotions are operator-gated; the step is non-blocking.
 **Priority:** P1
-**Linked metrics:** SC-004
+**Linked metrics:** SC-003, SC-005
 
 #### User Stories
-
-**US-006** — As a queue operator running a multi-piece session, I want the main context to stay lean so that sessions don't degrade or require `/compact` after 2-3 pieces.
+**US-007** — As a pipeline operator, I want recurring repo-level patterns to count against a registry and propose the right hardening (charter / QA / PRD) once they hit the threshold, with my confirmation, so the next plan starts denser.
 
 **Acceptance Criteria:**
-- [ ] No skill reads a file > 10KB directly into main context; large file reads go through a summarizing sub-agent
-- [ ] All sub-agents called from execute return results via schema (structured output ≤2K tokens) not raw text
-- [ ] A context-discipline reference doc (`reference/context-discipline.md`) documents the budget rules and which tools are context-safe
-- [ ] Execute emits `[CTX-LOAD: <filename> <kb>]` for each file read into main context; any file >10KB triggers `[CTX-OVERSIZED: routing to summarizer]` and dispatches a sub-agent to summarize before the content reaches main context
+- [ ] Repo-level patterns are recorded to `docs/patterns.yaml` with stable IDs; each occurrence carries provenance (piece, date, source finding); count = occurrences length.
+- [ ] On recording a finding, the flywheel proposes a match to an existing pattern ID or "new"; the operator confirms the classification and scope before any write (no silent write).
+- [ ] When a pattern's count ≥ threshold (default 2, configurable in `.spec-flow.yaml`), a hardening proposal is surfaced in a single batched operator review, routed to its repo home (charter amendment / local QA hardening / PRD work).
+- [ ] Rejected proposals are recorded with rationale and not re-proposed; the flywheel step is non-blocking — failure does not affect the execute result.
 
-**Failure mode:** Sub-agent fails to return structured output → main thread receives a truncated plain-text fallback with a `[CONTEXT-BUDGET-EXCEEDED]` warning.
+**Failure mode:** `docs/patterns.yaml` unwritable → flywheel emits `[FLYWHEEL-DEGRADED: repo registry unavailable]` and does not block execute; the finding still flows to normal end-of-piece reflection.
 
 ---
 
-### FR-007: Learning flywheel — recurring findings promote to charter amendments and spec-flow improvements
-**Statement:** After every execute completion, the reflection agents record findings to `learnings.md`. A new flywheel step scans all learnings across the PRD's pieces, counts recurrences of semantically similar findings, and when a finding has appeared in ≥2 pieces:
-  (a) For process findings about the project — proposes a charter amendment (new NN-C entry) for operator review
-  (b) For process findings about the spec-flow pipeline itself — creates a new piece in the spec-flow shared manifest as a self-improvement item
-
-The operator reviews proposed amendments/pieces and approves or rejects; approved proposals are committed immediately.
+### FR-007: Plugin-global cross-install flywheel
+**Statement:** **Plugin-level** patterns (spec-flow pipeline/agent/QA defects, distinct from project concerns) are recorded to a machine-global registry under `~/` (proposed `~/.claude/spec-flow/patterns.yaml`, path confirmed at spec time) that survives plugin updates and is read/written by any repo's flywheel run on that machine. This is what lets a defect appearing once per repo correlate across all repos on the machine. Same stable-ID + human-confirmed-match + count mechanics as FR-006. When a plugin pattern reaches the threshold, the proposal is to create a spec-flow self-improvement piece in the plugin's home repo. Cross-machine correlation is an explicit non-goal (no shared remote backend).
 **Priority:** P1
-**Linked metrics:** SC-003
+**Linked metrics:** SC-005
 
 #### User Stories
-
-**US-007** — As a queue operator running many pieces over time, I want the pipeline to notice recurring mistakes and encode them as permanent rules, so that future pieces start with those lessons built in rather than rediscovering them.
+**US-006** — As a plugin maintainer, I want plugin-level defects that each appear once in different repos to correlate in one machine-global registry, so a recurring spec-flow weakness is detected and hardened instead of rediscovered everywhere.
 
 **Acceptance Criteria:**
-- [ ] A flywheel step runs after each execute's reflection phase; it reads all `learnings.md` files for the current PRD
-- [ ] Findings are clustered by semantic similarity; any cluster with ≥2 occurrences triggers a promotion proposal
-- [ ] Charter proposals are presented as a draft NN-C entry (type, statement, scope, rationale, QA verification) for operator one-time approval
-- [ ] Spec-flow self-improvement proposals are presented as a draft manifest piece entry for the `shared` PRD for operator approval
-- [ ] Rejected proposals are recorded with rationale in the PRD's `backlog.md` (not silently dropped)
-- [ ] The flywheel step is non-blocking — if it fails or produces no proposals, execute's result is unaffected
+- [ ] Plugin-level patterns are recorded to a machine-global registry under `~/` (path confirmed at spec time) that survives plugin updates and is read/written by any repo's flywheel run on that machine.
+- [ ] Each plugin-pattern occurrence carries provenance including the originating repo; the operator confirms scope = plugin before any write (no silent write).
+- [ ] When a plugin pattern's count ≥ threshold, the batched review proposes creating a spec-flow self-improvement piece in the plugin's home repo (operator-gated).
+- [ ] If the machine-global registry is unwritable, the flywheel emits `[FLYWHEEL-DEGRADED: plugin registry unavailable]`, repo-level recording (FR-006) continues, and execute is not blocked. Cross-machine correlation is documented as out of scope.
 
-**Failure mode:** Flywheel scan finds no recurring patterns → step exits silently; no operator prompt.
-
----
+**Failure mode:** Two machines hit the same plugin defect → not correlated (per-machine registries); accepted limitation, see Non-Goals.
 
 ## Non-Functional Requirements
 
-### NFR-001: Research sub-agent context isolation
-**Statement:** The research sub-agent always runs in a fresh context isolated from the spec/plan main thread. It must not receive brainstorming history or prior conversational context. Its output to main context is bounded to a structured schema ≤2K tokens.
-**Priority:** P0
-**Linked metrics:** SC-004
-
-### NFR-002: research.md is a durable, session-portable artifact
-**Statement:** `research.md` is committed to the piece branch before spec Q&A begins. It remains valid for plan consumption across separate sessions (no time-limited cache). If more than 7 days pass between research commit and plan start, plan emits a staleness notice but does not block.
+### NFR-001: Research and spike agents are context-isolated
+**Statement:** The FR-001 research agent and the FR-005 spike agent always run in fresh, isolated contexts (no brainstorm or coordinator history). Each returns a structured summary ≤2K tokens to the main thread; richer detail lives in the on-disk artifact.
 **Priority:** P0
 **Linked metrics:** SC-001
 
-### NFR-003: Backward compatibility — all new behavior is additive
-**Statement:** All changes are additive and backward-compatible within the current major version (NN-C-003). Pieces without `research.md` run current spec/plan/execute behavior unchanged. The loop driver is opt-in. The flywheel is opt-in (can be disabled via `.spec-flow.yaml` key).
+### NFR-002: Coordinator state is fully re-derivable from disk
+**Statement:** No resume-critical coordinator state exists only in the in-context transcript. A coordinator re-started in a fresh context reaches the same next action from on-disk state alone. This is the property that makes a cheap-model coordinator viable (G-4).
+**Priority:** P0
+**Linked metrics:** SC-004
+
+### NFR-003: Backward compatibility — additive
+**Statement:** All changes are additive and backward-compatible within the current major (NN-C-003). Pieces without a research artifact, concreteness contract, or test-data blocks run current spec/plan/execute behavior. The flywheel and the model policy are opt-out via `.spec-flow.yaml`.
 **Priority:** P0
 **Linked metrics:** —
 
-### NFR-004: decisions.md is operator-reviewable before merge
-**Statement:** The Final Review gate in execute must include a check that `decisions.md` has been reviewed by the operator before the merge step proceeds. The review is a prompt — operator confirms they have read and accepted the autonomous decisions.
+### NFR-004: Plugin version bump and self-containment
+**Statement:** Each piece that changes plugin behavior bumps the plugin version (NN-C-009) and keeps every new/edited agent self-contained with a bare `name:` (NN-C-004, NN-C-008). The root `plugin.json` and `.claude-plugin/plugin.json` versions are kept in sync (the 5.2.1 skew is corrected when first touched).
 **Priority:** P1
-**Linked metrics:** SC-002
+**Linked metrics:** —
 
 ## Edge Cases & Failure Modes
 
-| Scenario | Expected behavior | FR reference |
+| Scenario | Expected behavior | FR |
 |---|---|---|
-| Research sub-agent times out or errors | Spec falls back to standard brainstorm with `[RESEARCH-UNAVAILABLE]` notice | FR-001 |
-| research.md is stale (>7 days) | Plan emits staleness notice, proceeds with current codebase exploration as supplement | FR-003 |
-| Execute hits direct spec contradiction during self-resolve | Escalates to operator with: what was ambiguous, what was found, the contradiction | FR-004 |
-| Execute hits circuit breaker (3 Final Review iterations) | Loop terminates with `BLOCKED`, records blocking reason + last clean phase in journal; operator resolves and re-invokes to resume | FR-005 |
-| Execute session interrupted mid-phase (laptop close, /clear) | Journal records last clean checkpoint; re-invoking execute resumes from that phase without re-running passing phases | FR-005 |
-| All stop criteria simultaneously true | Loop terminates with `DONE`, manifest status updated to `merged`, loop-run.log written | FR-005 |
-| Flywheel scan finds ≥5 simultaneous proposals | Batch-present all proposals in one operator review session (not 5 sequential prompts) | FR-007 |
-| Recurring finding is a spec-flow pipeline bug | Creates spec-flow shared manifest piece with severity HIGH | FR-007 |
-| Main context approaches Sonnet limit mid-piece | Execute checkpoints manifest state, emits `[CONTEXT-BUDGET-WARNING]`, suggests `/compact` | FR-006 |
+| Research sub-agent errors | `[RESEARCH-UNAVAILABLE]`; spec falls back to L-10; plan runs legacy sweep | FR-001 |
+| Plan cannot concretize a phase and it is not spike-able | `qa-plan` must-fix; phase re-planned, not passed downstream | FR-002 |
+| TDD expected outcome genuinely unpredictable | Phase marked `[SPIKE]`; spike resolves real outcome → becomes test data | FR-003, FR-005 |
+| Coordinator interrupted mid-piece (`/clear`, laptop close) | Fresh context resumes from disk to the same next action; no passing phase re-run | FR-004, NFR-002 |
+| Non-`[SPIKE]` phase can't complete on Sonnet | Halt → plan amendment (Step 6c); no silent Opus upgrade | FR-005 |
+| Doc-as-code piece needs >3 Final Review iterations | Configurable circuit-breaker (raised default) allows it; cascade detection still applies | FR-004 |
+| Same finding appears in two repos (plugin scope) | Both occurrences land in the machine-global `~/` registry; 2nd write trips threshold → spec-flow self-improvement proposal | FR-007 |
+| Same finding twice in one repo (repo scope) | Two occurrences in `docs/patterns.yaml`; threshold trips → charter/QA/PRD proposal | FR-006 |
+| Two machines, same plugin defect | Not correlated (per-machine registries) — accepted limitation; see Non-Goals | FR-007 |
+| Flywheel match ambiguous | LLM proposes match; operator confirms/corrects at Step 6c; no silent assignment | FR-006, FR-007 |
 
 ## Success Metrics
 
-- **SC-001:** Spec Q&A rounds ≤3 per piece on pieces with `research.md` present (current baseline: 5–8 rounds) — Linked to: FR-001, FR-002, FR-003
-- **SC-002:** Execute drives a single planned piece to `DONE` (all phases + Final Review clean) without operator prompting on ≥80% of pieces attempted — Linked to: FR-004, FR-005
-- **SC-003:** Recurring findings (≥2 occurrences) are promoted to charter or spec-flow manifest within the same PRD's lifetime — Linked to: FR-007
-- **SC-004:** Main orchestrator context accumulation stays below 80K tokens across a 3-piece queue run — Linked to: FR-006, NFR-001
+- **SC-001:** On pieces with a research artifact, spec Q&A rounds ≤3 (baseline 5–8). — FR-001
+- **SC-002:** ≥80% of execute phases complete on Sonnet without escalation or unmarked discovery on pieces whose plan passed the concreteness floor. — FR-002, FR-003, FR-004
+- **SC-003:** Avoidable execute-time discoveries (Step 6c events not attributable to a `[SPIKE]`) trend down across a PRD: the second half of a PRD's pieces show fewer than the first half. — FR-002, FR-006
+- **SC-004:** A coordinator forced into a fresh context mid-piece resumes correctly from disk on 100% of attempts; execute runs on Sonnet by default. — FR-004, NFR-002
+- **SC-005:** Opus token spend per piece trends down across a PRD as spikes decrease (proxy: `[SPIKE]` count per piece declines). — FR-005, FR-006, FR-007
 
 ## Priority Tiers
 
 | ID | Requirement | Priority | Rationale |
 |---|---|---|---|
-| FR-001 | Pre-spec research phase | P0 | Front-loads all context; feeds FR-002 and FR-003 |
-| FR-002 | Spec consumes research.md | P0 | Direct reduction in Q&A rounds — highest operator impact |
-| FR-003 | Plan consumes research.md | P0 | Eliminates redundant exploration; speeds spec→execute cycle |
-| FR-004 | Execute self-resolve | P0 | Makes execute safe to run unattended — prerequisite for FR-005 |
-| FR-005 | Execute loop driver | P0 | Core queue-operator capability |
-| FR-006 | Sonnet context discipline | P1 | Enables long multi-piece sessions without degradation |
-| FR-007 | Learning flywheel | P1 | Compounds value over time; not needed for first loop run |
-| NFR-001 | Research isolation | P0 | NN-C-008 compliance; fresh context per dispatch |
-| NFR-002 | research.md durability | P0 | Multi-session pipeline portability |
-| NFR-003 | Backward compat | P0 | NN-C-003 — mandatory for minor bump |
-| NFR-004 | decisions.md review gate | P1 | Operator oversight of autonomous decisions |
+| FR-001 | Unified research artifact | P0 | One gathering pass feeds spec + plan; prerequisite for dense plans |
+| FR-002 | Plan concreteness contract | P0 | The core — makes execute mechanical |
+| FR-003 | Test data upfront | P0 | Moves test design from execute to plan |
+| FR-004 | Sonnet coordinator on file state | P0 | Removes the Opus-as-driver cost; enables cheap mechanics |
+| FR-005 | Opus spike agent + model policy | P0 | The sanctioned thinking path; keeps "dumb execute" honest |
+| FR-006 | Repo-level flywheel | P1 | Drives the spike/Opus curve down; repo charter/QA/PRD hardening |
+| FR-007 | Plugin-global flywheel | P1 | Cross-install plugin learning; machine-global correlation |
+| NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
+| NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
+| NFR-003 | Backward compat | P0 | NN-C-003 |
+| NFR-004 | Version bump + self-containment | P1 | NN-C-004/008/009 |
 
 ## Assumptions
 
-- **Technical:** The `Agent` tool, `ScheduleWakeup`, and `/loop` skill are all available in this Claude Code install (verified in docs/autonomous-loops-and-spec-flow.md)
-- **Technical:** Sonnet is the primary model for orchestration; Opus is dispatched only for QA/review-board agents (per existing execute behavior)
-- **Technical:** `research.md` fits comfortably in the piece's spec directory without requiring a new layout version
-- **User behavior:** The operator will review `decisions.md` before approving the merge gate — the gate is a prompt, not enforced technically
-- **User behavior:** The operator runs `/loop` or the loop driver manually; there is no automatic trigger that starts the loop without explicit operator action
-- **Pipeline:** Pieces passing the plan gate have well-formed specs and plans — the loop assumes valid artifacts, not garbage-in tolerance
+- **Technical:** `Agent` (isolated sub-agents), per-stage model selection, and `.spec-flow.yaml` config are available (verified in the capability audit, 2026-06-06).
+- **Technical:** spec-flow already ships the execute loop, journal resume, auto Final Review with fix/re-review, and reflection agents — this PRD upgrades plan density, model placement, and learning, not the loop mechanics.
+- **Technical:** The plan-stage `introspection.md` already performs deep codebase gathering; FR-001 unifies it with the pre-spec scan rather than adding a third mechanism.
+- **User behavior:** The operator invests in a dense plan at the Opus gate and reviews flywheel proposals; nothing is auto-applied.
+- **Pipeline:** Pieces reaching execute have passed the human spec and plan gates.
 
 ## Open Questions
 
 | Question | Owner | Status |
 |---|---|---|
-| Should `research.md` schema be versioned (v1/v2) or free-form markdown with frontmatter? | spec author | open |
-| Flywheel recurrence threshold: exactly 2 occurrences, or configurable via `.spec-flow.yaml`? | spec author | open — default 2, configurable recommended |
-| Should `decisions.md` be a new artifact template or appended to `learnings.md`? | spec author | open — separate file preferred for clarity |
-| Context budget ceiling for FR-006: 80K tokens or configurable? | spec author | open — 80K starting point, configurable |
-| Does the loop driver live as a skill (`/spec-flow:exec-loop`) or as a docs artifact (paste-to-use prompt)? | spec author | open — docs artifact first, skill if it proves stable |
+| Exact machine-global plugin-registry path (`~/.claude/spec-flow/patterns.yaml`?) and update-stability guarantees | spec author (FR-007 piece) | open — proposal `~/.claude/spec-flow/patterns.yaml` |
+| Pattern occurrence granularity: one per piece where it appeared, or one per reflection finding? | spec author (FR-006/FR-007 pieces) | open |
+| Doc-as-code "exact prose" concreteness bar — how exact is enforceable by `qa-plan`? | spec author (FR-002 piece) | open |
+| Test-data-upfront for integration/non-deterministic phases — `[SPIKE]` fallback sufficient? | spec author (FR-003 piece) | open — lean: yes, spike then record |
+| Which `.spec-flow.yaml` keys: `flywheel_threshold`, `circuit_breaker.docs`, `model_policy`? | spec author (FR-004/006/007 pieces) | open |
 
 ## Non-Negotiables (Product)
 
 ### NN-P-001: Human approval gate on spec and plan is never removed
 - **Type:** Rule
-- **Statement:** The research phase and spec/plan optimization reduce the number of Q&A rounds but do not remove the human review and sign-off step. No spec or plan may advance to execute without explicit operator approval. Automation is upstream of the gate, not a replacement for it.
-- **Scope:** FR-001, FR-002, FR-003 and any future additions to the research/spec/plan pipeline
-- **Rationale:** Spec and plan encode design intent. The human is the only source of ground truth on "is this the right thing to build." Removing the gate conflates "Claude found context" with "Claude made the right design decision."
-- **How QA verifies:** QA-spec and qa-plan agents confirm human sign-off is still required. Any diff that removes the sign-off prompt from spec or plan skills is a must-fix.
+- **Statement:** Research, density, and model placement reduce rounds and cost but never remove the human review-and-sign-off on spec and plan. No spec or plan advances to execute without explicit operator approval.
+- **Scope:** FR-001, FR-002, FR-003 and any research/spec/plan additions
+- **Rationale:** Spec and plan encode design intent; the human is the only ground truth on "is this the right thing, scoped right."
+- **How QA verifies:** `qa-spec`/`qa-plan` confirm sign-off remains; any diff removing the sign-off prompt is must-fix.
 
-### NN-P-002: All autonomous decisions are auditable before merge
+### NN-P-002: No silent execute-time discovery or self-resolution
 - **Type:** Rule
-- **Statement:** Every decision made autonomously during execute (FR-004) must be recorded in `decisions.md` before the Final Review gate. The Final Review gate includes a `decisions.md` review prompt. No piece may merge with autonomous decisions that were not presented to the operator.
-- **Scope:** FR-004, FR-005 (loop driver must not skip the decisions.md review gate)
-- **Rationale:** Operators must be able to audit what Claude decided autonomously. Silent decisions that ship to production violate the operator's oversight contract.
-- **How QA verifies:** Review-board spec-compliance reviewer checks that `decisions.md` exists and is non-empty whenever the implementer self-resolved ≥1 ambiguity.
+- **Statement:** Execute never silently resolves a spec/plan ambiguity and proceeds. Genuine unknowns are explicit `[SPIKE]` markers resolved by a recorded spike agent; anything else routes to plan amendment (Step 6c) for synchronous operator triage. There is no in-execute decision log that ships unreviewed.
+- **Scope:** FR-002, FR-005, and the execute path
+- **Rationale:** An execute-time discovery is a plan-incompleteness signal; hiding it as a self-resolved decision destroys the feedback the flywheel needs and violates the synchronous-discovery doctrine.
+- **How QA verifies:** Review-board / `qa-plan` confirm every unknown is either a `[SPIKE]` (with recorded resolution) or a Step 6c amendment; no silent decision artifact exists.
 
 ### NN-P-003: Execute loop is operator-invoked only
 - **Type:** Rule
-- **Statement:** No automated mechanism starts the execute completion loop without explicit operator action. The operator invokes `/spec-flow:execute <prd>/<piece>` deliberately. The loop then runs unattended to completion (FR-005), but the initial invocation is always manual.
-- **Scope:** FR-005
-- **Rationale:** Unattended execution is powerful; it should never start silently. The operator reviews the spec and plan, approves them, then deliberately hands off execution.
-- **How QA verifies:** Execute skill must not auto-invoke itself on a piece without an explicit operator invocation in the session. The loop-driver.md prompt makes this explicit — it shows the operator pasting the command, not a silent trigger.
+- **Statement:** No automated mechanism starts execute. The operator invokes it deliberately; the loop then runs to completion, but the initial invocation is always manual.
+- **Scope:** FR-004
+- **Rationale:** Unattended execution is powerful; it must never start silently.
+- **How QA verifies:** Execute contains no self-invocation path on an unstarted piece.
 
-### NN-P-004: Flywheel proposals require operator one-time approval
+### NN-P-004: Flywheel writes and promotions are operator-gated
 - **Type:** Rule
-- **Statement:** The learning flywheel (FR-007) may propose charter amendments and spec-flow manifest pieces but may not apply them without operator review. A proposal presented and ignored is re-surfaced on the next flywheel run; a proposal explicitly rejected is recorded in backlog.md with rationale and not re-proposed.
-- **Scope:** FR-007
-- **Rationale:** Charter amendments are binding rules. Spec-flow manifest pieces become real work. Neither should be created without human intent.
-- **How QA verifies:** Flywheel step contains no code path that writes to charter files or manifest without a user-confirmation prompt.
+- **Statement:** Both registries (repo `docs/patterns.yaml` and machine-global `~/`) are written only after operator confirmation at triage. Pattern matches are LLM-proposed, human-confirmed. Promotions (charter amendments, QA hardening, spec-flow self-improvement pieces) require operator approval. Rejected proposals are recorded with rationale and not re-proposed. Nothing is auto-applied; nothing is silently deferred.
+- **Scope:** FR-006, FR-007
+- **Rationale:** Charter rules are binding and manifest pieces are real work; both demand human intent. Silent deferral violates the no-silent-defer doctrine.
+- **How QA verifies:** No flywheel code path writes a registry or proposes a promotion without a confirmation prompt; spec-compliance reviewer checks the gate.
+
+### NN-P-005: Thinking on Opus, mechanics on Sonnet — no silent upgrade
+- **Type:** Rule
+- **Statement:** Spec authoring, plan authoring, all adversarial gates, and spikes run on Opus. Execute (coordinator, implementer, test transcription) runs on Sonnet by default. Execute never silently upgrades a non-`[SPIKE]` phase to Opus to compensate for an under-specified plan — it halts and routes to plan amendment or a `[SPIKE]`. Operator override is explicit.
+- **Scope:** FR-004, FR-005
+- **Rationale:** Concentrating thinking upstream is the entire cost model; a silent Opus upgrade in execute hides plan incompleteness and re-introduces the cost this PRD removes.
+- **How QA verifies:** Model-policy check asserts stage→model assignment; any execute path that escalates a non-`[SPIKE]` phase to Opus without halting/override is must-fix.

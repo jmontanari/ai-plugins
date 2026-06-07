@@ -1,112 +1,139 @@
 schema_version: 1
 generated: 2026-06-06
 last_updated: 2026-06-06
-prd_source: "docs/prds/exec-loop/prd.md"
+prd_source: "docs/prds/exec-ready/prd.md"
 
 feature_branch: null
 merge_target: master
 pr_required: true
 
 pieces:
-  - name: research-artifact
-    slug: research-artifact
+  - name: research-unify
+    slug: research-unify
     description: |
-      New research sub-agent (agents/researcher.md) that runs in a fresh context before
-      spec brainstorm, reads relevant codebase files, charter rules, backlog items, and
-      past learnings, then returns a schema-bounded brief (≤2K tokens) to main context.
-      Output is committed as research.md at docs/prds/<prd>/specs/<piece>/research.md
-      before the first spec Q&A question. Covers artifact production only (FR-001, NFR-001,
-      NFR-002). New template: templates/research.md. Spec skill gains the research dispatch
-      call and the [RESEARCH-UNAVAILABLE] fallback path.
-    prd_sections: [FR-001, NFR-001, NFR-002, G-1]
+      One deep codebase-gathering pass runs once, before spec brainstorm, in an isolated
+      Opus sub-agent, and writes a durable research.md to the piece spec directory. Spec
+      consumes it for proposed answers during brainstorm; plan consumes the same artifact
+      as primary context and stops re-deriving introspection.md (emits [RESEARCH-CONSUMED]
+      / [RESEARCH-ABSENT]). Folds in the L-10 convention scan and the plan-stage
+      introspection so there is exactly one gathering pass, not three. [RESEARCH-UNAVAILABLE]
+      fallback preserves current behavior. Return to main thread is ≤2K tokens; on-disk file
+      may be richer. Covers FR-001, NFR-001.
+    prd_sections: [FR-001, NFR-001, NFR-003, G-1]
     dependencies: []
     status: open
 
-  - name: research-consume
-    slug: research-consume
+  - name: plan-concrete
+    slug: plan-concrete
     description: |
-      Spec and plan skill updates to consume research.md. Spec skill reads research.md at
-      brainstorm start and presents proposed answers from research findings before asking
-      each question ("Based on [finding], I propose [answer] — confirm or correct?"). Plan
-      skill checks for research.md at plan start; if present and non-empty, emits
-      [RESEARCH-CONSUMED: N files] and skips file-discovery sweep; if absent, emits
-      [RESEARCH-ABSENT: running full exploration] and runs sweep normally. Staleness check
-      (>7 days): plan emits notice and supplements with current exploration. Covers FR-002,
-      FR-003.
-    prd_sections: [FR-002, FR-003, G-1]
-    dependencies: [research-artifact]
+      Plan concreteness contract — the core piece. Each plan phase specifies exact file,
+      exact location/anchor, and exact content/signatures (not "implement X"). Genuine
+      unknowns become explicit [SPIKE: <unknown>] markers. Doc-as-code phases require exact
+      prose plus a branch-enumeration AC per conditional (codifies the pi-011 finding).
+      qa-plan gains a concreteness floor: vague deliverables, unmarked unknowns, and missing
+      branch ACs are must-fix. Goal: a passing plan yields zero unmarked execute-time
+      discoveries. Covers FR-002.
+    prd_sections: [FR-002, G-1, G-2]
+    dependencies: [research-unify]
     status: open
 
-  - name: exec-self-resolve
-    slug: exec-self-resolve
+  - name: test-data-up
+    slug: test-data-up
     description: |
-      Execute ambiguity self-resolution. When the implementer encounters a case not covered
-      by the spec, it dispatches a mini research step (reads spec, charter, research.md,
-      related existing code) before escalating. Documents autonomous decisions in decisions.md
-      (new artifact at docs/prds/<prd>/specs/<piece>/decisions.md) with: what was ambiguous,
-      what was found, what was decided, why. Escalates only for direct spec contradictions or
-      genuinely undecidable cases after research. Final Review gate gains a decisions.md review
-      prompt before merge (NFR-004). Covers FR-004, NFR-004, NN-P-002, G-2.
-    prd_sections: [FR-004, NFR-004, G-2]
-    dependencies: [research-artifact]
+      Test data defined upfront for TDD phases. Each TDD phase in the plan carries a
+      `Test Data` block (concrete inputs + expected outcomes/oracle). tdd-red transcribes
+      the oracle from the plan instead of designing it live; it invents no inputs/outcomes
+      absent from the plan. Unpredictable outcomes use a [SPIKE] marker instead of fabricated
+      data. qa-plan flags a TDD phase with neither a Test Data block nor a [SPIKE] marker.
+      Covers FR-003.
+    prd_sections: [FR-003, G-1]
+    dependencies: [plan-concrete]
     status: open
 
-  - name: ctx-discipline
-    slug: ctx-discipline
+  - name: sonnet-coord
+    slug: sonnet-coord
     description: |
-      Sonnet-optimized orchestrator context discipline. Adds reference/context-discipline.md
-      documenting budget rules and context-safe tools. Skills updated to emit [CTX-LOAD:
-      <filename> <kb>] for each file read into main context; files >10KB trigger [CTX-OVERSIZED]
-      and route to a summarizing sub-agent. All sub-agent return values schema-bounded to ≤2K
-      tokens. Configurable token budget via .spec-flow.yaml key `ctx_budget` (default 80K).
-      [CONTEXT-BUDGET-WARNING] emitted when main context approaches the limit. Covers FR-006,
-      NFR-003 (backward compat: new behavior additive, existing invocations unchanged), G-5.
-    prd_sections: [FR-006, NFR-003, G-5]
-    dependencies: [exec-self-resolve]
+      Sonnet-driven coordinator on file-based state. Execute assigns Sonnet to coordinator +
+      implementer by default. The existing 5.2.1 pre-flight already warns when the active
+      model is NOT Sonnet (bbcf58c); this piece generalizes that single execute-start prompt
+      into a per-stage model policy that reports the assignment and flags only exceptions
+      (spike path / operator override). All resume-critical state is on disk so a fresh
+      context re-derives position and resumes from the last clean checkpoint
+      ([STATE-INCOMPLETE] escalation if a field is missing). Final Review circuit-breaker
+      becomes configurable via .spec-flow.yaml (raised default for doc-as-code; fixes the
+      pi-011 hard-3 defect). Corrects the root/.claude-plugin plugin.json version skew when
+      first touched. Covers FR-004, NFR-002, NFR-003, NFR-004.
+    prd_sections: [FR-004, NFR-002, NFR-003, NFR-004, G-3, G-4]
+    dependencies: [plan-concrete]
     status: open
 
-  - name: exec-loop
-    slug: exec-loop
+  - name: spike-agent
+    slug: spike-agent
     description: |
-      Execute completion loop with objective stop criteria. Drives a single piece's
-      implementation through all phases to DONE without stopping for operator input.
-      Stop criteria: all plan phases complete AND oracle green AND Final Review zero
-      must-fix findings. Explicit DONE/BLOCKED termination states — BLOCKED only on:
-      FR-004 escalation (genuine spec contradiction), circuit-breaker hit (3 Final Review
-      iterations), or unrecoverable tool error. Loop state persisted to journal; interrupted
-      sessions resume from last clean phase checkpoint. On DONE: manifest status updated
-      to merged, loop-run.log written. On BLOCKED: loop-run.log records blocking reason
-      and last clean checkpoint. Also produces docs/exec-loop/loop-driver.md — a
-      copy-paste /loop prompt for running execute on successive planned pieces (docs
-      artifact, not a new skill). Covers FR-005, G-3.
-    prd_sections: [FR-005, G-3]
-    dependencies: [exec-self-resolve, ctx-discipline]
+      New Opus spike agent (agents/spike.md) + execute wiring. A [SPIKE] phase dispatches the
+      spike agent on Opus in an isolated context; it resolves the genuine unknown and records
+      a structured resolution to a durable artifact (consumable as FR-003 test data, so the
+      same unknown is not spiked twice). A non-[SPIKE] phase the implementer cannot complete
+      on Sonnet halts and routes to plan amendment (Step 6c) — never a silent Opus upgrade.
+      Operator override forces Opus for a named piece/phase at invocation. Spike that cannot
+      resolve returns BLOCKED with findings; execute escalates (no fabricated resolution).
+      Covers FR-005.
+    prd_sections: [FR-005, G-2, G-3]
+    dependencies: [plan-concrete, sonnet-coord]
     status: open
 
-  - name: learn-flywheel
-    slug: learn-flywheel
+  - name: flywheel-repo
+    slug: flywheel-repo
     description: |
-      Learning flywheel. Post-execute step added to execute's reflection phase. Scans all
-      learnings.md files for the current PRD, clusters semantically similar findings, proposes
-      charter amendments (draft NN-C entries) for project-level findings appearing in ≥2 pieces,
-      and proposes spec-flow shared manifest pieces for pipeline process gaps. Operator reviews
-      all proposals in one batched session. Approved charter amendments committed to
-      .claude/skills/charter-non-negotiables/SKILL.md. Approved spec-flow pieces appended to
-      docs/prds/shared/manifest.yaml. Rejected proposals recorded in exec-loop backlog.md.
-      Non-blocking: execute result unaffected if step fails. Configurable threshold via
-      .spec-flow.yaml key `flywheel_threshold` (default 2). Covers FR-007, NN-P-004, G-4.
-    prd_sections: [FR-007, G-4]
-    dependencies: [exec-loop]
+      Repo-level self-hardening flywheel. Recurring patterns become countable against a
+      durable stable-ID registry at docs/patterns.yaml, correlating charter/project/PRD
+      patterns across PRDs within the repo. On recording, the flywheel proposes a pattern-ID
+      match (or "new"); operator confirms classification + scope at Step 6c (no silent write).
+      Count = dated occurrences (provenance: piece, date, source). At threshold (default 2,
+      configurable in .spec-flow.yaml) a batched hardening proposal routes to its repo home
+      (charter amendment / local QA hardening / PRD work). Rejections recorded with rationale,
+      not re-proposed. Non-blocking; [FLYWHEEL-DEGRADED: repo registry unavailable] if
+      docs/patterns.yaml is unwritable. Establishes the registry + match + count mechanics
+      reused by flywheel-global. Covers FR-006.
+    prd_sections: [FR-006, G-5]
+    dependencies: [sonnet-coord]
+    status: open
+
+  - name: flywheel-global
+    slug: flywheel-global
+    description: |
+      Plugin-global cross-install flywheel. Plugin-level patterns (spec-flow pipeline/agent/QA
+      defects) are recorded to a machine-global registry under ~/ (proposed
+      ~/.claude/spec-flow/patterns.yaml; path confirmed at spec) that survives plugin updates
+      and is read/written by any repo's flywheel run on the machine — so a defect appearing
+      once per repo correlates across all repos on the machine. Reuses the stable-ID + match +
+      count mechanics from flywheel-repo; each occurrence carries the originating repo;
+      operator confirms scope=plugin before write. At threshold, the batched proposal is to
+      create a spec-flow self-improvement piece in the plugin home repo. [FLYWHEEL-DEGRADED:
+      plugin registry unavailable] if unwritable (repo-level recording continues; execute not
+      blocked). Cross-machine correlation is an explicit non-goal (no shared remote backend).
+      Covers FR-007.
+    prd_sections: [FR-007, G-5]
+    dependencies: [flywheel-repo]
     status: open
 
 coverage:
-  total_prd_sections: 10
-  covered_sections: 10
+  total_prd_sections: 11
+  covered_sections: 11
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs, NFRs, and Goals covered across 6 pieces. Piece splits applied per qa-prd
-    findings: research-phase split into research-artifact (FR-001) + research-consume
-    (FR-002/003); exec-loop split into ctx-discipline (FR-006) + exec-loop (FR-005).
-    NFR-003 backward-compat covered in ctx-discipline (additive changes). NN-Ps enforced
-    via spec/plan QA gates and review-board spec-compliance reviewer.
+    All FRs (001-007) and NFRs (001-004) covered across 7 pieces. NFR-003 (backward-compat,
+    additive) is borne by research-unify (the [RESEARCH-ABSENT] fallback) and sonnet-coord
+    (the opt-out .spec-flow.yaml model policy / configurable circuit-breaker), and is listed
+    in their prd_sections for traceability. The old exec-loop framing (autonomous execute
+    loop, self-resolve + decisions.md, Sonnet context budget) was retired after a 2026-06-06
+    re-evaluation: FR-004/005 of the prior PRD were ~90% already shipped (auto phase-loop,
+    auto Final Review + fix loop, manifest→merged, journal resume), the Sonnet-context premise
+    was superseded by the Opus-1M driver, and execute self-resolve conflicted with the
+    synchronous-discovery doctrine. The genuinely-new surface is plan density (plan-concrete,
+    test-data-up), model placement + file-state (sonnet-coord, spike-agent), and cross-install
+    learning (flywheel-repo, flywheel-global). Pieces split to keep each ≤7 ACs per the qa-prd
+    granularity rule: the coordinator into sonnet-coord + spike-agent, and the flywheel into
+    flywheel-repo + flywheel-global (the latter splits the two distinct registry subsystems
+    per qa-prd iteration-1 must-fix #1).
