@@ -1,7 +1,7 @@
 ---
 slug: exec-ready
 status: drafting
-version: 1
+version: 2
 ---
 
 # Product Requirements Document — Execution-Ready Plans
@@ -29,7 +29,7 @@ version: 1
 ## Goals
 
 - **G-1: Execution-ready plans.** Every decision knowable from the spec + codebase is resolved at plan time — exact file, location, content, signatures, and (for TDD) concrete test data with expected outcomes. Execute transcribes; it does not design.
-- **G-2: No unplanned discovery.** Genuine unknowns (real external behavior that cannot be predicted) are explicit `[SPIKE]` markers in the plan, resolved by an isolated thinking agent — never silent execute-time discovery. The bar is *zero avoidable discovery*.
+- **G-2: No unplanned, mid-stream discovery.** Genuine unknowns (real external behavior that cannot be predicted) are explicit `[SPIKE]` markers in the plan, resolved by an isolated thinking agent. Any mid-execution scope change — whether agent-discovered or operator-initiated — is scoped by a spike and folded into the plan before code changes, never applied as a silent mid-stream patch. The bar is *zero avoidable discovery and zero mid-stream fixes*.
 - **G-3: Right model in the right place.** Opus does the thinking (spec, plan, all adversarial gates, spikes); Sonnet runs the mechanics (coordinator, implementer, test transcription). Execute never silently upgrades to Opus to mask an under-specified plan.
 - **G-4: File-based, re-derivable state.** All coordinator state needed to resume lives on disk; a fresh, cheap context re-derives the pipeline from disk. The transcript is disposable, so the large-context-window crutch (and its cost) is removed.
 - **G-5: A self-hardening flywheel.** Recurring avoidable-discovery patterns are counted against a durable registry and routed to the right hardening home — repo (charter/project/PRD) or plugin (machine-global) — operator-gated, driving spikes and Opus cost down piece over piece.
@@ -183,6 +183,26 @@ version: 1
 
 **Failure mode:** Two machines hit the same plugin defect → not correlated (per-machine registries); accepted limitation, see Non-Goals.
 
+---
+
+### FR-008: Scoping spike for mid-execution changes
+**Statement:** Any mid-execution scope change is routed through one disciplined workflow before any code change, never applied as a mid-stream patch. Two triggers converge on it: **(a) agent-discovered** found-work surfaced at Step 6c (`qa-phase`/`qa-phase-lite` findings, AC-matrix NOT-COVERED rows, Build missing-prerequisite escalations) and **(b) operator-initiated** change requests issued while execute is running ("add X", "change Y", "I think we should do X"). Both triggers follow the **same regime**: the change enters Step 6c triage rather than being applied mid-stream, and a size/complexity threshold (the existing Step 6c diff-ratio gate, default 50% of cumulative diff) decides the path. Above the threshold, a scoping spike runs first — the FR-005 spike agent (Opus, isolated context) understands the change's full scope and enumerates its task list / blast-radius, recording a durable scoping artifact that `plan-amend` then consumes. Below the threshold, the change amends the plan directly as today (no scoping spike). Either way the resulting amendment phases are added to the plan/task list at a dependency-correct position and do **not** preempt the in-progress phase — current work-in-progress completes first; preemption occurs only when the operator explicitly force-stops current work.
+**Priority:** P0
+**Linked metrics:** SC-002, SC-006
+
+#### User Stories
+**US-008** — As a pipeline operator, when I realize mid-execution that something must be added or changed (or an agent surfaces found-work), I want it scoped and folded into the plan before any code is written, so the change is implemented completely and in order — instead of patched halfway, taking over my current work, or forgotten.
+
+**Acceptance Criteria:**
+- [ ] A mid-execution change — agent-discovered OR operator-initiated ("add/change/do X") — enters the Step 6c triage workflow and is not applied as a mid-stream patch.
+- [ ] When the change exceeds the size/complexity threshold (the Step 6c diff-ratio gate, default 50% of cumulative diff), a scoping spike (FR-005 agent, Opus, isolated) runs before `plan-amend` and writes a durable scoping artifact (scope + enumerated task list) that `plan-amend` consumes; below the threshold the change amends the plan directly with no scoping spike.
+- [ ] The scoping artifact is recorded to the piece directory and referenced by the resulting `chore(plan): amend` commit and its `.discovery-log.md` row (audit trail).
+- [ ] Amendment phases produced by the workflow are added to the plan/task list at a dependency-correct position and do NOT preempt the in-progress phase; current WIP completes first. Preemption occurs only when the operator explicitly force-stops current work.
+- [ ] If the scoping spike returns `BLOCKED` (cannot scope the change), execute escalates to the operator with the spike's findings; no plan amendment is produced and no mid-stream patch is applied.
+- [ ] No execute path applies an above-threshold mid-execution change without a scoping spike followed by a plan amendment; `qa-plan` / review-board verify the gate (NN-P-002).
+
+**Failure mode:** Scoping spike cannot resolve the change's scope → returns `BLOCKED` with findings; execute escalates to the operator (no fabricated scope, no mid-stream patch, no plan amendment).
+
 ## Non-Functional Requirements
 
 ### NFR-001: Research and spike agents are context-isolated
@@ -214,6 +234,10 @@ version: 1
 | TDD expected outcome genuinely unpredictable | Phase marked `[SPIKE]`; spike resolves real outcome → becomes test data | FR-003, FR-005 |
 | Coordinator interrupted mid-piece (`/clear`, laptop close) | Fresh context resumes from disk to the same next action; no passing phase re-run | FR-004, NFR-002 |
 | Non-`[SPIKE]` phase can't complete on Sonnet | Halt → plan amendment (Step 6c); no silent Opus upgrade | FR-005 |
+| Operator requests a change mid-execute ("add/change X") | Enters Step 6c; above threshold → scoping spike → plan amendment → queued task; not applied mid-stream | FR-008 |
+| Mid-execution change scoped while a phase is in progress | Amendment phases queued at dependency-correct position; current WIP finishes first unless operator force-stops | FR-008 |
+| Scoping spike cannot scope a mid-execution change | `BLOCKED` with findings; execute escalates; no amendment, no mid-stream patch | FR-008 |
+| Trivial mid-execution change below size threshold | Amends the plan directly (no scoping spike), as today | FR-008 |
 | Doc-as-code piece needs >3 Final Review iterations | Configurable circuit-breaker (raised default) allows it; cascade detection still applies | FR-004 |
 | Same finding appears in two repos (plugin scope) | Both occurrences land in the machine-global `~/` registry; 2nd write trips threshold → spec-flow self-improvement proposal | FR-007 |
 | Same finding twice in one repo (repo scope) | Two occurrences in `docs/patterns.yaml`; threshold trips → charter/QA/PRD proposal | FR-006 |
@@ -223,10 +247,11 @@ version: 1
 ## Success Metrics
 
 - **SC-001:** On pieces with a research artifact, spec Q&A rounds ≤3 (baseline 5–8). — FR-001
-- **SC-002:** ≥80% of execute phases complete on Sonnet without escalation or unmarked discovery on pieces whose plan passed the concreteness floor. — FR-002, FR-003, FR-004
+- **SC-002:** ≥80% of execute phases complete on Sonnet without escalation or unmarked discovery on pieces whose plan passed the concreteness floor. — FR-002, FR-003, FR-004, FR-008
 - **SC-003:** Avoidable execute-time discoveries (Step 6c events not attributable to a `[SPIKE]`) trend down across a PRD: the second half of a PRD's pieces show fewer than the first half. — FR-002, FR-006
 - **SC-004:** A coordinator forced into a fresh context mid-piece resumes correctly from disk on 100% of attempts; execute runs on Sonnet by default. — FR-004, NFR-002
 - **SC-005:** Opus token spend per piece trends down across a PRD as spikes decrease (proxy: `[SPIKE]` count per piece declines). — FR-005, FR-006, FR-007
+- **SC-006:** Mid-execution changes that route through a scoping spike produce a complete plan amendment — measured: no second amendment targeting the same change within the same piece (the change was fully scoped on the first pass). — FR-008
 
 ## Priority Tiers
 
@@ -239,6 +264,7 @@ version: 1
 | FR-005 | Opus spike agent + model policy | P0 | The sanctioned thinking path; keeps "dumb execute" honest |
 | FR-006 | Repo-level flywheel | P1 | Drives the spike/Opus curve down; repo charter/QA/PRD hardening |
 | FR-007 | Plugin-global flywheel | P1 | Cross-install plugin learning; machine-global correlation |
+| FR-008 | Scoping spike for mid-execution changes | P0 | Routes all mid-run scope change (agent + operator) through scope→amend→execute; kills mid-stream patching |
 | NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
 | NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
 | NFR-003 | Backward compat | P0 | NN-C-003 |
@@ -261,6 +287,8 @@ version: 1
 | Doc-as-code "exact prose" concreteness bar — how exact is enforceable by `qa-plan`? | spec author (FR-002 piece) | open |
 | Test-data-upfront for integration/non-deterministic phases — `[SPIKE]` fallback sufficient? | spec author (FR-003 piece) | open — lean: yes, spike then record |
 | Which `.spec-flow.yaml` keys: `flywheel_threshold`, `circuit_breaker.docs`, `model_policy`? | spec author (FR-004/006/007 pieces) | open |
+| How does execute reliably detect an operator-initiated mid-execution change request vs normal operator input/answers? | spec author (spike-agent / FR-008) | open |
+| Spike-first threshold for mid-execution changes — reuse the 50% diff-ratio gate as-is, or add a separate `.spec-flow.yaml` key? | spec author (spike-agent / FR-008) | open — lean: reuse the 50% gate, configurable |
 
 ## Non-Negotiables (Product)
 
@@ -271,12 +299,12 @@ version: 1
 - **Rationale:** Spec and plan encode design intent; the human is the only ground truth on "is this the right thing, scoped right."
 - **How QA verifies:** `qa-spec`/`qa-plan` confirm sign-off remains; any diff removing the sign-off prompt is must-fix.
 
-### NN-P-002: No silent execute-time discovery or self-resolution
+### NN-P-002: No silent or mid-stream execute-time change
 - **Type:** Rule
-- **Statement:** Execute never silently resolves a spec/plan ambiguity and proceeds. Genuine unknowns are explicit `[SPIKE]` markers resolved by a recorded spike agent; anything else routes to plan amendment (Step 6c) for synchronous operator triage. There is no in-execute decision log that ships unreviewed.
-- **Scope:** FR-002, FR-005, and the execute path
-- **Rationale:** An execute-time discovery is a plan-incompleteness signal; hiding it as a self-resolved decision destroys the feedback the flywheel needs and violates the synchronous-discovery doctrine.
-- **How QA verifies:** Review-board / `qa-plan` confirm every unknown is either a `[SPIKE]` (with recorded resolution) or a Step 6c amendment; no silent decision artifact exists.
+- **Statement:** Execute never silently resolves a spec/plan ambiguity and proceeds, and never applies a mid-execution scope change as a mid-stream patch. Genuine planned unknowns are explicit `[SPIKE]` markers resolved by a recorded spike agent. ANY mid-execution scope change — whether agent-discovered (Step 6c) or operator-initiated ("add/change/do X" during execute) — enters Step 6c triage: above the size/complexity threshold it is first scoped by a recorded spike agent, below it amends the plan directly; either way it routes through plan amendment for synchronous operator triage and executes in dependency order. There is no in-execute decision log that ships unreviewed and no mid-stream fix that bypasses the Step 6c → amend → execute workflow.
+- **Scope:** FR-002, FR-005, FR-008, and the execute path
+- **Rationale:** An execute-time discovery — or an operator's mid-run change — is a plan-incompleteness or scope-growth signal; applying it mid-stream destroys the feedback the flywheel needs, produces partial fixes, and violates the synchronous-discovery doctrine.
+- **How QA verifies:** Review-board / `qa-plan` confirm every planned unknown is a `[SPIKE]` (with recorded resolution), and every above-threshold mid-execution change is a scoping spike + Step 6c amendment; no silent decision artifact and no mid-stream patch exists.
 
 ### NN-P-003: Execute loop is operator-invoked only
 - **Type:** Rule

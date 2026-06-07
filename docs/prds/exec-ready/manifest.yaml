@@ -70,15 +70,22 @@ pieces:
   - name: spike-agent
     slug: spike-agent
     description: |
-      New Opus spike agent (agents/spike.md) + execute wiring. A [SPIKE] phase dispatches the
-      spike agent on Opus in an isolated context; it resolves the genuine unknown and records
-      a structured resolution to a durable artifact (consumable as FR-003 test data, so the
-      same unknown is not spiked twice). A non-[SPIKE] phase the implementer cannot complete
-      on Sonnet halts and routes to plan amendment (Step 6c) — never a silent Opus upgrade.
-      Operator override forces Opus for a named piece/phase at invocation. Spike that cannot
-      resolve returns BLOCKED with findings; execute escalates (no fabricated resolution).
-      Covers FR-005.
-    prd_sections: [FR-005, G-2, G-3]
+      New Opus spike agent (agents/spike.md) + execute wiring, serving two roles on one shared
+      agent. ROLE 1 (FR-005): a [SPIKE] phase dispatches the spike agent on Opus in an isolated
+      context; it resolves the genuine unknown and records a structured resolution to a durable
+      artifact (consumable as FR-003 test data, so the same unknown is not spiked twice). A
+      non-[SPIKE] phase the implementer cannot complete on Sonnet halts and routes to plan
+      amendment (Step 6c) — never a silent Opus upgrade. Operator override forces Opus for a
+      named piece/phase at invocation. ROLE 2 (FR-008): any mid-execution scope change — agent-
+      discovered found-work at Step 6c OR an operator-initiated change ("add/change/do X") during
+      execute — enters Step 6c triage under one uniform regime; above the size/complexity
+      threshold (the 50% diff-ratio gate) the same spike agent scopes the change first and writes
+      a scoping artifact that plan-amend consumes, below it the change amends the plan directly.
+      The resulting amendment phases are queued onto the plan/task list at a dependency-correct
+      position and do not preempt in-progress work unless the operator force-stops. Amends
+      NN-P-002. Spike that cannot resolve/scope returns BLOCKED with findings; execute escalates
+      (no fabricated resolution, no mid-stream patch). Covers FR-005, FR-008.
+    prd_sections: [FR-005, FR-008, G-2, G-3]
     dependencies: [plan-concrete, sonnet-coord]
     status: open
 
@@ -118,12 +125,15 @@ pieces:
     status: open
 
 coverage:
-  total_prd_sections: 11
-  covered_sections: 11
+  total_prd_sections: 12
+  covered_sections: 12
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs (001-007) and NFRs (001-004) covered across 7 pieces. NFR-003 (backward-compat,
+    All FRs (001-008) and NFRs (001-004) covered across 7 pieces. FR-008 (scoping spike for
+    mid-execution changes) was added in PRD v2 and folded into the spike-agent piece alongside
+    FR-005 — both share the agents/spike.md primitive (FR-005 resolves planned [SPIKE] unknowns;
+    FR-008 scopes mid-execution changes before plan amendment). FR-008 amends NN-P-002. NFR-003 (backward-compat,
     additive) is borne by research-unify (the [RESEARCH-ABSENT] fallback) and sonnet-coord
     (the opt-out .spec-flow.yaml model policy / configurable circuit-breaker), and is listed
     in their prd_sections for traceability. The old exec-loop framing (autonomous execute
