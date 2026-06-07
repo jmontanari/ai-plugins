@@ -230,6 +230,20 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **Why this does not block pi-010-discovery's goals:** Process improvement for future pieces; does not affect pi-010-discovery's shipped artifacts.
 **Captured:** 2026-04-30
 
+### [Deferred via /spec-flow:defer] Cross-phase citation-consistency LLM oracle is not a named verify step type — 2026-06-07
+
+**Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-process-retro`)
+**Finding (verbatim):** Phase 5 of plan-concrete ran a §2d cross-phase schema-consistency LLM oracle (definitional alignment across 4 files: reference doc + 3 citers). It was effective but one-off and undocumented as a pattern. Any future Implement-track piece where N≥3 files must stay semantically aligned (shared terminology, cross-cited criteria numbers, slot naming) should include this as a standard verify step. Without naming it, future orchestrators will either omit it or re-invent it ad hoc. Candidate action: add a named "citation-consistency oracle" verify step type to plan/SKILL.md §9 or the plan template, triggered when a phase touches ≥3 files that cross-reference each other's vocabulary.
+**Why this does not block plan-concrete's goals:** Process improvement for future pieces; plan-concrete's citation contract was successfully verified by the oracle. Does not affect shipped artifacts.
+**Captured:** 2026-06-07
+
+### [Deferred via /spec-flow:defer] Disjoint consumer phases should use a Phase Group, not serial ordering — 2026-06-07
+
+**Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-process-retro`)
+**Finding (verbatim):** Phases 2, 3, 4 of plan-concrete touched disjoint files (plan/SKILL.md, qa-plan.md, templates/plan.md) with only a read dependency on Phase 1's output — not a write dependency on each other. Serializing them was safe but wasted ~2/3 wall-time. A plan-authoring heuristic is needed: "if N≥2 phases each read the same completed Phase-K output but do not write to each other's files, model them as a Phase Group with Phase-K as the barrier."
+**Why this does not block plan-concrete's goals:** Retroactive plan-structure observation; shipped artifacts are correct. Heuristic is for future piece authoring.
+**Captured:** 2026-06-07
+
 ### [Deferred via /spec-flow:defer] Phase 9 bundled three behavioral regions — should be three phases — 2026-04-30
 
 **Source:** `shared/pi-010-discovery` phase `step-4.5-reflection` (agent: `reflection-process-retro`)

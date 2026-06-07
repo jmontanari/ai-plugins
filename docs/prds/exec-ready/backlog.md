@@ -24,3 +24,28 @@ The original `exec-loop` PRD was re-scoped after a capability audit + fresh Bori
 - **Execute self-resolve + `decisions.md` (old FR-004)** — CUT. Conflicts with the synchronous-discovery doctrine; an execute-time ambiguity is a plan-incompleteness signal routed to Step 6c or a `[SPIKE]`, not a silent in-execute decision log. Captured as NN-P-002.
 - **`loop-driver.md` multi-piece driver + DONE/BLOCKED vocabulary (old FR-005 scraps)** — DROPPED. The execute loop, manifest→merged, and journal resume already ship; only the configurable circuit-breaker survived (folded into `sonnet-coord`). Autonomous multi-piece queue is an explicit non-goal.
 - **Cross-machine plugin-pattern correlation** — NON-GOAL. The `~/` plugin registry is per-machine; cross-machine correlation needs a shared remote backend (auth/privacy/weight). Revisit only if multi-machine plugin learning becomes a real need.
+
+---
+
+## Recent findings
+
+### [Deferred via /spec-flow:defer] qa-spec + spec/SKILL.md + templates/spec.md lack branch-enumeration AC coverage — 2026-06-07
+
+**Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** plan-concrete shipped branch-enumeration AC enforcement at the plan layer (qa-plan criterion #30, plan/SKILL.md §2f sub-rule 3, §9d, templates/plan.md slot). The upstream spec layer is untouched — a spec can ship with implicit conditional branches that no AC covers, and the plan author must retrofit ACs later (or qa-plan must-fixes the resulting plan). The pi-011 retro in improvement-backlog.md also called for qa-spec branch-enumeration. Candidate piece: add qa-spec criterion (#19) for doc-as-code phases, extend spec/SKILL.md with a parallel authoring note, add branch-AC slot to templates/spec.md — all citing reference/plan-concreteness.md §3. Deps: plan-concrete (merged ✓).
+**Why this does not block plan-concrete's goals:** plan-concrete's scope is the plan layer only; the spec-layer gap is a follow-on improvement. qa-plan's criterion #30 provides a backstop even when the spec layer is silent.
+**Captured:** 2026-06-07
+
+### [Deferred via /spec-flow:defer] flywheel-repo spec should include unmarked-execute-time-discovery as a first-class metric — 2026-06-07
+
+**Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** plan-concrete's stated outcome goal ("a passing plan yields zero unmarked execute-time discoveries") has no measurement surface. The flywheel-repo piece (FR-006, status: open) is the natural recording surface. During flywheel-repo spec brainstorm, propose adding "unmarked execute-time discovery" as a first-class flywheel pattern-type: each Step 6c discovery event that was NOT a [SPIKE]-routed resolution increments a per-plan-quality counter in docs/patterns.yaml. This is a scope amendment for flywheel-repo, not a new piece. Deps: spike-agent (FR-005) must land first (Step 6c plan amendments must exist).
+**Why this does not block plan-concrete's goals:** The measurement surface is downstream of multiple open pieces; plan-concrete's enforcement layer is complete and correct without it.
+**Captured:** 2026-06-07
+
+### [Deferred via /spec-flow:defer] test-data-up spec must cite reference/plan-concreteness.md §2 for [SPIKE] syntax — 2026-06-07
+
+**Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
+**Finding (verbatim):** reference/plan-concreteness.md §2 is the authoritative home for [SPIKE: <unknown>] syntax. test-data-up (FR-003, status: open) will use [SPIKE] for unpredictable TDD outcomes and must cite §2 rather than re-specifying the marker syntax. If the test-data-up spec brainstorm doesn't surface this dependency, it may inadvertently introduce a [SPIKE-DATA] variant or re-define the marker, causing marker-token drift. Action: inject reference/plan-concreteness.md §2 as a required input during test-data-up spec brainstorm; add an AC that test-data-up cites §2 for the syntax.
+**Why this does not block plan-concrete's goals:** test-data-up is a future open piece; this is a spec-authoring constraint to inject at its spec stage, not a gap in plan-concrete's deliverables.
+**Captured:** 2026-06-07
