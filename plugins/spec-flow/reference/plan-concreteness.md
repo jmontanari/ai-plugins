@@ -109,25 +109,15 @@ Correct AC enumeration:
 
 -->
 
-## 4. Interim plan-finalize spike-block + FR-005 handoff
+## 4. Plan-finalize spike-gate (FR-005: routed-resolution)
 
-**Interim behavior:** The plan-skill Phase 4 finalize step currently enforces a hard gate: it refuses to advance while any `[SPIKE: <unknown>]` survives in prose. The same scan scoping as §2 applies — skip lines inside fenced code blocks (between opening ``` and closing ``` fences) and skip lines inside HTML comments (between `<!--` and `-->`); for multi-line HTML comments skip every line between and including the opening and closing lines; HTML-comment exclusion takes precedence over fence-state entry; only raw marker text in prose counts as a surviving marker.
+**Shipped (FR-005):** The plan-skill Phase 4 finalize step now enforces a routed-resolution gate rather than a hard block. The same scan scoping as §2 applies — skip lines inside fenced code blocks (between opening ``` and closing ``` fences) and skip lines inside HTML comments (between `<!--` and `-->`); for multi-line HTML comments skip every line between and including the opening and closing lines; HTML-comment exclusion takes precedence over fence-state entry; only raw marker text in prose counts as a surviving marker.
 
-When one or more `[SPIKE:]` markers survive, the finalize step reports:
-
-```
-Plan finalize refused — N surviving [SPIKE:] marker(s) must be resolved before the plan is approved:
-  1. [SPIKE: <description>] — found in Phase <N>: <surrounding sentence>
-  ...
-Resolve each marker by either: (a) replacing it with concrete content if the unknown is now
-resolved, or (b) awaiting FR-005 spike-agent resolution, which will issue a plan amendment.
-```
-
-This block is **interim**: it applies until FR-005 (`spike-agent`) ships and the harness gains automated spike-resolution capability.
-
-**FR-005 / spike-agent forward reference:** FR-005 (`spike-agent`) adds an Opus spike resolver that clears a `[SPIKE]` via a Step 6c **plan amendment** — an in-place targeted amendment to the relevant phase that replaces the spike marker with concrete, verified content. After the plan amendment is applied, the finalize gate is relaxed to a routed-resolution annotation rather than a hard refusal. Until FR-005 ships, the operator must resolve each `[SPIKE:]` marker manually by editing the plan and re-running finalize.
+For each surviving marked `[SPIKE:]` marker, finalize annotates it as "routed-resolution: resolved at execute by `spike-agent` (FR-005)" and **advances** — finalize does not refuse. The operative model is **annotate-and-advance at finalize → resolve at execute**: the `[SPIKE:]` phase must reach execute for the spike agent to fire, investigate the unknown, and record the resolution artifact (and, when the unknown is a test oracle, emit the concrete `Test Data` block back into the plan). The spike agent may also emit a Step 6c plan amendment when the resolution requires additional phases.
 
 **Silent no-op path:** If no `[SPIKE:]` markers survive in prose after the scan, the finalize spike-scan is a silent no-op and Phase 4 continues without interruption.
+
+**Unmarked unknowns:** qa-plan #29 (concreteness) catches unmarked unknowns before finalize runs — the finalize scan governs only *marked* `[SPIKE:]` spikes.
 
 ## 5. Test Data contract
 

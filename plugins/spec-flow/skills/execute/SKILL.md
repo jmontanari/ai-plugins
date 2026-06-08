@@ -46,7 +46,9 @@ If the model already contains `sonnet` → proceed to Step 0 immediately with no
 
 ### Per-stage model policy report
 
-When `model_policy: auto` (the default), after the Sonnet-class check passes, emit a per-stage model-assignment report from the table in `plugins/spec-flow/reference/coordinator-contract.md` `## Model Policy`. The report lists each in-execute stage → its model and **flags only the two sanctioned exceptions** (spike phase → Opus; operator override → Opus). It never upgrades a non-`[SPIKE]` stage to Opus (NN-P-005).
+When `model_policy: auto` (the default), after the Sonnet-class check passes, emit a per-stage model-assignment report from the table in `plugins/spec-flow/reference/coordinator-contract.md` `## Model Policy`. The report lists each in-execute stage → its model and **flags only the two sanctioned exceptions**: (1) **spike phase → Opus** — a `[SPIKE]` phase triggers the Step 1c resolve dispatch on Opus (FR-005); (2) **operator override → Opus** — the `--opus=<phase-id|all>` invocation flag forces Opus for the named phase(s) (absent flag → silent no-op, NN-C-005). A non-`[SPIKE]`, non-`--opus` stage never upgrades to Opus (NN-P-005).
+
+**`--opus` flag parse (pre-flight):** If the user invokes execute with `--opus=<phase-id>` or `--opus=all`, parse it at Step 0 (config load) and store as `opus_override_phases` (a list of phase IDs, or `["all"]`). When dispatching any phase listed in `opus_override_phases`, use `model: "opus"` and surface it as the operator-override exception in the model-policy report. Absent `--opus` → `opus_override_phases = []` (no override, silent no-op).
 
 When `model_policy: off`, skip the report entirely — only the Pre-flight Model Check prompt above runs (legacy behavior).
 
@@ -387,6 +389,43 @@ Inspect the phase's checkboxes in plan.md to determine the mode flag passed to t
 - Both markers present, or neither: plan is malformed. Escalate to human.
 
 The orchestrator branches mechanically on the checkbox; it does not decide which mode applies. The mode decision was made by the plan author. The Implement mode exists for phases where TDD doesn't fit (config, infra, scaffolding, glue code, docs-as-code) **and** for all phases when the plan uses non-TDD mode (`tdd: false` in plan front-matter).
+
+### Step 1c: [SPIKE]-phase resolution (FR-005)
+
+*(Runs before Step 1b when triggered — the spike resolves the unknown before pre-flight gathers facts.)*
+
+If the current phase carries a `[SPIKE:]` marker in its prose (detected before mode-dispatch and outside fenced code / HTML comments per `plugins/spec-flow/reference/plan-concreteness.md` §2 scan-scoping), the orchestrator runs the spike agent in `resolve` mode BEFORE the implementer:
+
+**Guard — skip if already resolved:** Check whether `docs/prds/<prd-slug>/specs/<piece-slug>/spikes/<phase-id>.md` already exists. If it does, the spike was previously resolved — skip the dispatch and proceed to Step 1b with the existing artifact. If the file exists, read the first `STATUS:` line. If `STATUS:` is absent or its value is neither `OK` nor `BLOCKED`, the artifact is malformed — log a warning and re-dispatch the spike resolve rather than silently advancing.
+
+**Resolve dispatch:**
+```
+Agent({
+  description: "Resolve [SPIKE] unknown for phase <phase-id>",
+  prompt: "<inject: mode:resolve + the [SPIKE] marker text + full phase plan context + (if the phase has a [TDD-Red] or [Write-Tests] step) the Test Data skeleton from the plan>",
+  model: "opus"
+})
+```
+Dispatch is isolated — no shared history. All inputs injected by the orchestrator.
+
+**On `STATUS: OK`:**
+1. Read the spike artifact at `docs/prds/<prd-slug>/specs/<piece-slug>/spikes/<phase-id>.md`.
+2. If the artifact carries a `**Test Data:**` block, write it into the phase's `Test Data` block in `plan.md` (so Step 2.7 / `tdd-red` transcribes it verbatim — both already consume `plan.md` per `plugins/spec-flow/reference/plan-concreteness.md` §5). If the phase has a `[TDD-Red]` or `[Write-Tests]` step (i.e., it requires test data) AND the spike artifact carries no `**Test Data:**` block, treat this as a BLOCKED response: surface a `requires-amendment` discovery row with reason 'spike resolved OK but produced no Test Data for TDD phase' and route to Step 6c. Do NOT proceed to the implementer.
+3. Record the artifact path in orchestrator state.
+4. Proceed to Step 1b (pre-flight) then the phase's normal track (TDD or Implement).
+
+**On `STATUS: BLOCKED`:**
+Surface a discovery row:
+```
+Type: requires-amendment
+Source: spike-agent (resolve mode, phase <phase-id>)
+Why this blocks: spike could not resolve [SPIKE: <description>]. Reason: <agent reason>.
+Proposed amendment scope: operator must supply the resolution or redefine the unknown.
+Estimated absorption size: unknown
+```
+Route to Step 6c discovery triage. Do NOT proceed to the implementer for this phase.
+
+See `plugins/spec-flow/reference/spike-agent.md` `## Agent modes` for the full mode contract.
 
 ### Step 1b: Phase Pre-Flight (read-only)
 
@@ -962,6 +1001,26 @@ Read three sources and combine them into a single ordered discovery list keyed b
 
 **Re-dispatch idempotence.** When the orchestrator re-dispatches Build mid-scan (the `does-not-block-goal: n` rejection path defined in Step 4, or any other Build re-dispatch path), it MUST clear `phase_<id>_routed_discoveries` for this phase before re-running Build. Otherwise the rejected attempt's routed rows would accumulate alongside the re-run's rows, double-counting discoveries against the budget and surfacing stale rows in the triage prompt. The clear is unconditional: routed-discoveries state is per-attempt, not per-phase. Step 6c always sees only the currently-accepted attempt's routed rows for the phase.
 
+#### Operator-initiated change admission (FR-008)
+
+When a free-form operator turn (NOT a structured answer to an active execute prompt — triage choice, QA sign-off, BLOCKED escalation response, etc.) reads as a behavior or scope change — imperative phrasing such as "add…", "change…", "we should…", "what if we…", "can you also…" — the coordinator emits ONE confirmation prompt:
+
+```
+That reads as a scope change: "<one-line summary of the change>". Route it through scope → amend → execute? (y/n)
+```
+
+- **On `y`:** append the change to the Step 6c discovery list with:
+  - `source_agent: operator`
+  - `default_triage: amend`
+  - `row_text` = the operator's change text verbatim (used as input to the scope spike if threshold exceeded)
+  Proceed through the normal triage + amend flow for that discovery.
+
+- **On `n`:** treat the operator turn as a comment; no routing, no discovery appended.
+
+**Detection is SUPPRESSED while the coordinator is awaiting a structured answer** — a y/n triage choice, a model-policy confirmation, a QA sign-off, or any active prompt the coordinator emitted that expects a constrained response. Free-form input during these windows is treated as a structured answer, not as a potential scope change.
+
+This path does NOT bypass the 50% threshold gate (T-2 below) or the no-bypass gate (T-3 below) — operator-admitted changes enter Step 6c and are evaluated by the same threshold and spike logic as agent-discovered changes.
+
 If the combined discovery list is empty after aggregation, skip directly to Step 7 — there is nothing to triage.
 
 #### Triage prompt
@@ -987,6 +1046,13 @@ A fourth option, `(s) amend-spec`, is offered ONLY for discoveries whose finding
 **Aggregate shortcuts decompose into per-discovery dispatches.** The `'A'` (amend all that fit < 50% threshold) and `'D'` (defer all) shortcuts are input sugar — they decompose into the same per-discovery dispatch flow as if the operator had typed `(a)` or `(d)` for each discovery individually. There is no batched-amend or batched-defer code path. `'A'` produces one `plan-amend` (or `spec-amend`) dispatch and one `chore(plan): amend` (or `chore(spec): amend`) commit per amended discovery; `'D'` produces one `/spec-flow:defer` invocation and one `chore: defer` commit per deferred discovery. Per-discovery `.discovery-log.md` rows append per the Resolution-commit cell convention (below) regardless of which input form was used.
 
 #### Auto-mode threshold (FR-17)
+
+**Universal threshold (spike-vs-direct decision).** For every admitted change — whether in operator mode or `--auto` mode — the 50% diff-ratio gate determines whether a scope spike runs before `plan-amend` (see T-3 below). This gate is orthogonal to the auto-amend-vs-escalate decision: the scope-spike decision is evaluated first; the auto-mode amend-vs-escalate semantics (below) are a SEPARATE, subsequent decision layered on top.
+
+- `ratio ≥ 0.5` (and the undefined-ratio / zero-cumulative-diff case — treated as infinity per the edge case below) → dispatch scope spike before `plan-amend` (see `plugins/spec-flow/reference/spike-agent.md` `## Threshold reuse`).
+- `ratio < 0.5` → direct `plan-amend` without a scope spike.
+
+No new config key. Reuses the 0.5 value from the threshold computation below.
 
 When execute is invoked with `--auto`, each discovery in the aggregated triage list is evaluated independently against the auto-amend threshold at the moment the discovery surfaces. **Per-discovery evaluation:** threshold breaches do NOT lock subsequent discoveries into operator-required mode — each subsequent discovery is evaluated independently against the cumulative diff size *as of when that discovery surfaces*, even if an earlier discovery in the same triage event escalated to operator prompt. The auto-mode default state is preserved across discoveries; only the specific discovery whose ratio exceeded the threshold falls back to operator prompt.
 
@@ -1024,6 +1090,23 @@ where `<phase>` is the discovery's source phase ID and `<X>` is `ratio × 100` r
 
 For each discovery the operator routes `amend` (or `amend-spec`):
 
+**Scope-spike pre-step (when threshold exceeded).** When the threshold computation (above) determined `ratio ≥ 0.5` (or undefined-ratio) for this discovery, dispatch the spike agent in `scope` mode before invoking `plan-amend`:
+
+```
+Agent({
+  description: "Scope change for discovery in <phase-id>",
+  prompt: "<inject: mode:scope + the change text (row_text) + current plan.md + diff/neighborhood scope>",
+  model: "opus"
+})
+```
+
+- **On `STATUS: OK`:** read the scoping artifact at `docs/prds/<prd-slug>/specs/<piece-slug>/spikes/<discovery-id>.md`. Extract `Classification:` and `Scope / Task list:` from the artifact. Before passing the classification to `plan-amend`, validate it against the three-value allowlist (`blocking-on-current`, `blocking-on-later: <phase-id>`, `additive: <after-phase-id>`). If the `Classification:` prefix (before any `:`) is not one of `blocking-on-current`, `blocking-on-later`, `additive`, reject with: `Refused — spike artifact Classification field is not a recognized value; re-dispatch spike or escalate.` Do NOT pass an unrecognized value to plan-amend. Pass the classification to `plan-amend` as the placement directive (consumed by Phase 3's `agents/plan-amend.md` `## Context Provided` contract). Proceed to step 1 (plan-amend dispatch).
+- **On `STATUS: BLOCKED`:** Before escalating, append a `.discovery-log.md` row for this discovery with `Triage choice: blocked — scope spike BLOCKED` and commit it as `chore(<piece-slug>): block — scope spike BLOCKED (<discovery-id>)`. Then escalate — surface a new `requires-amendment` discovery row with the spike's blocking reason; do NOT dispatch `plan-amend` for this discovery.
+
+**No-bypass gate.** No above-threshold admitted change (ratio ≥ 0.5 or undefined-ratio) may reach `plan-amend` without a completed scope spike — this invariant is enforced by the pre-step above and verified by qa-plan + review-board spec-compliance per NN-P-002 (see `plugins/spec-flow/reference/spike-agent.md` `## No-bypass gate`).
+
+Below-threshold changes (ratio < 0.5) skip the scope spike and proceed directly to step 1.
+
 1. **Plan amendments — dispatch `plugins/spec-flow/agents/plan-amend.md` (Phase 4 output)** with the current `plan.md`, the structured discovery report (the full record from the aggregation list — `row_text`, `default_triage`, `source_agent`, `ac_id`), and the diff+neighborhood scope. Compute scope by enumerating phases whose `[Implement]` or `[Build]` blocks touch any file the discovery references — exact file path match, not shared directory, per FR-11 (`auth/login.py` does not pull in scope phases that touch `auth/logout.py`).
 
 2. **Extract the unified diff** from the agent's `## Diff of changes` section by parsing everything between that heading and the next `##`-or-EOF boundary (mirroring the `fix-doc` agent's diff-extraction pattern already used elsewhere in execute).
@@ -1052,9 +1135,17 @@ For each discovery the operator routes `amend` (or `amend-spec`):
    git add docs/prds/<prd-slug>/specs/<piece-slug>/.discovery-log.md
    git commit -m "chore(plan): amend — <reason — discovery summary>"
    ```
-   The `<reason>` is the discovery's `default_triage`-implied reason (`requires-amendment`, etc.) plus the one-line finding summary. Both files land in the same commit, producing a single coherent amend-with-audit-trail entry in `git log`.
+   The `<reason>` is the discovery's `default_triage`-implied reason (`requires-amendment`, etc.) plus the one-line finding summary. When the amend path ran a scope spike before `plan-amend`, append the spike artifact path to the commit subject: `chore(plan): amend — <reason> (spike: spikes/<discovery-id>.md)`. Both files land in the same commit, producing a single coherent amend-with-audit-trail entry in `git log`.
 
-6. **Resume execution at the first amendment phase** using the suffix-form ID convention `phase_<N>_amend_<K>` per FR-13, where `<N>` is the original phase ID and `<K>` is the 1-indexed amendment counter for that phase (`phase_3_amend_1`, `phase_3_amend_2` if the amendment introduced two new phases, etc.). Amendment phases run through the full Per-Phase Loop including their own Step 6 QA gate (see "NN-P-002 preservation" below).
+6. **Block-aware placement and resume** — The resume position is determined by the `Classification` field from the scope spike's artifact (passed to `plan-amend` as the placement directive). When no scope spike ran (below-threshold direct amend), classify as `additive` unless the discovery explicitly names a dependent later phase:
+
+   - `blocking-on-current` → the change targets the in-progress phase's own deliverable. Re-open the in-progress phase as `phase_<N>_amend_<K>` (superseding its remainder); resume at that amendment phase immediately.
+   - `blocking-on-later: <phase-id>` → a not-yet-started phase depends on the change. Insert `phase_<N>_amend_<K>` before `<phase-id>`; let current WIP finish first, then resume at the amendment phase before `<phase-id>`.
+   - `additive: <after-phase-id>` → no existing phase depends on it. Append `phase_<N>_amend_<K>` after `<after-phase-id>` at the dependency-correct slot; current WIP finishes first.
+
+   No amendment phase preempts the in-progress phase except `blocking-on-current` or an explicit operator force-stop. An operator force-stop means the operator explicitly overrides the triage prompt to treat the discovery as `blocking-on-current` — use the same preempt path as that class regardless of what the scope spike returned. Resume re-derives placement from `plan.md` checkboxes + amendment IDs on disk (so a fresh context re-enters at the correct position without in-memory state). The `phase_<N>_amend_<K>` suffix-ID convention (FR-13) is unchanged. Amendment phases run through the full Per-Phase Loop including their own Step 6 QA gate (see "NN-P-002 preservation" below).
+
+   See `plugins/spec-flow/reference/spike-agent.md` `## Placement rule` for the canonical definition.
 
 7. **Spec amendments — dispatch `plugins/spec-flow/agents/spec-amend.md` (Phase 5 output)** when the operator chose `amend-spec`. Apply the same extract → `git apply --check` → `git apply` → qa-spec re-dispatch (iter-until-clean) → commit flow, with the commit message:
    ```
@@ -1115,12 +1206,10 @@ This counts only successful amend commits (failed dispatches produce no commit a
 
 **Pre-dispatch budget check.** Before invoking `plan-amend` or `spec-amend` for any discovery (whether operator-chosen or auto-resolved under `--auto`), the orchestrator checks the budget:
 
-1. If `piece_amendment_count >= 5`, refuse the dispatch with the budget-exhaustion escalation prompt (below). Do NOT dispatch the amend agent.
-2. If the choice is `amend-spec` AND `piece_spec_amendment_count >= 1`, refuse with the verbatim string:
-   ```
-   Refused — spec-amend budget exhausted (1/1); choose plan-amend, fork, or defer.
-   ```
-   and re-prompt the operator at the Triage prompt for THIS discovery only (other discoveries in the same triage event are unaffected). The discovery itself does NOT consume a budget slot when refused — only successful dispatches increment counters.
+When both step 1 (total budget) and step 2 (spec sub-cap) would fire simultaneously for the same dispatch — i.e. `piece_amendment_count >= 5` AND the choice is `amend-spec` AND `piece_spec_amendment_count >= 1` — surface a single merged soft-checkpoint prompt: `Hit spec sub-cap AND total amendment budget — this piece may be under-scoped. Choose: (c) continue / (f) fork / (d) defer / (b) block`. Do not fire two sequential prompts.
+
+1. If `piece_amendment_count >= 5`, route to the soft-checkpoint prompt (below) — the total-budget cap uses the same four-option checkpoint, not a hard refuse. The discovery itself does NOT consume a budget slot unless the operator chooses `(c)` and the dispatch succeeds — only successful dispatches increment counters.
+2. If the choice is `amend-spec` AND `piece_spec_amendment_count >= 1`, route to the soft-checkpoint prompt (below) — the spec-amend sub-cap uses the same four-option checkpoint as the total budget, not a hard refuse. The discovery itself does NOT consume a budget slot unless the operator chooses `(c)` and the dispatch succeeds — only successful dispatches increment counters.
 
 **Counter increment on successful amend.** The counters are incremented only after the amend dispatch produces a successful commit (the `chore(plan): amend — ...` or `chore(spec): amend — ...` commit lands cleanly per Amend dispatch step 5/7). The increment rules:
 
@@ -1129,26 +1218,29 @@ This counts only successful amend commits (failed dispatches produce no commit a
 
 A failed amend (diff fails `git apply --check` and the operator chooses not to re-dispatch, or the dispatched agent halts with BLOCKED) does NOT increment either counter. The "no extra budget slot for re-dispatch within the same triage event" provision under Amend dispatch step 4 means: a discovery's amend dispatch consumes one slot total, regardless of how many plan-amend/spec-amend invocations the orchestrator runs to produce a clean diff for that one discovery.
 
-**Budget-exhaustion escalation prompt.** When `piece_amendment_count >= 5` blocks an amend dispatch, the orchestrator prompts the operator with the verbatim string:
+**Soft-checkpoint prompt.** When `piece_amendment_count >= 5` (or `piece_spec_amendment_count >= 1` for a spec amendment) would block an amend dispatch, the orchestrator emits a soft-checkpoint prompt rather than a hard refusal. The count is at threshold — the piece may be under-scoped — but the operator decides:
 
 ```
-Amendment budget exhausted (5/5) — this piece may be under-scoped. Consider forking remaining must-fix work into a new piece. Continue anyway? (y/n)
+Hit <N> amendments — this piece may be under-scoped. Choose:
+  (c) continue amending
+  (f) fork remaining must-fix work into a new piece
+  (d) defer this finding
+  (b) block piece
 ```
 
-This is a y/n confirmation gated by NN-C-006 (operator confirmation required for destructive or piece-state-changing operations).
+Per NN-C-006 (operator confirmation for piece-state-changing operations):
 
-- **On `y`:** the orchestrator continues execution with **no further amendments allowed**. Subsequent discoveries — whether in the current triage event, later phases, or Step 8's Final Review Triage — may only choose `fork` or `defer`. The `(a) amend` and `(s) amend-spec` options are no longer offered. Auto-mode under `--auto` falls back to the operator prompt (since auto-amend cannot dispatch) and the operator must choose fork or defer.
-- **On `n`:** the orchestrator halts execute. It sets the current piece's status to `blocked` in `docs/prds/<prd-slug>/manifest.yaml` with a notes-line citing budget exhaustion (the operator's `n` response constitutes the explicit confirmation NN-C-006 requires; this is therefore not a destructive operation without confirmation). It commits the manifest update on the current worktree branch:
+- **On `c` (continue):** dispatch the amendment. Re-surface this same four-option prompt on each subsequent amendment attempt — the count never resets and never hard-blocks. Auto-mode under `--auto` falls back to operator prompt at this juncture (auto-amend cannot dispatch without explicit confirmation above threshold). When no operator is present (unattended `--auto` run), auto-mode defaults to `(d)` defer for the current finding and continues execution.
+- **On `f` (fork):** execute the Fork dispatch flow for this discovery, creating a new piece. Halt the current piece's execute and set status to `blocked` (discovery is forked, not deferred).
+- **On `d` (defer):** execute the Defer dispatch flow for this discovery. Continue executing the current piece.
+- **On `b` (block):** operator-chosen halt. Set the current piece's status to `blocked` in `docs/prds/<prd-slug>/manifest.yaml` with a notes-line citing budget exhaustion, commit the manifest update:
   ```bash
   git add docs/prds/<prd-slug>/manifest.yaml
   git commit -m "chore(<piece-slug>): block — amendment budget exhausted"
   ```
-  and exits with the operator-facing message:
-  ```
-  Halted: piece <piece-slug> status set to blocked (amendment budget exhausted). Re-spec or abandon recommended.
-  ```
+  and exit with: `Halted: piece <piece-slug> status set to blocked (amendment budget exhausted). Re-spec or abandon recommended.`
 
-The budget-exhaustion check fires once per amend dispatch attempt; if the operator answers `y` once in a triage event, the orchestrator does not re-prompt for subsequent amend attempts in the same execute session — but the "no further amendments allowed" lock applies regardless.
+The count never resets within a piece and never hard-blocks. The soft checkpoint re-surfaces on each subsequent amendment; the operator's `(c)` choice is per-amendment (not a session-wide unlock). See `plugins/spec-flow/reference/spike-agent.md` `## Soft-checkpoint budget` for the canonical definition.
 
 #### `.discovery-log.md` authoring
 
@@ -1165,7 +1257,7 @@ For each triaged discovery, append a row to `<docs_root>/prds/<prd-slug>/specs/<
 
 If the file does not exist when the first row is appended, create it with the H1 + table header shown above (the H1 uses the live `<prd-slug>` and `<piece-slug>` values). Subsequent rows append below the existing rows in chronological triage order.
 
-**Resolution-commit cell convention.** The orchestrator does NOT pre-compute or amend SHAs into the row. Instead, the row's `Resolution commit` cell records the commit subject (e.g., `chore(plan): amend — auth helper missing X`) which uniquely identifies the commit when grepped (`git log --grep "<subject>"`). The row append is committed in the SAME commit as the resolution itself, but the actor that stages the row depends on the dispatch type:
+**Resolution-commit cell convention.** The orchestrator does NOT pre-compute or amend SHAs into the row. Instead, the row's `Resolution commit` cell records the commit subject (e.g., `chore(plan): amend — auth helper missing X`) which uniquely identifies the commit when grepped (`git log --grep "<subject>"`). When the amend path ran a scope spike before `plan-amend`, the orchestrator appends the spike artifact path to the commit subject inside the cell: `abc1234 chore(plan): amend — auth helper missing X (spike: spikes/<id>.md)`. No new column is added — the reference is embedded in the existing `Resolution commit` cell. The row append is committed in the SAME commit as the resolution itself, but the actor that stages the row depends on the dispatch type:
 
 - **Amend (plan-amend or spec-amend):** the orchestrator stages both `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.discovery-log.md` and `plan.md` (or `spec.md`) before invoking `git commit`.
 - **Fork:** the orchestrator stages both `.discovery-log.md` and `manifest.yaml` before invoking `git commit`.

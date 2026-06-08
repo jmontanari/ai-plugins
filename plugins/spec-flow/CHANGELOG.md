@@ -4,6 +4,20 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.7.0] — 2026-06-07
+
+### Added
+- **`agents/spike.md` (Opus spike agent, resolve+scope modes):** new first-class agent that runs under Opus and handles two modes — `resolve` (turns a `[SPIKE: <unknown>]` marker in an approved plan into a concrete answer, then routes back to plan-amend) and `scope` (evaluates a mid-execution change request against the current plan, assessing impact and producing a classification and task list). The spike artifact is consumed by execute Step 6c.
+- **`reference/spike-agent.md` (canonical contract):** reference doc providing the spike agent's canonical contract, including input/output structure, the Opus mandate, and the escalation rules for unresolvable unknowns.
+- **Operator `--opus=<phase-id|all>` override:** execute Step 0 accepts an `--opus` flag that forces the named phase(s) (or all phases) to dispatch under Opus, overriding the per-stage model table. Documented in `reference/coordinator-contract.md` § Sanctioned Exceptions.
+- **Mid-execution scope-change workflow:** detect-and-confirm admission gate at Step 6c triggers when the operator submits a change request mid-execution; a scope spike assesses impact and produces a classification and task list; admitted changes flow through plan-amend with a placement directive before execution resumes. Full flow documented in execute § Step 6c.
+
+### Changed
+- **Step 6c amend now scope-spikes above-threshold changes before plan-amend:** changes flagged as above-threshold by the admission heuristic are no longer routed directly to plan-amend; a scope spike runs first and its `SpikeReport` is passed as context to plan-amend, ensuring placement decisions are grounded in actual impact data.
+- **Amendment budget is a soft checkpoint (was a hard wall):** the amendment iteration cap is now a soft checkpoint — exceeding it surfaces an operator prompt rather than hard-aborting, matching the `qa_max_iterations` circuit-breaker discipline.
+- **`plan-amend` gains an optional placement directive:** plan-amend accepts a `placement` field from the spike report (insert-after-phase, re-scope-phase, new-terminal-phase) and honours it when present, falling back to its own placement logic when absent.
+- **Plan-finalize `[SPIKE]` gate relaxed to routed-resolution (FR-005 shipped):** the previously blocking finalize scan now routes surviving `[SPIKE]` markers to the spike agent rather than refusing to advance; a plan may finalize with markers present provided each is covered by a dispatched spike in the execute journal.
+
 ## [5.6.0] — 2026-06-07
 
 ### Added

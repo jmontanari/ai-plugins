@@ -298,3 +298,20 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 - Escalations / circuit-breaker hits during phases: 0.
 - Cumulative diff: 20 files, 817 insertions(+), 4 deletions(-).
 - Refactor skips: 4/4 (100% auto-skipped; correct).
+
+---
+
+## Process retro — exec-ready/spike-agent (5.7.0, 2026-06-07)
+
+**Source:** end-of-piece reflection, 8 phases, non-TDD Implement track.
+**Cumulative diff:** 12 files, 335 insertions(+), 76 deletions(-).
+
+**must-improve: Sub-section anti-drift greps for multi-spec, same-file phases.** Phase 7 targeted `execute/SKILL.md` across 3 change specs (T-1 placement, T-2 budget, T-3 log ref). The implementer correctly rewrote the `**Soft-checkpoint prompt.**` section but left the immediately-prior `**Pre-dispatch budget check.**` step 1 with residual hard-refusal language ("refuse the dispatch / Do NOT dispatch"). The `[Verify]` anti-drift sweep checked for two specific superseded strings (`"no further amendments allowed"`, `"spec-amend budget exhausted"`) but did not include `"refuse the dispatch"` as a third superseded string. Result: 2 MUST-FIX caught at QA time. Fix candidate: when a phase has ≥3 change specs all targeting the same large file, the plan's `[Verify]` anti-drift sweep should enumerate all sub-sections that carry semantically linked language (not just the directly-edited anchor) and include a grep for each superseded sub-section string. The plan author (Opus) should derive these from the change spec's `Current:` fields.
+
+**must-improve: MUST-FIX and SHOULD-FIX QA corrections should produce separate fix commits.** Phase 7 QA produced 2 MUST-FIX + 2 SHOULD-FIX items, all resolved in a single `fix(spike-agent): Phase 7 QA — ...` commit. Bundling MUST-FIX and SHOULD-FIX into one commit obscures severity tiers and complicates bisect. Fix candidate: the execute `fix-code` guidance (or QA-phase output format) should distinguish severity and indicate that MUST-FIX items should be committed before SHOULD-FIX items, producing separate commits when there are both tiers.
+
+**worked-well: Inside-out build order (contract first, consumers second).** All 8 phases completed on first dispatch with no BLOCKED dispatches. Phases 2–7 all cited `reference/spike-agent.md` rather than restating vocabulary. The Phase 1 define-once/cite-everywhere constraint was honored throughout. Pattern worth repeating for any piece introducing a shared vocabulary (classification names, artifact schemas) before wiring consumers.
+
+**worked-well: Cross-phase schema-consistency grep in [Verify].** Phase 7's `for f in` grep confirming `blocking-on-current` appears in all three vocabulary-bearing files served as a regression guard (no defect at verify time) rather than a defect finder. The QA catch on the `Classification:` schema colon-arg mismatch was found by the QA agent reading the schema directly, not the grep — showing that greps are a necessary but not sufficient consistency check. Both layers (structural grep + Opus semantic review) are needed.
+
+**metrics:** QA catch rate — Phase 1: 1 MUST-FIX; Phases 2/3: 0; Phase 4: 1 SHOULD-FIX; Phase 5: 1 SHOULD-FIX; Phase 6: 1 non-issue; Phase 7: 2 MUST-FIX + 2 SHOULD-FIX; Phase 8: 0. Total: 3 MUST-FIX, 3 SHOULD-FIX across 8 phases. Phase 7 (57% of all actionable findings) concentrated defects because it was the third serial phase targeting the same large file — compound target, accumulated complexity.

@@ -1,12 +1,12 @@
 ---
 name: plan-amend
-description: "Internal agent — dispatched by spec-flow:execute Step 6c when an operator chooses to amend the plan in response to a discovery. Do NOT call directly. Reads the current plan.md, a structured discovery report, and the diff+neighborhood scope; emits a unified diff that inserts suffix-named amendment phases (phase_<N>_amend_<K>) before the next original phase. Does NOT commit — outputs `## Diff of changes` containing the unified diff that the orchestrator stages and commits."
+description: "Internal agent — dispatched by spec-flow:execute Step 6c when an operator chooses to amend the plan in response to a discovery. Do NOT call directly. Reads the current plan.md, a structured discovery report, and the diff+neighborhood scope; emits a unified diff that inserts suffix-named amendment phases (phase_<N>_amend_<K>) at the position selected by an optional placement directive (default: before the next original phase). Does NOT commit — outputs `## Diff of changes` containing the unified diff that the orchestrator stages and commits."
 model: sonnet
 ---
 
 # Plan Amendment Agent
 
-Read the current plan, a structured discovery report describing what was found and why it blocks the piece's goals, and the diff+neighborhood scope. Emit a unified diff against plan.md that inserts new phases to address the discovery. The orchestrator commits and resumes execute from the first amendment phase.
+Read the current plan, a structured discovery report describing what was found and why it blocks the piece's goals, and the diff+neighborhood scope. Emit a unified diff against plan.md that inserts new phases to address the discovery. The orchestrator commits and resumes execute at the placement directive's position (default: the first amendment phase).
 
 ## Environment preconditions
 
@@ -26,12 +26,13 @@ Read the current plan, a structured discovery report describing what was found a
   - `Proposed amendment scope:` list of phases to add or modify
   - `Estimated absorption size:` LOC count
 - **Diff+neighborhood scope:** a list of phases (with their `[Implement]` / `[Build]` blocks) whose file scopes overlap with the proposed amendment. The orchestrator computes neighborhood by exact file path per FR-11.
+- **Placement directive (optional):** one of `blocking-on-current`, `blocking-on-later: <phase-id>`, or `additive: <after-phase-id>`, supplied by the orchestrator from the scope spike's classification (see `plugins/spec-flow/reference/spike-agent.md` `## Placement rule`). When absent, default to inserting before the next original phase (the legacy behavior).
 
 ## Output Contract
 
 - The agent emits a unified diff in standard `git diff` format, with `--- a/<path>` and `+++ b/<path>` headers, `@@ ... @@` hunk headers, and standard context lines.
 - Amendment phases use suffix-form IDs `phase_<N>_amend_<K>` per FR-13 of pi-010-discovery's spec (e.g., amending the work that should land before phase_4 produces `phase_3_amend_1`, `phase_3_amend_2`, ...).
-- The diff inserts amendment phases BEFORE the next original phase numerically — amending phase_3 inserts `phase_3_amend_1` before `phase_4`.
+- The diff inserts amendment phases at the position selected by the **Placement directive** (see Context Provided): `blocking-on-current` → re-open the in-progress phase as `phase_<N>_amend_<K>` superseding its remainder; `blocking-on-later: <phase-id>` → insert before `<phase-id>`; `additive: <after-phase-id>` → insert after `<after-phase-id>` at the dependency-correct slot. **When no directive is supplied, insert BEFORE the next original phase numerically** — amending phase_3 inserts `phase_3_amend_1` before `phase_4` (legacy default). The `phase_<N>_amend_<K>` suffix-ID convention (FR-13) and the diff format are unchanged regardless of directive.
 - The diff must be committable via `git apply --check` then `git apply` against the worktree. If your diff would not apply cleanly (wrong context lines, drifted line numbers, malformed hunks), STOP and report BLOCKED — do not emit a diff that the orchestrator cannot apply.
 - On `## Diff of changes (none)`, the agent declares the discovery does not require a plan change; the orchestrator routes the discovery as a Build re-dispatch instead of staging a commit.
 

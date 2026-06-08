@@ -87,7 +87,7 @@ pieces:
       (no fabricated resolution, no mid-stream patch). Covers FR-005, FR-008.
     prd_sections: [FR-005, FR-008, G-2, G-3]
     dependencies: [plan-concrete, sonnet-coord]
-    status: open
+    status: merged
 
   - name: flywheel-repo
     slug: flywheel-repo
