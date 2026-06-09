@@ -196,7 +196,55 @@ eliminate.
 
 ---
 
-## Part 6 — Sources (consolidated)
+## Part 7 — Second-tier validation: the answer-validation loop (Tier 2)
+
+Tier 1 (Parts 1–5) investigates *before* asking, so the questions are grounded. Tier 2 closes
+the complementary gap: **the operator's own free-form answers are themselves ungrounded design
+assertions that Tier 1 never evaluated.** The Phase D board adversarially reviews the AI's
+recommendation, but a typed human answer was, until Tier 2, accepted into the spec with no
+scrutiny at all. That asymmetry contradicts the piece's own premise ("no ungrounded design choice
+reaches the spec"). Tier 2 makes grounding **bidirectional**.
+
+### Research basis (verified 2026-06-08)
+
+- **Human-in-the-loop iterative refinement is the established shape.** LLM requirement-engineering
+  systems (AISD, MARE) wrap generation in a *reformulation/validation loop* that gives each
+  human-supplied requirement "explicit validation," explicitly to **intercept ungrounded
+  assertions before they propagate** into the spec. The successful pattern is human-as-co-creator
+  in a tight iterate→validate→refine loop, not one-shot Q&A.
+  Sources: [SMU — LLM multi-agent systems for SE](https://ink.library.smu.edu.sg/cgi/viewcontent.cgi?article=11489&context=sis_research) · [arXiv — LLMs in UI/UX (SLR)](https://arxiv.org/pdf/2507.04469)
+- **Addy Osmani's loop is explicitly iterative** — "instruct → verify → refine," not write-once
+  (Part 3.4). Tier 2 is the verify/refine half applied to the operator's inputs.
+
+### Reuse anchor (codebase, not greenfield)
+
+The merged `spike-agent` piece already implements the needed mechanism as the spike agent's
+**`scope` mode** (`plugins/spec-flow/agents/spike.md`): given a change + current plan, it
+determines blast-radius, classifies the change, and writes a scoped artifact. Tier 2 is that exact
+pattern **relocated from execute-time to brainstorm-time** and pointed at a typed answer instead of
+a code change. New narrow agent `deliberation-validate.md` mirrors the spike-scope contract.
+
+### Decisions (operator-confirmed 2026-06-08)
+
+- **D-3 Detection gate:** the calling skill classifies a free-form answer *inline* against the
+  deliberation's evaluated path-set + §Answered-by-Investigation. A path in neither = a new
+  assertion → auto-fire validation. The trigger is itself artifact-traceable (no opaque classifier).
+- **D-4 Auto-fire:** a detected new assertion validates automatically (no "want me to check?" prompt).
+- **D-5 Lite, scoped:** validation is scoped to the single assertion — viability + scope/risk
+  lenses + prior-art (web + codebase) — not a re-run of the full 5-phase protocol.
+- **D-6 Two-tier verdict:** a flag is **hard** (charter/non-negotiable violation → operator must
+  revise; no override — honors NN-P-001 and the binding NN-C set) or **soft** (risk/scope/complexity
+  → operator may override; the override is recorded with rationale in `deliberation.md`).
+- **D-7 Human-paced termination:** the loop ends when the operator introduces no new assertions and
+  signs off. No artificial round cap; the human is always the terminating authority.
+- **D-8 One piece:** Tier 1 + Tier 2 ship as a single piece (`spec-preresearch`). Rationale: the
+  full effort touches a small file set (the deliberation agents + `deliberation-validate.md` +
+  `brainstorm-procedure.md` + the four skill wirings); many FRs, one focused surface. Accepts an
+  AC count above the ≤7 granularity guideline as a deliberate, operator-made tradeoff.
+
+---
+
+## Part 8 — Sources (consolidated)
 
 - Sean Grove / SDD movement — [The New Code (summary)](https://www.darekm101.com/articles/the-new-code-sean-grove-openai) · [Implicator](https://www.implicator.ai/the-end-of-coding-how-specifications-are-becoming-the-new-source-code/) · [SDD 2026 Guide (BCMS)](https://thebcms.com/blog/spec-driven-development) · [Martin Fowler — SDD tools](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html)
 - Boris Cherny — [Push to Prod](https://getpushtoprod.substack.com/p/how-the-creator-of-claude-code-actually) · [10 Tips (Feb 2026)](https://www.jitendrazaa.com/blog/others/tips/10-claude-code-tips-from-the-creator-boris-cherny-february/)
@@ -206,3 +254,4 @@ eliminate.
 - AWS Kiro / EARS — [Kiro Feature Specs](https://kiro.dev/docs/specs/feature-specs/) · [EARS Format Guide](https://kiro.directory/tips/ears-format)
 - GitHub Spec Kit / Tessl — [Tessl on Spec Kit](https://tessl.io/blog/a-look-at-spec-kit-githubs-spec-driven-software-development-toolkit/) · [Augment Code — Best SDD tools](https://www.augmentcode.com/tools/best-spec-driven-development-tools)
 - SCoT — [Li et al. 2023, arXiv:2305.06599](https://arxiv.org/abs/2305.06599)
+- HITL iterative refinement (Tier 2) — [SMU — LLM multi-agent systems for SE](https://ink.library.smu.edu.sg/cgi/viewcontent.cgi?article=11489&context=sis_research) · [arXiv — LLMs in UI/UX (SLR)](https://arxiv.org/pdf/2507.04469)
