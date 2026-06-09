@@ -62,7 +62,7 @@ Replace the current reactive brainstorm model — where the spec/PRD/small-chang
 ### Non-Functional Requirements
 
 - NFR-009-1: Each deliberation agent (coordinator, viability, synthesis, lens, convergence) runs in a fresh, isolated context (no brainstorm history). Each agent's return to the calling skill is a structured digest ≤2K tokens; `deliberation.md` on disk (written by Phase E) may be richer (NN-C-008, mirrors NFR-001).
-- NFR-009-2: If the deliberation agent fails (any trigger), the calling skill emits `[DELIBERATION-UNAVAILABLE: <reason>]` non-blocking and falls back to current brainstorm behavior. The fallback is silent beyond the emitted marker (NN-C-005, mirrors NFR-001's UNAVAILABLE path).
+- NFR-009-2: If the deliberation protocol fails on any of the 5 fatal triggers enumerated in AC-12 (Phase A BLOCKED, Phase C BLOCKED, Phase E BLOCKED, deliberation.md missing/empty after Phase E, git commit fails), the calling skill emits `[DELIBERATION-UNAVAILABLE: <reason>]` non-blocking and falls back to current brainstorm behavior. Phase B and Phase D partial failures are non-fatal (AC-12) and do not emit UNAVAILABLE. The fallback is silent beyond the emitted marker (NN-C-003, mirrors NFR-001's UNAVAILABLE path).
 - NFR-009-3: All changes are additive and backward-compatible (NN-C-003). Pieces whose skills do not dispatch the deliberation agent run unchanged; no existing config keys or skill invocation patterns are broken.
 
 ### Non-Negotiables Honored
@@ -80,7 +80,7 @@ Replace the current reactive brainstorm model — where the spec/PRD/small-chang
 **Product (NN-P — from `docs/prds/exec-ready/prd.md`):**
 - NN-P-001 (human approval gate preserved): The investigation-first protocol reduces the question count and improves question quality; it does not remove spec/plan/PRD sign-off. The brainstorm still concludes with human review and sign-off.
 - NN-P-003 (execute is operator-invoked only): No change to execute invocation. This piece touches spec/prd/small-change/charter/plan only.
-- NN-P-005 (thinking on Opus): Deliberation agent runs on Opus (the thinking tier). Calling skills (Sonnet-tier coordinators) dispatch it as an isolated Opus sub-agent, consistent with the model placement policy.
+- NN-P-005 (thinking on Opus): All five deliberation agent files (`deliberation-coordinator`, `deliberation-viability`, `deliberation-synthesis`, `deliberation-lens`, `deliberation-convergence`) run on Opus; calling skills (Sonnet-tier coordinators) dispatch each as an isolated Opus sub-agent per model placement policy. CR-001 enforces `model: opus` frontmatter on all five files.
 
 ### Coding Rules Honored
 
@@ -95,7 +95,7 @@ AC-1: Given a spec/prd/small-change/charter skill is invoked for any piece, When
   Independent Test: `ls plugins/spec-flow/agents/deliberation-{coordinator,viability,synthesis,lens,convergence}.md` all exit 0; each frontmatter contains `model: opus` and a `name: deliberation-<role>` entry; `grep -n 'deliberation-coordinator' plugins/spec-flow/skills/spec/SKILL.md` returns a dispatch line in the Phase 2 pre-brainstorm section. (No live dispatch required — all checks are file-system and grep assertions.)
 
 AC-2: Given the deliberation protocol is running, When the calling skill executes it, Then the skill dispatches five phases in strict order — Phase A (coordinator: read-all artifacts + web research) → Phase B (parallel: per-FR-cluster viability, one agent per cluster, barrier) → Phase C (synthesis: cross-cluster integration) → Phase D (parallel: five adversarial lens agents, barrier) → Phase E (convergence: final recommendation + deliberation.md write) — and does not emit validated open questions until Phase E convergence.
-  Independent Test: `deliberation.md` contains output sections corresponding to all five phases; the calling skill's deliberation orchestration block shows the Phase A → B (parallel + barrier) → C → D (parallel + barrier) → E sequencing explicitly.
+  Independent Test: `grep -n 'Phase A\|Phase B\|barrier\|Phase C\|Phase D\|Phase E' plugins/spec-flow/skills/spec/SKILL.md` returns the deliberation orchestration block with Phase A → B (barrier) → C → D (barrier) → E sequencing in the pre-brainstorm setup section; `ls plugins/spec-flow/agents/deliberation-{coordinator,viability,synthesis,lens,convergence}.md` all exit 0. (No live run required — all checks are static file and grep assertions; deliberation.md structure is verified independently by AC-7.)
 
 AC-3: Given the per-FR viability state runs for a piece with N functional requirements, When analysis completes, Then `deliberation.md` §Per-FR Viability Analysis contains one entry per FR; each entry lists all viable paths the agent found (not bounded to 2–3) with VIABLE/NON-VIABLE verdict and explicit reasoning per path.
   Independent Test: For a test piece with 3 FRs, `deliberation.md` has 3 per-FR entries each containing ≥1 path with verdict + reasoning.
@@ -130,8 +130,11 @@ AC-11: Given deliberation concludes a mandatory spec block is N/A with logged re
   When deliberation cannot conclude N/A for a block, Then the block runs as confirmation, not open discovery — the calling skill presents deliberation's partial answer as a prefacing statement before the confirmation question (e.g., "Deliberation found: [deliberation's conclusion for this dimension]. Please confirm: is this correct for your piece?") rather than asking the question from scratch.
   Independent Test: A doc-as-code test piece's deliberation.md §Answered by Investigation contains an entry for each auto-skipped block with N/A rationale; the skill emits a one-line note for each auto-skipped block visible in the brainstorm output.
 
-AC-12: Given the deliberation protocol fails at any phase (Phase A STATUS: BLOCKED, Phase C STATUS: BLOCKED, Phase E STATUS: BLOCKED, deliberation.md missing or zero-length after Phase E, git commit of deliberation.md fails), When the calling skill detects failure, Then the skill emits `[DELIBERATION-UNAVAILABLE: <phase>-<reason>]` inline (non-blocking) and falls back to current brainstorm behavior; the fallback is indistinguishable from pre-5.8.0 spec behavior. Phase B partial failures (some cluster agents BLOCKED, others OK) are non-fatal: the skill proceeds to Phase C with available findings.
-  Independent Test: Simulate each of the five fatal failure triggers; verify `[DELIBERATION-UNAVAILABLE]` is emitted and brainstorm proceeds normally. Simulate a Phase B partial failure (one cluster blocked); verify Phase C proceeds with remaining findings.
+AC-12: Given the deliberation protocol fails at any phase, When the calling skill detects failure, Then behavior is:
+  Fatal (5 triggers — skill emits `[DELIBERATION-UNAVAILABLE: <phase>-<reason>]` and falls back to current brainstorm behavior): (a) Phase A STATUS: BLOCKED; (b) Phase C STATUS: BLOCKED; (c) Phase E STATUS: BLOCKED; (d) deliberation.md missing or zero-length after Phase E completes; (e) git commit of deliberation.md fails.
+  Non-fatal (2 partial cases — skill proceeds with available findings): (f) Phase B some-cluster BLOCKED: skill proceeds to Phase C with remaining cluster outputs; (g) Phase D any/all lens BLOCKED: skill proceeds to Phase E with available verdicts; Phase E notes "adversarial review unavailable" in §Adversarial Review; no UNAVAILABLE marker emitted.
+  The fallback on fatal triggers is indistinguishable from pre-5.8.0 spec behavior.
+  Independent Test: Simulate each of the 5 fatal triggers; verify `[DELIBERATION-UNAVAILABLE]` is emitted and brainstorm proceeds normally. Simulate Phase B partial failure (one cluster blocked); verify Phase C proceeds with remaining findings. Simulate Phase D all-BLOCKED; verify Phase E runs and §Adversarial Review notes unavailability.
 
 AC-13: Given `qa-spec` reviews a spec, When `deliberation.md` is present on the piece branch, Then qa-spec checks: (a) `deliberation.md` contains all 7 required H2 sections in order; (b) `[DELIBERATION-UNAVAILABLE]` if present in the spec artifact is treated as informational (not must-fix). When `deliberation.md` is absent (UNAVAILABLE path), qa-spec notes this as informational only and does not add a must-fix finding. qa-spec does NOT add a transcript-behavior check (brainstorm transcripts are not reviewable from the spec artifact).
   Independent Test: `agents/qa-spec.md` contains a criterion entry for deliberation-grounding check that verifies `deliberation.md` structure (presence of all 7 H2 sections) — not transcript behavior.
@@ -143,7 +146,7 @@ AC-15: Given any file under `plugins/spec-flow/` is modified by this piece, When
   Independent Test: `diff <(jq -r .version plugins/spec-flow/.claude-plugin/plugin.json) <(jq -r '.plugins[] | select(.name == "spec-flow") | .version' .claude-plugin/marketplace.json)` produces no output; CHANGELOG has `## [5.8.0]` heading.
 
 AC-16: Given the plan skill is invoked for a piece, When Phase 1 loads context, Then the plan skill reads `deliberation.md` §Recommendation and §Per-FR Viability Analysis (if the artifact exists on the piece branch); emits `[DELIBERATION-CONSUMED: <recommendation>]` inline before proceeding; and the plan prompt uses the recommendation as the approach anchor. When `deliberation.md` is absent, the skill emits `[DELIBERATION-ABSENT: no deliberation artifact]` and continues with current plan behavior unchanged.
-  Independent Test: `grep -n 'DELIBERATION-CONSUMED\|DELIBERATION-ABSENT' plugins/spec-flow/skills/plan/SKILL.md` returns at least two lines in the Phase 1 context-load section.
+  Independent Test: `grep -n 'DELIBERATION-CONSUMED\|DELIBERATION-ABSENT' plugins/spec-flow/skills/plan/SKILL.md` returns at least two lines; those line numbers fall within the Phase 1 / context-load section of the file (not in a comment block or later phase). Implementer: mark the insertion point in SKILL.md with a `## Phase 1` or equivalent heading that the grep line-number check can bound against.
 
 AC-17: Given the pre-brainstorm deliberation protocol runs for a piece with N functional requirements, When the calling skill identifies FR clusters, Then it dispatches Phase B viability agents in parallel (one per cluster); the Phase C synthesis agent dispatches only after all Phase B agents complete (barrier); the coordinator (Phase A) and convergence agent (Phase E) run sequentially before and after the parallel phases. When the piece has a single FR, exactly one viability agent is dispatched (no minimum cluster count).
   Independent Test: `ls plugins/spec-flow/agents/deliberation-viability.md` exits 0; frontmatter contains `name: deliberation-viability`, `model: opus`; the calling skill's deliberation orchestration section shows Phase B as a parallel dispatch block with a barrier before Phase C.
@@ -214,8 +217,12 @@ In each calling skill's pre-brainstorm setup (after any research dispatch+commit
 
 5. Dispatch Phase D (parallel adversarial, 5 lenses): inject Phase C recommendation
    + lens label per agent. Barrier: wait for all 5 Phase D agents.
+   On any/all Phase D STATUS: BLOCKED → log the blocked lens(es); proceed to Phase E
+   with available verdicts. Phase D all-BLOCKED is non-fatal (same pattern as Phase B
+   partial failure); Phase E notes "adversarial review unavailable" in §Adversarial Review.
 
-6. Dispatch Phase E (convergence): inject Phase C recommendation + all Phase D verdicts.
+6. Dispatch Phase E (convergence): inject Phase C recommendation + all Phase D verdicts
+   (may be empty if Phase D all-BLOCKED).
    On STATUS: OK and deliberation.md present + non-empty: commit deliberation.md.
    On STATUS: BLOCKED or deliberation.md missing/empty:
      emit [DELIBERATION-UNAVAILABLE: phase-E-blocked], fall back.
@@ -282,7 +289,7 @@ This is a doc-as-code piece (markdown + YAML changes). No test runner (charter-t
 - Manual smoke: run `/spec-flow:spec` on a scratch piece, verify deliberation protocol runs (all 5 phases), check `deliberation.md` has all 7 H2 sections, verify brainstorm starts with investigation summary
 
 Branch-enumeration ACs for skill-wiring conditionals:
-- AC-12 enumerates all 5 fatal UNAVAILABLE triggers + 1 partial (Phase B) failure branch (each branch verified)
+- AC-12 enumerates all 5 fatal UNAVAILABLE triggers + 2 partial (Phase B and Phase D) failure branches (each branch verified)
 - AC-11 enumerates N/A vs confirmation branch (both verified)
 - AC-4 enumerates web-fires vs web-skips branch (both verified)
 
@@ -302,4 +309,4 @@ Branch-enumeration ACs for skill-wiring conditionals:
 ## Open Questions
 
 - OQ-1: Should `deliberation.md` carry a `deliberation_snapshot:` front-matter (like `charter_snapshot:` in spec.md) recording when it was written? (Default: no — deliberation is consumed in the same session it is written; snapshot staleness isn't a concern as it is for charter drift)
-- OQ-2: Should the protocol emit `[DELIBERATION-PARTIAL: <reason>]` if it completes some but not all phases (e.g., Phase D agents all return BLOCKED)? (Default: no — emit `[DELIBERATION-UNAVAILABLE]` on any fatal phase failure; the Phase B partial-failure path is the only sanctioned partial case and it is already enumerated in AC-12)
+- OQ-2: ~~Should the protocol emit `[DELIBERATION-PARTIAL]` for partial phase failures?~~ RESOLVED in AC-12: Phase B and Phase D partial/all-BLOCKED are non-fatal (proceed with available outputs); only Phase A, C, E failures emit `[DELIBERATION-UNAVAILABLE]`. No `[DELIBERATION-PARTIAL]` marker is introduced.
