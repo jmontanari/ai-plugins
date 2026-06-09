@@ -1,6 +1,6 @@
 schema_version: 1
 generated: 2026-06-06
-last_updated: 2026-06-07
+last_updated: 2026-06-09
 prd_source: "docs/prds/exec-ready/prd.md"
 
 feature_branch: null
@@ -140,31 +140,178 @@ pieces:
       create a spec-flow self-improvement piece in the plugin home repo. [FLYWHEEL-DEGRADED:
       plugin registry unavailable] if unwritable (repo-level recording continues; execute not
       blocked). Cross-machine correlation is an explicit non-goal (no shared remote backend).
-      Covers FR-007.
+      Covers FR-007. ORDERING (2026-06-09 audit): deliberately sequenced last — depends on
+      flywheel-refresh (lifecycle mechanics must exist before a second registry is built on
+      them) and metrics (cross-install correlation should consume measured signal); start
+      only after the repo flywheel has produced at least one real threshold-triggered
+      hardening on live pieces.
     prd_sections: [FR-007, G-5]
+    dependencies: [flywheel-repo, flywheel-refresh, metrics]
+    status: open
+
+  - name: metrics
+    slug: metrics
+    description: |
+      Pipeline instrumentation — per-piece metrics artifact (proposed metrics.yaml in the
+      piece spec directory; location/schema confirmed at spec time). Spec records Q&A rounds;
+      execute records Step 6c discoveries (spike-attributed vs unmarked), escalations,
+      amendments, QA iterations, dispatches by model tier, resume outcomes; Final Review
+      records iterations + must-fix counts. /spec-flow:status renders SC-001..SC-006 per PRD
+      from disk (SC-007). Wires the flywheel's reserved `metric` occurrence source
+      (flywheel-repo ADR-3) — pattern occurrences may cite measured trends, operator-confirmed
+      per NN-P-004. [METRICS-DEGRADED] on unwritable artifact; [METRICS-ABSENT] rendering for
+      pre-instrumentation pieces (NN-C-003). Covers FR-010.
+      WHY (audit 2026-06-09): all six SCs currently "measurement pending"; a flywheel without
+      a programmatic evaluator is the documented failure mode of self-improvement loops
+      (PRD Research Basis R4, R6). Highest-priority new piece — baselines must exist before
+      gate-scaling claims any oversight reduction.
+    prd_sections: [FR-010, SC-007, G-5, G-6]
+    dependencies: [flywheel-repo]
+    status: open
+
+  - name: exec-guardrails
+    slug: exec-guardrails
+    description: |
+      Execute integrity guardrails. (1) Test immutability: upgrades tdd-red's SHA-256 manifest
+      (pi-020 anti-cheat anchoring) from detect-later to reject-mechanically — a Build-step
+      diff touching any Red-manifest file is rejected pre-commit and the implementer
+      re-dispatched with violating paths named; no warn-only path. Phase exit re-verifies
+      hashes; Implement-track phases that legitimately author tests declare those paths in
+      the plan (qa-plan verifies). Repeated rejections route to Step 6c as plan-incompleteness,
+      never an exemption. (2) Amendment budget becomes a hard cap (.spec-flow.yaml,
+      documented default): reaching it halts execute with an operator escalation — no
+      soft-checkpoint continuation. Covers FR-011.
+      WHY (audit 2026-06-09): every major coding-agent model family has been caught deleting/
+      modifying tests or hardcoding inputs (R1, R2); the proven mitigation is tests-as-
+      immutable-inputs, and the 80%-reliability horizon (~1h, R3) demands hard stops, not
+      soft checkpoints, for unattended runs. Precondition for safe loop-driven execute.
+    prd_sections: [FR-011, SC-002, G-2, G-6]
+    dependencies: []
+    status: open
+
+  - name: gate-scaling
+    slug: gate-scaling
+    description: |
+      Verifiability-scaled sign-off gates + review-cost controls. Every AC tagged at spec time
+      as machine-checkable (named check) or judgment-required (named judgment); untagged ACs
+      are qa-spec must-fix. Spec/plan/Final-Review gates render an evidence digest and offer a
+      single summary-confirm keystroke ONLY when QA is clean, zero surviving markers, and all
+      machine-checkable ACs have attached evidence — otherwise today's full gate runs
+      unchanged. NN-P-001 fully preserved: a keystroke is always required; nothing
+      auto-advances. Plus two review-cost controls: review_board_variant: doc-as-code
+      (substitute blind-reviewer slot with a second edge-case reviewer — codifies pi-011
+      retro: blind 0/6, edge-case 6/6 must-fix detection) and a single-Opus triage pre-filter
+      on Final Review fix iterations (full board re-dispatches only for contested/new
+      findings). Tag ratios flow into the metrics artifact. Covers FR-012.
+      WHY (audit 2026-06-09): gate-hardness ladder + reviewer-zeal warning (R5); machine-
+      verifiable checks as the "external source of truth" enabling reduced supervision (R13);
+      gates must keep consequence (R11) while cost scales. Depends on metrics: the SC-008
+      baseline (operator interactions per clean piece) must be measured before this ships.
+    prd_sections: [FR-012, SC-008, G-6]
+    dependencies: [metrics]
+    status: open
+
+  - name: pipeline-e2e
+    slug: pipeline-e2e
+    description: |
+      End-to-end smoke test for the pipeline itself — peer to the coherence linter. Committed
+      fixture project + scripted scenario driving a minimal piece (≥1 TDD phase, ≥1 Implement
+      phase); asserts artifact existence/ordering (research.md before first brainstorm commit,
+      Test Data blocks, journal, discovery-log rows, metrics artifact), required dispatch
+      sequence (tdd-red → qa-tdd-red → implementer → verify → QA gate → board), and manifest
+      status transitions. Explicit cases for the two never-exercised round-trips: spike
+      [SPIKE]-resolution → test-data consumption, and the [TEST-DATA-ABSENT] fallback.
+      SKIPPED-per-capability reporting, never false green. CI wiring may land with
+      pi-022-vsync-ci. Covers FR-013.
+      WHY (audit 2026-06-09): only the linter has tests today; superpowers' e2e suite for its
+      own framework is the proven pattern (R7). Sequenced EARLY — regression insurance should
+      exist before exec-guardrails and gate-scaling perform surgery on execute/SKILL.md
+      (1,986 lines of orchestration prose).
+    prd_sections: [FR-013, G-1]
+    dependencies: []
+    status: open
+
+  - name: artifact-budgets
+    slug: artifact-budgets
+    description: |
+      Artifact size budgets — the inverse of the FR-002 concreteness floor. Reference doc
+      defines per-class budgets (spec.md, plan.md per-phase + total, research.md,
+      deliberation.md, learnings.md) in lines + approximate tokens, with .spec-flow.yaml
+      overrides; defaults derived from the size distribution of the 5 merged exec-ready
+      pieces. qa-spec/qa-plan flag overage as must-fix with split/condense guidance;
+      irreducible overage routes to piece-splitting (qa-prd ≤7-AC rule), not waivers. Budget
+      compliance recorded in the metrics artifact. BINDS spec-preresearch: its deliberation.md
+      budget is registered here, before that piece's plan is authored, and is verified at its
+      qa-plan gate. Covers FR-014.
+      WHY (audit 2026-06-09): artifact bloat is the most common way spec pipelines die —
+      spec-kit's 2,577 lines of faux-context markdown per ~700 lines of code (R8); context
+      rot is measurable (R10). Land before or alongside spec-preresearch execution so Spec
+      2.0's investigation artifact starts bounded.
+    prd_sections: [FR-014, SC-008, G-1, G-6]
+    dependencies: []
+    status: open
+
+  - name: flywheel-refresh
+    slug: flywheel-refresh
+    description: |
+      Flywheel pattern lifecycle — outcome tracking, expiry, refresh. Pattern schema gains
+      state (active/hardened/archived), last_seen, and hardening outcome (spike artifact ref +
+      landing site); registries without the fields read as active (NN-C-003). Applying a
+      hardening transitions the pattern to hardened; a post-hardening confirmed occurrence
+      re-opens it active with an ineffective-hardening flag at the next batched review — the
+      check that the fix actually worked. Operator-gated refresh pass proposes archival for
+      stale patterns (configurable window) and clean hardened patterns; nothing archives
+      silently (NN-P-004); archived entries stay in-file for audit and leave the
+      match-proposal candidate set. [FLYWHEEL-DEGRADED: lifecycle unavailable] on malformed
+      registry. Covers FR-015.
+      WHY (audit 2026-06-09): capture without expiry rots — compound-engineering pairs
+      compound with refresh (R9); retained items must be re-verified in the loop (R4, R14).
+      Gates flywheel-global: lifecycle mechanics must exist before a second registry is
+      built on them.
+    prd_sections: [FR-015, SC-003, SC-005, G-5]
     dependencies: [flywheel-repo]
     status: open
 
 coverage:
-  total_prd_sections: 12
-  covered_sections: 12
+  total_prd_sections: 18
+  covered_sections: 18
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs (001-008) and NFRs (001-004) covered across 7 pieces. FR-008 (scoping spike for
-    mid-execution changes) was added in PRD v2 and folded into the spike-agent piece alongside
-    FR-005 — both share the agents/spike.md primitive (FR-005 resolves planned [SPIKE] unknowns;
-    FR-008 scopes mid-execution changes before plan amendment). FR-008 amends NN-P-002. NFR-003 (backward-compat,
-    additive) is borne by research-unify (the [RESEARCH-ABSENT] fallback) and sonnet-coord
-    (the opt-out .spec-flow.yaml model policy / configurable circuit-breaker), and is listed
-    in their prd_sections for traceability. The old exec-loop framing (autonomous execute
-    loop, self-resolve + decisions.md, Sonnet context budget) was retired after a 2026-06-06
-    re-evaluation: FR-004/005 of the prior PRD were ~90% already shipped (auto phase-loop,
-    auto Final Review + fix loop, manifest→merged, journal resume), the Sonnet-context premise
-    was superseded by the Opus-1M driver, and execute self-resolve conflicted with the
-    synchronous-discovery doctrine. The genuinely-new surface is plan density (plan-concrete,
-    test-data-up), model placement + file-state (sonnet-coord, spike-agent), and cross-install
-    learning (flywheel-repo, flywheel-global). Pieces split to keep each ≤7 ACs per the qa-prd
-    granularity rule: the coordinator into sonnet-coord + spike-agent, and the flywheel into
-    flywheel-repo + flywheel-global (the latter splits the two distinct registry subsystems
-    per qa-prd iteration-1 must-fix #1).
+    All FRs (001-008, 010-015) and NFRs (001-004) covered across 14 pieces. FR-009 is
+    reserved — the spec-preresearch piece adds it to the PRD at merge. FR-008 (scoping spike
+    for mid-execution changes) was added in PRD v2 and folded into the spike-agent piece
+    alongside FR-005 — both share the agents/spike.md primitive. FR-008 amends NN-P-002.
+    NFR-003 (backward-compat, additive) is borne by research-unify and sonnet-coord and
+    listed in their prd_sections for traceability. The old exec-loop framing was retired
+    after the 2026-06-06 re-evaluation (see git history of this note for detail).
+
+    PRD v3 (2026-06-09 deep-dive audit) added FR-010..FR-015 and six pieces: metrics,
+    exec-guardrails, gate-scaling, pipeline-e2e, artifact-budgets, flywheel-refresh.
+    Evidence for each lives in prd.md ## Research Basis ([R1]..[R14]); companion design doc
+    docs/autonomous-loops-and-spec-flow.md.
+
+    ORDER OF OPERATIONS (v3, audit-derived — dependencies encode the hard edges; this note
+    records the intended sequencing rationale):
+      1. flywheel-repo — in flight (worktree at Final Review); merge first. Everything
+         flywheel- and metrics-shaped builds on its registry + Step 6c/4.5 wiring.
+      2. pipeline-e2e — land EARLY as regression insurance before any further surgery on
+         execute/SKILL.md (exec-guardrails, gate-scaling both modify it). No dependencies.
+      3. artifact-budgets — land before/alongside spec-preresearch execution: it registers
+         the deliberation.md size budget that binds Spec 2.0's plan. No dependencies.
+      4. spec-preresearch — already specced; plan + execute next. Its qa-plan gate inherits
+         the artifact-budgets constraint (FR-014 AC) once that piece merges; if sequenced
+         earlier, the plan must self-impose a deliberation.md budget and SC-001
+         before/after measurement (see prd.md FR-014/FR-010).
+      5. metrics — immediately after flywheel-repo merges (wires its `metric` source).
+         Establishes the SC baselines that gate-scaling's SC-008 claim is measured against.
+         Highest-priority NEW piece: measurement precedes optimization.
+      6. exec-guardrails — parallel-safe with metrics (different surface: Step 3/4 + budget
+         enforcement vs recording). Precondition for any unattended/loop-driven execute.
+      7. gate-scaling — after metrics (needs the interaction baseline); the
+         oversight-reduction centerpiece.
+      8. flywheel-refresh — after flywheel-repo has real entries; lifecycle on live data.
+      9. flywheel-global — LAST: after flywheel-refresh + metrics, and only once the repo
+         flywheel has produced at least one genuine threshold-triggered hardening.
+    Parallelization: 2+3 are independent of everything; 5+6 can run concurrently; 4 can
+    overlap 2/3/5/6 (different skills touched: spec/prd/charter vs execute).
