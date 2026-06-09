@@ -89,6 +89,27 @@ pieces:
     dependencies: [plan-concrete, sonnet-coord]
     status: merged
 
+  - name: spec-preresearch
+    slug: spec-preresearch
+    description: |
+      Investigation-First Design Protocol (Spec 2.0), two tiers, one piece. TIER 1: a 5-phase
+      multi-agent deliberation protocol runs before the first user question in spec/prd/small-change/
+      charter — coordinator (read all + web research) → parallel per-decision-unit-cluster viability
+      agents (all paths incl. reuse/extend-existing) → synthesis → parallel single-model multi-lens
+      adversarial board (architecture/scope/user-intent/backward-compat/risk; NOT multi-model, per
+      NN-P-005) → convergence writing deliberation.md. Questions restricted to VOQ-tagged validated
+      open questions (artifact-verifiable grounding). Depth policy full/lite/off (.spec-flow.yaml).
+      Plan consumes the recommendation ([DELIBERATION-CONSUMED/ABSENT]). TIER 2: an answer-validation
+      loop auto-fires a lite scoped deliberation-validate pass when an operator free-form answer
+      introduces an assertion outside the evaluated path-set — verdict CONFIRM/FLAG-HARD(NN violation,
+      no override)/FLAG-SOFT(override w/ rationale); validation rounds append to deliberation.md; makes
+      grounding bidirectional; reuses spike-agent scope-mode. Plus an Opus pre-flight (inverse of
+      execute's Sonnet check) recommending Opus for spec/prd/plan/charter. Adds FR-009 (A–N) to the
+      exec-ready PRD and appends FR-009 to NN-P-005 Scope. 14 FRs, 25 ACs. Deps: research-unify.
+    prd_sections: [FR-009]
+    dependencies: [research-unify]
+    status: planned
+
   - name: flywheel-repo
     slug: flywheel-repo
     description: |
