@@ -393,7 +393,7 @@ Branch-enumeration ACs for skill-wiring conditionals:
 - AC-19 enumerates the full / lite / off depth branches (each verified; off-path SKIPPED marker + small-change lite default)
 - AC-21 enumerates the assertion fire vs no-fire branch (new assertion → validate; covered answer → accept; no deliberation.md → no fire)
 - AC-22 enumerates the CONFIRM / FLAG-HARD / FLAG-SOFT verdict branches (hard = no override, soft = override-with-rationale)
-- AC-24 enumerates the Opus vs not-Opus pre-flight branch (advisory prompt vs silent no-op)
+- AC-24 enumerates the Opus vs not-Opus pre-flight branch (three-choice Override-proceeds prompt when not Opus vs silent no-op when already Opus)
 
 ## Integration Coverage
 
