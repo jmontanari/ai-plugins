@@ -108,7 +108,7 @@ pieces:
       exec-ready PRD and appends FR-009 to NN-P-005 Scope. 14 FRs, 25 ACs. Deps: research-unify.
     prd_sections: [FR-009]
     dependencies: [research-unify]
-    status: planned
+    status: in-progress
 
   - name: flywheel-repo
     slug: flywheel-repo
