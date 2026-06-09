@@ -88,7 +88,7 @@ None in scope. The spec's `## Integration Coverage` entries (the 5-agent protoco
 - CR-009 (heading hierarchy): H2/H3 structure mirroring `reference/research-artifact.md`.
 - CR-008 (define-once/cite-everywhere): all schema/marker/return detail lives here; agents and skills cite it.
 
-- [ ] **[Implement]** Author the artifact contract doc
+- [x] **[Implement]** Author the artifact contract doc
   - Architecture constraints: mirror the section style and the "three roles" preamble of `reference/research-artifact.md` (introspection.md §11, lines 836–842). Define-once: every consumer cites this file and restates nothing.
 
   **Change Specifications:**
@@ -121,7 +121,7 @@ None in scope. The spec's `## Integration Coverage` entries (the 5-agent protoco
   - Done: all eight H2 sections present; the 7-core-+-optional-8th order stated with the tolerate-8th rule; §Viability Analysis table format with reuse-flag + blocker columns; VOQ-N + Validation-Round contracts; all four markers with the 5-fatal/2-nonfatal split; ≤2K/STATUS return; repo-root-relative cross-references; no secrets.
   - Verify: `grep -nE "^## (Location|deliberation.md structure|VOQ-N ID contract|Validation Round contract|Marker contract|Return contract|See also)" plugins/spec-flow/reference/deliberation-artifact.md` returns 7 matches.
 
-- [ ] **[Verify]** Confirm the artifact contract is complete
+- [x] **[Verify]** Confirm the artifact contract is complete
   **Per-change checks:**
   - T-1: `ls plugins/spec-flow/reference/deliberation-artifact.md` — Expected: exit 0 (satisfies AC-7's `ls` test for the reference doc).
   - T-1: `grep -c "DELIBERATION-UNAVAILABLE\|DELIBERATION-SKIPPED\|DELIBERATION-CONSUMED\|DELIBERATION-ABSENT" plugins/spec-flow/reference/deliberation-artifact.md` — Expected: ≥4 (all four markers defined).
@@ -132,7 +132,7 @@ None in scope. The spec's `## Integration Coverage` entries (the 5-agent protoco
   - Expected: 5 fatal + 2 non-fatal enumerated; tolerance stated; exactly four markers.
   - Failure: any trigger missing, the partial/fatal split absent, or a fifth marker invented.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-7, AC-12, AC-13, AC-20, AC-23 (definition coverage)
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
