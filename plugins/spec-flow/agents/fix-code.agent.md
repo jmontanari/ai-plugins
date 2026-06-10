@@ -42,3 +42,9 @@ For each finding report: Status (FIXED or BLOCKED), files changed, what was chan
 Return a summary: "Fixed N of M findings. K blocked (requires human decision)."
 
 End your report with a `## Diff of changes` section containing the unified diff of every file you modified. Produce it by running `git diff -- <files you touched>` against the working tree (include uncommitted changes — do not rely on commits). The orchestrator uses this diff as the sole input to the next QA iteration, so it must be complete and accurate. If you made no changes (all findings blocked), write `## Diff of changes` followed by `(none)`.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.
+
+manifest.yaml is orchestrator-owned: you MUST NOT create, modify, or delete any `manifest.yaml` file. If your task appears to require a manifest change, report it to the orchestrator instead of editing it.

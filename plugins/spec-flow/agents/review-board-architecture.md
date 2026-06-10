@@ -46,3 +46,7 @@ You receive one of two inputs. The orchestrator's prompt will label which:
 - NN-C and NN-P violations are always must-fix.
 - CR violations default to must-fix; the rare case where a CR is knowingly exempted for a piece must be called out in the spec and reviewed — if the exemption isn't documented, treat as must-fix.
 - Charter `Reference`-type entries defer to external content. For URL references you can't fetch, check the link format is correct and escalate to the human in your findings if content-level verification is needed.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

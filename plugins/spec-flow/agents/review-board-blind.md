@@ -39,3 +39,7 @@ You receive one of two inputs. The orchestrator's prompt will label which:
 - You have NO context about what this code is supposed to do. Review it purely on code quality.
 - Do not request access to other files. Work only with the diff.
 - Fresh eyes perspective — this is your advantage.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

@@ -58,6 +58,19 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 
    **In a deferred Phase Group (orchestrator passes a deferred-group flag in your prompt).** When the prompt tells you this phase is a sub-phase of a deferred Phase Group, do NOT commit and do NOT stage: write your production code to the working tree, run the oracle against the working tree, and stop there. Do NOT `git add` and do NOT `git commit` — the orchestrator commits the whole group as one barrier work-commit at the group barrier (it stages the group's union and commits it for you). Report your `## Files Created/Modified` exactly as usual; that list is what the orchestrator folds into the barrier commit's union and records in the group journal. The orchestrator anchors Red's tests with `git hash-object -w`; you cannot make a tampered test hash to the original blob — do not touch Red's test files. This branch applies ONLY when the prompt carries the deferred-group flag — for a flat phase or any run under `deferred_commit: off` (no such flag), the existing single unified commit above applies unchanged.
 
+   **READY-TO-COMMIT marker (flat-phase / `deferred_commit: off` only).** After staging
+   your work and completing the pre-DONE pitfalls self-check (see the Known pitfalls
+   checklist below) — but BEFORE invoking any long-running gate command (full test/type-check
+   runs) — emit a single line: `READY-TO-COMMIT`. This signals that staging + self-review
+   are complete and the only remaining work is the gate run + commit. If your output is
+   truncated before this marker, the orchestrator treats the dispatch as a resumable
+   failure and re-dispatches you with prior context; do not assume a partial run was accepted.
+
+   This marker does NOT apply in a deferred Phase Group (when the prompt carries the
+   deferred-group flag). In that path you do not stage or commit at all — the orchestrator
+   tracks per-sub-phase progress via the group journal `status` field
+   (`pending` / `red-done` / `green`), which is the resume signal there.
+
    **Opt-out (rare).** For exceptionally large phases (>200 LOC delta OR where a hook failure on the batched diff would be hard to debug), you MAY split into multiple commits at public-surface boundaries — but the default is the single unified commit. Each additional commit costs another hook run without earning meaningful benefit for AI-driven TDD (agents don't bisect intra-phase SHAs; the orchestrator retries at phase scope).
 
    **What "Red test modification" means.** Any change to a file in Red's `## Staged test manifest` — including auto-formatting via an editor, accidental save, or attempting to "fix" a test that looks wrong. If a Red test really is wrong, STOP and report BLOCKED; do not edit it. The content-hash integrity check (orchestrator-produced `git hash-object -w` blob anchor in deferred groups; HEAD-hash in flat phases) is strict and unforgiving by design.
@@ -180,3 +193,9 @@ When a real method signature changes (e.g. a new `resume_from` parameter is adde
 A `try/except Exception:` block that wraps test setup or fixture materialization can swallow the very AssertionError your test relies on. Narrow the except clause to the specific exception you're handling (e.g. `except FileNotFoundError:`), or move the try/except outside the assertion path.
 
 If you recognize your current code matches one of these patterns, fix it BEFORE running your oracle — not after the first oracle failure. Each avoided iteration saves 5–15 min of agent self-correction.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.
+
+manifest.yaml is orchestrator-owned: you MUST NOT create, modify, or delete any `manifest.yaml` file. If your task appears to require a manifest change, report it to the orchestrator instead of editing it.

@@ -149,3 +149,7 @@ PASS | FAIL (with specific findings — each finding cites file, test name or li
 - You write NO code. Read and verify only.
 - Be specific in findings — file paths and function names.
 - If the prompt lacks a `Mode:` line or provides Audit mode without an AC Coverage Matrix, report BLOCKED — the orchestrator is misconfigured.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

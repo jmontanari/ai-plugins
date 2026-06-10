@@ -68,3 +68,7 @@ You receive one of two inputs. The orchestrator's prompt will label which:
 - Every must-fix must be specific: file, location, what's wrong, why it matters.
 - Trust the AC matrix as your starting point (Full mode). If you find gaps, raise them as must-fix; do NOT re-walk every AC from scratch.
 - Focused re-review mode: stay inside the fix delta. Return BLOCKED if you need more.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

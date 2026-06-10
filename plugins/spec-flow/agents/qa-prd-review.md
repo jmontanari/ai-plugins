@@ -41,3 +41,7 @@ Structured findings with must-fix and acceptable sections. Include requirement I
 - This is a holistic, cross-piece review. Look at the big picture.
 - Use Read, Grep, Glob to verify implementations in the actual codebase.
 - Be thorough but fair — only flag real gaps, not stylistic preferences.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

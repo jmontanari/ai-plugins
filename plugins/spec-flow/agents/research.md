@@ -95,3 +95,7 @@ STATUS: BLOCKED
 `STATUS: BLOCKED` means you could not complete the exploration (missing inputs, unresolvable dependencies, or an error that prevents useful output). On `STATUS: BLOCKED`, include a brief reason in the digest body before the status line, and do NOT write a partial `research.md`.
 
 No other STATUS values are valid. See [`plugins/spec-flow/reference/research-artifact.md`](../reference/research-artifact.md) for the full return contract definition, marker semantics, and the covered-file definition used by the plan skill.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

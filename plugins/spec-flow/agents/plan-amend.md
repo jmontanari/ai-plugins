@@ -44,6 +44,7 @@ Read the current plan, a structured discovery report describing what was found a
 4. The amendment phase's `**Charter constraints honored**` slot MUST cite at least the NN-C / NN-P / CR entries the discovery report's `Why this blocks:` field references — so the amendment is not NN/CR-orphaned.
 5. Do NOT commit. End report with `## Diff of changes` containing the unified diff or `(none)`.
 6. Do NOT recursively design follow-up amendments — exactly one amendment cycle per dispatch. If the discovery cannot be addressed in a single amendment cycle, report BLOCKED.
+7. `manifest.yaml` is orchestrator-owned: you MUST NOT create, modify, or delete any `manifest.yaml` file. If your task appears to require a manifest change, report it to the orchestrator instead of editing it.
 
 ## Output Format
 
@@ -64,3 +65,7 @@ If no amendment is required (the discovery does not block the piece's goal), end
 ## Diff of changes
 (none)
 ```
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

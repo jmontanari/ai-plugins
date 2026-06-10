@@ -77,3 +77,7 @@ Full (sub-phase iter 1) | Focused re-review (sub-phase iter 2+)
 2. Scan the delta for regressions on touched surface.
 3. **Hard cap:** reading any file outside the fix delta is a contract violation. Return `BLOCKED — needs full re-review` rather than fetching.
 4. If the delta is `(none)` and all findings are blocked, return an empty `### must-fix` and note the blocked findings under acceptable.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

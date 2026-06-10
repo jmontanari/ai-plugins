@@ -28,6 +28,27 @@ Exactly two exceptions upgrade an in-execute stage to Opus and are the only assi
 
 The coordinator stays lean over long pieces by consuming **bounded, structured** agent returns. Every agent return to the coordinator MUST be a bounded summary; raw artifacts — full diffs, full test output, file bodies — live on disk or git and are referenced by path, never pasted into the coordinator's context. The execute skill carries an audit table (one row per dispatch) asserting each return is bounded; any dispatch instructing an agent to paste a raw dump is a defect.
 
+## Dispatch Preamble — Worktree Resolution
+
+Every agent dispatched by execute or review-board receives, as the **first lines** of its prompt, the verbatim block below. The absolute path is the active worktree root. An agent that does not receive this preamble MUST stop and report `[WORKTREE-ABSENT]` rather than infer a path from the plan or any other source.
+
+**Canonical preamble block (reproduce verbatim at each dispatch site):**
+
+```
+WORKTREE: <absolute-path>
+Resolve every file read and write from this root. Do not read from or
+write to the main repository checkout. If this WORKTREE preamble is
+absent from your prompt, STOP and report `[WORKTREE-ABSENT]`.
+```
+
+This rule is the single authoritative source for the preamble text. Agent input contracts (`plugins/spec-flow/agents/<name>.agent.md` and `<name>.md`) and dispatch sites in `plugins/spec-flow/skills/execute/SKILL.md` and `plugins/spec-flow/skills/review-board/SKILL.md` cite this section rather than re-deriving the rule. A single grep token (`WORKTREE:`) verifies coverage everywhere.
+
+## Orchestrator-Owned Files
+
+`manifest.yaml` files are **orchestrator-owned**. No dispatched agent — implementer, tdd-red, fix-code, refactor, or any other — may create, modify, or delete a `manifest.yaml` file. An agent whose task appears to require a manifest change MUST report the required change to the orchestrator instead of editing the file directly.
+
+This ownership boundary exists because manifest state (`status`, `merged_at`, phase checkboxes) drives orchestrator flow-control decisions. A manifest edit made by a dispatched agent can advance or close a piece before the orchestrator has verified the necessary preconditions (e.g. Final Review sign-off, Step 5.5 commit ordering). The Step 6b sweep in `plugins/spec-flow/skills/execute/SKILL.md` enforces this rule at the phase-commit gate, and the Step G9 manifest-ownership sweep enforces it again at the group-barrier gate: any diff (committed or working-tree union) touching a `manifest.yaml` path is a blocking violation.
+
 ## Resume-Critical State — Field Tiers
 
 `[STATE-INCOMPLETE: <field>]` is emitted (and the coordinator escalates to the operator rather than guessing) **iff** a field is (a) resume-critical, (b) expected-present given the current resume position, and (c) missing or corrupt. Otherwise the coordinator recomputes (tier 2) or treats the absence as valid (tier 3).

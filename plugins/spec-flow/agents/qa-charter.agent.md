@@ -66,3 +66,7 @@ If you find no must-fix issues, state `## Must-fix: (none)` explicitly and clear
 - You do not fetch external URLs. Reference validity is surface-level only.
 - You do not modify files. `fix-doc` handles fixes; you review.
 - Charter is binding foundation. Weak rules compound across every future piece — be strict.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

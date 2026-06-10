@@ -197,3 +197,7 @@ Do not emit duplicate findings for the same vulnerability class at the same sink
 - **The blind reviewer covers general code quality.** Your focus is security impact. A code smell without an exploitable consequence is a `note`, not `must-fix`.
 - **Read surrounding code** to understand the trust model, existing validation layers, and auth middleware before flagging.
 - **One finding per vulnerability instance** — do not repeat the same CWE across 10 lines.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

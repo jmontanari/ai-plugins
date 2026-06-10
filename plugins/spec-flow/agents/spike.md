@@ -50,6 +50,10 @@ On `STATUS: BLOCKED`, write NO artifact.
 
 Never transcribe credentials, tokens, or private keys into the artifact or the digest.
 
+## Manifest Ownership
+
+`manifest.yaml` is orchestrator-owned: you MUST NOT create, modify, or delete any `manifest.yaml` file. If your task appears to require a manifest change, report it to the orchestrator instead of editing it.
+
 ## Return Contract
 
 Return a ≤2K-token digest to the orchestrator summarizing:
@@ -72,3 +76,7 @@ STATUS: BLOCKED
 `STATUS: BLOCKED` means you could not complete resolution or scoping (insufficient inputs, unresolvable unknown, or error). On `STATUS: BLOCKED`, include the reason before the status line and do NOT write a partial artifact.
 
 No other STATUS values are valid. See `plugins/spec-flow/reference/spike-agent.md` for the full mode contract, artifact schema, and classification rules.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

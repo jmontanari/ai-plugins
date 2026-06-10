@@ -4,6 +4,19 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.12.0] — 2026-06-10
+
+### Added
+- **WORKTREE dispatch-preamble contract + `[WORKTREE-ABSENT]` escalation:** every execute and review-board agent dispatch now carries a `WORKTREE: <absolute-path>` preamble line. The contract is documented in `reference/coordinator-contract.md` and every dispatched agent's input contract. If the preamble is absent at dispatch time the agent emits `[WORKTREE-ABSENT]` and escalates rather than proceeding with an ambiguous working tree.
+- **`manifest.yaml` declared orchestrator-owned:** `reference/coordinator-contract.md` records `manifest.yaml` as an orchestrator-owned file. A blocking manifest-ownership sweep is added to execute Step 6b and Step G9 (working-tree-union aware under `deferred_commit: auto`); a manifest-ownership notice is added to the implementer, tdd-red, fix-code, and refactor agent input contracts, prohibiting those agents from writing the manifest.
+- **Step 5.5 manifest commit promoted to a checked Step 6 precondition:** the previously advisory prose is now a hard precondition checked at the start of Step 6 across both merge strategies and every retry path (change-track carve-out documented). An operator checklist line is added to reinforce this gate.
+- **Implementer `READY-TO-COMMIT` marker + Step 3 truncation/resume protocol:** flat-phase and `deferred_commit: off` implementer agents emit a `READY-TO-COMMIT` marker after staging + the pre-DONE self-check but BEFORE the long-running gate run (signals "staging done, gate+commit remaining"); marker-absent + no commit landed → resumable; marker-absent + commit landed → accepted via Step 7 gates. Step 3 of execute gains a truncation/resume protocol; the manual stage-and-commit bypass is explicitly prohibited.
+
+### Changed
+- **Agent input contracts extended with WORKTREE and manifest-ownership fields:** the implementer, tdd-red, fix-code, and refactor `.agent.md` / `.md` twin files each gain a `WORKTREE:` input field and a manifest-ownership line. The appended blocks are identical across each pair; the 22 already-identical pairs stay byte-identical; the 4 pre-existing divergent pairs (plan-amend, qa-plan, tdd-red, review-board-security) are not unified by this change.
+- **4 previously-divergent agent twins reconciled to byte-identical:** `plan-amend`, `qa-plan`, `tdd-red`, and `review-board-security` `.agent.md` files were stale relative to their `.md` counterparts; the canonical `.md` is now copied over each, making all 4 pairs byte-identical alongside the existing 22.
+- **Final Review diff base now uses `git merge-base`:** the 4-tier `$default_branch` resolver is preserved (still needed to compute the merge-base), but all diff invocations in Final Review (Step 1a scope detection, Step 1 full diff, fast-mode 9th board member, CHANGELOG re-verification, and Step 8 re-entry prose) now diff against `$diff_base=$(git merge-base "$default_branch" HEAD)` rather than `"$default_branch"..HEAD`. This is robust to the default branch advancing mid-branch, which would otherwise include intervening main commits as spurious diff.
+
 ## [5.11.0] — 2026-06-10
 
 ### Added

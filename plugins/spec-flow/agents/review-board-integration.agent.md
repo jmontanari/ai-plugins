@@ -152,3 +152,7 @@ No other board reviewer audits these two axes.
 - **Self-consistency is not coverage.** "The unit tests pass" is not evidence of path coverage — only that each component agrees with its own mocks. Say so when that's all that exists.
 - **Mock-avalanche is piece-scoped.** Do not conclude "no avalanche" from a single-phase read. Always scan the full piece's test files before clearing probe 6.
 - **Un-contract-tested doubles are must-fix.** A stub whose faithfulness to the real external is unverified is a latent boundary correctness defect. Do not downgrade it.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

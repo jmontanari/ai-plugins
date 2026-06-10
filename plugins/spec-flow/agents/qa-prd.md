@@ -70,3 +70,7 @@ If no must-fix findings: return "### must-fix\nNone" and list all passing criter
 - Every must-fix finding must cite a specific criterion and the specific FR/SC/persona involved.
 - Do not suggest improvements or nice-to-haves. Only flag things that are wrong, missing, or ambiguous.
 - A PRD with zero user stories or zero personas is always must-fix, regardless of how complete the FR list looks.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

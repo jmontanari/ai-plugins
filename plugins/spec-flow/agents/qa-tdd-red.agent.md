@@ -101,3 +101,7 @@ PASS | FAIL (with the specific pattern numbers and AC IDs to address)
 ## Retry contract
 
 If you return FAIL, the orchestrator will re-dispatch `tdd-red` with your findings surfaced. Red has one retry attempt. If the second Red attempt still fails this review, the orchestrator escalates to a human — because at that point either the phase's ACs are too vague to write adversarial tests against (spec defect) or the plan's `[TDD-Red]` block is directing Red toward un-testable surface (plan defect).
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

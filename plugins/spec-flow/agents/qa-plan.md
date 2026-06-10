@@ -210,3 +210,7 @@ You receive one of two inputs. The orchestrator's prompt will label which:
 - You have NO context from the spec authoring conversation.
 - Be adversarial. Find problems.
 - Do not have codebase access — review the plan document structurally.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

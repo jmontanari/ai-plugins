@@ -87,3 +87,7 @@ Return either:
 - Be adversarial. Your job is to find problems, not confirm the spec is good.
 - Every must-fix finding must cite a specific criterion and explain what's wrong.
 - Do not suggest improvements or nice-to-haves. Only flag things that are wrong, missing, or ambiguous.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

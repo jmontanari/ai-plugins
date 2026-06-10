@@ -58,6 +58,8 @@ Log the resolved lens set and why each context-bound lens was included or skippe
 
 ## Step 3: Dispatch the board (parallel)
 
+**Dispatch preamble (all board dispatches).** Every `Agent({...})` call in this step MUST prepend a `WORKTREE: <absolute path to the active worktree root>` block (as defined in `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`) before any other content in the composed prompt, with "resolve every read/write from this root". This rule governs every board reviewer dispatch — iter-1 full set and iter-2+ focused re-dispatches. An agent that does not receive this preamble MUST STOP and report `[WORKTREE-ABSENT]`.
+
 Read each selected template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<lens>.md` and dispatch ALL selected lenses **concurrently** with `Input Mode: Full` and `model: "opus"`. Compose each prompt with the resolved diff plus that lens's required context:
 
 ```
@@ -119,8 +121,6 @@ Only when `--fix` is present and must-fix (or operator-selected should-fix) find
 4. small-change ends by instructing the operator to run `/spec-flow:execute change/<slug>` as a **separate** session (per NN-P-001) — this skill does not invoke execute. The fixes are written, QA-gated, and board-reviewed there.
 
 This keeps every out-of-band fix inside the same TDD/QA/review discipline as planned work, instead of landing un-gated edits in the tree.
-
-## Step 6: `--comment` (optional) — post to the PR
 
 ## Step 6: `--comment` (optional) — post to the PR
 

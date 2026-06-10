@@ -56,3 +56,9 @@ All tests still pass: yes/no
 ## Status
 DONE | NO_CHANGES_NEEDED
 ```
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.
+
+manifest.yaml is orchestrator-owned: you MUST NOT create, modify, or delete any `manifest.yaml` file. If your task appears to require a manifest change, report it to the orchestrator instead of editing it.

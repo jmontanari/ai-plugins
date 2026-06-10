@@ -131,6 +131,10 @@ You (the main window) are a PURE CONDUCTOR. You:
 
 You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git grep`, reading `.pre-commit-config.yaml`) are explicitly part of the conductor role — they are cheap reads that collapse 5–15 agent tool calls per dispatch. Synthesis and code-writing still come from subagents.
 
+### Dispatch Preamble (all agent dispatches)
+
+**Every** prompt composed for any agent dispatch in this skill MUST begin with a `WORKTREE: <absolute path to the active worktree root>` block as defined in `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`, followed by "resolve every read/write from this root". An agent that does not receive this preamble MUST STOP and report `[WORKTREE-ABSENT]`. The canonical template in Step 3 shows the correct first-line placement; every other dispatch step is governed by this standing rule.
+
 ### Coordinator Return Discipline
 
 To stay lean over long pieces (G-4), the coordinator consumes **bounded, structured** agent returns. Every agent return to the coordinator MUST be a bounded summary; raw artifacts — full diffs, full test output, file bodies — live on disk or git and are referenced by path, never pasted into the coordinator's context. See `plugins/spec-flow/reference/coordinator-contract.md` `## Coordinator Return Discipline`.
@@ -540,6 +544,9 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
 2. Compose prompt using the canonical template below. **Reference plan.md by file path and line range rather than restating its contents** — the agent reads plan.md directly. The prompt supplies only what plan.md doesn't: pre-flight facts, pre-decisions, and the mode oracle.
 
    ```markdown
+   WORKTREE: <absolute path to the active worktree root>
+   (resolve every read/write from this root — see reference/coordinator-contract.md)
+
    Mode: TDD | Implement
 
    ## Plan reference
@@ -592,6 +599,22 @@ If `.pre-commit-config.yaml` is absent, the hook inventory is empty — agents c
      - On violation of (b) or (c): retry within the 2-attempt budget with the specific offending IDs surfaced to the agent (e.g. "tests X, Y were SKIPPED in your run; you cannot pass Red tests by skipping them"). Escalate on second failure — a Red test that cannot go green without skipping means the plan or the Red tests themselves are wrong. On violation of (d): escalate immediately — a due `[integration]` test that is not green means the completing-phase `[Integration-Test]` sub-cycle did not run or failed.
    - Mode: Implement — the plan's `[Verify]` command must pass with the plan's expected output.
 6. **Circuit breaker:** If the oracle does not pass after 2 attempts in either mode, escalate to human. If the agent reports BLOCKED (e.g. ambiguous plan, architecture conflict, pre-decision vs. filesystem mismatch), escalate — do not retry blindly.
+
+   **Truncation/resume (flat-phase / `deferred_commit: off` only).** If the implementer
+   returns WITHOUT the `READY-TO-COMMIT` marker AND no phase commit landed (HEAD
+   unchanged from `phase_N_start_sha`), treat it as a resumable failure and re-dispatch
+   with prior context. Manually staging + committing such an incomplete return is PROHIBITED
+   — it bypasses the agent's pre-DONE pitfalls self-check. If a valid phase commit DID land
+   (HEAD has advanced), accept it via the normal Step 7 post-commit gates regardless of
+   marker presence — marker absence on an otherwise-complete, gate-passing commit is NOT
+   by itself a rejection. This prohibition applies ONLY to a marker-absent incomplete
+   implementer return and does NOT restrict the by-design Step G9b barrier work-commit,
+   fix-code application commits, or progress commits.
+
+   Under `deferred_commit: auto`, a marker-absent incomplete sub-phase routes to the
+   existing file-scoped reset + re-run-from-Red recovery (journal `status` field + FR-6
+   recovery path), NOT to "finish the gate/commit."
+
 7. **Post-commit integrity and reconciliation gates (Mode: TDD + Implement, v3.1.1+).** After the implementer's commit lands (HEAD now points to it), run cheap checks before accepting the phase. Gate (a) is TDD-only (uses Red's manifest); gate (b) is HARD FAIL on BOTH modes — strays or missings reject the phase. The Implement-track extension was added in v3.1.1 per pi-009-hardening's Phase Group A contamination event, where A.2 silently swept in A.4's staged files because the gate was previously gated `Mode: TDD only`.
 
    > **Deferred Phase Group note (`deferred_commit: auto`).** The HEAD-hash form of both gates below — gate (a) content-hash integrity and gate (b) reconciliation — applies to flat phases and to `deferred_commit: off`, where each phase/sub-phase makes its own commit and HEAD points at that work. Under `deferred_commit: auto` the sub-phases do NOT commit individually, so these gates do NOT run per sub-phase. Instead they run ONCE at the group barrier (Step G9b: Barrier work-commit), evaluated against the **working tree** (gate (a): re-hash each sub-phase's Red tests in the working tree against the journal `red_manifest_hashes`) and the **barrier work-commit** (gate (b): reconcile the work-commit `--name-only` against the union of all sub-phase scopes). The per-sub-phase HEAD-hash form does not apply under `auto` because there is no per-sub-phase HEAD commit to hash.
@@ -962,6 +985,8 @@ After each QA iteration (regardless of whether must-fix findings remain), scan t
 ### Step 6b: Phase Hook Sanity Check
 
 Every intermediate commit in the phase already ran hooks (the implementer's unified commit, Refactor, and fix-code commits all trigger pre-commit normally — Red does not commit and therefore does not trigger hooks, but its tests ride along in the implementer's commit where the hook DOES run over the unified diff), so the cumulative phase diff has been lint/format/type-check-clean at each commit. This step is a single defensive sweep against any autofix residue or staging-area drift that might have slipped through.
+
+**Manifest-ownership sweep (blocking — unconditional).** Before the pre-commit run, check the phase diff for orchestrator-owned file violations. From the phase diff (`git diff --name-only $phase_N_start_sha..HEAD`), if any path's basename is `manifest.yaml`, STOP — `manifest.yaml` is orchestrator-owned (`reference/coordinator-contract.md` → `## Orchestrator-Owned Files`). A dispatched agent modified it; escalate to the operator and do NOT advance to Step 7. (Orchestrator-authored manifest commits — made by the main window after agent return: Step 5.5, Step 6c amend/fork, Step 7, recognizable by their `chore(manifest):` / `chore(plan): amend` / `chore(spec): amend` / `chore(<piece-slug>): fork` messages — are exempt. The authoritative ownership backstop is the Step 3 gate-(b) reconciliation, which rejects any agent-commit containing a manifest.yaml as a stray regardless of message; this sweep is the early, message-level signal.)
 
 1. Run pre-commit over the phase's changed files:
    ```bash
@@ -1426,6 +1451,11 @@ Run `pre-commit run --files $(git diff --name-only $group_start_sha..HEAD)`. Sam
 
 > **Coherence note (`deferred_commit: auto`).** Under `deferred_commit: auto` the sub-phase files are untracked until the Step G9b work-commit lands, so `git diff $group_start_sha..HEAD` is empty pre-commit; in that case the hook-sweep file list is the working-tree union (the journal `sub_phases` scope) rather than the committed group diff — enumerate it per `reference/deferred-commit-journal.md` §Working-tree enumeration over an untracked union (deferred_commit: auto).
 
+**Manifest-ownership sweep (blocking).** After the hook sweep, run the manifest-ownership check. This check uses a DIFFERENT file enumeration strategy than the hook sweep above — the manifest check must be unfiltered to catch out-of-scope violations that a scope-union filter would miss:
+
+- Under `deferred_commit: auto` (the default): use `git status --porcelain` over the full working tree (unfiltered — do NOT restrict to the journal `sub_phases` scope union). If any reported dirty or untracked path's basename is `manifest.yaml`, STOP — `manifest.yaml` is orchestrator-owned (`reference/coordinator-contract.md` → `## Orchestrator-Owned Files`). An agent wrote a `manifest.yaml` outside its declared scope; escalate to the operator and do NOT advance to Step G9b or the barrier commit. (Already-committed orchestrator manifest writes, such as Step 5.5 and Step 7, are committed and not "dirty/untracked" — no exemption logic is needed.)
+- Under `deferred_commit: off`: use the committed group diff (`git diff --name-only $group_start_sha..HEAD`) as the file list. If any path's basename is `manifest.yaml`, STOP and escalate. (Orchestrator-authored manifest commits — made by the main window after agent return: Step 5.5, Step 6c amend/fork, Step 7, recognizable by their `chore(manifest):` / `chore(plan): amend` / `chore(spec): amend` / `chore(<piece-slug>): fork` messages — are exempt. The authoritative ownership backstop is the Step 3 gate-(b) reconciliation, which rejects any agent-commit containing a manifest.yaml as a stray regardless of message; this sweep is the early, message-level signal.)
+
 ### Step G9b: Barrier work-commit (deferred_commit: auto)
 
 This step runs ONLY under `deferred_commit: auto`. Under `deferred_commit: off` (and for flat phases) there is no barrier work-commit — each phase commits its own work, and this step is skipped. See `plugins/spec-flow/reference/deferred-commit-journal.md` `## Barrier commit recipe` for the canonical recipe; this step is its orchestration in the group barrier.
@@ -1635,12 +1665,15 @@ if [ -z "$default_branch" ]; then
   echo "ERROR: cannot resolve default branch (no origin/HEAD, no origin remote, no .spec-flow.yaml default_branch:) — set default_branch: in .spec-flow.yaml" >&2
   exit 1
 fi
+# Compute merge-base once — robust to the default branch advancing mid-branch
+# (using "$default_branch"..HEAD would include intervening main commits as spurious diff)
+diff_base=$(git merge-base "$default_branch" HEAD)
 ```
 
 (execute uses a strict 4-tier resolver: `git symbolic-ref` → `git remote show origin` → `.spec-flow.yaml default_branch:` → loud error. It does NOT fall back to `main` or `master` guesses — see ADR-3.)
 
 ```bash
-git diff "$default_branch"..HEAD
+git diff "$diff_base"..HEAD
 ```
 
 ### Step 1a: Pre-board coherence linter self-check
@@ -1649,7 +1682,7 @@ Before dispatching the review board, run a mechanical coherence self-check over 
 
 1. **Scope detection.** Compute the changed-file set:
    ```bash
-   git diff "$default_branch"..HEAD --name-only
+   git diff "$diff_base"..HEAD --name-only
    ```
    Filter it for paths matching `skills/*/SKILL.md` (any `skills/<name>/SKILL.md` path, whatever the leading directory). When the piece's diff touches **no** `SKILL.md`, this self-check is a **silent no-op** — skip directly to the board dispatch below.
 2. **Run the linter** over exactly those changed `SKILL.md` paths:
@@ -1658,6 +1691,8 @@ Before dispatching the review board, run a mechanical coherence self-check over 
    ```
 3. **Non-zero exit (invariant-1–3 violation) is must-fix.** This self-check runs **before** the board, so it does not reuse Step 3's board-reviewer re-dispatch loop — it reuses only the **`fix-code` dispatch + 3-iteration circuit-breaker mechanics** that Step 3's fix loop uses, driven by the **linter** rather than by board findings: dispatch `fix-code` (Sonnet, `agents/fix-code.md`) with the linter findings, commit the fix, then **re-run the linter** over the changed `SKILL.md` paths. Repeat until the linter exits `0` or the same **3-iteration circuit breaker** fires (escalate to a human on the 3rd cycle without a clean exit). Do not dispatch the board while the linter is still red.
 4. **`WARNING:` lines (invariant-4, state-field producer→consumer) are advisory only** — surface them for visibility, but they do NOT change the exit code and do NOT block the board.
+
+(Each board prompt also begins with the `WORKTREE: <abs-path>` preamble per the Dispatch Preamble standing rule — the `+ diff only` shorthand below describes the review payload, not an exhaustive prompt spec.)
 
 Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<role>.md` and dispatch ALL EIGHT concurrently with `Input Mode: Full`:
 
@@ -1691,7 +1726,7 @@ When `track = "piece"`, the existing 8-standard-agent dispatch runs unchanged.
 ```
 Agent({
   description: "Test quality review — Piece Full (fast mode compensation, iter 1)",
-  prompt: <verify.md + "Mode: Piece Full\n\n" + full piece diff (git diff $default_branch..HEAD) + all spec ACs (all phases, from spec.md) + "Tests verified per-phase — do NOT re-run the test suite.">,
+  prompt: <verify.md + "Mode: Piece Full\n\n" + full piece diff (git diff $diff_base..HEAD) + all spec ACs (all phases, from spec.md) + "Tests verified per-phase — do NOT re-run the test suite.">,
   model: "opus"
 })
 ```
@@ -1739,9 +1774,9 @@ If must-fix findings exist:
 
 **How.** After the fix commit lands, run:
 ```bash
-git diff "$default_branch"..HEAD -- CHANGELOG.md
+git diff "$diff_base"..HEAD -- CHANGELOG.md
 ```
-Compare the CHANGELOG diff against the full cumulative piece diff (`git diff $default_branch..HEAD`) to identify any artifact-level change not reflected in the CHANGELOG. If a discrepancy is found, dispatch a targeted fix-code agent scoped to `CHANGELOG.md` with the discrepancy listed as its sole finding. The fix does NOT count against the `[Verify]` oracle for the phase that originally authored the CHANGELOG — it is a separate targeted correction. After the CHANGELOG fix lands, re-run the version-sync check (`grep -h '"version"'` across version-bearing files) to confirm all version strings still agree.
+Compare the CHANGELOG diff against the full cumulative piece diff (`git diff $diff_base..HEAD`) to identify any artifact-level change not reflected in the CHANGELOG. If a discrepancy is found, dispatch a targeted fix-code agent scoped to `CHANGELOG.md` with the discrepancy listed as its sole finding. The fix does NOT count against the `[Verify]` oracle for the phase that originally authored the CHANGELOG — it is a separate targeted correction. After the CHANGELOG fix lands, re-run the version-sync check (`grep -h '"version"'` across version-bearing files) to confirm all version strings still agree.
 
 **Scope.** This rule applies to every post-CHANGELOG fix path: Final Review Step 3 fix iterations, Step 8 amendment phases (`phase_final_amend_<K>`), and any human-directed rework via Step 4 (Human Sign-Off) that touches behavior after the CHANGELOG phase. It does NOT apply to fixes that land before the CHANGELOG phase runs — those are covered by the normal phase `[Verify]` oracle and CHANGELOG-phase QA gate.
 
@@ -1762,7 +1797,7 @@ Each finding is processed as a separate Step 6c invocation (one Step 6c invocati
 
 **Per-choice flow.**
 
-- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 on the new cumulative diff `git diff $default_branch..HEAD`. For `track = "change"` pieces: re-dispatch the same 7-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth, integration) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 8 standard agents (blind, edge-case, spec-compliance, prd-alignment, architecture, security, ground-truth, integration, and verify-piece-full in fast mode). The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
+- **On `amend` (or `amend-spec`):** the piece **re-opens**. The amendment phase(s) inserted as `phase_final_amend_<K>` run through the full Per-Phase Loop including their own Red/Build/Verify/Refactor cycle (where applicable per the amended plan's track) AND their own per-phase QA gate (Step 6) per NN-P-002 preservation. Amendment phases run through QA-phase, Step 6a (deferred-finding surface-to-Step-6c), Step 6b (hook sweep), Step 6c (their own discovery triage, recursing if discoveries surface — bounded by the amendment budget). **Re-entry to Final Review (explicit hand-off).** When the LAST `phase_final_amend_<K>` phase completes its Step 7 (Mark Progress) commit, the orchestrator does NOT advance to "next plan.md phase" (there is none — amendment phases were inserted post-hoc by Step 8). Instead, the orchestrator detects the just-completed phase's ID matches the `phase_final_amend_<K>` pattern and the next phase ID would advance off the end of the amendment-phase chain, then jumps back to Final Review Step 1 on the new cumulative diff `git diff $diff_base..HEAD`. For `track = "change"` pieces: re-dispatch the same 7-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth, integration) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 8 standard agents (blind, edge-case, spec-compliance, prd-alignment, architecture, security, ground-truth, integration, and verify-piece-full in fast mode). The merge gate (Step 6) fires only after the re-run Final Review returns clean (or after a subsequent Step 8 invocation processes its findings). This guarantees NN-P-002's two-human-gate non-negotiable (per-phase QA + end-of-piece review board) survives Step 8's amendment cycle intact.
 
 - **On `fork`:** a follow-up piece is written to `docs/prds/<prd-slug>/manifest.yaml` with `depends_on: [<current-piece-slug>]`, exactly as Step 6c's Fork dispatch specifies. The current piece **merges as-is** with the discovery deferred to the new piece — Step 8's fork choice does NOT re-open the piece and does NOT re-run Final Review. Execution proceeds to Step 4 (Human Sign-Off) once all Step 8 findings have been routed. The current piece's status remains `executing` (or whatever its pre-Step-8 status was); the operator's sign-off at Step 4 is on the merge-as-is artifact with the forked discovery noted.
 
@@ -1935,6 +1970,20 @@ After escalation, if the human resolves the issue and retries, **re-run Step 5.5
 
 ### Step 6: Merge
 
+**Precondition (piece-track only — checked both strategies, every retry path).** When
+`track = "piece"`, confirm the manifest at HEAD shows `status: merged`:
+
+```bash
+git show HEAD:docs/prds/<prd-slug>/manifest.yaml | grep 'status: merged'
+```
+
+This MUST return `status: merged`. The manifest CONTENT at HEAD is the sole authoritative signal — do NOT use `git log` grep as a satisfying signal. A `git revert HEAD` of a Step 5.5 commit leaves the original `chore(manifest): mark … merged` commit in log history while reverting the manifest content to non-merged at HEAD, so a log-grep would falsely pass while the manifest is in a stale state. Only the manifest content at HEAD is reliable.
+
+If the content check does not show `status: merged` — including after a reverted Step 6 retry — re-run Step 5.5 first (re-commit `status: merged` + `merged_at`). This precondition gates BOTH `squash_local` and `pr`, on the first run and every retry path. Do NOT merge, push, or open a PR while this precondition is unmet.
+
+When `track = "change"`, there is no manifest and Step 5.5 makes no manifest commit —
+**skip this precondition entirely** and proceed directly to `merge_strategy` branching.
+
 Read `merge_strategy` from `.spec-flow.yaml` (valid values: `squash_local`, `pr`;
 default: `squash_local` when the key is absent, unset, or unrecognized — per NN-C-003
 backward compatibility). Branch on the value:
@@ -1969,12 +2018,14 @@ Display the following command for the human to copy-paste and run manually:
 gh pr create --base main --head piece/<prd-slug>-<piece-slug>
 ```
 Print: "PR-based merge required. Run the command above to open a pull request.
-The piece branch already carries `status: merged` + `merged_at` in the manifest (Step 5.5).
-When the PR is reviewed and merged, main receives the correct terminal state automatically.
+[piece-track only] ✓ HEAD carries the Step 5.5 manifest commit (`status: merged`). The piece branch already carries `status: merged` + `merged_at` in the manifest (Step 5.5). When the PR is reviewed and merged, main receives the correct terminal state automatically.
 Jira task(s) are now In Review — run intake at the start of your next session to mark them Done once the PR merges.
 After the PR merges, run these cleanup commands:
   git worktree remove {{worktree_root}}
   git branch -d piece/<prd-slug>-<piece-slug>"
+
+_(Omit the `[piece-track only]` manifest line when `track = "change"` — no manifest exists for change-track.)_
+
 **Halt.** Do NOT execute the `gh` command — no `gh` CLI dependency is introduced.
 
 ## Escalation Rules

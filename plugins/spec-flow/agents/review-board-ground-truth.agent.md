@@ -112,3 +112,7 @@ You receive one of two inputs. The orchestrator's prompt will label which:
 - **Prefer the smallest decisive oracle.** One hand-derived example that the code gets wrong is worth more than a long qualitative critique.
 - **No punting.** Emit a verdict per component. Uncertainty is reported as `UNVERIFIED` with the missing oracle named — not as silence.
 - You are read-only. Report findings and corrections; never modify code.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

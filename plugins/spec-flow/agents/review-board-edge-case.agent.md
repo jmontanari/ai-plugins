@@ -43,3 +43,7 @@ You receive one of two inputs. The orchestrator's prompt will label which:
 ## Rules
 - Read surrounding code to understand context. Don't flag edge cases already handled elsewhere.
 - Focus on cases that could cause data loss, crashes, or incorrect behavior — not style.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.

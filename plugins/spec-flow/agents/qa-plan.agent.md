@@ -146,6 +146,50 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 
 26. **Integration allocation (activate only when the spec declares an Integration Coverage block; skip if absent — not an error per NFR-INT-02):** For each declared integration: (a) exactly one phase contains an `[Integration-Test]` block with a concrete real-path `[Verify]` command and a `completes_in_phase` marker no earlier than the completing component's phase; (b) each doubled true external has a contract test named in that block; (c) the block states its boundary (nothing inside the boundary is doubled); (d) the `## Integration-Test Registry` table is well-formed (one row per `[integration]` test; required columns present, including `registered_in_phase`); (e) for every registry row, `registered_in_phase ≤ completes_in_phase` — a row where `registered_in_phase > completes_in_phase` is a must-fix (the skeleton cannot be authored after the completing phase). When `registered_in_phase == completes_in_phase`, verify the phase's plan block includes both a `[TDD-Red]`/`[Write-Tests]` skeleton step AND an `[Integration-Test]` completing step (the intra-phase ordering the execute skill enforces). Any missing (a)/(b)/(c)/(d)/(e) → must-fix. Evidence: quote the integration and the phase block.
 
+27. **P2/P3 cross-step authoring discipline (pi-021).** When a plan phase's `In scope:` edits a *multi-step orchestration file* — a `skills/*/SKILL.md` containing ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b` — verify the phase header carries BOTH cross-step fields: a non-empty `**Steps traversed (P2):**` enumeration of the pre-existing steps the change traverses or invalidates, AND a `**Dispatch sites (P3):**` field holding either an enumeration of affected agent (re-)dispatch sites or an explicit "none." Absence of either field, or a `**Steps traversed (P2):**` field left empty/placeholder, → must-fix. Cite the Definition (plan SKILL.md §9c: ≥3 `^#{3,4} (Step|Phase|Sub-Phase)\b` headings) and quote the offending phase header as evidence. This criterion does not activate when the phase edits no multi-step orchestration file.
+
+   Evidence: quote the phase header (showing the missing or empty field) and name the in-scope multi-step orchestration `SKILL.md` that triggers the requirement. **Must-fix.**
+
+28. **Per-phase concreteness floor (FR-002a) (activate when the plan contains `[Implement]` or `[Build]` blocks; a plan with neither has no deliverables to floor-check — skip; the floor applies to the numbered Change Specification Blocks — the T-N entries — within those blocks, not to narrative prose that may precede them).** Each phase's Change Specification Blocks must satisfy the concreteness floor in `plugins/spec-flow/reference/plan-concreteness.md` §1: a target file (exact path), a location/anchor, and concrete content/signatures. The primary test is presence of that triple. Treat vague action verbs ("implement", "handle", "add support for", "wire up", "support") as an illustrative signal of a missing triple ONLY within deliverable / TARGET prose — never a standalone match (do NOT flag "the `[Implement]` block" or "implementer agent").
+
+    Flag:
+    - A deliverable that names no target file, or only a directory/glob
+    - A MODIFY deliverable with a file but no location/anchor; a CREATE deliverable with no structure outline
+    - A deliverable whose content is a bare verb-phrase ("implement the validator") with no concrete signature/prose/structure
+
+    Evidence: quote the phase's deliverable showing the missing element of the triple. **Must-fix.**
+
+29. **Unmarked unknown (FR-002b).** A decision the plan defers or hedges but cannot resolve must be an explicit `[SPIKE: <unknown>]` marker (`plugins/spec-flow/reference/plan-concreteness.md` §2). A correctly-marked `[SPIKE]` is acceptable — do NOT flag it on that basis. A hedged/deferred unknown in ordinary prose with no marker is a must-fix.
+
+    Flag:
+    - Prose that defers a decision ("the exact threshold depends on profiling", "to be determined during implementation", "the right value will emerge") with no `[SPIKE:` marker
+    Do NOT flag:
+    - A deliverable carrying a `[SPIKE: <description>]` marker on the unknown — that is the sanctioned form
+
+    Evidence: quote the hedged sentence and note the absent marker. **Must-fix.**
+
+30. **Doc-as-code branch-enumeration AC (FR-002c) (activate only for Implement-track / Non-TDD phases — a phase with `[Implement]` and no `[TDD-Red]`; skip TDD-track phases).** For each such phase, every conditional branch in the deliverable prose (a clause introduced by if/when/unless/otherwise/either, or an enumerated case) must have a matching numbered AC (`plugins/spec-flow/reference/plan-concreteness.md` §3). Read the phase's own enumerated branches and its `**ACs Covered:**` / AC list — evaluable from plan text alone.
+
+    Flag:
+    - A conditional branch in the deliverable with no corresponding numbered AC, naming the un-AC'd branch
+    Do NOT flag:
+    - A phase whose every branch has a matching AC, or a phase with no conditional branches
+    - A TDD-track phase (one that contains `[TDD-Red]`); note: a Non-TDD mode phase (`tdd: false`) uses `[Implement]` + `[Write-Tests]` with no `[TDD-Red]` — the presence of `[Write-Tests]` does NOT reclassify it as TDD-track; Non-TDD mode phases ARE subject to this criterion
+
+    Evidence: quote the branch clause and show the AC list lacks a covering AC. **Must-fix.**
+
+31. **Test Data block presence + completeness (FR-003) (activate per phase containing a `[TDD-Red]` or `[Write-Tests]` step; a phase with neither authors no tests — skip).** Each such phase must carry a complete `Test Data` block per `plugins/spec-flow/reference/plan-concreteness.md` §5: every behavior the test step names maps to a covering case, and every case has both a concrete input and an expected outcome — or a per-case `[SPIKE: <unknown>]` (§2) on an unpredictable case. Read the phase's own `Test Data` block and its `[TDD-Red]`/`[Write-Tests]` test entries (case-id references) — evaluable from plan text alone. Do NOT judge whether an expected value is *correct* (no oracle access); judge only presence + completeness.
+
+    Flag:
+    - A `[TDD-Red]`/`[Write-Tests]` phase with no `Test Data` block at all
+    - A named test behavior with no covering case in the block
+    - A case missing its input, or missing its expected outcome (and not marked `[SPIKE]`)
+    Do NOT flag:
+    - A case whose expected-outcome position is a well-formed `[SPIKE: <description>]` — that is the sanctioned unpredictable-outcome form
+    - A pure `[Implement]` phase with no `[TDD-Red]`/`[Write-Tests]` step — out of scope for this criterion
+
+    Evidence: quote the phase's `Test Data` block (or its absence) and the uncovered/incomplete case. **Must-fix.**
+
 ## Output Format
 
 Same structure: must-fix and acceptable sections. Every must-fix must cite a criterion and explain what's wrong.
@@ -166,3 +210,7 @@ You receive one of two inputs. The orchestrator's prompt will label which:
 - You have NO context from the spec authoring conversation.
 - Be adversarial. Find problems.
 - Do not have codebase access — review the plan document structurally.
+
+## Worktree
+
+Your prompt's first lines are a `WORKTREE: <absolute-path>` preamble (see `plugins/spec-flow/reference/coordinator-contract.md` → `## Dispatch Preamble — Worktree Resolution`). Resolve every file read and write from that root — never the main repository checkout. If the `WORKTREE:` preamble is absent from your prompt, STOP and report `[WORKTREE-ABSENT]`; do not infer a path from the plan.
