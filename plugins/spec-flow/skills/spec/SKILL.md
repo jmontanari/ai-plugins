@@ -12,6 +12,40 @@ description: >-
   the pipeline has an open piece ready to spec — even if the user doesn't say "spec" explicitly.
 ---
 
+## Pre-flight: Model Check
+
+Before any other step, verify the active model is an Opus-class model.
+
+Determine the active model using the platform-appropriate method:
+
+- **Copilot CLI** — read the `<model_information>` system tag injected into this session's context. The model name and ID are present there explicitly.
+- **Claude Code** — no equivalent tag is injected. Use Claude's self-knowledge: introspect your own model identity (Claude reliably knows which model variant it is from training) and treat that as the model name for the check below.
+
+If the active model name does **not** contain `opus` (case-insensitive):
+
+1. Use `ask_user` to block and prompt the user:
+
+   > ⚠️ **Model mismatch.** Spec authoring is thinking work per NN-P-005, but the active model appears to be **[model-name]**.
+
+   Choices:
+   - "Override — proceed on [model-name]"
+   - "Change now — I'll switch models"
+   - "Cancel spec"
+
+2. If the user selects **"Cancel spec"** → stop immediately and emit:
+   `Spec cancelled. Re-run after switching to an Opus model.`
+
+3. If the user selects **"Override — proceed on [model-name]"** → proceed to Step 0 immediately on the current model. Emit a one-line acknowledgment first:
+   `Overriding model check — proceeding on [model-name]. Spec quality may be reduced.`
+
+4. If the user selects **"Change now — I'll switch models"** → **close the prompt and return control to the user.** The model cannot be switched while an `ask_user` prompt is blocking, and there is no programmatic model-change event to listen for — so leave the dialog and wait for the user to signal. Emit:
+   `Switch to an Opus model now. When ready, type "proceed" to resume, or "cancel" to stop.`
+   Then wait for the user's free-text reply:
+   - On `proceed` (or any "I've switched / continue" phrasing) → re-run this model check (re-introspect your model identity on Claude Code, or re-read the `<model_information>` tag on Copilot CLI). If the model now contains `opus`, proceed to Step 0. If it still does not, re-present the three choices above.
+   - On `cancel` → stop and emit the cancellation line from step 2.
+
+If the model already contains `opus` → proceed to Step 0 immediately with no prompt.
+
 # Spec — Author Spec for One Piece
 
 Author a detailed specification for one piece from the manifest through Socratic dialogue, adversarial QA review, and human sign-off.
@@ -107,6 +141,55 @@ Socratic dialogue with the user, one question at a time. **Prefer multiple-choic
    The brainstorm then leads with the digest's inferences (seeding step 3's "lead with your understanding" pattern), and the Charter Constraint Identification Protocol's Conventions Block consumes `research.md`'s `## Codebase Conventions` (per `plugins/spec-flow/reference/brainstorm-procedure.md`).
 6. **UNAVAILABLE path** — surface `[RESEARCH-UNAVAILABLE: <reason>]` to the user (include it in your response so the operator sees it) and fall back **non-blocking** when ANY of these four triggers holds: (a) the agent returns `STATUS: BLOCKED`; (b) the dispatch errors; (c) `research.md` is missing or zero-length after dispatch; (d) the `git add`/`git commit` of `research.md` fails (zero files staged or non-zero exit). On this path commit NO `research.md`, and run the standalone L-10 convention scan below (whose output the Conventions Block then consumes). See `plugins/spec-flow/reference/research-artifact.md` for the marker definition.
 
+**[Deliberation protocol]** *(runs after step 6, before the first brainstorm question)*:
+
+Depth levels and per-skill defaults are defined in `reference/deliberation-depth.md` (full / lite / off profiles, operator override contract). The artifact structure, VOQ-N IDs, marker contract, and STATUS line are defined in `reference/deliberation-artifact.md` — cite both; do not restate.
+
+0. **Resolve depth:** read `.spec-flow.yaml` `deliberation.depth`; apply any operator override; else use per-skill default (`full` for spec). On `depth=off` → emit `[DELIBERATION-SKIPPED: depth=off]`, run current brainstorm, STOP here.
+
+1. **Dispatch Phase A** (`agents/deliberation-coordinator.md`): inject PRD sections, piece description, `research.md` digest (if `STATUS: OK`), charter constraints.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-A-blocked]`, fall back to current brainstorm.
+
+2. **Identify decision-unit clusters:** group FRs by functional similarity / dependency. At `lite` depth treat the whole piece as one cluster.
+
+3. **Dispatch Phase B in parallel, one `agents/deliberation-viability.md` agent per cluster**: inject Phase A investigation seed + per-cluster FR assignment + charter constraints. Each agent enumerates reuse/extend-existing paths from `research.md`, not only greenfield.
+   **Barrier:** wait for all Phase B agents to complete.
+   On any Phase B `STATUS: BLOCKED` → log the blocked cluster; proceed with remaining cluster outputs (non-fatal partial).
+
+4. **Dispatch Phase C** (`agents/deliberation-synthesis.md`): inject all Phase B per-cluster findings.
+   **Skip when ≤1 cluster** — single-cluster output is already integrated.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-C-blocked]`, fall back.
+
+5. **Dispatch Phase D in parallel, exactly five lens agents** (`agents/deliberation-lens.md` dispatched 5×): inject Phase C recommendation + one lens label per agent. Full depth lens labels (one agent per label):
+   - `architecture-integrity` — structural / layering / dependency-direction review
+   - `scope/simplicity` — YAGNI / over-engineering / unnecessary abstraction review
+   - `user-intent` — does the recommendation serve the operator's stated goal?
+   - `backward-compat` — breaking-change / migration / rollback impact review
+   - `risk` — failure modes, hidden assumptions, external-dependency exposure review
+   At `lite` depth use the configured subset (default: `scope/simplicity` + `risk`). Depth profile and per-lens label list are defined in `reference/deliberation-depth.md`.
+   **Barrier:** wait for all dispatched Phase D agents.
+   On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
+
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in §Investigation Summary.
+   On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
+   On `STATUS: BLOCKED` or `deliberation.md` missing/empty or commit fail → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back.
+
+7. **First brainstorm message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
+
+8. **Questions:** draw from §Validated Open Questions in order; each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation §Integration Check: …").
+
+On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run today's brainstorm (step 1b live approach framing, step 3 unrestricted questions).
+
+<!-- Example: a spec piece with FRs {auth-token, token-refresh, session-store} clustered into
+2 clusters {auth (auth-token, token-refresh), session (session-store)}. full depth.
+Phase A coordinator reads PRD+research+charter, fires 1 web search on an unknown.
+Phase B: 2 viability agents (one per cluster) in parallel → barrier.
+Phase C synthesis runs (2 clusters ≥2 → not skipped) → integrated recommendation.
+Phase D: 5 lens agents in parallel → barrier (4 HOLDS, 1 CONTESTED on backward-compat).
+Phase E: folds the CONTESTED into VOQ-1, writes deliberation.md (7 sections), records depth=full.
+First brainstorm message: Investigation Summary + Recommendation + "I have 1 validated question (VOQ-1)."
+Single-cluster counter-example: a 1-FR piece → 1 viability agent, Phase C SKIPPED (≤1 cluster). -->
+
 **YAGNI throughout.** Remove anything the mapped PRD sections don't ask for. If a brainstorm question surfaces a feature not in the piece's PRD sections, name it out-of-scope before discussing it. Don't add behavior the user didn't request. When the agent proposes an approach, explicitly flag any scope it introduces that the PRD didn't ask for.
 
 **[Convention context]** *(L-10 — runs only on the `[RESEARCH-UNAVAILABLE]` path)*: On the OK path, the conventions list comes from `research.md`'s `## Codebase Conventions` section (written by the pre-brainstorm research pass above), and the standalone L-10 scan is skipped. Only on the `[RESEARCH-UNAVAILABLE]` path, run the L-10 Convention Context Scan specified in `plugins/spec-flow/reference/brainstorm-procedure.md` per the reference doc's "## Core Brainstorm Building Blocks" section ("### L-10: Convention Context Scan"). Outputs: conventions list surfaced in step 1a.
@@ -130,9 +213,9 @@ Emit `[PENDING-DECISION: <decision area>]` inline at the exact location in spec.
     inferred applicable set with rationale, not the full charter list. Outputs: confirmed NN-C/NN-P/CR list.
     The confirmed list populates `### Non-Negotiables Honored`
     and `### Coding Rules Honored` in spec.md (Phase 3).
-1b. **Approach framing** *(H-6)*: Propose 2-3 lightweight approaches and ask the user to choose one. This is not a deep trade-off discussion — just enough framing to know which approach to design for. The chosen approach becomes the design anchor for step 3; full trade-off analysis happens in step 5.
+1b. **Approach framing** *(H-6)*: When `deliberation.md` exists (depth ≠ `off`), do NOT frame approaches live — read `deliberation.md` §Recommendation and present it as the design anchor for step 3 (the protocol already evaluated the viable paths in §Viability Analysis). When `deliberation.md` is absent (`[DELIBERATION-UNAVAILABLE]` / `[DELIBERATION-SKIPPED]`), fall back to today's behavior: propose 2–3 lightweight approaches and ask the user to choose one. This is not a deep trade-off discussion — just enough framing to know which approach to design for. The chosen approach becomes the design anchor for step 3; full trade-off analysis happens in step 5.
 2. **Surface backlog items.** If Phase 1 step 6 loaded items from `<docs_root>/prds/<prd-slug>/backlog.md`, present the top ~5 most-relevant to the user with their concrete references and ask "for each, is this `incorporated` in this piece's spec, `deferred` to a later piece, or `obsolete`?" Record each response in orchestrator state keyed by backlog item — Phase 5 step 4 reads this state to prune `incorporated` and `obsolete` entries from the file. If no items were surfaced (file did not exist, or no relevant matches), skip this step. Any item the user marks as `deferred` is logged internally in orchestrator state for the deferred scope close-out at the end of Phase 2.
-3. **Explore purpose, boundaries, and design.** For each sub-area below, state what you've already inferred from the PRD and codebase context, then ask only about what remains genuinely unclear. Lead with your understanding; the user corrects or fills gaps. **Floor check (C-3):** Before advancing past each sub-area, verify the cumulative answer contains (a) one concrete named scenario or example AND (b) one failure mode or edge case. If not, ask one targeted follow-up: *"Can you give me a concrete example of [X failing / Y being invalid]?"* One follow-up max per sub-area; accept explicit N/A without pushback.
+3. **Explore purpose, boundaries, and design.** For each sub-area below, state what you've already inferred from the PRD and codebase context, then ask only about what remains genuinely unclear. Lead with your understanding; the user corrects or fills gaps. **Floor check (C-3):** Before advancing past each sub-area, verify the cumulative answer contains (a) one concrete named scenario or example AND (b) one failure mode or edge case. If not, ask one targeted follow-up: *"Can you give me a concrete example of [X failing / Y being invalid]?"* One follow-up max per sub-area; accept explicit N/A without pushback. When `deliberation.md` exists, design questions are **restricted to §Validated Open Questions**; each question presented MUST carry a citation — either a `VOQ-N` ID (for a listed validated open question) or a named deliberation section (for an emergent follow-up, e.g. "Following deliberation §Integration Check: …"). Mandatory blocks (C-1, C-2, H-4, M-7) follow the auto-skip / confirmation-not-discovery logic in `reference/brainstorm-procedure.md` (cite, do not restate).
    - **Architecture & components:** Propose the key components and their relationships from L-10 scan and PRD. State what you understand about boundary independence. Ask only about design decisions the codebase can't resolve — specifically where multiple valid decompositions exist and the user needs to choose.
    - **Data flow:** Map the inferred data flow from PRD and codebase: how data enters, transforms, and exits, and what states it passes through. State the inferred flow; ask only about transitions that are genuinely unclear from PRD and code.
    - **Security** *(C-2 — run via brainstorm-procedure.md C-2 Security Sub-Block)*: Apply the inference-first C-2 protocol from the reference doc.
