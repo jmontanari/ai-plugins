@@ -22,7 +22,7 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
 
 **Order:** Worktree scan → PRD discovery → archive filter → per-PRD parse (with worktree overrides for in-progress pieces) → drift surfacing → all-PRDs default view → drill-in mode.
 
-0. **Load config:** Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+0. **Load config:** Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`. Also read `metrics:` (informational; status renders SCs regardless, marking `off`/absent pieces `[METRICS-ABSENT]`).
 
 1. **Worktree scan (AC-7 / AC-8):** Run `git worktree list --porcelain` to discover
    all active worktrees. For each worktree whose branch matches the primary pattern
@@ -124,6 +124,10 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    This is a passive surface (NN-C-005). The user is informed; the fix is a manual
    manifest edit. Do not block, error, or prevent other pieces from displaying.
 
+   **Success Metrics (per PRD):** run `DOCS_ROOT="<docs_root>" bash "${CLAUDE_PLUGIN_ROOT}/scripts/metrics-aggregate" <prd-slug>`; parse its output per `plugins/spec-flow/reference/metrics-artifact.md` `## Helper output contract`. If the helper is absent or every piece is `ABSENT`, mark the block `[METRICS-ABSENT]`.
+
+   This is a passive surface (NN-C-005). Pieces with no/`off` `metrics.yaml` render `[METRICS-ABSENT]` and are excluded from the aggregate; never block, error, or prevent other pieces from displaying.
+
 5. **Drift surfacing per active PRD (FR-008 passive):** For each non-archived PRD, iterate its pieces whose status is `specced`, `planned`, or `in-progress`. For each such piece, read its `charter_snapshot:` front-matter from `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/spec.md` (and `plan.md` if present). Compare every snapshot date against the matching charter skill's last commit date (`git log -1 --format=%cs -- <charter_root>/skills/charter-<domain>/SKILL.md`) loaded in step 2a. If any current commit date is newer than the corresponding snapshot, flag the piece as **diverged** and record which domain(s) changed.
 
    Status surfaces drift only — it does NOT dispatch the drift-mode `qa-spec` agent. Active resolution (FR-009) is the job of `spec`, `plan`, `execute`, and `prd --update` during their Phase-1 context load. When this skill surfaces drift, it points the user at `/spec-flow:spec <piece>` / `/spec-flow:plan <piece>` / `/spec-flow:execute <piece>` (each of which triggers resolution) or at `/spec-flow:status --resolve <piece>` for the walk-through flow documented below.
@@ -138,6 +142,10 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    PRD: auth (active, v1)                        <-- from docs/prds/auth/prd.md
      Pieces: 5 total — 2 merged, 1 in-progress, 1 planned, 1 open
      ⚠ Drift flagged on 1 piece (token-refresh: non-negotiables)
+     Success Metrics (over 1 instrumented piece):
+       SC-001 Q&A≤3: 1/1 pass   SC-002 Sonnet-clean: 86%   SC-003 unmarked-discovery: insufficient-data
+       SC-004 resume+Sonnet: pass   SC-005 spike-trend: insufficient-data   SC-006 no-repeat-amend: pass
+       [METRICS-ABSENT]: 6 merged pieces predate instrumentation (excluded from aggregate)
 
    PRD: billing (drafting, v1)                   <-- from docs/prds/billing/prd.md
      Pieces: 3 total — 3 open

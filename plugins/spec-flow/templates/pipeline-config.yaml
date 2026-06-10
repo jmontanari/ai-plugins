@@ -85,6 +85,13 @@ reflection: auto
 #   See plugins/spec-flow/reference/flywheel.md `## Threshold + batched proposal`.
 flywheel_threshold: 2
 
+# metrics: per-piece pipeline instrumentation (new in v5.11.0; FR-010).
+#   auto — stages write docs/prds/<prd>/specs/<piece>/metrics.yaml; /spec-flow:status renders SC-001..SC-006 (default).
+#   off  — stages skip the metrics write entirely; the piece renders [METRICS-ABSENT] (identical to a pre-instrumentation piece).
+#   Absent ⇒ auto (non-blocking; degrades to [METRICS-DEGRADED] on an unwritable artifact; NN-C-003).
+#   See plugins/spec-flow/reference/metrics-artifact.md.
+metrics: auto
+
 # charter: configures the charter stage
 #   required      — if true, prd/spec/plan skills fail fast when no charter skills are found
 #                   at <charter_root>/skills/charter-*/SKILL.md

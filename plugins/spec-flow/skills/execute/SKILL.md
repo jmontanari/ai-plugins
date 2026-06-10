@@ -96,7 +96,7 @@ Otherwise:
 - Skip: manifest status check (`specced` / `planned` gate) — no manifest entry exists for change-track pieces
 - Use `spec_path` (brief.md) wherever the standard path uses `spec.md` for context injection throughout execution
 
-Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`. Also read `metrics:` (default `auto`); store `metrics_enabled`. `off` ⇒ skip all metrics writes below (the piece renders [METRICS-ABSENT]). **All metrics writes below honor `metrics_enabled`; on an unwritable/unparseable path emit `[METRICS-DEGRADED: <reason>]` and continue — never block, and never write inside the Step G4 concurrent git-free section.**
 
 **Integration config load.** If `integrations.issue_tracker.enabled: true`, read the
 integrations charter skill for transition rules and commit format. Resolve the active charter
@@ -359,6 +359,8 @@ If the trigger does NOT fire, set `mid_piece_opus_pass: not-triggered` for this 
 
 5. On circuit-breaker escalation: log `mid_piece_opus_pass: escalated`; surface to human; halt.
 
+**Metrics:** Increment `execute.escalations` on each operator-halt event — `mid_piece_opus_pass: escalated`, a `[STATE-INCOMPLETE]` resume failure, a spike returning `BLOCKED`, the amendment hard-cap being reached, and a non-`[SPIKE]` phase the implementer cannot complete on Sonnet (halt → plan-amend) — per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`. Persist at the next serial checkpoint per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`.
+
 ### Step 1: Capture Phase Start SHA
 
 Record the current HEAD into orchestrator state as `phase_N_start_sha`. No tag, no commit — this lives in your (the orchestrator's) working memory.
@@ -391,6 +393,8 @@ Inspect the phase's checkboxes in plan.md to determine the mode flag passed to t
 The orchestrator branches mechanically on the checkbox; it does not decide which mode applies. The mode decision was made by the plan author. The Implement mode exists for phases where TDD doesn't fit (config, infra, scaffolding, glue code, docs-as-code) **and** for all phases when the plan uses non-TDD mode (`tdd: false` in plan front-matter).
 
 ### Step 1c: [SPIKE]-phase resolution (FR-005)
+
+**Metrics:** Increment `execute.spikes.planned` for each `[SPIKE:]`-phase resolved here. For scope-mode spikes dispatched at Step 6c or Step 4.5, increment `execute.spikes.scope`. Both counters persist at the next serial checkpoint per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
 
 *(Runs before Step 1b when triggered — the spike resolves the unknown before pre-flight gathers facts.)*
 
@@ -859,6 +863,8 @@ Worked examples:
 
 Record the decision (`opus_dispatched: true|false (reason)`) for the session summary and for Step 0a's mid-piece trigger evaluation.
 
+**Metrics (serial per-phase checkpoint):** Upsert `execute.qa_iterations` (running sum across all phases to this point), `execute.phases.{total,clean_sonnet}` (increment `total` each phase; increment `clean_sonnet` only when the phase completed on Sonnet with no escalation and no unmarked discovery), and `execute.dispatches.{opus,sonnet}` (tier from the model-policy assignment). Set `execute.sonnet_default` = `true` when the coordinator + implementer ran Sonnet-default with no global Opus override; `false` otherwise. Per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
+
 Iter-until-clean per plugins/spec-flow/reference/qa-iteration-loop.md (no skip; `qa_max_iterations`-limited circuit breaker).
 
 1. Read agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-phase.md`
@@ -1279,6 +1285,8 @@ If the file does not exist when the first row is appended, create it with the H1
 
 This produces one commit per discovery containing both the resolution and the audit-trail row, without amend-after-the-fact gymnastics, regardless of which actor stages the row.
 
+**Metrics (at the `.discovery-log.md` commit):** Upsert `execute.discoveries.{spike_attributed,unmarked}` (spike_attributed = count of `.discovery-log.md` rows whose Resolution-commit cell carries `(spike: spikes/<id>.md)`; unmarked = total amend/discovery rows − spike_attributed) and `execute.amendments.{total,repeat_scope}` (total = the existing `piece_amendment_count`; repeat_scope = count of amend rows re-targeting a scope already amended in this piece). Per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
+
 #### Recursion semantics (FR-12)
 
 **Triage-event boundary.** A triage event is exactly one Step 6c invocation — it begins when Step 6c is entered (at end of Step 6 or from Step 8's Final Review Triage flow) and ends when Step 6c either advances to Step 7 or halts execute. All discoveries triaged within a single Step 6c invocation belong to the same triage event, regardless of how many there are or whether they were operator-chosen or auto-resolved under `--auto`. Amendment phases run through the standard Per-Phase Loop including their own Step 6 → Step 6c flow, so any discoveries surfaced inside an amendment phase reach Step 6c as a NEW triage event (separate from the event that created the amendment phase). Per FR-12, amendments cannot recursively amend within a single triage event; per FR-14 (defined in Phase 9), amendments DO consume the per-piece budget regardless of which triage event creates them.
@@ -1499,6 +1507,8 @@ If the combined list is empty (no discoveries from any source), skip Step G9c en
 
 ### Step G10: Group Progress commit
 
+**Metrics (Phase Group serial checkpoint):** At this Group Progress commit, upsert the group's collective sub-phase metrics into `metrics.yaml`: increment `execute.phases.total` once per sub-phase in the group, increment `execute.phases.clean_sonnet` for each sub-phase that completed on Sonnet with no escalation and no unmarked discovery, and tally `execute.dispatches.{opus,sonnet}` from the model-policy assignment for each sub-phase's dispatch. Also set or refresh `execute.sonnet_default` (false if any sub-phase used a non-Sonnet assignment). Per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`. This is a serial checkpoint and the write is outside Step G4.
+
 ```bash
 git add docs/prds/<prd-slug>/specs/<piece-slug>/plan.md
 git commit -m "progress: Phase Group <letter> complete"
@@ -1698,6 +1708,8 @@ Collect findings from all board agents (8 in standard mode; 9 in fast mode — t
 
 Record each reviewer's must-fix list separately in orchestrator state — iteration 2+ needs to tell each reviewer which of its own prior findings to verify.
 
+**Metrics (final-review serial checkpoint):** Upsert `final_review.{iterations,must_fix}` — `iterations` = board cycle count (1 = clean first pass); `must_fix` = deduped must-fix count from this triage. Accumulate in orchestrator state; write to `metrics.yaml` at the Step 5 learnings commit (the final-review-pending marker commit precedes this data — do not write there).
+
 ### Step 3: Fix Loop (iterations 2+, focused)
 
 If must-fix findings exist:
@@ -1890,10 +1902,12 @@ If Step 4.5 was skipped (`reflection: off`), fall back to pre-v1.5 behavior: orc
 
 Commit on worktree branch before merge:
 
+**Metrics — completion checkpoint:** By this Step-5 learnings commit the `execute` and `final_review` blocks of `metrics.yaml` MUST be complete. Co-stage `metrics.yaml` with `learnings.md`:
 ```bash
-git add docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md
+git add docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml
 git commit -m "learnings: <prd-slug>/<piece-slug>"
 ```
+This is the latest serial checkpoint by which both blocks must be complete, per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`.
 
 ### Step 5.5: Update Manifest to Merged (mandatory gate — do not push or open a PR before this)
 
@@ -1987,6 +2001,7 @@ Progress tracked via [x] checkboxes in plan.md:
 - **Mid-group resume (`deferred_commit: auto`).** When the interrupted phase is a deferred Phase Group, the deferred commits never landed, so HEAD alone cannot tell which sub-phases finished. Resume from the group journal instead, per `reference/deferred-commit-journal.md` §Resume algorithm:
   - **Read the journal** for the active group (matched by `group_letter`) and take `group_start_sha` as the file-scoped recovery baseline.
   - **No/corrupt journal WHILE a group is in flight → `[STATE-INCOMPLETE: journal]`, escalate.** Per the field-tier table in `plugins/spec-flow/reference/coordinator-contract.md` `## Resume-Critical State — Field Tiers`, a journal is *expected-present* when the active group is *in flight* — plan.md shows ≥1 checked sub-phase step under the group AND the group-level `[Progress]` checkbox is unchecked. If the journal is then missing or corrupt, the coordinator MUST emit `[STATE-INCOMPLETE: journal]` and escalate to the operator rather than guessing which sub-phases are green. Worked trace: group B with `B.1 [Build] = [x]` and group `[Progress] = [ ]` ⇒ in flight ⇒ missing journal ⇒ escalate; group B with no checked sub-phase steps ⇒ not in flight ⇒ missing journal ⇒ fresh start (next bullet).
+  **Metrics:** On each journal-resume, append one `execute.resume[]` row `{at: <phase-id>, outcome: clean|state-incomplete}` — `clean` when the resume reached the correct next action without re-running a passing phase; `state-incomplete` when a `[STATE-INCOMPLETE: journal]` was emitted. **Write the row at the next serial checkpoint (Step 7 progress commit) — never inside Step G4.** Per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`.
   - **No journal AND no group in flight → fresh group start (tier-3 valid absence)** (NN-C-005). This is not an error — it is the normal case for a group that never began. Proceed to Step G1 (write a fresh journal) and run the group from scratch.
   - **Stale `group_letter` → depends on whether the active group is in flight.** A journal whose on-disk `group_letter` does NOT equal the active group's letter is STALE. Log the orphan (NN-C-006, e.g. `NN-C-006: orphaned journal for group <on-disk letter> ignored; active group is <active letter>`). Then branch on the active group's in-flight state: (a) if the active group IS in flight (≥1 checked sub-phase step under the active group AND the group `[Progress]` checkbox is unchecked), the active group's own journal is missing — emit `[STATE-INCOMPLETE: journal]` and escalate (tier-1); (b) if the active group is NOT in flight (no checked sub-phase steps), treat it as no-journal and proceed to fresh group start (tier-3 valid absence, per next bullet), overwriting the stale journal at Step G1. This preserves the single-fixed-filename safety: a resume only ever trusts a journal that matches the active group.
   - **`green` sub-phases → trust after a hash re-check.** For each sub-phase with `status: green`, re-hash ONLY its Red test files (the keys of its `red_manifest_hashes`) against the stored digests. The production files in that sub-phase's `scope` are trusted by association and are NOT independently re-hashed — a matching Red-test hash is taken as proof the whole sub-phase is intact. On an exact match for every Red test file, trust the sub-phase as done: do not re-run it and do not touch its files. (A mismatch demotes it to incomplete — fall through to the next bullet.) **FR-4 resume fallback:** if the journal carries `anchor: blob`, re-verify green sub-phases with `git hash-object` (comparing working-tree blob SHAs against the journal's `red_manifest_hashes`); if the `anchor:` marker is ABSENT (journal written by ≤5.1.0), re-verify with `sha256sum` instead and do NOT re-anchor or refuse — honor the old format as-is for this in-flight piece.
@@ -1995,7 +2010,7 @@ Progress tracked via [x] checkboxes in plan.md:
 
 ## Measurement
 
-At session end, emit a summary with per-phase **Build duration**, **Build token count**, **Verify mode chosen** (Audit vs Full), **Refactor skipped** (auto-skip predicate matched), **QA iteration count** (iter-1 / iter-2 / iter-3 mix per phase), **Step 6b outcome** (pass / autofix / fix-code dispatched), **mid_piece_opus_pass** (`dispatched` with iteration count / `not-triggered` / `escalated`), and **deferred_findings_recorded** (count of `Deferred to reflection:` stubs written to backlog across all QA iterations for this piece). For a deferred Phase Group (`deferred_commit: auto`), also emit the **Phase Group commit model** (`deferred` vs the legacy per-phase model), the **group wall-clock duration** (Red→Build→barrier across all sub-phases), and the **group commit count** (`2` under `deferred` — one barrier work-commit covering the group's Red∪Build union plus one separate plan.md progress commit — vs the `N+1` commits a flat / `deferred_commit: off` run of the same N sub-phases produces). Observable properties:
+At session end, render the summary **from the persisted `docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml`** (written incrementally at the serial checkpoints above per `plugins/spec-flow/reference/metrics-artifact.md`) — the file is the single source of truth; do not recompute from session memory. The summary surfaces: per-phase Build duration/token count (ephemeral, not persisted), and from `metrics.yaml` the QA iteration count, `execute.escalations`, `execute.discoveries.unmarked`, and the group commit model. For a deferred Phase Group (`deferred_commit: auto`), also emit the **Phase Group commit model** (`deferred` vs the legacy per-phase model), the **group wall-clock duration** (Red→Build→barrier across all sub-phases), and the **group commit count** (`2` under `deferred` — one barrier work-commit covering the group's Red∪Build union plus one separate plan.md progress commit — vs the `N+1` commits a flat / `deferred_commit: off` run of the same N sub-phases produces). Observable properties:
 
 1. Build token count is materially lower than a comparable-scope phase would have been without pre-flight digests and scoped QA prompts — pre-flight facts + pitfall checklist reduce agent rediscovery and self-iteration.
 2. Build tool-use count drops commensurately.

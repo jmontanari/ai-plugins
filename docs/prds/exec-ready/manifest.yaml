@@ -181,7 +181,7 @@ pieces:
       notes).
     prd_sections: [FR-010, SC-007, G-5, G-6]
     dependencies: [flywheel-repo]
-    status: open
+    status: in-progress
 
   - name: exec-guardrails
     slug: exec-guardrails

@@ -52,7 +52,7 @@ Author a detailed specification for one piece from the manifest through Socratic
 
 ## Step 0: Load Config
 
-Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`. Also read `metrics:` (default `auto`; `off` ⇒ skip the Phase-5 metrics write per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`).
 
 ## Prerequisites
 
@@ -114,6 +114,8 @@ for operation `create_piece_issue`. If the tool is available:
 On tool unavailable → emit warning → skip.
 
 Socratic dialogue with the user, one question at a time. **Prefer multiple-choice questions** when possible — they're faster to answer than open-ended. Ask one question per message; if a topic needs more exploration, break it into sequential messages. The brainstorm is complete when every sub-area in step 3 below has been explored and each meets the C-3 floor check (one concrete example + one failure mode). There is no question count — ask as many as it takes. Do not ask theater questions (questions whose answer is already clear from the PRD, prior responses, or obvious context). If an area is clear, confirm it in one sentence rather than asking.
+
+**Metrics — Q&A rounds:** Increment a `qa_rounds` counter once per operator-answer turn during this brainstorm (one AskUserQuestion card answered in one turn counts as one round, regardless of sub-question count within that card). This counter is persisted in Phase 5 per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
 
 **Before the first question — scope check.** Assess whether the piece as described covers multiple independent subsystems (e.g., "vault integration, CI pipeline changes, and a new CLI command" is three pieces). If so, flag immediately: don't spend questions refining details of work that needs to be decomposed first. Propose the decomposition, let the user confirm the sub-piece ordering, and brainstorm only the first sub-piece.
 
@@ -298,8 +300,9 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    > full PRD ships — **never commit PRD piece work directly to `merge_target:` while
    > `feature_branch:` is set.**
 3. Commit spec on worktree branch:
+   **3a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, create/upsert `docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml` with the `schema_version`/`generated`/`last_updated`/`piece` envelope (on first write) and the `spec:` block — `qa_rounds` from the Phase-2 counter, `qa_iterations` = the Phase-4 QA-loop iteration count to clean, `research_artifact` = `true` iff a `research.md` exists at the canonical path for this piece. If `metrics: off`, skip. On write failure, emit `[METRICS-DEGRADED: <reason>]` and continue.
    ```bash
-   git add docs/prds/<prd-slug>/specs/<piece-slug>/spec.md
+   git add docs/prds/<prd-slug>/specs/<piece-slug>/spec.md docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml
    git commit -m "spec: add <prd-slug>/<piece-slug> specification"
    ```
 4. **Prune addressed backlog items.** If Phase 1 step 6 surfaced backlog items from `<docs_root>/prds/<prd-slug>/backlog.md` and the user marked any as `incorporated` or `obsolete` during brainstorm, remove those entries from that PRD-local backlog file. `deferred` items stay in the file. Commit the prune as a separate commit on the worktree branch:

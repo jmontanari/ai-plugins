@@ -7,7 +7,10 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 ## [5.11.0] — 2026-06-10
 
 ### Added
-
+- **`reference/metrics-artifact.md` (per-piece metrics SSOT, FR-010):** schema, write procedure, field semantics, `[METRICS-DEGRADED]`/`[METRICS-ABSENT]` markers, helper output contract, SC computation, no-secrets clause.
+- **`metrics.yaml` instrumentation:** spec/plan/execute write per-piece metrics at serial checkpoints; the execute `## Measurement` summary now renders from the persisted file.
+- **`scripts/metrics-aggregate` (+ test):** deterministic SC-001..SC-006 aggregator (python3 fast path + pure-bash fallback); `/spec-flow:status` renders a per-PRD Success Metrics block in the default view.
+- **`metrics: auto|off` config key** in `templates/pipeline-config.yaml` (default `auto`).
 - **e2e smoke harness (`plugins/spec-flow/tests/e2e/`):** three-layer on-demand pipeline verification suite (FR-013).
   - **L1 static** — commit-subject grammar, dispatch-sequence rules, contract artifact presence; runs in < 5 s against committed fixtures.
   - **L2 fixture-replay + audit** — `run-e2e.sh --audit <piece-dir>` re-runs the full contract check against any piece directory. Committed fixtures (`tests/e2e/fixtures/`) cover the happy path and six break variants: `research-after-spec`, `no-test-data`, `no-spike-artifact`, `skip-transition`, `journal-survives`, `missing-learnings`.
@@ -16,6 +19,9 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
   - Audit mode (`--audit`) allows re-running L2 checks against any piece directory post-hoc.
   - Operator-driven live procedure documented in `tests/e2e/README.md`; the harness never invokes a model — token cost is operator-chosen.
 - **Charter sanctioning of `tests/` layer:** `plugins/spec-flow/tests/` is now an enumerated plugin-internal layer in the architecture charter (`charter-architecture/SKILL.md`) and the test-runner section of `charter-tools/SKILL.md` names all three on-demand bash suites.
+
+### Changed
+- **`reference/flywheel.md`:** the `metric` occurrence `source_type` flips RESERVED → WIRED (an occurrence may cite a measured `metrics.yaml` trend via the existing operator-confirm flow, NN-P-004).
 
 ### Notes for upgraders
 

@@ -43,7 +43,7 @@ Generate an exhaustive implementation plan from an approved spec. The plan is so
 
 ## Step 0: Load Config
 
-Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`.
+Read `.spec-flow.yaml` from the project root. Use `docs_root` in place of `docs/` and `worktrees_root` in place of `worktrees/` for all paths below. If the file is missing, default to `docs` and `worktrees`. Also read `metrics:` (default `auto`; `off` ⇒ skip the Phase-4 metrics write per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`).
 
 **Integration config load.** If `integrations.issue_tracker.enabled: true`, read the integrations charter skill for task naming and transition rules at the active charter root (resolved per `plugins/spec-flow/reference/charter-location.md`) — `<charter_root>/skills/charter-integrations/SKILL.md`, where `<charter_root>` is `.github` or `.claude`. Store as `integration_cfg`. If integration is disabled or the key is absent, set `integration_cfg = null` and skip all integration steps below.
 
@@ -638,6 +638,8 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    - **Circuit breaker:** 3 iterations max, then escalate.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
+**Metrics — concreteness_floor:** Record `plan.concreteness_floor = passed` when this QA loop reaches clean with no circuit-breaker escalation; `overridden` when the piece advances via the 3-iter circuit-breaker human override. `plan.qa_iterations` = the iteration count to clean. Both fields are persisted in Phase 4 per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
+
 4. Present to user for sign-off.
 
 ### Phase 4: Finalize
@@ -690,7 +692,8 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    > **Branch ownership:** The manifest update stays on `piece/<prd-slug>-<piece-slug>`.
    > Main's manifest advances when this branch is merged or a PR is opened.
 5. Commit plan on worktree branch:
+   **5a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, upsert the `plan: {qa_iterations, concreteness_floor}` block into the existing `metrics.yaml` (created at spec stage; create with the envelope if absent), refresh `last_updated`, and stage it with the plan commit. `off` ⇒ skip; write failure ⇒ emit `[METRICS-DEGRADED: <reason>]` and continue.
    ```bash
-   git add <docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md
+   git add <docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md <docs_root>/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml
    git commit -m "plan: add <prd-slug>/<piece-slug> implementation plan"
    ```
