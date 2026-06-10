@@ -96,7 +96,7 @@ Small-change is excluded from the model capability check that runs in other skil
    On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to current Step-6 brainstorm.
    On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back.
-   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → remove the uncommitted `deliberation.md` before falling back (e.g. `rm -f <path>` if it was not previously committed, or `git checkout -- <path>` if it was) so downstream consumers cannot pick up the disowned artifact → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back.
+   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → remove the uncommitted `deliberation.md` before falling back (e.g. `git checkout -- <path>` if previously committed, else `rm -f <path>`) so downstream consumers cannot pick up the disowned artifact → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back.
 
 7. **First Step-6 message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
 
