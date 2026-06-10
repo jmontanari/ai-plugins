@@ -67,6 +67,52 @@ Create `brief.md` and `plan.md` for a bounded one-session change, create the `ch
 - Surface the conventions before closing the brainstorm.
 - If no peer component of the target type exists, skip L-10 silently; there are no conventions to surface.
 
+## Step 5b: Deliberation Protocol (lite depth)
+
+**[Deliberation protocol]** *(runs after Step 5, before the first brainstorm question)*:
+
+Depth levels and per-skill defaults are defined in `reference/deliberation-depth.md` (full / lite / off profiles, operator override contract). The artifact structure, VOQ-N IDs, marker contract, and STATUS line are defined in `reference/deliberation-artifact.md` — cite both; do not restate.
+
+Small-change is excluded from the model capability check that runs in other skills (FR-009-N). No such check runs here.
+
+0. **Resolve depth:** read `.spec-flow.yaml` `deliberation.depth`; apply any operator override; else use per-skill default (`lite` for small-change — see `reference/deliberation-depth.md`). On `depth=off` → emit `[DELIBERATION-SKIPPED: depth=off]`, run current Step-6 brainstorm, STOP here.
+
+1. **Dispatch Phase A** (`agents/deliberation-coordinator.md`): inject the change description, Step 5 conventions, and charter constraints.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-A-blocked]`, fall back to current Step-6 brainstorm.
+
+2. **Consume decision-unit cluster from Phase A:** the decision unit is **the change** (singular). At `lite` depth the whole change is treated as one cluster regardless of what Phase A returned — collapse to a single cluster.
+
+3. **Dispatch Phase B** — single `agents/deliberation-viability.md` agent over the one cluster: inject Phase A investigation seed + change description + charter constraints. The agent enumerates reuse/extend-existing paths, not only greenfield.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-B-blocked]`, fall back to current Step-6 brainstorm (non-fatal if partial output is available — proceed with available output).
+
+4. **Phase C — skipped (≤1 cluster, no-op).** The whole change is one cluster; there is nothing to synthesize across clusters. The `## Integration Check` section of `deliberation.md` records single-cluster coherence rather than a cross-cluster composition analysis.
+
+5. **Dispatch Phase D** — configured lens subset (`agents/deliberation-lens.md` dispatched 2×): inject Phase B viability output + one lens label per agent.
+   Default lite subset: `scope/simplicity` + `risk` (see `reference/deliberation-depth.md`).
+   **Barrier:** wait for both Phase D agents.
+   On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
+
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase B viability output + Phase D lens verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth (`lite`) in §Investigation Summary.
+   On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to current Step-6 brainstorm.
+   On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back.
+   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back.
+
+7. **First Step-6 message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
+
+8. **Questions:** draw from §Validated Open Questions in order; each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation §Integration Check: …").
+
+On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run today's Step-6 brainstorm (open brainstorm from Step 6's current procedure).
+
+<!-- Example: slug="add-rate-limit-header"
+  Decision unit = the change (singular). lite depth (default for small-change).
+  Phase A coordinator reads change description + charter, returns one cluster.
+  Phase B: 1 viability agent over the whole change → single pass.
+  Phase C: SKIPPED — ≤1 cluster, no-op; Integration Check records single-cluster coherence.
+  Phase D: 2 lens agents (scope/simplicity + risk) in parallel → barrier.
+  Phase E: folds any CONTESTED verdicts into VOQs, writes deliberation.md (depth=lite).
+  First Step-6 message: Investigation Summary + Recommendation + "I have N validated questions." -->
+
 ## Step 6: Focused Brainstorm (FR-SC-1, FR-SC-2)
 
 - **Seeded input (e.g. a review-board findings digest).** When this skill is invoked with a pre-formed requirement set — most commonly a `source: review-board` findings digest handed off from `/spec-flow:review-board --fix` — treat that digest as the authoritative requirements, not a topic to brainstorm from zero. The findings ARE the functional requirements; each finding's suggested correction seeds an acceptance criterion. Run a brief **scope-confirmation** pass instead of an open brainstorm: confirm the finding set is complete and correctly scoped, ask only what's needed to make the four `brief.md` sections draftable (e.g. ambiguous fixes, ordering), and still apply the C-2 security and C-3 floor checks and the scope gate. Record provenance in `brief.md` (a `## Source` line naming the review-board run / target) so the fix is traceable to the review that found it. Then proceed normally from the draft.
