@@ -3,6 +3,40 @@ name: plan
 description: Use when a spec is approved and needs a detailed implementation plan. Does read-only codebase exploration, generates an exhaustive phase-by-phase plan where each phase picks a TDD track (for behavior-bearing code) or an Implement track (for config, infra, glue code, docs-as-code), runs QA review, and gets human sign-off. Use whenever the user wants to turn an approved spec into an executable plan — even for non-TDD work.
 ---
 
+## Pre-flight: Model Check
+
+Before any other step, verify the active model is an Opus-class model.
+
+Determine the active model using the platform-appropriate method:
+
+- **Copilot CLI** — read the `<model_information>` system tag injected into this session's context. The model name and ID are present there explicitly.
+- **Claude Code** — no equivalent tag is injected. Use Claude's self-knowledge: introspect your own model identity (Claude reliably knows which model variant it is from training) and treat that as the model name for the check below.
+
+If the active model name does **not** contain `opus` (case-insensitive):
+
+1. Use `ask_user` to block and prompt the user:
+
+   > ⚠️ **Model mismatch.** Plan authoring is thinking work per NN-P-005, but the active model appears to be **[model-name]**.
+
+   Choices:
+   - "Override — proceed on [model-name]"
+   - "Change now — I'll switch models"
+   - "Cancel plan"
+
+2. If the user selects **"Cancel plan"** → stop immediately and emit:
+   `Plan cancelled. Re-run after switching to an Opus model.`
+
+3. If the user selects **"Override — proceed on [model-name]"** → proceed to Step 0 immediately on the current model. Emit a one-line acknowledgment first:
+   `Overriding model check — proceeding on [model-name]. Plan quality may be reduced.`
+
+4. If the user selects **"Change now — I'll switch models"** → **close the prompt and return control to the user.** The model cannot be switched while an `ask_user` prompt is blocking, and there is no programmatic model-change event to listen for — so leave the dialog and wait for the user to signal. Emit:
+   `Switch to an Opus model now. When ready, type "proceed" to resume, or "cancel" to stop.`
+   Then wait for the user's free-text reply:
+   - On `proceed` (or any "I've switched / continue" phrasing) → re-run this model check (re-introspect your model identity on Claude Code, or re-read the `<model_information>` tag on Copilot CLI). If the model now contains `opus`, proceed to Step 0. If it still does not, re-present the three choices above.
+   - On `cancel` → stop and emit the cancellation line from step 2.
+
+If the model already contains `opus` → proceed to Step 0 immediately with no prompt.
+
 # Plan — Generate Detailed Implementation Plan
 
 Generate an exhaustive implementation plan from an approved spec. The plan is so detailed that a Sonnet-tier agent can execute each task without design decisions.
@@ -99,6 +133,7 @@ Phase 1 writes exploration findings incrementally to `introspection.md` in the p
 3. Resolve the research commit: `git log -1 --format=%H -- docs/prds/<prd-slug>/specs/<piece-slug>/research.md`; for each covered file changed since that commit (`git diff <commit>..HEAD -- <file>` non-empty), re-read it and update its `introspection.md` entry.
 4. Define the counts: `N` = covered files; `M` = files processed in steps 2 + 3.
 5. Emit `[RESEARCH-CONSUMED: <N> files, <M> re-read]`.
+6. Read `deliberation.md` §Recommendation and §Viability Analysis from the piece branch (per `reference/deliberation-artifact.md` `## Location`). On file present and non-empty: emit `[DELIBERATION-CONSUMED: <recommendation-one-liner>]` and include 'Deliberation recommendation: <recommendation>' in the plan agent prompt as the approach anchor. On file absent or zero-length: emit `[DELIBERATION-ABSENT: no deliberation artifact]` and proceed with current behavior (research.md as primary context).
 
 <!-- Example: spec targets = [a.md, b.md, c.md, d.md]. research.md File Inventory blocks cover
 [a.md, b.md, c.md] (N=3). d.md is not covered → targeted read of d.md, append its four-block entry.
@@ -110,7 +145,8 @@ Emit: [RESEARCH-CONSUMED: 3 files, 2 re-read]. -->
 **ABSENT path (`research.md` does not exist on the piece branch):**
 
 1. Emit `[RESEARCH-ABSENT: running full exploration]`.
-2. Run the existing per-cluster sweep (the "Cluster identification" + "Per-cluster exploration loop" below) unchanged.
+2. Read `deliberation.md` §Recommendation and §Viability Analysis from the piece branch (per `reference/deliberation-artifact.md` `## Location`). On file present and non-empty: emit `[DELIBERATION-CONSUMED: <recommendation-one-liner>]` and include 'Deliberation recommendation: <recommendation>' in the plan agent prompt as the approach anchor. On file absent or zero-length: emit `[DELIBERATION-ABSENT: no deliberation artifact]` and proceed with current behavior (research.md as primary context).
+3. Run the existing per-cluster sweep (the "Cluster identification" + "Per-cluster exploration loop" below) unchanged.
 
 On both paths, **Phase 2 then reads the resulting `introspection.md` section-by-section with no change to its reader.**
 
