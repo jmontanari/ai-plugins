@@ -92,7 +92,7 @@ Small-change is excluded from the model capability check that runs in other skil
    **Barrier:** wait for both Phase D agents.
    On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
 
-6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase B viability output + Phase D lens verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth (`lite`) in §Investigation Summary.
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase B viability output + Phase D lens verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth (`lite`) in the `## Investigation Summary` section.
    On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to current Step-6 brainstorm.
    On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back.
@@ -100,7 +100,7 @@ Small-change is excluded from the model capability check that runs in other skil
 
 7. **First Step-6 message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
 
-8. **Questions:** draw from §Validated Open Questions in order; each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation §Integration Check: …").
+8. **Questions:** draw from the `## Validated Open Questions` section in order; each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation's `## Integration Check`: …").
 
 On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run today's Step-6 brainstorm (open brainstorm from Step 6's current procedure).
 

@@ -375,7 +375,7 @@ The decision unit for this skill is the **per-domain rule / principle** (not a f
    **Barrier:** wait for all dispatched Phase D agents.
    On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
 
-6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in §Investigation Summary.
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in the `## Investigation Summary` section.
    On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to Phase 2 Socratic dialogue.
    On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back to Phase 2 Socratic dialogue.
@@ -383,7 +383,7 @@ The decision unit for this skill is the **per-domain rule / principle** (not a f
 
 7. **First Phase 2 message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
 
-8. **Questions:** draw from §Validated Open Questions in order; each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation §Domain Coverage Check: …").
+8. **Questions:** draw from the `## Validated Open Questions` section in order; each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation's `## Domain Coverage Check`: …").
 
 On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run Phase 2 Socratic dialogue as written (today's behavior — one question at a time, sections A–G in order).
 

@@ -199,15 +199,15 @@ The decision unit for this skill is the **candidate piece / decomposition bounda
    **Barrier:** wait for all dispatched Phase D agents.
    On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
 
-6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in §Investigation Summary.
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in the `## Investigation Summary` section.
    On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to Step 4 Brainstorm.
    On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back to Step 4 Brainstorm.
    On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back to Step 4 Brainstorm.
 
-7. **First Step 4 message:** present Investigation Summary + Recommendation + "I have N validated questions for you." Draw questions from §Validated Open Questions in order.
+7. **First Step 4 message:** present Investigation Summary + Recommendation + "I have N validated questions for you." Draw questions from the `## Validated Open Questions` section in order.
 
-8. **Questions:** each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation §Decomposition Check: …").
+8. **Questions:** each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation's `## Decomposition Check`: …").
 
 On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run Step 4 Brainstorm as written (today's behavior — interactive sub-steps 4a–4l in order, no deliberation pre-seed).
 
