@@ -288,7 +288,7 @@ Why serial: disjoint files citing the Phase-1 contract; kept serial for per-phas
 - CR-008 (single-task, no sub-agents).
 - NN-P-005 (Opus thinking; the board is an adversarial gate): both `model: opus` — the single-model multi-lens board (ADR-1).
 
-- [ ] **[Implement]** Author the lens and convergence agents
+- [x] **[Implement]** Author the lens and convergence agents
   - Architecture constraints: `deliberation-lens.md` is ONE file with a `{lens}` injection slot (ADR-1 — dimension diversity, single model); the calling skill supplies the lens label. `deliberation-convergence.md` is the only agent that writes `deliberation.md` (the 7 core sections), per the artifact contract. Both clone the research.md skeleton + STATUS block; both cite the artifact doc.
 
   **Change Specifications:**
@@ -317,7 +317,7 @@ Why serial: disjoint files citing the Phase-1 contract; kept serial for per-phas
   - Done: file exists; bare name; `model: opus`; writes the 7 core sections; assigns VOQ-N IDs; records depth; handles empty-Phase-D verdict set; cites artifact structure + marker contract; STATUS + no-partial.
   - Verify: phase `[Verify]` greps name/model + "VOQ" + "deliberation.md".
 
-- [ ] **[Verify]** Confirm the lens + convergence contracts
+- [x] **[Verify]** Confirm the lens + convergence contracts
   **Per-change checks:**
   - T-1: `grep -E "^name: deliberation-lens$" plugins/spec-flow/agents/deliberation-lens.md && grep -E "^model: opus$" plugins/spec-flow/agents/deliberation-lens.md` — Expected: both match.
   - T-1: `grep -c "{lens}\|HOLDS\|CONTESTED" plugins/spec-flow/agents/deliberation-lens.md` — Expected: ≥3 (param slot + both verdicts; satisfies AC-18's lens-param-slot grep).
@@ -328,7 +328,7 @@ Why serial: disjoint files citing the Phase-1 contract; kept serial for per-phas
   - Expected: all true.
   - Failure: lens hardcodes a single dimension, convergence writes the 8th section, VOQ IDs missing, or schema restated.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-1, AC-6, AC-7, AC-18
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
