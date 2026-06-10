@@ -648,7 +648,7 @@ Why serial: edits the plan skill itself (the consumer); must follow Phase 1 (cit
 - NN-P-005 (Opus): the pre-flight recommends Opus for plan authoring.
 - CR-008 (thin orchestrator): the plan agent decomposes the recommendation; the skill only reads + emits the marker.
 
-- [ ] **[Implement]** Wire the plan Opus pre-flight + Phase-1 deliberation consumption
+- [x] **[Implement]** Wire the plan Opus pre-flight + Phase-1 deliberation consumption
   - Architecture constraints: clone Phase 7's pre-flight (Cancel label "Cancel plan"; warning "Plan authoring is thinking work per NN-P-005…"). The consumption step mirrors the existing CONSUMED/ABSENT dual-path pattern (introspection.md §5 Pattern Catalog) and emits the marker on BOTH research paths so the markers appear in order: research marker, then deliberation marker. Cite `reference/deliberation-artifact.md`.
 
   **Change Specifications:**
@@ -662,7 +662,7 @@ Why serial: edits the plan skill itself (the consumer); must follow Phase 1 (cit
   - TARGET: on BOTH paths, after the research marker emit, add: "Read `deliberation.md` §Recommendation and §Viability Analysis from the piece branch (per `reference/deliberation-artifact.md` `## Location`). On file present and non-empty: emit `[DELIBERATION-CONSUMED: <recommendation-one-liner>]` and include 'Deliberation recommendation: <recommendation>' in the plan agent prompt as the approach anchor. On file absent or zero-length: emit `[DELIBERATION-ABSENT: no deliberation artifact]` and proceed with current behavior (research.md as primary context)." Place the insertion so the deliberation marker follows the research marker in Phase-1 output.
   - Done: both paths emit the deliberation marker after the research marker; the CONSUMED path feeds the recommendation to the plan agent; the ABSENT path preserves current behavior.
 
-- [ ] **[Verify]** Confirm the plan consumption
+- [x] **[Verify]** Confirm the plan consumption
   **Per-change checks:**
   - T-1: `grep -c "Override\|Change now\|Cancel" plugins/spec-flow/skills/plan/SKILL.md` — Expected: ≥3; `grep -n -i "opus" plugins/spec-flow/skills/plan/SKILL.md` — Expected: pre-flight block present (AC-24).
   - T-2: `grep -nE "DELIBERATION-CONSUMED|DELIBERATION-ABSENT" plugins/spec-flow/skills/plan/SKILL.md` — Expected: ≥2 lines, and within the Phase-1 / context-load section (AC-16).
@@ -670,7 +670,7 @@ Why serial: edits the plan skill itself (the consumer); must follow Phase 1 (cit
   - Run: LLM-agent-step — read the Phase-1 consumption step; confirm it appears on BOTH the CONSUMED and ABSENT research paths, emits the deliberation marker AFTER the research marker, feeds §Recommendation to the plan agent on the present path, and preserves current behavior on the absent path; confirm pre-flight semantics.
   - Expected: all true. Failure: marker on only one path, wrong order, or a hard-refusing pre-flight.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-16, AC-24
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
