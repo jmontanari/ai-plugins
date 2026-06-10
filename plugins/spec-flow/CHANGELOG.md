@@ -4,7 +4,7 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
-## [5.8.0] — 2026-06-09
+## [5.10.0] — 2026-06-10
 
 ### Added
 - **`agents/deliberation-coordinator.md`:** Phase A of the deliberation protocol — reads all injected inputs (PRD sections, research.md digest, charter, piece description), identifies genuine unknowns, fires WebSearch/WebFetch only on those, and returns an investigation seed (incl. identified decision-unit clusters). Dispatches no sub-agents; `model: opus`.
