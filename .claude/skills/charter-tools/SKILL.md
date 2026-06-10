@@ -9,7 +9,7 @@ The toolchain for the `shared-plugins` marketplace. Implementer agents must not 
 
 ## Language(s) and runtime
 
-- **Primary:** Markdown (content) + YAML (config) + JSON (manifests) + POSIX Bash 4+ (hooks only)
+- **Primary:** Markdown (content) + YAML (config) + JSON (manifests) + POSIX Bash 4+ (hooks, scripts, and tests only)
 - No compiled languages. No interpreted runtimes beyond the shell.
 
 ## Frameworks
@@ -18,7 +18,7 @@ The toolchain for the `shared-plugins` marketplace. Implementer agents must not 
 
 ## Test runner & coverage
 
-- **Runner:** None. No test suite exists; verification is:
+- **Runner:** plain-bash suites run on demand — `plugins/spec-flow/tests/e2e/run-e2e.sh` (pipeline e2e smoke, FR-013), `plugins/spec-flow/hooks/tests/test-lint-skill-coherence.sh` (coherence linter), and `plugins/spec-flow/scripts/tests/test-manifest-query.sh` (manifest-query tool). No framework. Additional verification:
   1. **Adversarial review** by spec-flow's own QA agents (self-hosted dogfooding)
   2. **Manual smoke tests** of hooks and skills before committing
   3. **Session reload (`/reload-plugins`)** + manual invocation on a scratch project

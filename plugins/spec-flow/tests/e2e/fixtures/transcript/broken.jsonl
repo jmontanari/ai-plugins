@@ -1,0 +1,14 @@
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:implementer","description":"phase 1 build — MISPLACED before tdd-red"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:tdd-red","description":"phase 1 red"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:qa-tdd-red","description":"phase 1 qa-red"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:verify","description":"phase 1 verify"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:spike","description":"phase 3 spike resolve"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:tdd-red","description":"phase 3 red"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:qa-tdd-red","description":"phase 3 qa-red"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:implementer","description":"phase 3 build"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:verify","description":"phase 3 verify"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:qa-tdd-red","description":"phase 4 qa-red"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:implementer","description":"phase 4 build"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:verify","description":"phase 4 verify"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:qa-phase","description":"piece qa gate"}}
+{"type":"assistant","tool":"Agent","input":{"subagent_type":"spec-flow:review-board-blind","description":"final review"}}

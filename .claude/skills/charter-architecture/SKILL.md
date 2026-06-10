@@ -18,6 +18,7 @@ Project-wide architectural decisions for the `shared-plugins` marketplace. Bindi
   - `templates/` — starting-shape files (PRD, spec, plan, manifest, charter)
   - `hooks/` — session-start and other harness hooks
   - `reference/` — auto-loaded doctrine documents
+  - `tests/` — on-demand verification suites (e2e smoke, hook tests)
   - `README.md`, `CHANGELOG.md` — human-facing docs
 
 ## Dependency direction

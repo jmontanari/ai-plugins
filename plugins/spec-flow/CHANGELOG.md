@@ -4,6 +4,23 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.11.0] — 2026-06-10
+
+### Added
+
+- **e2e smoke harness (`plugins/spec-flow/tests/e2e/`):** three-layer on-demand pipeline verification suite (FR-013).
+  - **L1 static** — commit-subject grammar, dispatch-sequence rules, contract artifact presence; runs in < 5 s against committed fixtures.
+  - **L2 fixture-replay + audit** — `run-e2e.sh --audit <piece-dir>` re-runs the full contract check against any piece directory. Committed fixtures (`tests/e2e/fixtures/`) cover the happy path and six break variants: `research-after-spec`, `no-test-data`, `no-spike-artifact`, `skip-transition`, `journal-survives`, `missing-learnings`.
+  - **L3 live-verification substrate** — `run-e2e.sh --verify-live <target> [--transcript <jsonl>]` checks a real `/spec-flow:execute` session output; `--record-golden` writes a baseline footprint (`golden/footprint.txt`). Three capability gates (`live-run`, `transcript`, `metrics-artifact`) emit `SKIPPED:` lines (never failures) when pre-conditions are absent.
+  - Committed fixtures and golden snapshot anchor the happy-path baseline.
+  - Audit mode (`--audit`) allows re-running L2 checks against any piece directory post-hoc.
+  - Operator-driven live procedure documented in `tests/e2e/README.md`; the harness never invokes a model — token cost is operator-chosen.
+- **Charter sanctioning of `tests/` layer:** `plugins/spec-flow/tests/` is now an enumerated plugin-internal layer in the architecture charter (`charter-architecture/SKILL.md`) and the test-runner section of `charter-tools/SKILL.md` names all three on-demand bash suites.
+
+### Notes for upgraders
+
+No behavior change to any existing skill, agent, or hook. All new tooling is on-demand only — nothing runs automatically. Existing `run-e2e.sh` default invocation (L1 + L2 against committed fixtures) is the only change to the observable harness surface.
+
 ## [5.10.0] — 2026-06-10
 
 ### Added
@@ -24,6 +41,7 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 - **`reference/brainstorm-procedure.md` — Tier-2 answer-validation loop + C-2 amendment:** adds the Tier-2 answer-validation loop (auto-fire deliberation-validate on a new operator assertion; CONFIRM/FLAG-HARD/FLAG-SOFT; human-paced termination) and amends the C-2 always-run rule so a mandatory block MAY be auto-skipped only when deliberation concludes N/A with logged rationale AND the skill surfaces the block name + rationale (auto-skip is not silent skip).
 - **`agents/qa-spec.md` — criteria 14 and 15:** criterion 14 checks deliberation structure (when deliberation.md is present, the 7 core sections must be in order; optional 8th tolerated; UNAVAILABLE/SKIPPED informational); criterion 15 checks grounding provenance (§Validated Open Questions entries carry VOQ-N IDs; spec Phase-2 requires VOQ-N/named-section citations). Both criteria add no finding when deliberation.md is absent.
 - **exec-ready PRD — FR-009 section + NN-P-005 Scope extension:** adds the FR-009 section (Investigation-First Design Protocol, both tiers + Opus pre-flight, P0) and extends NN-P-005's Scope to include FR-009.
+
 ## [5.9.0] — 2026-06-09
 
 ### Added

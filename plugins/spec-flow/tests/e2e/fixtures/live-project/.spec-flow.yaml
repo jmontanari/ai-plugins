@@ -1,0 +1,8 @@
+docs_root: docs
+worktrees_root: worktrees
+layout_version: 4
+charter_root: .claude
+charter:
+  required: false
+tdd: true
+merge_strategy: squash_local

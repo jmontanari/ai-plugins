@@ -243,7 +243,8 @@ pieces:
       (1,986 lines of orchestration prose).
     prd_sections: [FR-013, G-1]
     dependencies: []
-    status: open
+    status: merged
+    merged_at: 2026-06-10
 
   - name: artifact-budgets
     slug: artifact-budgets
