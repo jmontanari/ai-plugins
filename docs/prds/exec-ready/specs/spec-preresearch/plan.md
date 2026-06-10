@@ -685,7 +685,7 @@ Why serial: cites the Phase-1 artifact structure; the cross-phase check must run
 - CR-009 (heading hierarchy): the numbered bold-label criterion format (introspection.md §7 Pattern Catalog).
 - NN-C-003 (backward compat): both criteria are guarded — they add NO finding when `deliberation.md` is absent (UNAVAILABLE/SKIPPED), so pre-5.8.0 specs are unaffected.
 
-- [ ] **[Implement]** Add criteria 14 and 15
+- [x] **[Implement]** Add criteria 14 and 15
   - Architecture constraints: follow the numbered bold-label criterion format `N. **Category:** Description.` (introspection.md §7, lines 531–544); the new criteria explicitly do NOT treat DELIBERATION-UNAVAILABLE/SKIPPED as must-fix (unlike criterion 7's NEEDS-CLARIFICATION/PENDING-DECISION). Cite `reference/deliberation-artifact.md` for the structure; do not restate the 7 sections.
 
   **Change Specifications:**
@@ -698,7 +698,7 @@ Why serial: cites the Phase-1 artifact structure; the cross-phase check must run
   - Done: criteria 14 + 15 present in the numbered format; both guarded against the absent path; the optional-8th tolerance + the UNAVAILABLE-informational rule stated; cite the artifact doc.
   - Verify: phase `[Verify]` greps the two criteria.
 
-- [ ] **[Verify]** Confirm the qa-spec criteria + cross-phase schema consistency
+- [x] **[Verify]** Confirm the qa-spec criteria + cross-phase schema consistency
   **Per-change checks:**
   - T-1: `grep -nE "^14\.|^15\." plugins/spec-flow/agents/qa-spec.md` — Expected: both criteria present.
   - T-1: `grep -c "VOQ\|grounding" plugins/spec-flow/agents/qa-spec.md` — Expected: ≥1 (AC-20's provenance criterion grep).
@@ -709,7 +709,7 @@ Why serial: cites the Phase-1 artifact structure; the cross-phase check must run
   - Expected: all four files agree on the seven section names; §Recommendation and §Viability Analysis spelled identically everywhere.
   - Failure: any file renames/drops a section, or the plan-read names diverge from the definer.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-13, AC-20
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
