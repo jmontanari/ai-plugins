@@ -1,0 +1,47 @@
+schema_version: 1
+generated: 2026-06-10
+last_updated: 2026-06-10
+piece: exec-ready/artifact-budgets
+spec:
+  qa_rounds: 3
+  qa_iterations: 1
+  research_artifact: true
+plan:
+  qa_iterations: 1
+  concreteness_floor: passed
+  budget_compliance:
+    plan_md_total:
+      lines: 470
+      soft: 750
+      hard: 1000
+      status: pass
+    plan_md_max_phase:
+      lines: 91
+      soft: 90
+      hard: 220
+      status: pass
+execute:
+  sonnet_default: true
+  phases:
+    total: 6
+    clean_sonnet: 6
+  discoveries:
+    spike_attributed: 0
+    unmarked: 0
+  spikes:
+    planned: 0
+    scope: 0
+  escalations: 0
+  amendments:
+    total: 0
+    repeat_scope: 0
+  dispatches:
+    opus: 9
+    sonnet: 19
+  qa_iterations: 6
+  resume:
+    - at: phase_4
+      outcome: clean
+final_review:
+  iterations: 1
+  must_fix: 0

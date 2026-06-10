@@ -190,6 +190,15 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
 
     Evidence: quote the phase's `Test Data` block (or its absence) and the uncovered/incomplete case. **Must-fix.**
 
+32. **Plan over budget (FR-014) (activate when the orchestrator supplies budget values; skip if absent — not an error).** The orchestrator interpolates plan.md's total line count and its largest per-phase line count, each with soft + hard budgets (`plugins/spec-flow/reference/artifact-budgets.md`). Judge from the supplied counts — do NOT count lines yourself.
+    Flag (Must-fix):
+    - Total OR any per-phase count over its HARD ceiling → name which (total / largest phase), actual vs hard, and split/condense guidance (split the piece per the qa-prd ≤7-AC rule, or hoist detail to a reference doc). NO waiver.
+    Advisory only (NOT must-fix):
+    - A count over SOFT but under HARD → advisory note.
+    Do NOT flag:
+    - Counts at/under soft; no supplied budget (skip).
+    Evidence: quote the supplied count and the exceeded ceiling. **Must-fix on hard-ceiling breach only.**
+
 ## Output Format
 
 Same structure: must-fix and acceptable sections. Every must-fix must cite a criterion and explain what's wrong.

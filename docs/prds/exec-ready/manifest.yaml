@@ -264,7 +264,7 @@ pieces:
       2.0's investigation artifact starts bounded.
     prd_sections: [FR-014, SC-008, G-1, G-6]
     dependencies: []
-    status: open
+    status: merged
 
   - name: flywheel-refresh
     slug: flywheel-refresh

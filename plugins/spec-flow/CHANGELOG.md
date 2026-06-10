@@ -4,6 +4,16 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.12.2] — 2026-06-10
+
+### Added
+- **`reference/artifact-budgets.md` (per-artifact-class size budgets, FR-014):** SSOT reference doc defining soft/hard line-count budgets for six artifact classes (`spec.md`, `plan.md` total, `plan.md` per-phase, `research.md`, `deliberation.md`, `learnings.md`); two-tier soft (advisory) / hard (must-fix) model; derivation rationale; worked override example; irreducible-overage escalation path (qa-prd ≤7-AC piece-split).
+- **`artifact_budgets:` override block in `templates/pipeline-config.yaml`** (commented example): per-class soft/hard override keys; absent ⇒ defaults from the reference doc (NN-C-003).
+- **`metrics.yaml budget_compliance` passive metadata (Phase 3 + 4 + 5):** `spec.budget_compliance.{spec_md,deliberation_md}` and `plan.budget_compliance.{plan_md_total,plan_md_max_phase}` each record `{lines, soft, hard, status: pass|over}`; not consumed by `scripts/metrics-aggregate` (ADR-3); written at spec/plan finalize respectively.
+- **qa-spec criterion #16 (FR-014):** budget gate in the spec QA agent; orchestrator interpolates `wc -l` counts + resolved budgets; agent judges must-fix on hard-ceiling breach, advisory on soft-only breach, skip when absent; no waiver.
+- **qa-plan criterion #32 (FR-014):** budget gate in the plan QA agent; evaluates plan.md total AND largest per-phase count; same three-branch model; no waiver.
+- **`wc -l` + budget-resolution sub-steps in `skills/spec/SKILL.md` and `skills/plan/SKILL.md`:** orchestrator resolves `.spec-flow.yaml artifact_budgets` overrides (absent ⇒ reference-doc defaults), runs `wc -l`, interpolates counts into qa-spec/qa-plan prompts at both dispatch sites (iter-1 and focused re-review).
+
 ## [5.12.1] — 2026-06-10
 
 ### Fixed

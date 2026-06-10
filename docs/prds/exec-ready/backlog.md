@@ -66,3 +66,19 @@ The no-re-spike guard (Step 1c) is piece-scoped: `spikes/<phase-id>.md` lookup i
 **FW-3: resolved/blocked exclusion branches lack their own ACs.** The AC Coverage Matrix was finalized before `phase_final_amend_1` added the resolved-exclusion + blocked-exclusion rules; only AC-7 (rejection) has a covering AC. flywheel-global must inherit these exclusion rules (infinite re-proposal is at least as problematic globally) — add explicit ACs + smoke scenarios for the resolved/blocked branches in the flywheel-global spec (the agent notes these belong there, not retrofitted here). **Deps:** flywheel-repo (merged); resolution point = flywheel-global spec brainstorm.
 
 **Captured:** 2026-06-09
+
+---
+
+## Deferred from exec-ready/artifact-budgets step-4.5-reflection (2026-06-10)
+
+**Source:** `exec-ready/artifact-budgets` step-4.5 reflection (`reflection-future-opportunities`). Deferred via operator triage 2026-06-10 — all are future-scope, none are current defects.
+
+**AB-1: Aggregate reporting for documented-only artifact classes (research.md, learnings.md).** These classes are "documented-only" — authors self-enforce. Budget compliance is recorded passively in `metrics.yaml` per piece (Phase 3, ADR-3). Once the corpus has 5+ pieces with `budget_compliance` entries, `scripts/metrics-aggregate` could emit a `budget_compliance` summary (count measured, p75 actual, max actual) to give a measured basis for deciding whether a QA gate is warranted. Candidate: extend `scripts/metrics-aggregate.py` (+ parity test) to emit per-class compliance statistics. **Deps:** artifact-budgets (merged); gate-scaling (open).
+
+**AB-2: Budget threshold re-derivation mechanism.** The `artifact-budgets.md` thresholds are static, derived from 9 merged exec-ready pieces (2026-06-10). As more pieces merge, the p75/max distribution will drift. No mechanism triggers a corpus re-derivation. Candidate: add a note to `reference/artifact-budgets.md §2` that thresholds re-derive when corpus grows by 5+ pieces; have the flywheel record a `budget-threshold-drift` pattern when the p75 in an aggregate report diverges from the documented soft ceiling by >15%. **Deps:** AB-1; flywheel-refresh (open).
+
+**AB-3: Shared budget-resolution recipe to prevent per-skill drift.** The `wc -l` + config-resolve + interpolation sub-step is duplicated in `skills/spec/SKILL.md` and `skills/plan/SKILL.md`. A third skill requiring budget interpolation (e.g. if a `spike.md` artifact class is added) would introduce a third copy. Candidate: extract the shared resolution recipe into a `## Shared: budget resolution` anchor in the orchestrator reference or a `budget-resolution-recipe.md` so all skills cite-by-reference. **Deps:** artifact-budgets (merged); triggered by any third budget-interpolation site.
+
+**AB-4: Override sanity validation (soft ≤ hard invariant).** A `.spec-flow.yaml` with `soft > hard` (e.g. `{soft: 700, hard: 600}`) silently produces incoherent gate behavior. The reference doc says "unresolvable or malformed → skip" but doesn't define soft > hard as malformed. Candidate: add a budget-resolution validation rule in `skills/spec/SKILL.md` and `skills/plan/SKILL.md`; emit `[BUDGET-CONFIG-INVALID: spec_md soft=X > hard=Y]` and fall back to reference-doc defaults; document the `soft ≤ hard` invariant in `reference/artifact-budgets.md §5`. Small amendment, low blast radius. **Deps:** artifact-budgets (merged); self-contained.
+
+**Captured:** 2026-06-10

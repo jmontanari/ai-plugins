@@ -260,7 +260,13 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 1. Read the agent template: `${CLAUDE_PLUGIN_ROOT}/agents/qa-spec.md`
 
-2. **Iteration 1 (full review):** Compose prompt with `Input Mode: Full`: interpolate the full spec, PRD sections, charter files (all seven if present — architecture, non-negotiables (NN-C), tools, processes, flows, coding-rules (CR), integrations; at the active charter root resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-*/SKILL.md`, where `<charter_root>` is `.github` or `.claude`), manifest piece, and NN-P from the PRD's Non-Negotiables (Product) section. Dispatch:
+2. **Iteration 1 (full review):** Compose prompt with `Input Mode: Full`: interpolate the full spec, PRD sections, charter files (all seven if present — architecture, non-negotiables (NN-C), tools, processes, flows, coding-rules (CR), integrations; at the active charter root resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-*/SKILL.md`, where `<charter_root>` is `.github` or `.claude`), manifest piece, and NN-P from the PRD's Non-Negotiables (Product) section.
+
+   **Budget resolution (artifact-budgets, both dispatch sites — iter 1 and focused re-review):** Resolve `artifact_budgets` overrides from `.spec-flow.yaml` (absent key ⇒ defaults from `plugins/spec-flow/reference/artifact-budgets.md`). Run `wc -l` on `spec.md` and, if it exists on the piece branch, `deliberation.md`. Interpolate into the qa-spec prompt, for each artifact present: `<class> is N lines; soft S; hard H` so criterion #16 judges from the orchestrator-supplied count, never from the (possibly-truncated) interpolated text.
+
+   <!-- Example: artifact_budgets absent → spec_md hard=520. wc -l spec.md = 540. Interpolate "spec.md is 540 lines; soft 300; hard 520" → #16 must-fix. deliberation.md absent → no deliberation row interpolated. -->
+
+   Dispatch:
    ```
    Agent({
      description: "Spec QA for <prd-slug>/<piece-slug> (iter 1, full)",
@@ -273,6 +279,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    - Read the fix template: `${CLAUDE_PLUGIN_ROOT}/agents/fix-doc.md`
    - Dispatch fix agent with prior findings + spec + context. The fix agent does NOT commit; it ends its report with `## Diff of changes` containing its `git diff` of spec.md.
    - Extract that diff string and hold it in orchestrator state as `spec_iter_M_fix_diff`.
+   - Apply the **Budget resolution** sub-step from step 2 above (re-run `wc -l` on the current `spec.md` and `deliberation.md` if present; interpolate updated counts) before composing the focused re-review prompt.
    - Re-dispatch QA agent (fresh) with `Input Mode: Focused re-review`, the prior iteration's must-fix findings, and `spec_iter_M_fix_diff`. Do NOT re-send the full spec.
    - **Circuit breaker:** After 3 QA iterations, escalate to human.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
@@ -300,7 +307,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    > full PRD ships — **never commit PRD piece work directly to `merge_target:` while
    > `feature_branch:` is set.**
 3. Commit spec on worktree branch:
-   **3a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, create/upsert `docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml` with the `schema_version`/`generated`/`last_updated`/`piece` envelope (on first write) and the `spec:` block — `qa_rounds` from the Phase-2 counter, `qa_iterations` = the Phase-4 QA-loop iteration count to clean, `research_artifact` = `true` iff a `research.md` exists at the canonical path for this piece. If `metrics: off`, skip. On write failure, emit `[METRICS-DEGRADED: <reason>]` and continue.
+   **3a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, create/upsert `docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml` with the `schema_version`/`generated`/`last_updated`/`piece` envelope (on first write) and the `spec:` block — `qa_rounds` from the Phase-2 counter, `qa_iterations` = the Phase-4 QA-loop iteration count to clean, `research_artifact` = `true` iff a `research.md` exists at the canonical path for this piece. Also upsert `spec.budget_compliance`: for each artifact measured in the Phase-4 budget-resolution sub-step (`spec_md`, and `deliberation_md` if it exists), write `{lines: N, soft: S, hard: H, status: pass|over}` — `status` is `pass` when N ≤ H, `over` otherwise; the `hard` value is the resolved ceiling (override or reference-doc default). `budget_compliance` is passive metadata (ADR-3) — `scripts/metrics-aggregate` does NOT consume it. If `metrics: off`, skip. On write failure, emit `[METRICS-DEGRADED: <reason>]` and continue.
    ```bash
    git add docs/prds/<prd-slug>/specs/<piece-slug>/spec.md docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml
    git commit -m "spec: add <prd-slug>/<piece-slug> specification"
