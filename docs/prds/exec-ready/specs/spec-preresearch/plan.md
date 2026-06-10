@@ -774,7 +774,7 @@ Why serial: must be last — the CHANGELOG describes the finished piece; depends
 - NN-C-009 (version bump): all version-bearing files bumped in this commit series.
 - NN-C-002 (no runtime deps): JSON/markdown edits only.
 
-- [ ] **[Implement]** Bump the version files + author the CHANGELOG entry
+- [x] **[Implement]** Bump the version files + author the CHANGELOG entry
   - Architecture constraints: follow `plugins/spec-flow/reference/releasing.md` (the version recipe); the CHANGELOG entry inserts between `## [Unreleased]` (line 5) and `## [5.7.0]` (line 7) per the Keep-a-Changelog format (introspection.md §12(c)).
 
   **Change Specifications:**
@@ -790,7 +790,7 @@ Why serial: must be last — the CHANGELOG describes the finished piece; depends
   - Done: the `## [5.8.0]` section exists with non-empty Added + Changed groupings.
   - Verify: phase `[Verify]` checks version sync + CHANGELOG heading.
 
-- [ ] **[Verify]** Confirm version sync
+- [x] **[Verify]** Confirm version sync
   **Per-change checks:**
   - T-1/T-2: `diff <(jq -r .version plugins/spec-flow/.claude-plugin/plugin.json) <(jq -r '.plugins[] | select(.name == "spec-flow") | .version' .claude-plugin/marketplace.json)` — Expected: no output (both 5.8.0; AC-15).
   - T-1: `jq -r .version plugins/spec-flow/.claude-plugin/plugin.json` — Expected: `5.8.0`.
@@ -800,7 +800,7 @@ Why serial: must be last — the CHANGELOG describes the finished piece; depends
   - Run: LLM-agent-step — read the CHANGELOG 5.8.0 section; confirm Added names the six agents + two reference docs and Changed names the skill wiring + qa-spec + PRD edits.
   - Expected: all present. Failure: empty groupings, a missing file, or the qa entry altered.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-15
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
