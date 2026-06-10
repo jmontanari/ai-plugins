@@ -350,8 +350,6 @@ Depth levels and per-skill defaults are defined in `reference/deliberation-depth
 
 The decision unit for this skill is the **per-domain rule / principle** (not a file, not a whole-charter cluster). Each cluster in Phase A represents one charter domain (e.g., error-handling conventions, dependency rules, naming standards, auth enforcement) grouping the candidate rules/principles that will govern it; Phase B viability agents assess each domain cluster independently.
 
-*Worked example: for a Node.js microservice with inconsistent error-handling (Result<T,E> in auth module vs. unchecked exceptions in billing), Phase A produces two clusters — {error-handling-domain} and {naming-conventions-domain}. Phase B dispatches one viability agent per cluster; Phase C synthesizes (2 clusters ≥ 2 → not skipped); Phase D runs 5 lens agents in parallel; Phase E folds contested boundaries into VOQ-1 and seeds Phase 2 questions.*
-
 0. **Resolve depth:** read `.spec-flow.yaml` `deliberation.depth`; apply any operator override; else use per-skill default (`full` for charter). On `depth=off` → emit `[DELIBERATION-SKIPPED: depth=off]`, run Phase 2 Socratic dialogue from the top, STOP here.
 
 1. **Dispatch Phase A** (`agents/deliberation-coordinator.md`): inject the confirmed Signal Summary (from Phase 1.3), the domain being chartered (all seven charter domains — architecture, tools, coding-rules, processes, flows, non-negotiables, integrations), existing codebase patterns (from the Phase 1.1 scan / research/L-10 fallback), and related industry-standard rules for the project type (web research — the coordinator fires targeted searches for the detected stack and domain).
