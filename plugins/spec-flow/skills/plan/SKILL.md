@@ -145,7 +145,7 @@ Emit: [RESEARCH-CONSUMED: 3 files, 2 re-read]. -->
 **ABSENT path (`research.md` does not exist on the piece branch):**
 
 1. Emit `[RESEARCH-ABSENT: running full exploration]`.
-2. Read `deliberation.md` §Recommendation and §Viability Analysis from the piece branch (per `reference/deliberation-artifact.md` `## Location`). On file present and non-empty: emit `[DELIBERATION-CONSUMED: <recommendation-one-liner>]` and include 'Deliberation recommendation: <recommendation>' in the plan agent prompt as the approach anchor. On file absent or zero-length: emit `[DELIBERATION-ABSENT: no deliberation artifact]` and proceed with current behavior (research.md as primary context).
+2. Read `deliberation.md` §Recommendation and §Viability Analysis from the piece branch (per `reference/deliberation-artifact.md` `## Location`). On file present and non-empty: emit `[DELIBERATION-CONSUMED: <recommendation-one-liner>]` and include 'Deliberation recommendation: <recommendation>' in the plan agent prompt as the approach anchor. On file absent or zero-length: emit `[DELIBERATION-ABSENT: no deliberation artifact]` and proceed with current behavior (full per-cluster exploration as primary context).
 3. Run the existing per-cluster sweep (the "Cluster identification" + "Per-cluster exploration loop" below) unchanged.
 
 On both paths, **Phase 2 then reads the resulting `introspection.md` section-by-section with no change to its reader.**
