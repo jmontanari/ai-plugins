@@ -613,7 +613,7 @@ Why serial: kept serial for per-phase Opus QA audit value on the lite-depth wiri
 - NN-C-003 (backward compat): lite default via `reference/deliberation-depth.md`; UNAVAILABLE/off fall back to today's Step-6 brainstorm.
 - NN-C-008 (self-contained dispatch); CR-008 (thin orchestrator).
 
-- [ ] **[Implement]** Wire the small-change lite-depth deliberation block
+- [x] **[Implement]** Wire the small-change lite-depth deliberation block
   - Architecture constraints: clone the deliberation block but resolve depth to **lite** by default (cite `reference/deliberation-depth.md`): whole piece = one cluster → Phase B single pass, Phase C no-op, Phase D = configured lens subset (default scope/simplicity + risk), Phase E. NO pre-flight. Use the `## Step Nb:` heading convention (introspection.md §3 Pattern Catalog).
 
   **Change Specifications:**
@@ -622,7 +622,7 @@ Why serial: kept serial for per-phase Opus QA audit value on the lite-depth wiri
   - TARGET: insert `## Step 5b: Deliberation Protocol (lite depth)` transcribing the lite-profile orchestration: depth resolves to lite by default (cite `reference/deliberation-depth.md`; on `off` → `[DELIBERATION-SKIPPED: depth=off]`, run current Step-6 brainstorm, STOP); Phase A coordinator; Phase B single viability pass over the whole change (one cluster); Phase C skipped (≤1 cluster); Phase D = configured lens subset (default scope/simplicity + risk); Phase E convergence + commit; the first Step-6 message = Investigation Summary. 5-fatal/2-non-fatal handling per the marker contract. Include the literal `lite` token + a one-line worked example (decision-unit = the change; Phase C skipped).
   - Done: the Step 5b block present before Step 6, resolving to lite, with the single-cluster/Phase-C-skip + lens-subset profile + worked example; no pre-flight added.
 
-- [ ] **[Verify]** Confirm the small-change wiring
+- [x] **[Verify]** Confirm the small-change wiring
   **Per-change checks:**
   - T-1: `grep -n "deliberation-coordinator" plugins/spec-flow/skills/small-change/SKILL.md` — Expected: ≥1 (AC-10).
   - T-1: `grep -n "lite" plugins/spec-flow/skills/small-change/SKILL.md` — Expected: ≥1 (lite-depth default resolution; satisfies AC-19's small-change grep).
@@ -631,7 +631,7 @@ Why serial: kept serial for per-phase Opus QA audit value on the lite-depth wiri
   - Run: LLM-agent-step — read the Step 5b block; confirm lite-depth resolution (whole piece = one cluster, Phase C no-op, lens subset), the fallback handling, and that the first Step-6 message is the Investigation Summary; confirm NO Opus pre-flight was added.
   - Expected: all true. Failure: full-depth used, a pre-flight added, or Phase C not skipped.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-10, AC-19
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
