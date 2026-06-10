@@ -150,7 +150,7 @@ Depth levels and per-skill defaults are defined in `reference/deliberation-depth
 1. **Dispatch Phase A** (`agents/deliberation-coordinator.md`): inject PRD sections, piece description, `research.md` digest (if `STATUS: OK`), charter constraints.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-A-blocked]`, fall back to current brainstorm.
 
-2. **Identify decision-unit clusters:** group FRs by functional similarity / dependency. At `lite` depth treat the whole piece as one cluster.
+2. **Consume decision-unit clusters from Phase A:** take the identified decision-unit clusters returned in Phase A's investigation seed (the coordinator already derived them from the PRD and research). At `lite` depth, collapse them to one whole-piece cluster regardless of what Phase A returned.
 
 3. **Dispatch Phase B in parallel, one `agents/deliberation-viability.md` agent per cluster**: inject Phase A investigation seed + per-cluster FR assignment + charter constraints. Each agent enumerates reuse/extend-existing paths from `research.md`, not only greenfield.
    **Barrier:** wait for all Phase B agents to complete.
@@ -172,7 +172,9 @@ Depth levels and per-skill defaults are defined in `reference/deliberation-depth
 
 6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in §Investigation Summary.
    On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
-   On `STATUS: BLOCKED` or `deliberation.md` missing/empty or commit fail → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back.
+   On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back.
+   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back.
 
 7. **First brainstorm message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
 
