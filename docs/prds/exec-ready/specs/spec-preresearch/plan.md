@@ -576,7 +576,7 @@ Why serial: kept serial for per-phase Opus QA audit value on each calling-skill 
 **Charter constraints honored in this phase:**
 - NN-P-005 (Opus); NN-C-003 (backward compat, UNAVAILABLE/off fallback, silent pre-flight); NN-C-008 (self-contained dispatch); CR-008 (thin orchestrator).
 
-- [ ] **[Implement]** Wire the charter Opus pre-flight + Phase 1.9 deliberation block (full depth)
+- [x] **[Implement]** Wire the charter Opus pre-flight + Phase 1.9 deliberation block (full depth)
   - Architecture constraints: clone Phase 7's pre-flight (Cancel label "Cancel charter"; warning "Charter authoring is thinking work per NN-P-005…") and the deliberation block; use the `### Phase 1.N:` heading convention (introspection.md §4 Pattern Catalog). Decision unit = per-domain rule; coordinator investigation explicitly covers existing codebase patterns (research/L-10) + industry-standard rules for the project type (web research).
 
   **Change Specifications:**
@@ -589,7 +589,7 @@ Why serial: kept serial for per-phase Opus QA audit value on each calling-skill 
   - TARGET: insert `### Phase 1.9: Deliberation Protocol` (full depth; decision unit = per-domain rule/principle) transcribing steps 0–8 (Phase A→B[barrier]→C[skip ≤1 cluster]→D[5 lenses, barrier]→E; fatal/non-fatal handling; commit; first Phase-2 message = Investigation Summary). The Phase A inputs explicitly include existing codebase patterns + the domain being chartered + related industry-standard rules (web research). Include literal phase tokens + `barrier` + a one-line worked example (decision-unit = domain rule).
   - Done: the Phase 1.9 block present before Phase 2 with full-depth orchestration + the per-domain framing + the codebase-patterns/industry-standards context + worked example.
 
-- [ ] **[Verify]** Confirm the charter wiring
+- [x] **[Verify]** Confirm the charter wiring
   **Per-change checks:**
   - T-1: `grep -c "Override\|Change now\|Cancel" plugins/spec-flow/skills/charter/SKILL.md` — Expected: ≥3; `grep -n -i "opus" plugins/spec-flow/skills/charter/SKILL.md` — Expected: pre-flight block present (AC-24).
   - T-2: `grep -n "deliberation-coordinator" plugins/spec-flow/skills/charter/SKILL.md` — Expected: ≥1 (AC-10b); AND `grep -nE "Phase 1.9|Phase A|barrier|Phase E" …` — Expected: present.
@@ -597,7 +597,7 @@ Why serial: kept serial for per-phase Opus QA audit value on each calling-skill 
   - Run: LLM-agent-step — read the Phase 1.9 block; confirm full-depth orchestration with the per-domain-rule decision unit, the codebase-patterns + industry-standards investigation context, the dispatch order + barriers + fallback, and that the first Phase-2 message is the Investigation Summary; confirm pre-flight semantics.
   - Expected: all true. Failure: missing context inputs, wrong decision-unit, or hard-refusing pre-flight.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-10b, AC-24
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
