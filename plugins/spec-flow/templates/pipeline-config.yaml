@@ -149,3 +149,14 @@ charter:
 #       in_review: "In Review"
 #       done: "Done"
 #       backlog: "Backlog"
+
+# deliberation: pre-brainstorm Investigation-First protocol depth (new in v5.8.0)
+#   depth: full | lite | off
+#     full  — all 5 phases, all 5 lenses (default for spec/prd/charter)
+#     lite  — Phase A + single Phase B pass + reduced Phase D (lens subset) + Phase E (default for small-change)
+#     off   — skip deliberation; emit [DELIBERATION-SKIPPED: depth=off]; run pre-5.8.0 brainstorm
+#   lenses: optional list overriding the lite-depth lens subset (default: [scope-simplicity, risk])
+#   Absent key → per-skill default. See plugins/spec-flow/reference/deliberation-depth.md.
+# deliberation:
+#   depth: full
+#   lenses: [scope-simplicity, risk]
