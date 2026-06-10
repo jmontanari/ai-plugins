@@ -315,3 +315,19 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **worked-well: Cross-phase schema-consistency grep in [Verify].** Phase 7's `for f in` grep confirming `blocking-on-current` appears in all three vocabulary-bearing files served as a regression guard (no defect at verify time) rather than a defect finder. The QA catch on the `Classification:` schema colon-arg mismatch was found by the QA agent reading the schema directly, not the grep — showing that greps are a necessary but not sufficient consistency check. Both layers (structural grep + Opus semantic review) are needed.
 
 **metrics:** QA catch rate — Phase 1: 1 MUST-FIX; Phases 2/3: 0; Phase 4: 1 SHOULD-FIX; Phase 5: 1 SHOULD-FIX; Phase 6: 1 non-issue; Phase 7: 2 MUST-FIX + 2 SHOULD-FIX; Phase 8: 0. Total: 3 MUST-FIX, 3 SHOULD-FIX across 8 phases. Phase 7 (57% of all actionable findings) concentrated defects because it was the third serial phase targeting the same large file — compound target, accumulated complexity.
+
+---
+
+### Process-retro findings (exec-ready/flywheel-repo, 2026-06-09)
+
+**Source:** `exec-ready/flywheel-repo` phase `step-4.5-reflection` (agent: `reflection-process-retro`). Deferred via operator triage 2026-06-09. Category: process-improvement.
+
+**PR-FW-1: spec/plan QA should require "record-this-outcome" behaviors to enumerate their schema field.** The `hardenings` schema gap (board findings F1/F3/F5: no schema home for the accepted/blocked hardening outcome → broken spike `<id>` seam + infinite re-proposal loops) reached Final Review rather than being caught at spec or plan QA. Root: spec SF-6 said "the accepted outcome … is recorded against the pattern in docs/patterns.yaml" but named no concrete schema field and no re-proposal exclusion rule. **Fix:** add a qa-spec/qa-plan check — any AC/FR describing a "record/persist this outcome" behavior must enumerate the schema field(s) carrying it, and the plan's cross-phase schema-consistency [Verify] must confirm every outcome state (approved/rejected/blocked) has a dedicated schema home before the wiring phase ships.
+
+**PR-FW-2: qa-spec should grep `.gitignore` for config-file ACs.** The Phase 2 discovery (`.spec-flow.yaml` gitignored; AC-10 "documented in both files" mis-modeled the committed deliverable) fired at implementation time, costing one spec-amend + one plan-amend before Phase 2 completed. **Fix:** qa-spec for any AC referencing a config file should run a one-line `grep <file> .gitignore` and flag committed-vs-runtime mismatches before sign-off.
+
+**PR-FW-3: plan concreteness — require a grep-verifiable assertion per concrete identifier shipping a new dispatch contract.** Board F1 (broken spike `<id>` seam) occurred because the plan DID specify `<id> = flywheel-<pattern-id>` but the implementer didn't carry it through, and Phase 4's `[Verify]` for that branch was an LLM-agent-step ("confirm both branches present"), not grep-verifiable on the concrete token. **Fix:** when a phase ships a new dispatch contract / concrete identifier, require at least one grep-verifiable `[Verify]` assertion keying on that literal token (e.g. `grep 'flywheel-<pattern-id>'`), not only LLM-agent-step presence checks.
+
+**observation (NN-P-005):** the execute coordinator ran on Opus via operator override of the Sonnet-class pre-flight check. No observable effect on this doc-as-code piece, but the override is an NN-P-005 deviation worth tagging — consider requiring an explicit rationale field in the session log when the pre-flight model check is overridden, for cross-piece comparison.
+
+**Captured:** 2026-06-09

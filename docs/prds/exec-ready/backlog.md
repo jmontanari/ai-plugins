@@ -35,15 +35,6 @@ The original `exec-loop` PRD was re-scoped after a capability audit + fresh Bori
 **Why this does not block plan-concrete's goals:** plan-concrete's scope is the plan layer only; the spec-layer gap is a follow-on improvement. qa-plan's criterion #30 provides a backstop even when the spec layer is silent.
 **Captured:** 2026-06-07
 
-### [Deferred via /spec-flow:defer] flywheel-repo spec should include unmarked-execute-time-discovery as a first-class metric — 2026-06-07
-
-**Source:** `exec-ready/plan-concrete` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`)
-**Finding (verbatim):** plan-concrete's stated outcome goal ("a passing plan yields zero unmarked execute-time discoveries") has no measurement surface. The flywheel-repo piece (FR-006, status: open) is the natural recording surface. During flywheel-repo spec brainstorm, propose adding "unmarked execute-time discovery" as a first-class flywheel pattern-type: each Step 6c discovery event that was NOT a [SPIKE]-routed resolution increments a per-plan-quality counter in docs/patterns.yaml. This is a scope amendment for flywheel-repo, not a new piece. Deps: spike-agent (FR-005) must land first (Step 6c plan amendments must exist).
-**Why this does not block plan-concrete's goals:** The measurement surface is downstream of multiple open pieces; plan-concrete's enforcement layer is complete and correct without it.
-**Captured:** 2026-06-07
-
----
-
 ### spike-agent future opportunities (2026-06-07)
 
 **Source:** `exec-ready/spike-agent` step-4.5-reflection (agent: `reflection-future-opportunities`)
@@ -61,3 +52,17 @@ The no-re-spike guard (Step 1c) is piece-scoped: `spikes/<phase-id>.md` lookup i
 **Deps:** spike-agent merged (canonical artifact schema/location); flywheel-repo (the indexing surface).
 
 **Non-blocking on spike-agent goals:** all three items are flywheel-downstream. This piece's goals are complete without them.
+
+---
+
+### Reflection findings (flywheel-repo, 2026-06-09) — flywheel-global brainstorm inputs
+
+**Source:** `exec-ready/flywheel-repo` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`). Deferred via operator triage 2026-06-09.
+
+**FW-1: `hardenings` schema growth changes flywheel-global's reuse scope (SF-N4 undercount).** The final-review amendment (`phase_final_amend_1`) added `hardenings: [{date, outcome: resolved|blocked, spike_artifact, amend_commit, at_count}]` to `reference/flywheel.md` `## Registry schema` — a field not present when the spec's SF-N4 wrote "flywheel-global reuses the schema by varying only location, routing target, one added `originating_repo` field, and a `plugin` scope value." `spike_artifact` is a repo-relative path and `amend_commit` is a repo-local SHA — neither has a global analogue (global "hardening" = creating a self-improvement piece, not appending amendment phases). During `flywheel-global` spec brainstorm, resolve as an explicit open question: inherit `hardenings` verbatim, define a narrower variant (e.g. substitute `improvement_piece_slug` for `amend_commit`), or omit it. Update SF-N4's reuse claim to reference three varied elements, not one. **Deps:** flywheel-repo (merged); resolution point = flywheel-global spec brainstorm.
+
+**FW-2: registry-integrity lint for schema-valid-but-structurally-wrong `docs/patterns.yaml`.** The degraded path covers unwritable/unparseable, but a registry that parses as valid YAML yet is schema-invalid (missing `id`/`scope`/`occurrences`, unknown `scope`, `hardenings.outcome` outside `resolved|blocked`, `source_type` outside the 3-value enum, non-integer `at_count`) has no validation path — the only structural check is inline LLM read/write. As the registry accumulates across PRDs, silent schema drift corrupts counts undetected. Candidate: add a `## Registry invariants` grep/inspection recipe to `reference/flywheel.md` + a `flywheel-lint` step. **Deps:** flywheel-repo (merged); candidate owner `flywheel-enhancements` (TBD) or folded into flywheel-global.
+
+**FW-3: resolved/blocked exclusion branches lack their own ACs.** The AC Coverage Matrix was finalized before `phase_final_amend_1` added the resolved-exclusion + blocked-exclusion rules; only AC-7 (rejection) has a covering AC. flywheel-global must inherit these exclusion rules (infinite re-proposal is at least as problematic globally) — add explicit ACs + smoke scenarios for the resolved/blocked branches in the flywheel-global spec (the agent notes these belong there, not retrofitted here). **Deps:** flywheel-repo (merged); resolution point = flywheel-global spec brainstorm.
+
+**Captured:** 2026-06-09

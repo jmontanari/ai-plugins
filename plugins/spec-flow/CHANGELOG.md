@@ -4,6 +4,20 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.8.0] — 2026-06-09
+
+### Added
+- **`reference/flywheel.md` (repo self-hardening flywheel SSOT, FR-006):** the `docs/patterns.yaml` registry
+  schema, stable kebab-slug IDs, per-(pattern,piece) count rule, match/confirm flow (no silent write), source
+  taxonomy (`reflection-finding`/`execute-discovery` wired; `metric` reserved), `flywheel_threshold` semantics,
+  the hardening dispatch (reuses `spike` scope mode → existing Step 6c `plan-amend` path), and the
+  `[FLYWHEEL-DEGRADED: repo registry unavailable]` marker.
+- **execute Step 6c flywheel recording hook + Step 4.5 batched hardening proposal:** recurring findings are
+  recorded against `docs/patterns.yaml` (operator-confirmed, no silent write); at `flywheel_threshold` a single
+  batched proposal at end-of-piece reflection routes an approved pattern through a `scope` spike + the existing
+  reflection-amend path; rejections are recorded and not re-proposed; non-blocking degraded path.
+- **`flywheel_threshold` `.spec-flow.yaml` key (default 2):** added to the live config + `pipeline-config.yaml`.
+
 ## [5.7.0] — 2026-06-07
 
 ### Added

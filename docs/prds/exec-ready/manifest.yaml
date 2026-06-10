@@ -124,8 +124,9 @@ pieces:
       docs/patterns.yaml is unwritable. Establishes the registry + match + count mechanics
       reused by flywheel-global. Covers FR-006.
     prd_sections: [FR-006, G-5]
-    dependencies: [sonnet-coord]
-    status: open
+    dependencies: [sonnet-coord, spike-agent]
+    status: merged
+    merged_at: 2026-06-09
 
   - name: flywheel-global
     slug: flywheel-global
