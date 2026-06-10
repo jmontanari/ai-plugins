@@ -13,6 +13,40 @@ description: >-
   about how something should work, use the spec skill instead.
 ---
 
+## Pre-flight: Model Check
+
+Before any other step, verify the active model is an Opus-class model.
+
+Determine the active model using the platform-appropriate method:
+
+- **Copilot CLI** — read the `<model_information>` system tag injected into this session's context. The model name and ID are present there explicitly.
+- **Claude Code** — no equivalent tag is injected. Use Claude's self-knowledge: introspect your own model identity (Claude reliably knows which model variant it is from training) and treat that as the model name for the check below.
+
+If the active model name does **not** contain `opus` (case-insensitive):
+
+1. Use `ask_user` to block and prompt the user:
+
+   > ⚠️ **Model mismatch.** PRD authoring is thinking work per NN-P-005, but the active model appears to be **[model-name]**.
+
+   Choices:
+   - "Override — proceed on [model-name]"
+   - "Change now — I'll switch models"
+   - "Cancel prd"
+
+2. If the user selects **"Cancel prd"** → stop immediately and emit:
+   `PRD cancelled. Re-run after switching to an Opus model.`
+
+3. If the user selects **"Override — proceed on [model-name]"** → proceed to Step 0 immediately on the current model. Emit a one-line acknowledgment first:
+   `Overriding model check — proceeding on [model-name]. PRD quality may be reduced.`
+
+4. If the user selects **"Change now — I'll switch models"** → **close the prompt and return control to the user.** The model cannot be switched while an `ask_user` prompt is blocking, and there is no programmatic model-change event to listen for — so leave the dialog and wait for the user to signal. Emit:
+   `Switch to an Opus model now. When ready, type "proceed" to resume, or "cancel" to stop.`
+   Then wait for the user's free-text reply:
+   - On `proceed` (or any "I've switched / continue" phrasing) → re-run this model check (re-introspect your model identity on Claude Code, or re-read the `<model_information>` tag on Copilot CLI). If the model now contains `opus`, proceed to Step 0. If it still does not, re-present the three choices above.
+   - On `cancel` → stop and emit the cancellation line from step 2.
+
+If the model already contains `opus` → proceed to Step 0 immediately with no prompt.
+
 # PRD — Import, Create, Normalize, Decompose
 
 Import an existing PRD or build one from scratch via structured interview, normalize it into the pipeline format, decompose it into implementable pieces, and create the tracking manifest.
@@ -133,6 +167,58 @@ Before brainstorm, validate each FR meets all three criteria:
 3. **Metric-linked** — Either references a SC-xxx success criterion OR is explicitly marked as a constraint (not a measurable feature).
 
 FRs that fail any criterion are flagged inline as `[NEEDS EXPANSION: <reason>]`. These markers block the brainstorm step — the user must resolve or explicitly waive each flagged FR before proceeding. Lifecycle is identical to `[NEEDS CLARIFICATION]` in the spec skill: present all flagged FRs in a single list, ask the user to address or waive each one, then clear the markers before writing.
+
+**[Deliberation protocol]** *(runs after Step 3 FR quality floor check, before Step 4 Brainstorm)*:
+
+Depth levels and per-skill defaults are defined in `reference/deliberation-depth.md` (full / lite / off profiles, operator override contract). The artifact structure, VOQ-N IDs, marker contract, and STATUS line are defined in `reference/deliberation-artifact.md` — cite both; do not restate.
+
+The decision unit for this skill is the **candidate piece / decomposition boundary** (not an FR). Each cluster in Phase A represents a candidate piece or natural boundary grouping; Phase B viability agents assess each candidate piece independently.
+
+0. **Resolve depth:** read `.spec-flow.yaml` `deliberation.depth`; apply any operator override; else use per-skill default (`full` for prd). On `depth=off` → emit `[DELIBERATION-SKIPPED: depth=off]`, run Step 4 Brainstorm from the top, STOP here.
+
+1. **Dispatch Phase A** (`agents/deliberation-coordinator.md`): inject PRD sections, the normalized PRD draft (with FR/NFR/User Stories populated from Steps 1–3), charter constraints.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-A-blocked]`, fall back to Step 4 Brainstorm.
+
+2. **Consume decision-unit clusters from Phase A:** take the identified candidate-piece clusters returned in Phase A's investigation seed (the coordinator already derived them from the PRD). At `lite` depth, collapse them to one whole-PRD cluster regardless of what Phase A returned.
+
+3. **Dispatch Phase B in parallel, one `agents/deliberation-viability.md` agent per cluster**: inject Phase A investigation seed + per-cluster candidate-piece assignment + charter constraints. Each agent enumerates reuse/extend-existing paths from any available research context, not only greenfield.
+   **Barrier:** wait for all Phase B agents to complete.
+   On any Phase B `STATUS: BLOCKED` → log the blocked cluster; proceed with remaining cluster outputs (non-fatal partial).
+
+4. **Dispatch Phase C** (`agents/deliberation-synthesis.md`): inject all Phase B per-cluster findings.
+   **Skip when ≤1 cluster** — single-cluster output is already integrated.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-C-blocked]`, fall back to Step 4 Brainstorm.
+
+5. **Dispatch Phase D in parallel, exactly five lens agents** (`agents/deliberation-lens.md` dispatched 5×): inject Phase C recommendation + one lens label per agent. Full depth lens labels (one agent per label):
+   - `architecture-integrity` — structural / layering / dependency-direction review
+   - `scope/simplicity` — YAGNI / over-engineering / unnecessary abstraction review
+   - `user-intent` — does the recommendation serve the operator's stated goal?
+   - `backward-compat` — breaking-change / migration / rollback impact review
+   - `risk` — failure modes, hidden assumptions, external-dependency exposure review
+   At `lite` depth use the configured subset (default: `scope/simplicity` + `risk`). Depth profile and per-lens label list are defined in `reference/deliberation-depth.md`.
+   **Barrier:** wait for all dispatched Phase D agents.
+   On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
+
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in §Investigation Summary.
+   On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to Step 4 Brainstorm.
+   On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back to Step 4 Brainstorm.
+   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back to Step 4 Brainstorm.
+
+7. **First Step 4 message:** present Investigation Summary + Recommendation + "I have N validated questions for you." Draw questions from §Validated Open Questions in order.
+
+8. **Questions:** each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation §Decomposition Check: …").
+
+On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run Step 4 Brainstorm as written (today's behavior — interactive sub-steps 4a–4l in order, no deliberation pre-seed).
+
+<!-- Example: a PRD with FRs decomposing into 3 candidate pieces {ingestion-pipeline, api-layer, ui-dashboard} clustered into 2 clusters {data (ingestion-pipeline), surface (api-layer, ui-dashboard)}. Decision unit = candidate piece. full depth.
+Phase A coordinator reads PRD+charter, produces candidate-piece clusters.
+Phase B: 2 viability agents (one per cluster) in parallel → barrier.
+Phase C synthesis runs (2 clusters ≥2 → not skipped) → integrated recommendation on piece boundaries.
+Phase D: 5 lens agents in parallel → barrier.
+Phase E: folds contested boundaries into VOQ-1, writes deliberation.md, records depth=full.
+First Step 4 message: Investigation Summary + Recommendation + "I have 1 validated question (VOQ-1)."
+Single-cluster counter-example: a 1-piece PRD → 1 viability agent, Phase C SKIPPED (≤1 cluster). -->
 
 **Step 4: Brainstorm**
 
