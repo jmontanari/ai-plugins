@@ -140,14 +140,14 @@ None in scope. The spec's `## Integration Coverage` entries (the 5-agent protoco
 Why serial: disjoint from Phase 1's file but must land before any agent/skill cites depth; kept serial to preserve per-phase Opus QA on the new contract + config surface.
 **Exit Gate:** `reference/deliberation-depth.md` defines the `full`/`lite`/`off` profiles, the per-skill defaults (full for spec/prd/charter, lite for small-change), the `lite` lens subset (default scope/simplicity + risk) and the optional `.spec-flow.yaml deliberation.lenses` override, the resolution order (operator override → config → per-skill default), the `[DELIBERATION-SKIPPED: depth=off]` off-path, and the depth-independent ≤1-cluster Phase-C-no-op rule; `.spec-flow.yaml` carries an additive, commented `deliberation:` template block so the key is documented but absent-by-default (per-skill default applies → NN-C-003).
 **ACs Covered:** AC-19 (depth profiles + per-skill defaults + `off` SKIPPED marker definition)
-**In scope:** CREATE `plugins/spec-flow/reference/deliberation-depth.md`; MODIFY `.spec-flow.yaml` (add commented `deliberation:` template block).
+**In scope:** CREATE `plugins/spec-flow/reference/deliberation-depth.md`; MODIFY `plugins/spec-flow/templates/pipeline-config.yaml` (add commented `deliberation:` template block). NOTE (execute correction): `.spec-flow.yaml` is gitignored (`.gitignore:15`) — a per-developer local copy generated from the tracked template `pipeline-config.yaml`; the committable edit target is the template, not the local copy.
 **NOT in scope:** the small-change skill resolving its lite default (Phase 10); each skill's `step 0` depth read (Phases 7–10 wire it, citing this doc); the artifact/marker schema (Phase 1).
 **Charter constraints honored in this phase:**
 - NN-C-003 (backward compat): the `deliberation.depth`/`deliberation.lenses` keys are optional; absent → per-skill default; `off` → current brainstorm. The `.spec-flow.yaml` addition is a comment block (parseable, inert).
 - NN-C-002 (no runtime deps): markdown + YAML comment only.
 - CR-009 (heading hierarchy): H2/H3 structure consistent with `reference/research-artifact.md`.
 
-- [ ] **[Implement]** Author the depth-policy doc + config template
+- [x] **[Implement]** Author the depth-policy doc + config template
   - Architecture constraints: cite `reference/deliberation-artifact.md` for the Phase-C-no-op rule's interaction with the artifact's §Integration Check; do not restate the artifact schema.
 
   **Change Specifications:**
@@ -165,7 +165,7 @@ Why serial: disjoint from Phase 1's file but must land before any agent/skill ci
   - Done: all profiles/defaults/lens-subset/resolution-order/no-op-rule/off-path/see-also present; SKIPPED marker contract present; repo-root-relative refs.
   - Verify: `grep -nE "^## (Depth profiles|Per-skill defaults|Lens subset|Resolution order|Phase C no-op rule|off path|See also)" plugins/spec-flow/reference/deliberation-depth.md` returns 7 matches.
 
-  **T-2: MODIFY `.spec-flow.yaml`** (worktree root)
+  **T-2: MODIFY `plugins/spec-flow/templates/pipeline-config.yaml`** (the tracked template; `.spec-flow.yaml` is gitignored and generated from it)
   - Anchor: append after the existing `integrations:` commented block (end of file).
   - TARGET: add an additive, commented template block documenting the optional key, so absence → per-skill default (backward-compatible). Content:
     ```yaml
@@ -183,7 +183,7 @@ Why serial: disjoint from Phase 1's file but must land before any agent/skill ci
   - Done: the commented block is appended; the live config is unchanged (no active key added → existing behavior preserved); file still valid YAML.
   - Verify: `grep -n "deliberation.depth\|deliberation:" .spec-flow.yaml` returns the documented (commented) key.
 
-- [ ] **[Verify]** Confirm depth contract + config template
+- [x] **[Verify]** Confirm depth contract + config template
   **Per-change checks:**
   - T-1: `grep -n "DELIBERATION-SKIPPED" plugins/spec-flow/reference/deliberation-depth.md` — Expected: ≥1 match (satisfies AC-19's off-path marker grep).
   - T-1: `grep -c "full\|lite\|off" plugins/spec-flow/reference/deliberation-depth.md` — Expected: ≥3 (all three profiles named).
@@ -193,7 +193,7 @@ Why serial: disjoint from Phase 1's file but must land before any agent/skill ci
   - Expected: all present.
   - Failure: a default mislabeled, the lens subset wrong, or resolution order missing.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-19, NN-C-003
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
