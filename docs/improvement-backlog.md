@@ -299,14 +299,14 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 - Cumulative diff: 20 files, 817 insertions(+), 4 deletions(-).
 - Refactor skips: 4/4 (100% auto-skipped; correct).
 
-### [Deferred via /spec-flow:defer] Agent dispatches carry no worktree-path contract — false review verdicts — 2026-06-10
+### [RESOLVED 2026-06-10 — spec-flow 5.12.0, commit 7a6b924] Agent dispatches carry no worktree-path contract — false review verdicts — 2026-06-10
 
 **Source:** `external/devops` phase `field-report` (agent: `operator`) — 2026-06-10 cross-repo sweep, source-verified against plugins/spec-flow @ 5.8.0
 **Finding (verbatim):** BUG (HIGH): No agent template (implementer, verify, qa-phase, review-board-*) and no execute/review-board dispatch site requires an explicit `WORKTREE: <abs-path>` preamble; agents infer paths from the plan and may resolve reads against the MAIN repo. Field impact: devops logged 2 incidents — verify false-FAILed a clean phase (os-common-collection, 2026-05-01) and security+architecture board reviewers produced a false FAIL + misleading PASS by reading main-repo files during focused re-review (jenkins-collection, 2026-05-28). False gate verdicts are the worst failure class for a review system. FIX: add a dispatch-preamble rule to `reference/coordinator-contract.md` — every agent prompt begins with `WORKTREE: <absolute-path>` plus "resolve every read/write from this root"; wire it into all execute + review-board dispatch sites; add the field to each agent's input contract with a `[WORKTREE-ABSENT]` marker escalation when missing. Suggested home: "dispatch-integrity" small-change.
 **Why this does not block exec-ready's goals:** No active piece in this repo is affected; plugin-level defect filed from the cross-repo sweep for scheduled pickup (operator-directed batch).
 **Captured:** 2026-06-10
 
-### [Deferred via /spec-flow:defer] manifest.yaml ownership is implicit — agent wrote status:merged mid-execute — 2026-06-10
+### [RESOLVED 2026-06-10 — spec-flow 5.12.0, commit 7a6b924] manifest.yaml ownership is implicit — agent wrote status:merged mid-execute — 2026-06-10
 
 **Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-23, verified vs 5.8.0
 **Finding (verbatim):** BUG (HIGH): implementer.agent.md:44 has only generic "do not modify files outside phase scope"; no agent contract names manifest.yaml as orchestrator-owned, and no lint/hook-sweep checks for it. Field impact: prop_firm commit 0640a06 set `status: merged` during a [QA] step, before Final Review — manual revert required; premature piece closure was possible. FIX: (a) explicit "manifest.yaml is orchestrator-owned; agents MUST NOT modify it" line in implementer/tdd-red/fix-code/refactor input contracts and a manifest-ownership row in coordinator-contract.md; (b) Step 6b hook sweep (or coherence linter) flags any agent-produced diff touching manifest.yaml as a blocking violation. Suggested home: "dispatch-integrity" small-change.
@@ -334,14 +334,14 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **Why this does not block exec-ready's goals:** Pre-flight gap surfaced downstream; exec-guardrails is open and unstarted, so the fold-in costs nothing now.
 **Captured:** 2026-06-10
 
-### [Deferred via /spec-flow:defer] Step 5.5 re-run after failed merge is advisory prose, not a Step 6 precondition — 2026-06-10
+### [RESOLVED 2026-06-10 — spec-flow 5.12.0, commit 7a6b924] Step 5.5 re-run after failed merge is advisory prose, not a Step 6 precondition — 2026-06-10
 
 **Source:** `external/devops` phase `field-report` (agent: `operator`) — PR #223 stranded manifest commit; verified vs 5.8.0
 **Finding (verbatim):** BUG (MEDIUM): execute SKILL.md:1898–1920 orders Step 5.5 (manifest `status: merged` commit) before Step 6, but the re-run-5.5-before-retry rule lives nested in the Failure-path prose; a retried Step 6 (or an operator pushing after a revert) can merge without the manifest commit on the branch. Field impact: devops PR #223 merged with `status: in-progress`; the merged-status commit landed after the PR merge, orphaned on the piece branch. FIX: make "HEAD contains the Step 5.5 manifest commit" an explicit, checked precondition of Step 6 (both merge strategies and every retry path), and add it to the push-ready/PR-open checklist line emitted to the operator. Suggested home: "dispatch-integrity" small-change.
 **Why this does not block exec-ready's goals:** Ordering-robustness gap; current pieces here merge via the standard path that usually satisfies it.
 **Captured:** 2026-06-10
 
-### [Deferred via /spec-flow:defer] Implementer output truncation on long verify gates is undetectable — 2026-06-10
+### [RESOLVED 2026-06-10 — spec-flow 5.12.0, commit 7a6b924] Implementer output truncation on long verify gates is undetectable — 2026-06-10
 
 **Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-16; verified vs 5.8.0
 **Finding (verbatim):** BUG (MEDIUM): implementer.agent.md and execute Step 3 (:533–591) have no heartbeat marker, truncation detection, or resume protocol around long-running gate commands (~8-min mypy/test runs). Field impact: 2 implementer dispatches truncated mid-gate; the orchestrator manually staged+committed, silently bypassing the implementer's self-review checklist. FIX: implementer stages work and emits a `READY-TO-COMMIT` marker (self-review complete) BEFORE invoking long gates; the orchestrator treats truncated output lacking the marker as a resumable failure and re-dispatches with prior context — manual-commit bypass is prohibited. Suggested home: "dispatch-integrity" small-change.
