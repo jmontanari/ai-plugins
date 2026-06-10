@@ -539,7 +539,7 @@ Why serial: clones Phase 7's dispatch pattern into a disjoint file; must follow 
 - NN-C-003 (backward compat): UNAVAILABLE/off fall back to today's Step-4 brainstorm; silent pre-flight when Opus.
 - NN-C-008 (self-contained dispatch); CR-008 (thin orchestrator).
 
-- [ ] **[Implement]** Wire the prd Opus pre-flight + deliberation block (full depth)
+- [x] **[Implement]** Wire the prd Opus pre-flight + deliberation block (full depth)
   - Architecture constraints: clone Phase 7's pre-flight (invert to "PRD authoring is thinking work per NN-P-005"; Cancel label "Cancel prd") and the deliberation orchestration block (steps 0–8), citing `reference/deliberation-artifact.md` + `reference/deliberation-depth.md`. Decision unit = candidate piece.
 
   **Change Specifications:**
@@ -552,7 +552,7 @@ Why serial: clones Phase 7's dispatch pattern into a disjoint file; must follow 
   - TARGET: insert a `**[Deliberation protocol]**` block (full depth; decision unit = candidate piece) transcribing steps 0–8 as in Phase 7 T-2 (depth resolution; Phase A→B[barrier]→C[skip ≤1 cluster]→D[5 lenses, barrier]→E; 5-fatal/2-non-fatal handling; commit; first Step-4 message = Investigation Summary; questions VOQ-cited). Include the literal phase tokens + `barrier`. Add a one-line worked example noting decision-unit = candidate piece.
   - Done: the block present before Step 4 with full-depth orchestration + the candidate-piece decision-unit framing + worked example.
 
-- [ ] **[Verify]** Confirm the prd wiring
+- [x] **[Verify]** Confirm the prd wiring
   **Per-change checks:**
   - T-1: `grep -c "Override\|Change now\|Cancel" plugins/spec-flow/skills/prd/SKILL.md` — Expected: ≥3; `grep -n -i "opus" plugins/spec-flow/skills/prd/SKILL.md` — Expected: pre-flight block present (AC-24).
   - T-2: `grep -n "deliberation-coordinator" plugins/spec-flow/skills/prd/SKILL.md` — Expected: ≥1 (AC-9).
@@ -561,7 +561,7 @@ Why serial: clones Phase 7's dispatch pattern into a disjoint file; must follow 
   - Run: LLM-agent-step — read the prd deliberation block; confirm full-depth orchestration with the candidate-piece decision unit, the dispatch order + barriers, the fallback handling, and that the first Step-4 message is the Investigation Summary; confirm the Opus pre-flight semantics.
   - Expected: all true. Failure: missing dispatch, wrong decision-unit, or hard-refusing pre-flight.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-9, AC-24
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
