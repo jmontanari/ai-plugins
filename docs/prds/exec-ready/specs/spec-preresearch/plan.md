@@ -15,7 +15,7 @@ fast: false
 
 **Spec:** docs/prds/exec-ready/specs/spec-preresearch/spec.md
 **Charter:** .claude/skills/charter-*/SKILL.md (binding — each phase enumerates its honored NN-C/NN-P/CR entries)
-**Status:** draft
+**Status:** final-review-pending
 
 ## Overview
 
