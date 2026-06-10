@@ -724,7 +724,7 @@ Why serial: depends on the final AC set being stable (cross-references AC-1…AC
 - NN-C-002 (no runtime deps): markdown + YAML edits.
 - CR-009 (heading hierarchy): the FR section format matches FR-008 (introspection.md §14 Pattern Catalog).
 
-- [ ] **[Implement]** Write FR-009, extend NN-P-005 Scope, update manifest coverage
+- [x] **[Implement]** Write FR-009, extend NN-P-005 Scope, update manifest coverage
   - Architecture constraints: the FR-009 section format clones FR-008 (introspection.md §14(a), lines 945–963); the Statement transcribes spec.md §"FR-009 content to write into prd.md" (lines 372–378); the AC list cross-references AC-1…AC-24 (incl. AC-10b).
 
   **Change Specifications:**
@@ -748,7 +748,7 @@ Why serial: depends on the final AC set being stable (cross-references AC-1…AC
   - Done: the coverage counts include FR-009; the note names the covering piece; the piece-status line is untouched.
   - Verify: phase `[Verify]` greps prd FR-009 + Scope + manifest coverage.
 
-- [ ] **[Verify]** Confirm the PRD authorship
+- [x] **[Verify]** Confirm the PRD authorship
   **Per-change checks:**
   - T-1: `grep -n "### FR-009" docs/prds/exec-ready/prd.md` — Expected: the FR-009 heading (AC-14).
   - T-2: `grep -n "Scope:.*FR-009" docs/prds/exec-ready/prd.md` — Expected: the NN-P-005 Scope line contains FR-009 (**blocking** — AC-14).
@@ -758,7 +758,7 @@ Why serial: depends on the final AC set being stable (cross-references AC-1…AC
   - Run: LLM-agent-step — read the FR-009 section; confirm the Statement covers BOTH tiers + the Opus pre-flight, Priority is P0, US-009 is present, the AC line cross-references AC-1…AC-24 (incl. AC-10b), and the priority table carries an FR-009 row; confirm NN-P-005 Scope now includes FR-009 and its Statement is unchanged.
   - Expected: all true. Failure: a one-tier Statement, a missing US-009, or an unchanged Scope line.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-14
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
