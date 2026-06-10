@@ -1,7 +1,7 @@
 ---
 slug: exec-ready
 status: drafting
-version: 3
+version: 4
 ---
 
 # Product Requirements Document — Execution-Ready Plans
@@ -323,6 +323,48 @@ version: 3
 
 **Failure mode:** Refresh pass finds a malformed registry → emits `[FLYWHEEL-DEGRADED: lifecycle unavailable]`, proposes nothing, and leaves the file untouched; recording continues per FR-006.
 
+---
+
+### FR-016: Pipeline economics — TDD-lean track, conditional board slots, depth defaults
+**Statement:** The pipeline's per-phase and per-gate cost is cut where a cheaper mechanism provides equal or stronger assurance — never by removing a gate's consequence. Three levers. **(a) TDD-lean:** with FR-003 the oracle lives in the plan, so `tdd-red` is transcription, not design — `qa-tdd-red` becomes a deterministic conformance check (do the authored assertions match the phase's Test Data block?) with the LLM dispatch reserved for `[SPIKE]`-fallback phases and detected deviations; once FR-011's hash gate is active, Red and Build run as a single dispatch per phase (transcribe → confirm red → stage + hash → implement → confirm green) with the orchestrator verifying the hash manifest at phase exit — the integrity wall is the mechanical gate, not agent separation; phases whose ACs are all machine-checkable default to direct-verify (run the named commands) instead of a verify-agent dispatch. **(b) Conditional board slots:** specialist reviewers activate on diff signals (security ↔ input/auth/crypto/scripts touched; integration ↔ boundary changes; ground-truth ↔ computational components) over a documented always-on core; any seat removal or model downgrade must cite FR-017 catch-rate and ablation evidence. **(c) Deliberation depth defaults:** `lite` is the default unless the piece is new-surface (criteria documented); `full` requires SC-001 justification. Expected effect: a well-planned TDD phase drops from ~6 dispatches to 2–3; most pieces run 2–4 fewer Opus board seats.
+**Priority:** P1
+**Linked metrics:** SC-005, SC-002
+**Research basis:** [R16] lens diversity has diminishing returns (+14.9pp → +11.2pp by reviewer 4) and 8–9 same-model seats are past the knee; [R15] same-family judges share correlated blind spots that persona prompts cannot fix; [R6] multi-agent token cost is ~15× and only justified where value follows; [R2] the integrity wall for Red/Build merging is the mechanical hash gate (FR-011), which is exactly the tests-as-immutable-inputs mitigation.
+
+#### User Stories
+**US-016** — As a pipeline operator who likes the adversarial gates but pays for them, I want the ceremony priced to the risk — deterministic checks where the oracle is already planned, specialist reviewers only when their specialty is in the diff — so cost drops while catch-rate (measured, per FR-017) does not.
+
+**Acceptance Criteria:**
+- [ ] A TDD phase with a complete `Test Data` block runs a deterministic Red-conformance check instead of the `qa-tdd-red` LLM dispatch; the LLM dispatch fires only for `[SPIKE]`-resolved phases or when the conformance check detects deviation from the planned oracle.
+- [ ] After FR-011 ships, the TDD track offers a combined Red+Build dispatch (one agent: transcribe tests → confirm red → stage + hash → implement → confirm green), with the orchestrator independently verifying the hash manifest at phase exit; verify/QA remain separate contexts. Configurable; the split track remains available.
+- [ ] A phase whose ACs are all machine-checkable (FR-012 tags) defaults to direct-verify — the orchestrator runs the named verify commands — with the verify-agent dispatch reserved for judgment-bearing phases.
+- [ ] Board composition is signal-conditional over a documented always-on core; every seat removal, conditionalization, or model-tier downgrade cites FR-017 fixture catch-rates and the verdict-overlap/leave-one-out ablation (no composition change on intuition).
+- [ ] Deliberation depth defaults to `lite` except for documented new-surface criteria; the per-piece depth decision and its dispatch-count consequence are recorded in the FR-010 metrics artifact.
+- [ ] Per-phase dispatch counts before/after are visible in metrics so the savings claim (SC-005) is measured, not asserted.
+
+**Failure mode:** The deterministic conformance check cannot parse or match the Test Data block → it falls back to the full `qa-tdd-red` LLM dispatch and emits `[CONFORMANCE-FALLBACK: <reason>]`; cost optimization never silently skips the check.
+
+---
+
+### FR-017: Gate-efficacy evals and cheater track
+**Statement:** Every merge-blocking gate gets a measured catch rate. A committed fixture corpus (~60–80 to start) covers the three gate classes: defective + known-clean specs/plans for `qa-spec`/`qa-plan` (missing AC, contradictory requirements, untestable AC, silent scope drop), planted-defect + clean phase diffs for per-phase QA (logic inversion, boundary error, missing error path, dead AC, assertion-free test), and whole-piece fixtures with one defect each mapped to the board seat that should own it (per-reviewer recall). Metrics per gate: catch rate, clean-fixture flag rate (the false-positive control), verdict-flip rate across 3 runs, and severity-assignment accuracy. Judge prompts and rubrics are version-frozen: any edit to a QA agent's prompt or rubric triggers a gold-set re-run before release. A **cheater track** red-teams the FR-011 guardrails SHADE-Arena-style: ≥10 scripted cheat scenarios from the observed taxonomy (edit assertions, delete/skip failing tests, hardcode outputs including inside except-handlers, stub the function under test, weaken tolerances, claim an AC done with no diff) plus ≥5 legitimate test-refactor fixtures the gate must allow; any scenario under 100% detection is a guardrail bug and stays as a permanent regression; the cheat set refreshes when the executor model changes. Fixtures are living: every escaped defect adds 2–3 fixtures; saturated fixtures retire to a regression tier.
+**Priority:** P1
+**Linked metrics:** SC-009
+**Research basis:** [R17] judges flip on meaning-preserving perturbations and degrade up to 27.9% from benign rubric edits — calibrate and freeze; [R19] seeded-defect review benchmarks (real-bug tracing, injection into clean PRs, mutation-score analogs) are the established construction patterns, with uncalibrated reviewers spanning 6%–82% catch rates; [R18] SHADE-Arena/METR provide the cheater-vs-monitor template, and monitors top out below reliability (AUC 0.87) — so guardrail gaps must be found by red-team, not assumed; [R20] Anthropic eval doctrine: 20–50 tasks drawn from real failures, deterministic graders where possible, kappa over accuracy.
+
+#### User Stories
+**US-017** — As the plugin maintainer, I want each gate's precision and recall measured against planted defects and clean fixtures, so I know which reviewers earn their seats, which findings to trust, and whether the anti-cheat gates actually stop a corner-cutting executor.
+
+**Acceptance Criteria:**
+- [ ] A fixture corpus with a labeled defect taxonomy (class, severity, owning gate/seat) and known-clean controls is committed under the plugin test tree; initial size 60–80 across the three gate classes.
+- [ ] An eval run reports, per gate: catch rate on planted defects, flag rate on clean fixtures, verdict-flip rate over 3 repeated runs, and severity-assignment accuracy; board fixtures additionally report per-seat unique-catch (which seat found what no other seat found).
+- [ ] QA agent prompts/rubrics carry a version; any prompt or rubric change requires a gold-set re-run before the plugin version ships (enforced as a release-process check).
+- [ ] The cheater track runs ≥10 cheat scenarios against the FR-011 guardrails plus ≥5 legitimate test-refactor fixtures; results report detection rate per scenario and false-rejection rate on the legitimate set; sub-100% scenarios are filed as guardrail bugs and retained as regressions.
+- [ ] Escaped defects (post-merge bugs traced to a gate miss) feed back as new fixtures; saturated fixtures (3 consecutive full-catch runs) move to a regression tier.
+- [ ] FR-016 board-composition changes reference these measurements (the consuming contract).
+
+**Failure mode:** The eval suite cannot run in the current environment (capability absent) → per-stage `SKIPPED: <capability>` reporting, never a false green; mirrors FR-013's contract.
+
 ## Non-Functional Requirements
 
 ### NFR-001: Research and spike agents are context-isolated
@@ -372,6 +414,12 @@ version: 3
 | Artifact exceeds its size budget | `qa-spec`/`qa-plan` must-fix with split/condense guidance; irreducible overage routes to piece-splitting | FR-014 |
 | Hardened pattern recurs after its fix landed | Re-opened `active` with `ineffective-hardening` flag at next batched review | FR-015 |
 | Pattern stale past the window | Refresh proposes archival; operator-gated; archived entries stay in-file for audit | FR-015 |
+| Red-conformance check can't parse the Test Data block | `[CONFORMANCE-FALLBACK]` → full qa-tdd-red LLM dispatch; never silently skipped | FR-016 |
+| Diff signal for a conditional board seat is ambiguous | Seat runs (activation errs toward inclusion); the always-on core never deactivates | FR-016 |
+| QA agent prompt/rubric edited | Gold-set re-run required before the plugin version ships; rubric versions frozen otherwise | FR-017 |
+| Cheat scenario detected < 100% | Filed as a guardrail bug; scenario retained as a permanent regression | FR-017 |
+| Eval suite lacks a required capability | Per-stage `SKIPPED: <capability>`; never false green | FR-017 |
+| Executor model changes | Cheat-fixture set refreshed (stronger models cheat more subtly) | FR-017 |
 
 ## Success Metrics
 
@@ -383,6 +431,7 @@ version: 3
 - **SC-006:** Mid-execution changes that route through a scoping spike produce a complete plan amendment — measured: no second amendment targeting the same change within the same piece (the change was fully scoped on the first pass). — FR-008
 - **SC-007:** SC-001 through SC-006 are computable from on-disk artifacts for 100% of pieces executed after instrumentation ships; a single `/spec-flow:status` invocation renders them per PRD with no manual collection. — FR-010
 - **SC-008:** Median operator interactions per *clean* piece (zero must-fix at every gate) drop by ≥50% from the instrumented baseline once verifiability-scaled gates and artifact budgets ship — with the NN-P-001 keystroke preserved at every gate. — FR-012, FR-014
+- **SC-009:** 100% of merge-blocking gates have a published catch rate and clean-fixture flag rate; every board-composition or gate-mechanism change since FR-017 shipped cites fixture/ablation evidence; cheater-track detection is 100% across the scripted scenario set (sub-100% scenarios are open guardrail bugs). — FR-016, FR-017
 
 ## Priority Tiers
 
@@ -402,6 +451,8 @@ version: 3
 | FR-013 | Pipeline e2e smoke test | P1 | Regression insurance on 5K+ lines of orchestration prose; land before further execute surgery |
 | FR-014 | Artifact size budgets | P1 | The anti-bloat floor; binds spec-preresearch's deliberation.md before its plan is authored |
 | FR-015 | Flywheel pattern lifecycle | P1 | Expiry/outcome tracking keeps the registry high-signal; gates flywheel-global |
+| FR-016 | Pipeline economics | P1 | TDD-lean + conditional board + depth defaults; halves TDD phase dispatches; every cut evidence-gated |
+| FR-017 | Gate-efficacy evals + cheater track | P1 | Calibration prerequisite for any seat cut/downgrade; red-teams the FR-011 guardrails |
 | NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
 | NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
 | NFR-003 | Backward compat | P0 | NN-C-003 |
@@ -430,6 +481,10 @@ version: 3
 | Test-immutability response: reject-and-redispatch only, or superpowers-style delete-on-violation for code written before its failing test? | spec author (FR-011 piece) | open — lean: reject-and-redispatch (delete is a doctrine change) |
 | Default artifact size budgets per class (spec/plan/research/deliberation/learnings) — lines and token bounds? | spec author (FR-014 piece) | open — derive from the size distribution of the 5 merged exec-ready pieces |
 | Staleness window for pattern archival — N pieces, N days, or both? | spec author (FR-015 piece) | open |
+| Deterministic Red-conformance check form: structural assertion-vs-oracle diff, or string-level match? | spec author (FR-016 piece) | open |
+| Always-on board core — which 4 seats? | spec author (FR-016 piece) | open — decided by FR-017 ablation data, not upfront |
+| Cross-provider board seat (one GPT/Gemini reviewer): unique-catch value vs charter-tools/NN-P-005 implications | operator experiment via /spec-flow:review-board on 3–5 pieces, before any plugin change | open — evidence first ([R15][R16]) |
+| Cost reporting: embed a dated pricing table (drift risk) or report raw tokens by model only? | spec author (FR-010/metrics piece) | open — lean: tokens only, cost as flagged estimate |
 
 ## Research Basis — 2026-06-09 deep-dive audit
 
@@ -449,6 +504,16 @@ FR-010 through FR-015 derive from a full plugin audit (internals inventory, mani
 - **[R12]** Boris Cherny setup thread (x.com/bcherny, late 2025) + Anthropic long-running-harness post (2025-11-26) — plan-gate is the human leverage point; "give Claude a way to verify its work" ≈2–3× quality; deterministic startup ritual from on-disk state. Validates G-2/G-4; grounds FR-012's evidence digests.
 - **[R13]** OpenAI, "Run long-horizon tasks with Codex" (developers.openai.com) — per-milestone tests/lint/typecheck as the "external source of truth that stays accurate regardless of how long the session runs." Grounds FR-012's machine-checkable AC currency.
 - **[R14]** EvoSkills (arXiv:2604.01687) + Voyager (arXiv:2305.16291) — self-evolved skill libraries beat curated ones only with co-evolutionary verification; retained items must be re-verified in the loop. Grounds FR-015's outcome tracking.
+
+PRD v4 additions (second research pass, 2026-06-09 — judge calibration, telemetry, reviewer diversity):
+
+- **[R15]** "Correlated Errors in LLMs" (ICML 2025, arXiv:2506.07962) + "Great Models Think Alike" (arXiv:2502.04313) + self-preference studies (arXiv:2410.21819, arXiv:2508.06709) — same-family judges agree on the *same wrong answer* ~60% of the time; judge affinity bias is perplexity-driven (familiar text scores higher regardless of author), so an all-Opus board reviewing Claude-written code has a structural blind-spot class persona prompts cannot remove. Grounds FR-016(b) and the cross-provider experiment.
+- **[R16]** "Multi-Agent Code Verification via Information Theory" (arXiv:2511.16708) — inter-lens error correlation is genuinely low (ρ=0.05–0.25) but returns diminish monotonically (+14.9pp, +13.5pp, +11.2pp for reviewers 2–4); Milvus multi-model debate benchmark (2026-02) — Claude alone caught 53% and 0% of concurrency races, Claude+Gemini weaknesses "barely overlap." Lens diversity buys category coverage, not independence; 8–9 same-model seats are past the knee. Grounds FR-016(b).
+- **[R17]** Judge Reliability Harness (arXiv:2603.05399), Rubric-Induced Preference Drift (arXiv:2602.13576), adversarial persuasion of judges (arXiv:2508.07805) — judges flip on meaning-preserving perturbations; benign rubric edits degrade judge accuracy up to 27.9%; judges can be talked into inflated scores by text in the artifact under review. Grounds FR-017's perturbation fixtures and rubric-version freeze.
+- **[R18]** SHADE-Arena (Anthropic, arXiv:2506.15740) + NIST CAISI eval-cheating series — the saboteur-vs-monitor methodology; best monitors top out at AUC 0.87, so anti-cheat gaps must be found by scripted red-team, not assumed away. Grounds FR-017's cheater track.
+- **[R19]** Seeded-defect review benchmarks: Greptile real-bug tracing (commercial reviewer catch rates span 6%–82%), Qodo bug-injection-into-clean-PRs methodology (580 planted issues, precision/recall/F1), Meta ACH mutation testing (FSE 2025) — the three established corpus-construction patterns. Grounds FR-017's fixture design.
+- **[R20]** Anthropic, "Demystifying evals for AI agents" (2025) — 20–50 tasks drawn from real failures; deterministic code graders preferred over LLM graders; one rubric dimension per judge call; grade end state, not path; kappa over raw accuracy; watch for saturation. Grounds FR-017's metrics and refresh cadence.
+- **[R21]** Claude Code monitoring/costs docs + local transcript verification (2026-06-09) — Agent dispatch results carry `totalTokens`/`agentType`/duration; per-subagent transcripts carry per-message usage with unredacted plugin attribution; all POSIX-parseable. OTel exists but needs a collector and redacts third-party plugin names; Copilot CLI has no per-message usage surface (degrade to wall-clock + dispatch counts). Grounds the FR-010 metrics piece's layered capture design.
 
 ## Non-Negotiables (Product)
 

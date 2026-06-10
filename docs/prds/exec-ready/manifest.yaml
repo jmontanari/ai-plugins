@@ -166,6 +166,18 @@ pieces:
       a programmatic evaluator is the documented failure mode of self-improvement loops
       (PRD Research Basis R4, R6). Highest-priority new piece — baselines must exist before
       gate-scaling claims any oversight reduction.
+      SPEC-TIME INPUTS (v4, telemetry research R21): token capture is feasible bash-only via
+      a layered design — primary: the coordinator records totalTokens/agentType/duration from
+      each Agent dispatch result at stage boundaries; reconciliation: piece-end POSIX parse of
+      the session + subagents/*.jsonl transcripts (per-message usage, unredacted plugin
+      attribution). Report tokens by model+agent; dollars only as a flagged estimate (pricing
+      tables drift). Treat transcript schema as best-effort: probe fields, emit null on miss.
+      OTel documented as optional operator add-on only (collector = runtime dep; third-party
+      plugin names redacted). Copilot CLI host: degrade to wall-clock + dispatch counts +
+      tool/file stats, token fields marked unavailable. ALSO record per-reviewer finding IDs +
+      operator accept/reject at Final Review — this enables the FR-016/FR-017 verdict-overlap
+      and leave-one-out ablation, and surfaces rubber-stamp signals (fast approvals, zero
+      notes).
     prd_sections: [FR-010, SC-007, G-5, G-6]
     dependencies: [flywheel-repo]
     status: open
@@ -273,13 +285,63 @@ pieces:
     dependencies: [flywheel-repo]
     status: open
 
+  - name: gate-evals
+    slug: gate-evals
+    description: |
+      Gate-efficacy evals + cheater track. Committed fixture corpus (~60-80) across three
+      gate classes: defective + known-clean specs/plans (qa-spec/qa-plan), planted-defect +
+      clean phase diffs (per-phase QA), and whole-piece fixtures with one defect mapped to
+      the board seat that should own it (per-reviewer recall). Per-gate metrics: catch rate,
+      clean-fixture flag rate (FP control), verdict-flip rate over 3 runs, severity accuracy,
+      per-seat unique-catch. QA agent prompts/rubrics version-frozen — any edit triggers a
+      gold-set re-run before release. Cheater track red-teams the FR-011 guardrails
+      (SHADE-Arena pattern): >=10 scripted cheat scenarios (edit assertions, skip failing
+      tests, hardcode outputs incl. except-handlers, stub the function under test, weaken
+      tolerances, AC-done-with-no-diff) + >=5 legitimate test-refactor fixtures the gate must
+      allow; sub-100% detection = guardrail bug + permanent regression; cheat set refreshes
+      on executor model change. Escaped defects feed back as fixtures; saturated fixtures
+      retire to a regression tier. SKIPPED-per-capability, never false green. Covers FR-017.
+      WHY (v4 research): judges flip on perturbations and degrade up to 27.9% from benign
+      rubric edits (R17); uncalibrated reviewers span 6-82% catch rates (R19); monitors top
+      out at AUC 0.87 so gaps must be red-teamed (R18). This is the calibration prerequisite
+      for every FR-016 board cut and any future seat model-downgrade.
+    prd_sections: [FR-017, SC-009, G-6]
+    dependencies: [pipeline-e2e, metrics]
+    status: open
+
+  - name: pipeline-economics
+    slug: pipeline-economics
+    description: |
+      Pipeline economics — cost cuts with equal-or-stronger assurance, never gate removal.
+      (a) TDD-lean: qa-tdd-red becomes a deterministic Red-conformance check against the
+      phase's Test Data block (LLM dispatch only for [SPIKE] fallback or detected deviation;
+      [CONFORMANCE-FALLBACK] on parse failure — never silent skip); combined Red+Build single
+      dispatch once exec-guardrails' hash gate is the integrity wall (orchestrator verifies
+      the manifest at phase exit; verify/QA stay separate contexts; split track remains
+      available); direct-verify (run the named commands) for phases whose ACs are all
+      machine-checkable. (b) Conditional board slots over a documented always-on core
+      (security <-> input/auth/crypto/scripts; integration <-> boundary changes; ground-truth
+      <-> computational components); ambiguous signal errs toward inclusion; every seat
+      removal/downgrade cites gate-evals catch-rate + verdict-overlap/leave-one-out ablation.
+      (c) Deliberation depth defaults to lite except documented new-surface criteria; depth
+      decision + dispatch delta recorded in metrics. Expected: TDD phase ~6 -> 2-3 dispatches;
+      2-4 fewer Opus board seats on most pieces; measured via SC-005. Covers FR-016.
+      WHY (v4 research): 8-9 same-model seats are past the diminishing-returns knee
+      (+14.9pp -> +11.2pp by reviewer 4, R16); same-family correlated blind spots are
+      structural (R15); the oracle moved into the plan (FR-003) so Red is transcription and
+      the expensive anti-theater ritual can become deterministic. Deliberately sequenced
+      AFTER gate-evals: no cut without its catch-rate evidence.
+    prd_sections: [FR-016, SC-005, SC-002, G-3, G-6]
+    dependencies: [metrics, exec-guardrails, gate-evals]
+    status: open
+
 coverage:
-  total_prd_sections: 18
-  covered_sections: 18
+  total_prd_sections: 20
+  covered_sections: 20
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs (001-008, 010-015) and NFRs (001-004) covered across 14 pieces. FR-009 is
+    All FRs (001-008, 010-017) and NFRs (001-004) covered across 16 pieces. FR-009 is
     reserved — the spec-preresearch piece adds it to the PRD at merge. FR-008 (scoping spike
     for mid-execution changes) was added in PRD v2 and folded into the spike-agent piece
     alongside FR-005 — both share the agents/spike.md primitive. FR-008 amends NN-P-002.
@@ -289,30 +351,42 @@ coverage:
 
     PRD v3 (2026-06-09 deep-dive audit) added FR-010..FR-015 and six pieces: metrics,
     exec-guardrails, gate-scaling, pipeline-e2e, artifact-budgets, flywheel-refresh.
-    Evidence for each lives in prd.md ## Research Basis ([R1]..[R14]); companion design doc
-    docs/autonomous-loops-and-spec-flow.md.
+    PRD v4 (2026-06-09 second research pass: judge calibration, telemetry, reviewer
+    diversity) added FR-016/FR-017 and two pieces: pipeline-economics, gate-evals — the
+    cost-reduction track, with every cut evidence-gated. Evidence lives in prd.md
+    ## Research Basis ([R1]..[R21]); companion design doc
+    docs/autonomous-loops-and-spec-flow.md. A gates attention-queue (cross-lane decision
+    queue with evidence cards) was researched and deliberately NOT added — revisit after
+    gate-scaling ships if multi-lane operation still hurts.
 
-    ORDER OF OPERATIONS (v3, audit-derived — dependencies encode the hard edges; this note
-    records the intended sequencing rationale):
-      1. flywheel-repo — in flight (worktree at Final Review); merge first. Everything
-         flywheel- and metrics-shaped builds on its registry + Step 6c/4.5 wiring.
+    ORDER OF OPERATIONS (v4 — dependencies encode the hard edges; this note records the
+    sequencing rationale):
+      1. flywheel-repo — MERGED 2026-06-09.
       2. pipeline-e2e — land EARLY as regression insurance before any further surgery on
-         execute/SKILL.md (exec-guardrails, gate-scaling both modify it). No dependencies.
+         execute/SKILL.md (exec-guardrails, gate-scaling, pipeline-economics all modify it).
+         No dependencies. Its fixture infra is reused by gate-evals.
       3. artifact-budgets — land before/alongside spec-preresearch execution: it registers
          the deliberation.md size budget that binds Spec 2.0's plan. No dependencies.
-      4. spec-preresearch — already specced; plan + execute next. Its qa-plan gate inherits
-         the artifact-budgets constraint (FR-014 AC) once that piece merges; if sequenced
-         earlier, the plan must self-impose a deliberation.md budget and SC-001
-         before/after measurement (see prd.md FR-014/FR-010).
-      5. metrics — immediately after flywheel-repo merges (wires its `metric` source).
-         Establishes the SC baselines that gate-scaling's SC-008 claim is measured against.
-         Highest-priority NEW piece: measurement precedes optimization.
-      6. exec-guardrails — parallel-safe with metrics (different surface: Step 3/4 + budget
-         enforcement vs recording). Precondition for any unattended/loop-driven execute.
-      7. gate-scaling — after metrics (needs the interaction baseline); the
-         oversight-reduction centerpiece.
-      8. flywheel-refresh — after flywheel-repo has real entries; lifecycle on live data.
-      9. flywheel-global — LAST: after flywheel-refresh + metrics, and only once the repo
+      4. spec-preresearch — in progress (specced -> plan/execute). Its plan must carry a
+         deliberation.md budget and SC-001 before/after measurement (self-imposed until
+         artifact-budgets merges; see prd.md FR-014/FR-010).
+      5. metrics — NOW UNBLOCKED (flywheel-repo merged). Highest-priority new piece:
+         baselines before optimization; wires the flywheel `metric` source; records
+         per-reviewer finding provenance that gate-evals/pipeline-economics consume.
+      6. exec-guardrails — parallel-safe with metrics (different surface). Precondition for
+         unattended execute AND for pipeline-economics' combined Red+Build dispatch.
+      7. gate-scaling — after metrics (needs the SC-008 interaction baseline).
+      8. gate-evals — after pipeline-e2e (shared fixture infra) + metrics (finding
+         provenance). Calibrates every gate; runs the verdict-overlap ablation.
+      9. pipeline-economics — after gate-evals + exec-guardrails: the cost cuts land only
+         with catch-rate evidence behind each one. This is the answer to "TDD mode is heavy"
+         — TDD phases drop ~6 -> 2-3 dispatches.
+     10. flywheel-refresh — after flywheel-repo has real entries; lifecycle on live data.
+     11. flywheel-global — LAST: after flywheel-refresh + metrics, and only once the repo
          flywheel has produced at least one genuine threshold-triggered hardening.
-    Parallelization: 2+3 are independent of everything; 5+6 can run concurrently; 4 can
-    overlap 2/3/5/6 (different skills touched: spec/prd/charter vs execute).
+    Parallelization: 2+3 independent of everything; 5+6 concurrent; 4 overlaps 2/3/5/6;
+    8 can overlap 7; 10 can run any time after flywheel-repo data exists.
+    OPERATOR EXPERIMENT (no piece): run one cross-provider reviewer (GPT/Gemini) via
+    /spec-flow:review-board on 3-5 pieces; count unique valid findings vs the weakest Opus
+    lens before deciding on a cross-provider board seat ([R15][R16]; charter-tools and
+    NN-P-005 implications make this evidence-first).
