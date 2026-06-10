@@ -3,9 +3,10 @@
 Invocation order:
 1. Charter Context Loading Protocol — run first; outputs `charter_root`, `charter_snapshot`, `integration_cfg`
 2. Research pass — the spec skill creates the worktree and dispatches the research agent before any questions; on `STATUS: OK` its `## Codebase Conventions` section supplies conventions; emits `[RESEARCH-UNAVAILABLE: <reason>]` if the agent returns `STATUS: BLOCKED`, errors, or `research.md` is missing or zero-length
-3. L-10 Convention Context Scan — runs only on the `[RESEARCH-UNAVAILABLE]` path (fallback when research did not produce conventions)
-4. Charter Constraint Identification Protocol — its Conventions Block consumes `research.md`'s `## Codebase Conventions` on the OK path, or L-10's output on the `[RESEARCH-UNAVAILABLE]` path
-5. Remaining Core Brainstorm Building Blocks (C-2 always-run, C-3, Approach+Tradeoffs) — run during brainstorm session
+3. **Deliberation pass** — after the research commit (or the `[RESEARCH-UNAVAILABLE]` fallback), the calling skill dispatches the 5-phase deliberation protocol (Phase A coordinator → Phase B parallel per-cluster viability [barrier] → Phase C synthesis [skipped when ≤1 cluster] → Phase D parallel adversarial board [barrier] → Phase E convergence), commits `deliberation.md`, and emits `[DELIBERATION-UNAVAILABLE: <phase>-<reason>]` on any of the 5 fatal triggers (falling back to current brainstorm). Depth resolved per `reference/deliberation-depth.md`; on `off`, emit `[DELIBERATION-SKIPPED: depth=off]` and run the current brainstorm. See `reference/deliberation-artifact.md` for markers/return contract.
+4. L-10 Convention Context Scan — runs only on the `[RESEARCH-UNAVAILABLE]` path (fallback when research did not produce conventions)
+5. Charter Constraint Identification Protocol — its Conventions Block consumes `research.md`'s `## Codebase Conventions` on the OK path, or L-10's output on the `[RESEARCH-UNAVAILABLE]` path
+6. Remaining Core Brainstorm Building Blocks (C-2 always-run, C-3, Approach+Tradeoffs) — run during brainstorm session
 
 ## Charter Context Loading Protocol
 
@@ -64,6 +65,8 @@ Invocation order:
 ### C-2: Security Sub-Block (always-run)
 [shared] This is an always-run sub-block: never silently skip it, and treat its five prompts as additive — they run after coverage is established and do not count toward or affect the completion criteria for either track.
 
+**Amendment (v5.8.0, investigation-first):** a mandatory block (C-1, C-2, H-4 NFR sub-block, M-7 migration) MAY be auto-skipped ONLY when (a) deliberation explicitly concludes N/A for that dimension with reasoning logged in `deliberation.md` §Answered by Investigation AND (b) the calling skill surfaces the block name + N/A rationale to the user as a one-line note. Auto-skip is NOT silent skip — the user always sees the block name and rationale. When deliberation cannot conclude N/A, the block runs as **confirmation, not open discovery**: present deliberation's partial answer as a prefacing statement, then ask the confirmation question.
+
 Inference-first: based on the brainstorm discussion, assess what the work touches across the five dimensions below and state the security profile. For dimensions where the work clearly doesn't apply, state "N/A — [reason]" without asking. Ask only about dimensions where applicability is genuinely ambiguous from the brainstorm context. Close with a single question: "Does this security profile look right?" rather than asking each dimension individually.
 
 1. Trust boundaries — who calls this, from where, and with what trust level?
@@ -77,6 +80,24 @@ Inference-first: based on the brainstorm discussion, assess what the work touche
 
 ### Approach + Tradeoffs Confirmation
 [shared] Before broad design exploration, propose 2–3 lightweight approaches and ask the user to choose a design anchor. After the design is complete, revisit the full trade-offs, confirm the chosen approach still stands, and explicitly call out any PRD-untraced scope the chosen approach introduces.
+
+### Tier 2: Answer-Validation Loop [shared]
+Active whenever a `deliberation.md` exists (depth ≠ off / not UNAVAILABLE / not SKIPPED). When no `deliberation.md` exists, Tier 2 does not fire.
+
+1. After the operator answers a brainstorm question with **free-form input** (not selecting a presented option), **the calling skill itself** (the Opus authoring session, not a separate classifier agent) classifies the answer against `deliberation.md` §Viability Analysis path labels + §Answered by Investigation. **Decision rule:** it is a NEW ASSERTION when it names a design path/assumption/technology absent — verbatim or as a clear referent — from both. **Default bias toward NOT firing:** on an ambiguous match, treat as covered and do not fire (the cheaper miss is under-trigger).
+2. On a new assertion, auto-fire (no confirmation prompt) `deliberation-validate` (see `agents/deliberation-validate.md`), scoped to that single assertion. The agent is dispatched with the assertion + deliberation context injected (NN-C-008).
+3. Branch on the verdict: **CONFIRM** → fold with cited evidence; **FLAG-HARD** → charter/NN violation, operator MUST revise, **no override**; **FLAG-SOFT** → operator MAY override → record the rationale.
+4. Append `### Validation Round <n>` under `## Validation Rounds` in `deliberation.md` (cite `reference/deliberation-artifact.md` for schema); new conflicts become VOQ-tagged validated open questions feeding the brainstorm.
+5. The loop is **human-paced**: it continues until the operator introduces no new assertion and signs off; **no artificial round cap** (NN-P-001).
+
+<!-- Example: deliberation.md §Viability Analysis path labels = {"reuse research.md agent shape",
+"greenfield agent"}; §Answered by Investigation covers {security: N/A}. Operator answers a question
+with free-form "let's store deliberation.md in a Postgres table instead of the piece branch."
+"Postgres table" is in neither set → NEW ASSERTION → auto-fire deliberation-validate.
+Verdict = FLAG-HARD (violates NN-C-002 no-runtime-deps) → operator must revise, no override;
+append Validation Round 1 (assertion / FLAG-HARD / NN-C-002 evidence / resolution: revised to piece-branch file).
+Counter-example: operator answers "use the greenfield agent path" → matches a §Viability Analysis
+label → accepted, no validation fires. Ambiguous answer "the simpler one" → bias: accept, do not fire. -->
 
 ### Fallback Behavior
 - If the explore agent is unavailable for L-10, do a manual repo scan of 2–3 peer components with the normal search tools; if no relevant peers exist, continue with an empty conventions list.
