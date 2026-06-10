@@ -343,9 +343,9 @@ Why serial: disjoint file; cites the Phase-1 artifact (Validation-Round schema) 
 - CR-001 (frontmatter): `name:`/`description:`/`model: opus`.
 - NN-C-008 (self-contained): the single assertion + deliberation context are injected; no history.
 - CR-008 (single-task, no sub-agents).
-- NN-P-005 (Opus thinking — Tier-2 validation is an adversarial gate); NN-P-001 (FLAG-HARD honors the binding NN set; operator signs off).
+- NN-P-005 (Opus thinking — Tier-2 validation is an adversarial gate). FLAG-HARD enforces that a binding charter non-negotiable cannot be operator-waived — stated on its own terms (execute QA correction: the prior NN-P-001 citation was a misattribution; NN-P-001 governs the spec/plan sign-off gate, not brainstorm-time assertion validation).
 
-- [ ] **[Implement]** Author the deliberation-validate agent
+- [x] **[Implement]** Author the deliberation-validate agent
   - Architecture constraints: clone the `agents/spike.md` scope-mode structural shape (introspection.md §9, lines 633–675) — isolated Opus, single task, ≤2K digest, STATUS OK/BLOCKED, no-partial-on-BLOCKED, no sub-agents — but a `validate` task with a three-verdict output, citing `reference/deliberation-artifact.md` for the Validation-Round schema.
 
   **Change Specifications:**
@@ -372,7 +372,7 @@ Why serial: disjoint file; cites the Phase-1 artifact (Validation-Round schema) 
   - Done: file exists; bare name; `model: opus`; single validate task; the three-verdict contract with FLAG-HARD=no-override / FLAG-SOFT=override-with-rationale; appends a Validation Round (cites the schema); STATUS + no-partial; no sub-agents.
   - Verify: phase `[Verify]` greps name/model + the three verdicts.
 
-- [ ] **[Verify]** Confirm the validate agent contract
+- [x] **[Verify]** Confirm the validate agent contract
   **Per-change checks:**
   - T-1: `grep -E "^name: deliberation-validate$" plugins/spec-flow/agents/deliberation-validate.md && grep -E "^model: opus$" plugins/spec-flow/agents/deliberation-validate.md` — Expected: both match (AC-21).
   - T-1: `grep -c "CONFIRM\|FLAG-HARD\|FLAG-SOFT" plugins/spec-flow/agents/deliberation-validate.md` — Expected: ≥3 (the three-verdict contract; satisfies AC-22's agent grep).
@@ -381,7 +381,7 @@ Why serial: disjoint file; cites the Phase-1 artifact (Validation-Round schema) 
   - Expected: all true.
   - Failure: a fourth verdict, an override path on FLAG-HARD, a restated schema, or a sub-agent dispatch.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-21, AC-22
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
