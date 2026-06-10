@@ -310,7 +310,7 @@ At the start of each phase iteration, evaluate the mid-piece trigger before doin
 **Resume guard (v3.1.1+ two-source check):** before evaluating conditions 1-3, the orchestrator consults TWO independent sources for whether a prior mid-piece dispatch has already fired this piece. EITHER source positive → skip the dispatch.
 
   1. **Session-state file** (primary, survives history rewrites): read `<docs_root>/prds/<prd-slug>/specs/<piece-slug>/.orchestra-state.json`. If it contains `{"mid_piece_opus_pass_dispatched": true, "at_phase": <N>}`, the dispatch already fired in a prior session — set `mid_piece_opus_pass: not-triggered (resumed-after-prior-dispatch via state file)` and proceed to Step 1. The state file is gitignored or removed by Step 6 merge; it persists across orchestrator session restarts but not across squash-merge to master.
-  2. **Marker commit** (secondary, falls back when state file is absent): check whether a `chore(<piece-slug>): mid-piece Opus QA pass dispatched at phase <N>` commit (regex: `chore\(<piece-slug>\): mid-piece Opus QA pass dispatched at phase [0-9]+`) already exists in `git log --oneline $(git merge-base origin/main HEAD)..HEAD`. If so, set `mid_piece_opus_pass: not-triggered (resumed-after-prior-dispatch via marker commit)` and proceed to Step 1.
+  2. **Marker commit** (secondary, falls back when state file is absent): check whether a `chore(<piece-slug>): mid-piece Opus QA pass dispatched at phase <N>` commit (regex: `chore\(<piece-slug>\): mid-piece Opus QA pass dispatched at phase [0-9]+`) already exists in `git log --oneline $(git merge-base origin/HEAD HEAD)..HEAD`. If so, set `mid_piece_opus_pass: not-triggered (resumed-after-prior-dispatch via marker commit)` and proceed to Step 1.
 
 The marker-commit message embeds the resolved phase number (not the literal 'K+1') for unambiguous detection. The state-file source is checked FIRST because it survives interactive rebases / squash-merges that would erase the marker commit. If neither source returns positive, the trigger evaluation proceeds.
 
@@ -334,7 +334,7 @@ If the trigger does NOT fire, set `mid_piece_opus_pass: not-triggered` for this 
 **Mid-piece pass dispatch (when trigger fires):**
 
 1. Compose a self-contained prompt from `${CLAUDE_PLUGIN_ROOT}/agents/qa-phase.md` with `Input Mode: Mid-piece full review` on line 1. The prompt MUST include — and only these inputs (NN-C-008: no conversation history, no per-phase QA reports):
-   - **Cumulative diff:** `git diff $(git merge-base origin/main HEAD)..HEAD` output (the full diff from piece start through the last completed phase). The cumulative diff baseline is computed at dispatch time as `git merge-base origin/main HEAD` — the piece's branch point from main. Resume-safe because it's recomputed each time.
+   - **Cumulative diff:** `git diff $(git merge-base origin/HEAD HEAD)..HEAD` output (the full diff from piece start through the last completed phase). The cumulative diff baseline is computed at dispatch time as `git merge-base origin/HEAD HEAD` — the piece's branch point from the default branch. (`origin/HEAD` symbolically resolves to the remote's default branch — `main` OR `master` — so this is correct regardless of the default branch name; do NOT hardcode `origin/main`.) Resume-safe because it's recomputed each time.
    - **Full spec:** the complete text of `docs/prds/<prd-slug>/specs/<piece-slug>/spec.md`.
    - **AC matrix:** the union of `## AC Coverage Matrix` rows from all completed phase Build reports, held in orchestrator state since Step 3.8's validation gate captured them per-phase as `phase_<id>_ac_matrix` keys (one per phase / sub-phase). Format: phase-N | AC-id | status | pointer.
    - **Charter raw text (always-attach):** verbatim contents of the active charter root's `charter-non-negotiables/SKILL.md` (resolved per `plugins/spec-flow/reference/charter-location.md` — `<charter_root>/skills/charter-non-negotiables/SKILL.md`, `<charter_root>` ∈ {`.github`, `.claude`}) and the Step 6 track-aware NN-P payload. If `track = "piece"`, attach the `## Non-Negotiables (Product)` section from `<docs_root>/prds/<prd-slug>/prd.md` unchanged. If `track = "change"`, skip NN-P injection silently — no warning, no error. Plus, if the spec's `### Coding Rules Honored` block cites any `CR-xxx` entries, attach those specific entries (not the full file) extracted from `<charter_root>/skills/charter-coding-rules/SKILL.md`. Match Step 6's existing extraction pattern.
@@ -1835,7 +1835,7 @@ Present to user:
    git log --oneline | awk "/progress: Phase ${PREV} complete/{print \$1; exit}"
 
    # For Phase 1: the piece branch diverges from main at its merge-base
-   git merge-base origin/main HEAD
+   git merge-base origin/HEAD HEAD
    ```
 
 3. plan.md is already in the pre-Phase N state after the reset (checkboxes un-ticked by the

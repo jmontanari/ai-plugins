@@ -4,6 +4,11 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.12.1] — 2026-06-10
+
+### Fixed
+- **Hardcoded `origin/main` in execute broke non-`main`-default repos:** Step 0a mid-piece QA (resume-marker detection + cumulative-diff baseline) and Step 4 Phase-1 SHA recovery hardcoded `git merge-base origin/main HEAD`, which fatals in a repo whose default branch is `master` (or anything but `main`). Switched all three sites to `git merge-base origin/HEAD HEAD` — `origin/HEAD` symbolically resolves to the remote's default branch regardless of name. (Pre-existing bug surfaced during the dispatch-integrity review; the Final Review diff base was already resolver-based as of 5.12.0.)
+
 ## [5.12.0] — 2026-06-10
 
 ### Added
