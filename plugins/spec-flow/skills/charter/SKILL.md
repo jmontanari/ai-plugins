@@ -7,6 +7,40 @@ description: >-
   non-negotiables", "onboard project".
 ---
 
+## Pre-flight: Model Check
+
+Before any other step, verify the active model is an Opus-class model.
+
+Determine the active model using the platform-appropriate method:
+
+- **Copilot CLI** — read the `<model_information>` system tag injected into this session's context. The model name and ID are present there explicitly.
+- **Claude Code** — no equivalent tag is injected. Use Claude's self-knowledge: introspect your own model identity (Claude reliably knows which model variant it is from training) and treat that as the model name for the check below.
+
+If the active model name does **not** contain `opus` (case-insensitive):
+
+1. Use `ask_user` to block and prompt the user:
+
+   > ⚠️ **Model mismatch.** Charter authoring is thinking work per NN-P-005, but the active model appears to be **[model-name]**.
+
+   Choices:
+   - "Override — proceed on [model-name]"
+   - "Change now — I'll switch models"
+   - "Cancel charter"
+
+2. If the user selects **"Cancel charter"** → stop immediately and emit:
+   `Charter cancelled. Re-run after switching to an Opus model.`
+
+3. If the user selects **"Override — proceed on [model-name]"** → proceed to Step 0 immediately on the current model. Emit a one-line acknowledgment first:
+   `Overriding model check — proceeding on [model-name]. Charter quality may be reduced.`
+
+4. If the user selects **"Change now — I'll switch models"** → **close the prompt and return control to the user.** The model cannot be switched while an `ask_user` prompt is blocking, and there is no programmatic model-change event to listen for — so leave the dialog and wait for the user to signal. Emit:
+   `Switch to an Opus model now. When ready, type "proceed" to resume, or "cancel" to stop.`
+   Then wait for the user's free-text reply:
+   - On `proceed` (or any "I've switched / continue" phrasing) → re-run this model check (re-introspect your model identity on Claude Code, or re-read the `<model_information>` tag on Copilot CLI). If the model now contains `opus`, proceed to Step 0. If it still does not, re-present the three choices above.
+   - On `cancel` → stop and emit the cancellation line from step 2.
+
+If the model already contains `opus` → proceed to Step 0 immediately with no prompt.
+
 # Charter — Project-Wide Binding Constraints
 
 Produce a codified, binding set of project-wide constraints, published as charter **skills** under the project's host-native skills root — either `.github/skills/charter-*/` or `.claude/skills/charter-*/` (resolve per `plugins/spec-flow/reference/charter-location.md`). Charter skills are the single source of truth — there is no `docs/charter/` directory. Charter content is referenced by every downstream skill (`prd`, `spec`, `plan`, `execute`) and binds every implementation.
@@ -307,6 +341,62 @@ After Phase 1.3 confirmation, serialize the Signal Summary to a recoverable form
 > "I'll save the confirmed Signal Summary so we can resume if this session is interrupted."
 
 Write to `<charter_root>/skills/.charter-signal-summary.yaml` (gitignored, add to `.gitignore` if absent), where `<charter_root>` is resolved in Phase 0. If the session is interrupted and restarted, the user can instruct the skill to load this file instead of re-running the scan.
+
+### Phase 1.9: Deliberation Protocol
+
+**[Deliberation protocol]** *(runs after Signal Summary persistence, before Phase 2 Socratic dialogue)*:
+
+Depth levels and per-skill defaults are defined in `reference/deliberation-depth.md` (full / lite / off profiles, operator override contract). The artifact structure, VOQ-N IDs, marker contract, and STATUS line are defined in `reference/deliberation-artifact.md` — cite both; do not restate.
+
+The decision unit for this skill is the **per-domain rule / principle** (not a file, not a whole-charter cluster). Each cluster in Phase A represents one charter domain (e.g., error-handling conventions, dependency rules, naming standards, auth enforcement) grouping the candidate rules/principles that will govern it; Phase B viability agents assess each domain cluster independently.
+
+*Worked example: for a Node.js microservice with inconsistent error-handling (Result<T,E> in auth module vs. unchecked exceptions in billing), Phase A produces two clusters — {error-handling-domain} and {naming-conventions-domain}. Phase B dispatches one viability agent per cluster; Phase C synthesizes (2 clusters ≥ 2 → not skipped); Phase D runs 5 lens agents in parallel; Phase E folds contested boundaries into VOQ-1 and seeds Phase 2 questions.*
+
+0. **Resolve depth:** read `.spec-flow.yaml` `deliberation.depth`; apply any operator override; else use per-skill default (`full` for charter). On `depth=off` → emit `[DELIBERATION-SKIPPED: depth=off]`, run Phase 2 Socratic dialogue from the top, STOP here.
+
+1. **Dispatch Phase A** (`agents/deliberation-coordinator.md`): inject the confirmed Signal Summary (from Phase 1.3), the domain being chartered (all seven charter domains — architecture, tools, coding-rules, processes, flows, non-negotiables, integrations), existing codebase patterns (from the Phase 1.1 scan / research/L-10 fallback), and related industry-standard rules for the project type (web research — the coordinator fires targeted searches for the detected stack and domain).
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-A-blocked]`, fall back to Phase 2 Socratic dialogue.
+
+2. **Consume decision-unit clusters from Phase A:** take the identified per-domain-rule clusters returned in Phase A's investigation seed (the coordinator already derived them from the Signal Summary and industry-standard research). At `lite` depth, collapse them to one whole-charter cluster regardless of what Phase A returned.
+
+3. **Dispatch Phase B in parallel, one `agents/deliberation-viability.md` agent per cluster**: inject Phase A investigation seed + per-cluster domain-rule assignment + charter constraints. Each agent evaluates reuse/codify-existing paths vs. gaps, referencing codebase patterns and industry-standard rules.
+   **Barrier:** wait for all Phase B agents to complete.
+   On any Phase B `STATUS: BLOCKED` → log the blocked cluster; proceed with remaining cluster outputs (non-fatal partial).
+
+4. **Dispatch Phase C** (`agents/deliberation-synthesis.md`): inject all Phase B per-cluster findings.
+   **Skip when ≤1 cluster** — single-cluster output is already integrated.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-C-blocked]`, fall back to Phase 2 Socratic dialogue.
+
+5. **Dispatch Phase D in parallel, exactly five lens agents** (`agents/deliberation-lens.md` dispatched 5×): inject Phase C recommendation + one lens label per agent. Full depth lens labels (one agent per label):
+   - `architecture-integrity` — structural / layering / dependency-direction review
+   - `scope/simplicity` — YAGNI / over-engineering / unnecessary abstraction review
+   - `user-intent` — does the recommendation serve the operator's stated goal?
+   - `backward-compat` — breaking-change / migration / rollback impact review
+   - `risk` — failure modes, hidden assumptions, external-dependency exposure review
+   At `lite` depth use the configured subset (default: `scope/simplicity` + `risk`). Depth profile and per-lens label list are defined in `reference/deliberation-depth.md`.
+   **Barrier:** wait for all dispatched Phase D agents.
+   On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
+
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in §Investigation Summary.
+   On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
+   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to Phase 2 Socratic dialogue.
+   On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back to Phase 2 Socratic dialogue.
+   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back to Phase 2 Socratic dialogue.
+
+7. **First Phase 2 message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
+
+8. **Questions:** draw from §Validated Open Questions in order; each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation §Domain Coverage Check: …").
+
+On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run Phase 2 Socratic dialogue as written (today's behavior — one question at a time, sections A–G in order).
+
+<!-- Example: a project with an inconsistent error-handling pattern (Result<T,E> in auth vs. unchecked exceptions in billing) and no documented naming conventions → 2 domain clusters. full depth.
+Phase A coordinator reads Signal Summary + codebase patterns + fires web search for Node.js error-handling standards, produces per-domain-rule clusters.
+Phase B: 2 viability agents (one per domain cluster) in parallel → barrier.
+Phase C synthesis runs (2 clusters ≥2 → not skipped) → integrated recommendation.
+Phase D: 5 lens agents in parallel → barrier (4 HOLDS, 1 CONTESTED on backward-compat for existing unchecked exception callers).
+Phase E: folds the CONTESTED into VOQ-1, writes deliberation.md, records depth=full.
+First Phase 2 message: Investigation Summary + Recommendation + "I have 1 validated question (VOQ-1)."
+Single-cluster counter-example: a greenfield project with no prior patterns → 1 cluster, Phase C SKIPPED (≤1 cluster). -->
 
 ### Phase 2: Socratic dialogue — section by section
 
