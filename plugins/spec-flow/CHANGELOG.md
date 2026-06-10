@@ -4,6 +4,27 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.8.0] — 2026-06-09
+
+### Added
+- **`agents/deliberation-coordinator.md`:** orchestrates the full deliberation protocol — fans out to lens agents, collects perspectives, dispatches synthesis, and routes to validate before returning the deliberation artifact to the calling skill.
+- **`agents/deliberation-viability.md`:** first-pass viability lens — evaluates whether the proposed approach is technically feasible and surfacing blockers before deeper deliberation proceeds.
+- **`agents/deliberation-synthesis.md`:** merges the outputs of all active lens agents into a coherent, conflict-resolved deliberation artifact with a ranked recommendation set.
+- **`agents/deliberation-lens.md`:** parameterised single-lens perspective agent — instantiated once per active lens (architecture, risk, ux, cost, etc.) to produce an independent, adversarial view.
+- **`agents/deliberation-convergence.md`:** post-synthesis convergence pass — identifies residual disagreements across lens outputs and either resolves them or escalates to the operator as explicit unresolved tensions.
+- **`agents/deliberation-validate.md`:** final gate agent — checks the synthesised artifact against the originating spec/PRD acceptance criteria and blocks advancement if coverage gaps remain.
+- **`reference/deliberation-artifact.md`:** canonical schema for the deliberation artifact (lens outputs, synthesis block, convergence verdict, validation stamp); consumed by all six deliberation agents.
+- **`reference/deliberation-depth.md`:** reference doc defining the three depth tiers (Tier-1 lightweight, Tier-2 standard, Tier-3 deep) and the lens activation matrix per tier; governs which lens agents are dispatched.
+- **`.spec-flow.yaml` `deliberation.depth` / `deliberation.lenses` config keys:** optional operator overrides for deliberation depth tier and lens activation list; absent keys resolve to the defaults specified in `reference/deliberation-depth.md`.
+
+### Changed
+- **`skills/spec/SKILL.md`, `skills/prd/SKILL.md`, `skills/small-change/SKILL.md`, `skills/charter/SKILL.md` — Tier-1/Tier-2 deliberation wiring:** each skill's brainstorm/design phase now routes through the deliberation coordinator at the appropriate tier before advancing to the artifact-authoring step.
+- **`skills/plan/SKILL.md` — `deliberation.md` consumption:** the plan skill reads the deliberation artifact produced during spec and uses it to inform phase sequencing and track selection, rather than deriving those decisions from the spec alone.
+- **Opus pre-flight added to spec, prd, plan, charter skills (small-change excluded per FR-009-N):** each of the four primary pipeline skills now dispatches an Opus pre-flight pass at entry to validate charter alignment and surface show-stopping ambiguities before the main skill body runs.
+- **`reference/brainstorm-procedure.md` — Tier-2 answer-validation loop + C-2 amendment:** the brainstorm procedure gains an explicit answer-validation loop for Tier-2 sessions and a C-2 criteria amendment requiring that each brainstorm answer is grounded in at least one verifiable source or prior art reference.
+- **`agents/qa-spec.md` — criteria 14 and 15:** criterion 14 checks that deliberation depth is commensurate with the spec's complexity tier; criterion 15 checks that every unresolved tension flagged by deliberation-convergence is either addressed in the spec or explicitly deferred with a rationale.
+- **FR-009 PRD section + NN-P-005 Scope extension in the exec-ready PRD:** the exec-ready PRD gains an FR-009 section documenting the deliberation-protocol functional requirement and NN-P-005 is extended to scope the Opus pre-flight constraint (applies to spec/prd/plan/charter; does not apply to small-change).
+
 ## [5.7.0] — 2026-06-07
 
 ### Added
