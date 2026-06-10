@@ -146,12 +146,13 @@ pieces:
     status: open
 
 coverage:
-  total_prd_sections: 12
-  covered_sections: 12
+  total_prd_sections: 13
+  covered_sections: 13
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs (001-008) and NFRs (001-004) covered across 7 pieces. FR-008 (scoping spike for
+    FR-009 (Investigation-First Design Protocol) is covered by the spec-preresearch piece.
+    All FRs (001-009) and NFRs (001-004) covered across 7 pieces. FR-008 (scoping spike for
     mid-execution changes) was added in PRD v2 and folded into the spike-agent piece alongside
     FR-005 — both share the agents/spike.md primitive (FR-005 resolves planned [SPIKE] unknowns;
     FR-008 scopes mid-execution changes before plan amendment). FR-008 amends NN-P-002. NFR-003 (backward-compat,

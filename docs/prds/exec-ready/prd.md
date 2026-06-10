@@ -203,6 +203,20 @@ version: 2
 
 **Failure mode:** Scoping spike cannot resolve the change's scope → returns `BLOCKED` with findings; execute escalates to the operator (no fabricated scope, no mid-stream patch, no plan amendment).
 
+---
+
+### FR-009: Investigation-First Design Protocol (Deliberation)
+**Statement:** Before any user-facing question is asked, the spec, prd, small-change, and charter skills run a structured multi-agent deliberation protocol. **Tier 1** is a 5-phase pipeline: a coordinator, parallel per-decision-unit-cluster viability agents, a synthesis pass, a parallel single-model multi-lens adversarial board, and a convergence phase — executed across four calling skills (spec, prd, small-change, charter) with a configurable depth policy (full/lite/off). The output is a structured `deliberation.md` artifact with 7 core sections; the plan skill consumes the deliberation's recommendation so design decisions survive into implementation. Only questions the protocol could not resolve are surfaced to the operator, each traceable to a finding via a stable `VOQ-N` ID. **Tier 2** is an answer-validation loop that auto-fires a lite scoped `deliberation-validate` pass when an operator's free-form answer introduces an assertion outside the evaluated path-set, returning CONFIRM / FLAG-HARD / FLAG-SOFT and making grounding bidirectional. The protocol also includes an Opus pre-flight (FR-009-N) that recommends Opus for spec/prd/plan/charter calls (the inverse of execute's Sonnet check). Together: (a) the protocol runs before any user-facing question; (b) Tier 2 validates the operator's own answers against the deliberation's path-set; (c) the output is a structured `deliberation.md` (7 core sections + optional `## Validation Rounds` section appended by Tier 2); (d) only unresolved questions are asked, each traceable to a finding; (e) the plan skill consumes the recommendation so design decisions survive intact into implementation.
+**Priority:** P0
+
+#### User Stories
+**US-009** — As a pipeline operator, I want the spec/prd/charter/small-change skills to investigate the problem space before asking any questions, to validate my own free-form answers against that investigation, and for the plan skill to build on it — so that every design choice (mine or the AI's) that reaches the spec is grounded, and implementation follows the approved approach without re-deriving it.
+
+**Acceptance Criteria:**
+- [ ] Full FR-009 AC set: AC-1 through AC-24 (including AC-10b) from the spec-preresearch spec — see `docs/prds/exec-ready/specs/spec-preresearch/spec.md`.
+
+**Failure mode:** Deliberation fails on any of the 5 fatal triggers defined in `reference/deliberation-artifact.md` (Phase A/C/E BLOCKED, `deliberation.md` missing-or-empty after Phase E, or its commit failing) → the calling skill emits `[DELIBERATION-UNAVAILABLE]` and falls back to the current brainstorm flow. (Note: `depth=off` is the separate `[DELIBERATION-SKIPPED]` path, and a Phase D all-BLOCKED board is a non-fatal partial — neither is a fatal trigger.)
+
 ## Non-Functional Requirements
 
 ### NFR-001: Research and spike agents are context-isolated
@@ -265,6 +279,7 @@ version: 2
 | FR-006 | Repo-level flywheel | P1 | Drives the spike/Opus curve down; repo charter/QA/PRD hardening |
 | FR-007 | Plugin-global flywheel | P1 | Cross-install plugin learning; machine-global correlation |
 | FR-008 | Scoping spike for mid-execution changes | P0 | Routes all mid-run scope change (agent + operator) through scope→amend→execute; kills mid-stream patching |
+| FR-009 | Investigation-first deliberation protocol | P0 | Grounds every design choice before spec authoring begins; bidirectional validation removes post-hoc re-derivation |
 | NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
 | NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
 | NFR-003 | Backward compat | P0 | NN-C-003 |
@@ -323,6 +338,6 @@ version: 2
 ### NN-P-005: Thinking on Opus, mechanics on Sonnet — no silent upgrade
 - **Type:** Rule
 - **Statement:** Spec authoring, plan authoring, all adversarial gates, and spikes run on Opus. Execute (coordinator, implementer, test transcription) runs on Sonnet by default. Execute never silently upgrades a non-`[SPIKE]` phase to Opus to compensate for an under-specified plan — it halts and routes to plan amendment or a `[SPIKE]`. Operator override is explicit.
-- **Scope:** FR-004, FR-005
+- **Scope:** FR-004, FR-005, FR-009
 - **Rationale:** Concentrating thinking upstream is the entire cost model; a silent Opus upgrade in execute hides plan incompleteness and re-introduces the cost this PRD removes.
 - **How QA verifies:** Model-policy check asserts stage→model assignment; any execute path that escalates a non-`[SPIKE]` phase to Opus without halting/override is must-fix.
