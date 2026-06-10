@@ -79,6 +79,12 @@ qa_max_iterations: auto
 #   off     — skip Step 4.5; learnings.md authored without reflection-agent input (pre-v1.5 behavior)
 reflection: auto
 
+# flywheel_threshold: repo-level self-hardening flywheel — occurrence count at which a pattern's
+#   batched hardening proposal is surfaced at end-of-piece reflection (new in v5.8.0; FR-006).
+#   <int> — distinct-piece occurrence count threshold (default 2). Absent ⇒ 2 (non-blocking; NN-C-003).
+#   See plugins/spec-flow/reference/flywheel.md `## Threshold + batched proposal`.
+flywheel_threshold: 2
+
 # charter: configures the charter stage
 #   required      — if true, prd/spec/plan skills fail fast when no charter skills are found
 #                   at <charter_root>/skills/charter-*/SKILL.md

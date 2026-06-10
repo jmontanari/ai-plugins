@@ -299,6 +299,83 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 - Cumulative diff: 20 files, 817 insertions(+), 4 deletions(-).
 - Refactor skips: 4/4 (100% auto-skipped; correct).
 
+### [Deferred via /spec-flow:defer] Agent dispatches carry no worktree-path contract — false review verdicts — 2026-06-10
+
+**Source:** `external/devops` phase `field-report` (agent: `operator`) — 2026-06-10 cross-repo sweep, source-verified against plugins/spec-flow @ 5.8.0
+**Finding (verbatim):** BUG (HIGH): No agent template (implementer, verify, qa-phase, review-board-*) and no execute/review-board dispatch site requires an explicit `WORKTREE: <abs-path>` preamble; agents infer paths from the plan and may resolve reads against the MAIN repo. Field impact: devops logged 2 incidents — verify false-FAILed a clean phase (os-common-collection, 2026-05-01) and security+architecture board reviewers produced a false FAIL + misleading PASS by reading main-repo files during focused re-review (jenkins-collection, 2026-05-28). False gate verdicts are the worst failure class for a review system. FIX: add a dispatch-preamble rule to `reference/coordinator-contract.md` — every agent prompt begins with `WORKTREE: <absolute-path>` plus "resolve every read/write from this root"; wire it into all execute + review-board dispatch sites; add the field to each agent's input contract with a `[WORKTREE-ABSENT]` marker escalation when missing. Suggested home: "dispatch-integrity" small-change.
+**Why this does not block exec-ready's goals:** No active piece in this repo is affected; plugin-level defect filed from the cross-repo sweep for scheduled pickup (operator-directed batch).
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] manifest.yaml ownership is implicit — agent wrote status:merged mid-execute — 2026-06-10
+
+**Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-23, verified vs 5.8.0
+**Finding (verbatim):** BUG (HIGH): implementer.agent.md:44 has only generic "do not modify files outside phase scope"; no agent contract names manifest.yaml as orchestrator-owned, and no lint/hook-sweep checks for it. Field impact: prop_firm commit 0640a06 set `status: merged` during a [QA] step, before Final Review — manual revert required; premature piece closure was possible. FIX: (a) explicit "manifest.yaml is orchestrator-owned; agents MUST NOT modify it" line in implementer/tdd-red/fix-code/refactor input contracts and a manifest-ownership row in coordinator-contract.md; (b) Step 6b hook sweep (or coherence linter) flags any agent-produced diff touching manifest.yaml as a blocking violation. Suggested home: "dispatch-integrity" small-change.
+**Why this does not block exec-ready's goals:** Plugin-level guard gap; no in-flight piece here exhibits it.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] fix-code gets no sibling-file or call-site context — 3-repo recurrence — 2026-06-10
+
+**Source:** `external/devops+prop-firm` phase `field-report` (agent: `operator`) — also ai-plugins pi-013 retro; verified vs 5.8.0
+**Finding (verbatim):** BUG (HIGH, 3-repo recurrence — flywheel-global threshold case): fix-code.agent.md:14–30 scopes the agent to named findings only; the dispatch (execute SKILL.md ~:903) passes findings + plan context with no instruction to (a) apply an established pattern to structurally analogous files in the batch or (b) re-review call sites of changed signatures/exceptions. Field impact: devops — stat-guard applied to 1 of 4 analogous files, iter-2 created 3 unguarded files (extra board iteration); prop_firm FO-25 — iter-1 fixes introduced 2 new bugs (exception propagation at bare call site; init-order regression). FIX: orchestrator enriches every fix-code dispatch with the list of structurally analogous files modified this piece + the pattern-propagation instruction; after fix-code returns, a targeted call-site check (grep call sites of changed symbols; verify new exceptions/init-order handled) runs before any board re-dispatch. Suggested home: FR-018 qa-hardening candidate piece.
+**Why this does not block exec-ready's goals:** Correctness-of-the-fix-loop defect observed in consuming repos; filed for the qa-hardening batch.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] Opus QA skip-predicate is per-phase only — cross-phase composition bugs reach Final Review — 2026-06-10
+
+**Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-11/FO-20 (both CRITICAL); devops Pattern B; verified vs 5.8.0
+**Finding (verbatim):** BUG (HIGH): the FR-8 skip predicate (execute SKILL.md:847–862) is pure per-phase content analysis (markdown-only / no new SKILL / no branching); the mid-piece Opus pass (Step 0a:324–326) fires only when ALL phases 1..K skipped. Nothing forces integration-scope QA when multiple phases incrementally wire the same module. Field impact: prop_firm — `_persist_breaker` clobber and HC.io env-var bug each emerged from 3-phase interaction, survived per-phase QA (4 of 6 Opus dispatches skipped), caught only at Final Review; devops — 3 cross-role consistency gaps with the same shape. FIX: add a composition trigger — when ≥3 completed phases touch a common module AND ≥2 of their QA gates skipped, force one integration-scope Opus qa-phase at the next phase boundary whose input is the union diff of those phases. Suggested home: FR-018 qa-hardening (predicate change), with an async/integration fixture class in gate-evals (FR-017) to measure it.
+**Why this does not block exec-ready's goals:** Predicate logic gap; no current piece in this repo is multi-phase-wiring right now.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] Execute has no pre-flight test-suite baseline — inherited failures misattributed — 2026-06-10
+
+**Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-14, escalated CRITICAL on recurrence; verified vs 5.8.0
+**Finding (verbatim):** BUG (HIGH): Step 1b pre-flight (execute SKILL.md:430–453) captures LOC/schema/symbols/hooks but never runs the test suite; Verify treats inherited pre-existing failures as phase failures. Field impact: prop_firm triaged 5 pre-existing failures mid-execute (obs-http-wiring), misattributing cost to the piece; same ordering-sensitive test recurred in prereqs-phase-3-5. FIX: Step 1b optionally runs the project suite once before Phase 1, records the failing-test set to the pre-flight snapshot/journal; per-phase Verify filters baseline failures and reports them separately as `[INHERITED-FAILURE: <test-id>]` (triage-visible, never piece-attributed); skipped gracefully when no suite exists. Suggested home: fold into exec-guardrails (FR-011) spec brainstorm — it is execute pre-flight hardening.
+**Why this does not block exec-ready's goals:** Pre-flight gap surfaced downstream; exec-guardrails is open and unstarted, so the fold-in costs nothing now.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] Step 5.5 re-run after failed merge is advisory prose, not a Step 6 precondition — 2026-06-10
+
+**Source:** `external/devops` phase `field-report` (agent: `operator`) — PR #223 stranded manifest commit; verified vs 5.8.0
+**Finding (verbatim):** BUG (MEDIUM): execute SKILL.md:1898–1920 orders Step 5.5 (manifest `status: merged` commit) before Step 6, but the re-run-5.5-before-retry rule lives nested in the Failure-path prose; a retried Step 6 (or an operator pushing after a revert) can merge without the manifest commit on the branch. Field impact: devops PR #223 merged with `status: in-progress`; the merged-status commit landed after the PR merge, orphaned on the piece branch. FIX: make "HEAD contains the Step 5.5 manifest commit" an explicit, checked precondition of Step 6 (both merge strategies and every retry path), and add it to the push-ready/PR-open checklist line emitted to the operator. Suggested home: "dispatch-integrity" small-change.
+**Why this does not block exec-ready's goals:** Ordering-robustness gap; current pieces here merge via the standard path that usually satisfies it.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] Implementer output truncation on long verify gates is undetectable — 2026-06-10
+
+**Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-16; verified vs 5.8.0
+**Finding (verbatim):** BUG (MEDIUM): implementer.agent.md and execute Step 3 (:533–591) have no heartbeat marker, truncation detection, or resume protocol around long-running gate commands (~8-min mypy/test runs). Field impact: 2 implementer dispatches truncated mid-gate; the orchestrator manually staged+committed, silently bypassing the implementer's self-review checklist. FIX: implementer stages work and emits a `READY-TO-COMMIT` marker (self-review complete) BEFORE invoking long gates; the orchestrator treats truncated output lacking the marker as a resumable failure and re-dispatches with prior context — manual-commit bypass is prohibited. Suggested home: "dispatch-integrity" small-change.
+**Why this does not block exec-ready's goals:** Robustness gap that fires on long gates; this repo's doc-as-code gates are short.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] qa-phase-lite has no async-lifecycle checks and no routing carve-out — 2026-06-10
+
+**Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-24 (9 async must-fix at board); verified vs 5.8.0
+**Finding (verbatim):** GAP (MEDIUM): qa-phase-lite.md:39–46 review focus has no async/state-machine items (lifecycle sequencing, guard positioning, exception-safety ordering) and nothing routes async-heavy diffs to the Opus tier. Field impact: group QA passed Phase Group A; Opus board found 9 async must-fix findings in iter-1. FIX: (a) add async-lifecycle spot-checks to qa-phase-lite's focus list; (b) add a skip/route carve-out — diffs introducing or modifying async lifecycle code route to full Opus qa-phase regardless of group QA-lite; (c) add an async fixture class to gate-evals (FR-017) so the Sonnet-vs-Opus catch-rate gap is measured, per FR-016's no-downgrade-without-evidence rule. Suggested home: FR-018 qa-hardening + gate-evals fixture.
+**Why this does not block exec-ready's goals:** This repo's pieces are doc-as-code (no async surface); defect is real for code-bearing consumers.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] No disputed-finding routing — DISMISS requires no disk verification — 2026-06-10
+
+**Source:** `external/devops` phase `field-report` (agent: `operator`) — security-reviewer hallucination; verified vs 5.8.0
+**Finding (verbatim):** GAP (MEDIUM): Final Review triage (execute SKILL.md:1736–1759) lets the operator DISMISS a finding with no verification step, and no orchestrator logic flags contradictions between reviewers or between a finding and disk state. Field impact: devops security reviewer asserted files didn't exist / were unchanged — disk said otherwise; the operator had to manually `find`+`cat` before dismissing. FIX: when a finding asserts checkable file/disk state, the orchestrator runs the one-line disk check at triage time and attaches the result to the finding card; a `disputed` flag is set when reviewers contradict each other or disk evidence, and DISMISS on a disputed finding requires the attached evidence in the triage record. Suggested home: FR-018 qa-hardening.
+**Why this does not block exec-ready's goals:** Triage-quality gap; operator currently compensates manually.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] Intra-piece QA deferral recurrence is not escalated — 2026-06-10
+
+**Source:** `external/prop-firm` phase `field-report` (agent: `operator`) — FO-4 (predates sync-triage but the recurrence rule is still absent); verified vs 5.8.0
+**Finding (verbatim):** GAP (MEDIUM-LOW): Step 6a dedup (execute SKILL.md:919) matches duplicate backlog stubs within a session to avoid double-writing — but a finding deferred in an earlier QA pass that resurfaces in a later pass of the SAME piece gets re-triaged as a fresh discovery with no recurrence signal. The flywheel (5.8.0) counts cross-piece patterns only. Field impact: prop_firm had two findings each survive two QA passes as deferrals (clock bug; hardcoded verdict='pass'). FIX: on Step 6a dedup match, instead of silently skipping the stub, surface a recurrence escalation at triage — "this finding was previously deferred in this piece (phase N); recurrence suggests it blocks after all — recommend promote to must-fix." Suggested home: FR-018 qa-hardening (small predicate addition).
+**Why this does not block exec-ready's goals:** Sync-triage already prevents silent deferral; this adds the recurrence teeth.
+**Captured:** 2026-06-10
+
+### [Deferred via /spec-flow:defer] Blind reviewer gets zero domain hint — idiom false positives — 2026-06-10
+
+**Source:** `external/devops` phase `field-report` (agent: `operator`) — Ansible idiom false positives; verified vs 5.8.0
+**Finding (verbatim):** IMPROVEMENT (LOW): review-board-blind.agent.md:8–10 is diff-only by design — but with zero domain context it flagged mandated Ansible idioms (`changed_when: false` per the repo's CR-030; valid `cacheable: true`) as logic errors / malformed YAML, adding dismissal noise. FIX: permit exactly one line of tech-stack context in the blind input contract — language/framework name only, never spec/PRD/plan content (e.g. "Diff is Ansible YAML; treat idiomatic task constructs as correct unless clearly erroneous") — preserving blindness to intent while removing idiom noise. Complements the FR-012/FR-016 doc-as-code board variant. Suggested home: FR-018 qa-hardening or fold into gate-scaling's board-variant work.
+**Why this does not block exec-ready's goals:** Noise-reduction; the reviewer still functions, at extra operator dismissal cost.
+**Captured:** 2026-06-10
+
 ---
 
 ## Process retro — exec-ready/spike-agent (5.7.0, 2026-06-07)
@@ -315,3 +392,19 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **worked-well: Cross-phase schema-consistency grep in [Verify].** Phase 7's `for f in` grep confirming `blocking-on-current` appears in all three vocabulary-bearing files served as a regression guard (no defect at verify time) rather than a defect finder. The QA catch on the `Classification:` schema colon-arg mismatch was found by the QA agent reading the schema directly, not the grep — showing that greps are a necessary but not sufficient consistency check. Both layers (structural grep + Opus semantic review) are needed.
 
 **metrics:** QA catch rate — Phase 1: 1 MUST-FIX; Phases 2/3: 0; Phase 4: 1 SHOULD-FIX; Phase 5: 1 SHOULD-FIX; Phase 6: 1 non-issue; Phase 7: 2 MUST-FIX + 2 SHOULD-FIX; Phase 8: 0. Total: 3 MUST-FIX, 3 SHOULD-FIX across 8 phases. Phase 7 (57% of all actionable findings) concentrated defects because it was the third serial phase targeting the same large file — compound target, accumulated complexity.
+
+---
+
+### Process-retro findings (exec-ready/flywheel-repo, 2026-06-09)
+
+**Source:** `exec-ready/flywheel-repo` phase `step-4.5-reflection` (agent: `reflection-process-retro`). Deferred via operator triage 2026-06-09. Category: process-improvement.
+
+**PR-FW-1: spec/plan QA should require "record-this-outcome" behaviors to enumerate their schema field.** The `hardenings` schema gap (board findings F1/F3/F5: no schema home for the accepted/blocked hardening outcome → broken spike `<id>` seam + infinite re-proposal loops) reached Final Review rather than being caught at spec or plan QA. Root: spec SF-6 said "the accepted outcome … is recorded against the pattern in docs/patterns.yaml" but named no concrete schema field and no re-proposal exclusion rule. **Fix:** add a qa-spec/qa-plan check — any AC/FR describing a "record/persist this outcome" behavior must enumerate the schema field(s) carrying it, and the plan's cross-phase schema-consistency [Verify] must confirm every outcome state (approved/rejected/blocked) has a dedicated schema home before the wiring phase ships.
+
+**PR-FW-2: qa-spec should grep `.gitignore` for config-file ACs.** The Phase 2 discovery (`.spec-flow.yaml` gitignored; AC-10 "documented in both files" mis-modeled the committed deliverable) fired at implementation time, costing one spec-amend + one plan-amend before Phase 2 completed. **Fix:** qa-spec for any AC referencing a config file should run a one-line `grep <file> .gitignore` and flag committed-vs-runtime mismatches before sign-off.
+
+**PR-FW-3: plan concreteness — require a grep-verifiable assertion per concrete identifier shipping a new dispatch contract.** Board F1 (broken spike `<id>` seam) occurred because the plan DID specify `<id> = flywheel-<pattern-id>` but the implementer didn't carry it through, and Phase 4's `[Verify]` for that branch was an LLM-agent-step ("confirm both branches present"), not grep-verifiable on the concrete token. **Fix:** when a phase ships a new dispatch contract / concrete identifier, require at least one grep-verifiable `[Verify]` assertion keying on that literal token (e.g. `grep 'flywheel-<pattern-id>'`), not only LLM-agent-step presence checks.
+
+**observation (NN-P-005):** the execute coordinator ran on Opus via operator override of the Sonnet-class pre-flight check. No observable effect on this doc-as-code piece, but the override is an NN-P-005 deviation worth tagging — consider requiring an explicit rationale field in the session log when the pre-flight model check is overridden, for cross-piece comparison.
+
+**Captured:** 2026-06-09

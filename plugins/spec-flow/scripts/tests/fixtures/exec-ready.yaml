@@ -1,0 +1,170 @@
+schema_version: 1
+generated: 2026-06-06
+last_updated: 2026-06-07
+prd_source: "docs/prds/exec-ready/prd.md"
+
+feature_branch: null
+merge_target: master
+pr_required: true
+
+pieces:
+  - name: research-unify
+    slug: research-unify
+    description: |
+      One deep codebase-gathering pass runs once, before spec brainstorm, in an isolated
+      Opus sub-agent, and writes a durable research.md to the piece spec directory. Spec
+      consumes it for proposed answers during brainstorm; plan consumes the same artifact
+      as primary context and stops re-deriving introspection.md (emits [RESEARCH-CONSUMED]
+      / [RESEARCH-ABSENT]). Folds in the L-10 convention scan and the plan-stage
+      introspection so there is exactly one gathering pass, not three. [RESEARCH-UNAVAILABLE]
+      fallback preserves current behavior. Return to main thread is ≤2K tokens; on-disk file
+      may be richer. Covers FR-001, NFR-001.
+    prd_sections: [FR-001, NFR-001, NFR-003, G-1]
+    dependencies: []
+    status: merged
+
+  - name: plan-concrete
+    slug: plan-concrete
+    description: |
+      Plan concreteness contract — the core piece. Each plan phase specifies exact file,
+      exact location/anchor, and exact content/signatures (not "implement X"). Genuine
+      unknowns become explicit [SPIKE: <unknown>] markers. Doc-as-code phases require exact
+      prose plus a branch-enumeration AC per conditional (codifies the pi-011 finding).
+      qa-plan gains a concreteness floor: vague deliverables, unmarked unknowns, and missing
+      branch ACs are must-fix. Goal: a passing plan yields zero unmarked execute-time
+      discoveries. Covers FR-002.
+    prd_sections: [FR-002, G-1, G-2]
+    dependencies: [research-unify]
+    status: merged
+
+  - name: test-data-up
+    slug: test-data-up
+    description: |
+      Test data defined upfront for TDD phases. Each TDD phase in the plan carries a
+      `Test Data` block (concrete inputs + expected outcomes/oracle). tdd-red transcribes
+      the oracle from the plan instead of designing it live; it invents no inputs/outcomes
+      absent from the plan. Unpredictable outcomes use a [SPIKE] marker instead of fabricated
+      data. qa-plan flags a TDD phase with neither a Test Data block nor a [SPIKE] marker.
+      Covers FR-003.
+    prd_sections: [FR-003, G-1]
+    dependencies: [plan-concrete]
+    status: merged
+
+  - name: sonnet-coord
+    slug: sonnet-coord
+    description: |
+      Sonnet-driven coordinator on file-based state. Execute assigns Sonnet to coordinator +
+      implementer by default. The existing 5.2.1 pre-flight already warns when the active
+      model is NOT Sonnet (bbcf58c); this piece generalizes that single execute-start prompt
+      into a per-stage model policy that reports the assignment and flags only exceptions
+      (spike path / operator override). All resume-critical state is on disk so a fresh
+      context re-derives position and resumes from the last clean checkpoint
+      ([STATE-INCOMPLETE] escalation if a field is missing). Final Review circuit-breaker
+      becomes configurable via .spec-flow.yaml (raised default for doc-as-code; fixes the
+      pi-011 hard-3 defect). Corrects the root/.claude-plugin plugin.json version skew when
+      first touched. Covers FR-004, NFR-002, NFR-003, NFR-004.
+    prd_sections: [FR-004, NFR-002, NFR-003, NFR-004, G-3, G-4]
+    dependencies: [plan-concrete]
+    status: merged
+
+  - name: spike-agent
+    slug: spike-agent
+    description: |
+      New Opus spike agent (agents/spike.md) + execute wiring, serving two roles on one shared
+      agent. ROLE 1 (FR-005): a [SPIKE] phase dispatches the spike agent on Opus in an isolated
+      context; it resolves the genuine unknown and records a structured resolution to a durable
+      artifact (consumable as FR-003 test data, so the same unknown is not spiked twice). A
+      non-[SPIKE] phase the implementer cannot complete on Sonnet halts and routes to plan
+      amendment (Step 6c) — never a silent Opus upgrade. Operator override forces Opus for a
+      named piece/phase at invocation. ROLE 2 (FR-008): any mid-execution scope change — agent-
+      discovered found-work at Step 6c OR an operator-initiated change ("add/change/do X") during
+      execute — enters Step 6c triage under one uniform regime; above the size/complexity
+      threshold (the 50% diff-ratio gate) the same spike agent scopes the change first and writes
+      a scoping artifact that plan-amend consumes, below it the change amends the plan directly.
+      The resulting amendment phases are queued onto the plan/task list at a dependency-correct
+      position and do not preempt in-progress work unless the operator force-stops. Amends
+      NN-P-002. Spike that cannot resolve/scope returns BLOCKED with findings; execute escalates
+      (no fabricated resolution, no mid-stream patch). Covers FR-005, FR-008.
+    prd_sections: [FR-005, FR-008, G-2, G-3]
+    dependencies: [plan-concrete, sonnet-coord]
+    status: merged
+
+  - name: spec-preresearch
+    slug: spec-preresearch
+    description: |
+      Investigation-First Design Protocol (Spec 2.0), two tiers, one piece. TIER 1: a 5-phase
+      multi-agent deliberation protocol runs before the first user question in spec/prd/small-change/
+      charter — coordinator (read all + web research) → parallel per-decision-unit-cluster viability
+      agents (all paths incl. reuse/extend-existing) → synthesis → parallel single-model multi-lens
+      adversarial board (architecture/scope/user-intent/backward-compat/risk; NOT multi-model, per
+      NN-P-005) → convergence writing deliberation.md. Questions restricted to VOQ-tagged validated
+      open questions (artifact-verifiable grounding). Depth policy full/lite/off (.spec-flow.yaml).
+      Plan consumes the recommendation ([DELIBERATION-CONSUMED/ABSENT]). TIER 2: an answer-validation
+      loop auto-fires a lite scoped deliberation-validate pass when an operator free-form answer
+      introduces an assertion outside the evaluated path-set — verdict CONFIRM/FLAG-HARD(NN violation,
+      no override)/FLAG-SOFT(override w/ rationale); validation rounds append to deliberation.md; makes
+      grounding bidirectional; reuses spike-agent scope-mode. Plus an Opus pre-flight (inverse of
+      execute's Sonnet check) recommending Opus for spec/prd/plan/charter. Adds FR-009 (A–N) to the
+      exec-ready PRD and appends FR-009 to NN-P-005 Scope. 14 FRs, 25 ACs. Deps: research-unify.
+    prd_sections: [FR-009]
+    dependencies: [research-unify]
+    status: specced
+
+  - name: flywheel-repo
+    slug: flywheel-repo
+    description: |
+      Repo-level self-hardening flywheel. Recurring patterns become countable against a
+      durable stable-ID registry at docs/patterns.yaml, correlating charter/project/PRD
+      patterns across PRDs within the repo. On recording, the flywheel proposes a pattern-ID
+      match (or "new"); operator confirms classification + scope at Step 6c (no silent write).
+      Count = dated occurrences (provenance: piece, date, source). At threshold (default 2,
+      configurable in .spec-flow.yaml) a batched hardening proposal routes to its repo home
+      (charter amendment / local QA hardening / PRD work). Rejections recorded with rationale,
+      not re-proposed. Non-blocking; [FLYWHEEL-DEGRADED: repo registry unavailable] if
+      docs/patterns.yaml is unwritable. Establishes the registry + match + count mechanics
+      reused by flywheel-global. Covers FR-006.
+    prd_sections: [FR-006, G-5]
+    dependencies: [sonnet-coord]
+    status: open
+
+  - name: flywheel-global
+    slug: flywheel-global
+    description: |
+      Plugin-global cross-install flywheel. Plugin-level patterns (spec-flow pipeline/agent/QA
+      defects) are recorded to a machine-global registry under ~/ (proposed
+      ~/.claude/spec-flow/patterns.yaml; path confirmed at spec) that survives plugin updates
+      and is read/written by any repo's flywheel run on the machine — so a defect appearing
+      once per repo correlates across all repos on the machine. Reuses the stable-ID + match +
+      count mechanics from flywheel-repo; each occurrence carries the originating repo;
+      operator confirms scope=plugin before write. At threshold, the batched proposal is to
+      create a spec-flow self-improvement piece in the plugin home repo. [FLYWHEEL-DEGRADED:
+      plugin registry unavailable] if unwritable (repo-level recording continues; execute not
+      blocked). Cross-machine correlation is an explicit non-goal (no shared remote backend).
+      Covers FR-007.
+    prd_sections: [FR-007, G-5]
+    dependencies: [flywheel-repo]
+    status: open
+
+coverage:
+  total_prd_sections: 12
+  covered_sections: 12
+  uncovered_sections: []
+  percentage: 100
+  notes: |
+    All FRs (001-008) and NFRs (001-004) covered across 7 pieces. FR-008 (scoping spike for
+    mid-execution changes) was added in PRD v2 and folded into the spike-agent piece alongside
+    FR-005 — both share the agents/spike.md primitive (FR-005 resolves planned [SPIKE] unknowns;
+    FR-008 scopes mid-execution changes before plan amendment). FR-008 amends NN-P-002. NFR-003 (backward-compat,
+    additive) is borne by research-unify (the [RESEARCH-ABSENT] fallback) and sonnet-coord
+    (the opt-out .spec-flow.yaml model policy / configurable circuit-breaker), and is listed
+    in their prd_sections for traceability. The old exec-loop framing (autonomous execute
+    loop, self-resolve + decisions.md, Sonnet context budget) was retired after a 2026-06-06
+    re-evaluation: FR-004/005 of the prior PRD were ~90% already shipped (auto phase-loop,
+    auto Final Review + fix loop, manifest→merged, journal resume), the Sonnet-context premise
+    was superseded by the Opus-1M driver, and execute self-resolve conflicted with the
+    synchronous-discovery doctrine. The genuinely-new surface is plan density (plan-concrete,
+    test-data-up), model placement + file-state (sonnet-coord, spike-agent), and cross-install
+    learning (flywheel-repo, flywheel-global). Pieces split to keep each ≤7 ACs per the qa-prd
+    granularity rule: the coordinator into sonnet-coord + spike-agent, and the flywheel into
+    flywheel-repo + flywheel-global (the latter splits the two distinct registry subsystems
+    per qa-prd iteration-1 must-fix #1).

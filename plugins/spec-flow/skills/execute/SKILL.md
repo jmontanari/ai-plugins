@@ -394,7 +394,7 @@ The orchestrator branches mechanically on the checkbox; it does not decide which
 
 *(Runs before Step 1b when triggered — the spike resolves the unknown before pre-flight gathers facts.)*
 
-If the current phase carries a `[SPIKE:]` marker in its prose (detected before mode-dispatch and outside fenced code / HTML comments per `plugins/spec-flow/reference/plan-concreteness.md` §2 scan-scoping), the orchestrator runs the spike agent in `resolve` mode BEFORE the implementer:
+If the current phase carries a `[SPIKE:]` marker in its prose (detected before mode-dispatch and outside fenced code / HTML comments per the scan-scoping rule in `plugins/spec-flow/reference/plan-concreteness.md` §2), the orchestrator runs the spike agent in `resolve` mode BEFORE the implementer:
 
 **Guard — skip if already resolved:** Check whether `docs/prds/<prd-slug>/specs/<piece-slug>/spikes/<phase-id>.md` already exists. If it does, the spike was previously resolved — skip the dispatch and proceed to Step 1b with the existing artifact. If the file exists, read the first `STATUS:` line. If `STATUS:` is absent or its value is neither `OK` nor `BLOCKED`, the artifact is malformed — log a warning and re-dispatch the spike resolve rather than silently advancing.
 
@@ -1044,6 +1044,20 @@ A fourth option, `(s) amend-spec`, is offered ONLY for discoveries whose finding
 **Severity label shown in prompt (Final Review findings).** When a finding originates from a Final Review board reviewer, its severity (`must-fix` or `should-fix`) is displayed in the triage prompt so the operator can weigh it. Severity does NOT suppress options — the full menu `(a) amend  (f) fork  (d) defer` is always presented. The operator decides whether a should-fix finding warrants an amendment cycle.
 
 **Aggregate shortcuts decompose into per-discovery dispatches.** The `'A'` (amend all that fit < 50% threshold) and `'D'` (defer all) shortcuts are input sugar — they decompose into the same per-discovery dispatch flow as if the operator had typed `(a)` or `(d)` for each discovery individually. There is no batched-amend or batched-defer code path. `'A'` produces one `plan-amend` (or `spec-amend`) dispatch and one `chore(plan): amend` (or `chore(spec): amend`) commit per amended discovery; `'D'` produces one `/spec-flow:defer` invocation and one `chore: defer` commit per deferred discovery. Per-discovery `.discovery-log.md` rows append per the Resolution-commit cell convention (below) regardless of which input form was used.
+
+#### Flywheel pattern recording (FR-006)
+
+For each discovery being triaged in Step 6c, the flywheel proposes a match against `docs/patterns.yaml` — either an existing pattern `id` or a "new \<kebab-slug\>" for a pattern not yet in the registry. On operator confirmation of both the classification (which pattern) and the scope (charter / qa / prd), the flywheel appends a per-(pattern, piece) occurrence with `source_type: execute-discovery`. Nothing is written to `docs/patterns.yaml` before the operator confirms (NN-P-004).
+
+For all mechanics — the match/confirm interaction, the count rule, and the occurrence schema — see `plugins/spec-flow/reference/flywheel.md` `## Match + confirm flow (no silent write)` and `## Count rule`. Do NOT restate those rules here (CR-008 / NN-C-008).
+
+**Degraded path.** If `docs/patterns.yaml` is unwritable or unparseable, the flywheel emits the single verbatim line:
+
+```
+[FLYWHEEL-DEGRADED: repo registry unavailable]
+```
+
+No registry write is performed. Execute is NOT blocked or failed. The triggering finding still flows through its normal Step 6c triage / reflection resolution path unchanged. See `plugins/spec-flow/reference/flywheel.md` `## Degraded path`.
 
 #### Auto-mode threshold (FR-17)
 
@@ -1817,6 +1831,8 @@ Wait for both agents to complete. Each agent's output is a structured `## Findin
 
 #### Routing reflection findings through Step 6c
 
+When reflection findings route through Step 6c here, the same flywheel record/match hook described in `#### Flywheel pattern recording (FR-006)` fires for each finding, with `source_type: reflection-finding` — so reflection findings are recorded as occurrences identically to native execute-phase discoveries. See `plugins/spec-flow/reference/flywheel.md` `## Source taxonomy` for the full source taxonomy and the distinction between `execute-discovery` and `reflection-finding`.
+
 For each agent's findings, dispatch the Step 6c triage flow with `.discovery-log.md` rows authored using the literal source-phase token `step-4.5-reflection` (mirroring Step 8's `final-review` token convention — there is no numeric phase ID for end-of-piece reflection). The two agents differ in dispatch shape:
 
 - **`reflection-future-opportunities` — per-finding triage.** For each of the N findings, dispatch a SEPARATE Step 6c invocation. Dispatch shape: the orchestrator calls into Step 6c's aggregation step N times, once per finding, each call with a single-item discovery list. This produces N independent triage events sharing the source-phase token `step-4.5-reflection` — sharing the token is permitted because end-of-piece reflection has no numeric phase ID and each invocation is logically independent (resolutions of one finding do not constrain triage of the next). Each finding becomes a discovery record with:
@@ -1846,6 +1862,20 @@ For each agent's findings, dispatch the Step 6c triage flow with `.discovery-log
 - **The Step 5 learnings.md commit remains unchanged.** Step 5 synthesizes a human-readable narrative from the held reflection outputs plus the cumulative diff and produces its own `learnings: <prd-slug>/<piece-slug>` commit.
 
 **Explicit removal note (v3.2.0+).** The previous-version commit-message pattern `reflection: <prd-slug>/<piece-slug> — append findings to backlogs` no longer occurs on the worktree branch. Earlier versions auto-appended both backlog files and produced this single reflection commit before Step 5; under the rerouted flow there is no such commit because no auto-append happens — every backlog entry now lands via `/spec-flow:defer`'s own `chore(<piece-slug>): defer ...` commits, one per deferred finding. (Phase 13's CHANGELOG release notes call out this commit-pattern removal explicitly so downstream automation that grepped worktree history for `reflection: ... append findings to backlogs` can migrate.)
+
+#### Flywheel batched hardening proposal (FR-006)
+
+After this piece's reflection findings have been recorded through the Step 6c flywheel hook (above), read `flywheel_threshold` from `.spec-flow.yaml` (default 2; see `plugins/spec-flow/reference/flywheel.md` `## Threshold + batched proposal` for the full count/threshold mechanics and batched-proposal format). Surface **one** batched proposal listing every pattern whose distinct-piece count ≥ `flywheel_threshold` AND that is not currently excluded by a rejection, a resolved hardening, or a blocked hardening (see `plugins/spec-flow/reference/flywheel.md` `## Threshold + batched proposal` for the exclusion rules), together with its recorded `scope` as the routing home (`charter` → charter amendment, `qa` → local QA hardening, `prd` → PRD work). This is not a new pipeline step — it fires at the existing end-of-piece Step 4.5 juncture, after the Final Review board and Human Sign-Off, before merge.
+
+For each pattern in the proposal the operator may **approve** or **reject**:
+
+- **On reject:** append a `rejections` entry to the pattern in `docs/patterns.yaml` per `plugins/spec-flow/reference/flywheel.md` `## Rejection rule`. The pattern is excluded from future batched proposals while its count ≤ `rejected_at_count`; once a new occurrence pushes the count above that value the pattern becomes eligible again.
+
+- **On approve:** dispatch `agents/spike.md` in `scope` mode — reuse the `#### Amend dispatch` Scope-spike pre-step contract (same `Agent({... mode:scope ... model:"opus"})` shape). Inject `mode:scope` + the pattern description + its occurrences + the proposed routing home (framed as the change to scope) + the current `plan.md` + diff/neighborhood scope as context; use `<id>` = `flywheel-<pattern-id>`. The spike **always** runs; the hardening fix is unknown by nature — treat as the undefined-ratio → spike case (see `plugins/spec-flow/reference/flywheel.md` `## Hardening dispatch (reuse)`).
+
+  **On `STATUS: OK`:** read the spike artifact at `spikes/flywheel-<pattern-id>.md`, then route the scoped fix through the **existing** Step 6c reflection-finding `amend` dispatch (the behavior at `#### What gets committed (and what does not)` "On amend / amend-spec" — `plan-amend` appends the scoped hardening phases at a dependency-correct position; those phases run through the full Per-Phase Loop and re-enter the Final Review board before merge; the amendment consumes the standard per-piece amendment budget: 5 amendments total / 1 spec). Record a `hardenings` entry (outcome: resolved, spike_artifact: `spikes/flywheel-<pattern-id>.md`, amend_commit, at_count) against the pattern in `docs/patterns.yaml` — NOT a new occurrence entry. Append the standard `.discovery-log.md` row with source-phase token `step-4.5-reflection`. See `plugins/spec-flow/reference/flywheel.md` `## Hardening dispatch (reuse)`.
+
+  **On `STATUS: BLOCKED`:** escalate to the operator with the spike's findings. Produce **no** plan amendment. Apply **no** mid-stream patch. Record a `hardenings` entry (outcome: blocked, at_count) against the pattern in `docs/patterns.yaml` — this is **not** a rejection (do not write a `rejections` entry; the pattern remains eligible for future proposals). See `plugins/spec-flow/reference/flywheel.md` `## Hardening dispatch (reuse)`.
 
 ### Step 5: Capture Learnings
 
