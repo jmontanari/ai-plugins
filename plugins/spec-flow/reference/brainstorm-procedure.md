@@ -85,7 +85,7 @@ Inference-first: based on the brainstorm discussion, assess what the work touche
 Active whenever a `deliberation.md` exists (depth ≠ off / not UNAVAILABLE / not SKIPPED). When no `deliberation.md` exists, Tier 2 does not fire.
 
 1. After the operator answers a brainstorm question with **free-form input** (not selecting a presented option), **the calling skill itself** (the Opus authoring session, not a separate classifier agent) classifies the answer against `deliberation.md` §Viability Analysis path labels + §Answered by Investigation. **Decision rule:** it is a NEW ASSERTION when it names a design path/assumption/technology absent — verbatim or as a clear referent — from both. **Default bias toward NOT firing:** on an ambiguous match, treat as covered and do not fire (the cheaper miss is under-trigger).
-2. On a new assertion, auto-fire (no confirmation prompt) `deliberation-validate` (see `agents/deliberation-validate.md`), scoped to that single assertion. The agent is dispatched with the assertion + deliberation context injected (NN-C-008).
+2. On a new assertion, auto-fire (no confirmation prompt) `deliberation-validate` (see `agents/deliberation-validate.md`), scoped to that single assertion. The agent is dispatched with four injected inputs (per `agents/deliberation-validate.md` `## Injected Inputs`): (1) the verbatim operator assertion; (2) `deliberation.md`'s `## Viability Analysis` path labels + `## Answered by Investigation`; (3) applicable charter/NN constraints; (4) PRD/cross-FR context for the piece.
 3. Branch on the verdict: **CONFIRM** → fold with cited evidence; **FLAG-HARD** → charter/NN violation, operator MUST revise, **no override**; **FLAG-SOFT** → operator MAY override → record the rationale.
 4. Append `### Validation Round <n>` under `## Validation Rounds` in `deliberation.md` (cite `reference/deliberation-artifact.md` for schema); new conflicts become VOQ-tagged validated open questions feeding the brainstorm.
 5. The loop is **human-paced**: it continues until the operator introduces no new assertion and signs off; **no artificial round cap** (NN-P-001).
@@ -96,6 +96,9 @@ with free-form "let's store deliberation.md in a Postgres table instead of the p
 "Postgres table" is in neither set → NEW ASSERTION → auto-fire deliberation-validate.
 Verdict = FLAG-HARD (violates NN-C-002 no-runtime-deps) → operator must revise, no override;
 append Validation Round 1 (assertion / FLAG-HARD / NN-C-002 evidence / resolution: revised to piece-branch file).
+Verdict = FLAG-SOFT example: operator answers "let's add a sync fallback for slow networks — adds ~2 weeks scope."
+FLAG-SOFT (scope expansion, no NN violation) → operator may override; operator says "yes, include it, the deadline was already soft."
+append Validation Round 2 (assertion / FLAG-SOFT / scope risk evidence / resolution: overridden-with-rationale).
 Counter-example: operator answers "use the greenfield agent path" → matches a §Viability Analysis
 label → accepted, no validation fires. Ambiguous answer "the simpler one" → bias: accept, do not fire. -->
 

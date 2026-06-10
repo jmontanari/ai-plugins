@@ -46,7 +46,7 @@ Rules:
 - IDs are not assigned to questions resolved during deliberation (those go in `## Answered by Investigation`).
 - Once assigned, a `VOQ-N` ID is stable for the lifetime of the piece — it is not renumbered if earlier questions are later resolved.
 - The calling skill's Phase 2 brainstorm instructions require every question presented to the operator to cite either a `VOQ-N` ID (for a listed validated open question) or a named deliberation section (for an emergent follow-up, e.g., "Following deliberation §Integration Check: …").
-- qa-spec treats absence of `VOQ-N` IDs in `## Validated Open Questions` as a must-fix finding when `deliberation.md` is present.
+- qa-spec treats absence of `VOQ-N` IDs in `## Validated Open Questions` as a must-fix finding when `deliberation.md` is present. **Exemption:** a `## Validated Open Questions` section whose body is an explicit "None — …" sentinel (indicating no questions survived adversarial review) is a valid clean state and is NOT a must-fix finding. The VOQ-N-presence check applies only to actual question entries; the sentinel is not a question entry.
 
 ## Validation Round contract
 
@@ -80,14 +80,14 @@ Emitted by the **calling skill** (spec, prd, small-change, or charter). Triggers
 - **(b)** Phase C (`deliberation-synthesis`) returns `STATUS: BLOCKED`.
 - **(c)** Phase E (`deliberation-convergence`) returns `STATUS: BLOCKED`.
 - **(d)** `deliberation.md` is missing or zero-length on the piece branch after Phase E returns `STATUS: OK`.
-- **(e)** The `git commit` of `deliberation.md` fails (staging zero files or a non-zero exit from `git commit`).
+- **(e)** The `git commit` of `deliberation.md` fails (staging zero files or a non-zero exit from `git commit`). On this trigger, the calling skill MUST remove the uncommitted `deliberation.md` (e.g. `git checkout -- <path>` if previously committed, else `rm -f <path>`) before falling back, so downstream consumers cannot pick up a disowned artifact.
 
 The marker is **non-blocking**: the calling skill logs it inline and falls back to current (pre-5.8.0) brainstorm behavior, indistinguishable from a run without deliberation. No `deliberation.md` is committed on this path. `<phase>-<reason>` is a short human-readable description of which trigger fired (e.g., `phase-A-blocked`, `phase-E-blocked`, `deliberation.md-empty-after-dispatch`, `deliberation.md-commit-failed`).
 
 **2 non-fatal partial conditions (do NOT emit `[DELIBERATION-UNAVAILABLE]` for these):**
 
-- **(f)** Phase B (`deliberation-viability`) returns `STATUS: BLOCKED` for some-but-not-all clusters — the skill proceeds to Phase C with the remaining cluster outputs; Phase C notes the missing clusters. This is a non-fatal partial: deliberation continues.
-- **(g)** Phase D (`deliberation-lens`) returns `STATUS: BLOCKED` for any or all lens agents — the skill proceeds to Phase E with the available verdicts (which may be empty); Phase E notes "adversarial review unavailable" in `## Adversarial Review`. This is a non-fatal partial: deliberation continues.
+- **(f)** Phase B (`deliberation-viability`) returns `STATUS: BLOCKED` for some-but-not-all clusters — the skill proceeds to Phase C with the remaining cluster outputs; Phase C notes the missing clusters. This is a non-fatal partial: deliberation continues. **Single cluster (lite/small-change): the only cluster is blocked, so no viability output exists and a valid `deliberation.md` cannot be produced — the calling skill falls back to the current brainstorm. No `[DELIBERATION-UNAVAILABLE]` marker is emitted in either case (Phase B is non-fatal); the single-cluster fallback is surfaced to the operator as a plain one-line note, not a marker.**
+- **(g)** Phase D (`deliberation-lens`) returns `STATUS: BLOCKED` for any or all lens agents — the skill proceeds to Phase E with the available verdicts (which may be empty); Phase E notes "adversarial review unavailable" in `## Adversarial Review`. This is a non-fatal partial: deliberation continues. When ALL Phase D lens agents are BLOCKED, the calling skill also surfaces a one-line operator note: "deliberation proceeded without adversarial review — recommendation not adversarially vetted."
 
 These two partial conditions do not trigger `[DELIBERATION-UNAVAILABLE]`. They are documented here to make the fatal/non-fatal distinction unambiguous.
 

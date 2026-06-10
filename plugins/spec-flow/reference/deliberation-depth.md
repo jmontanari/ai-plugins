@@ -7,7 +7,7 @@ This document is the single source of truth for the deliberation depth policy. C
 | Depth | Phases run | Lenses | Default for | Cost |
 |-------|-----------|--------|-------------|------|
 | `full` | A → B(parallel) → C* → D(parallel, 5 lenses) → E | 5 | spec, prd, charter | highest (deep investigation where it belongs) |
-| `lite` | A → B(single pass over whole piece) → C* → D(subset, default 2) → E | 2 (scope/simplicity + risk) | small-change | ~3–4 dispatches |
+| `lite` | A → B(single pass over whole piece) → C* → D(subset, default 2) → E | 2 (scope/simplicity + risk) | small-change | ~5 dispatches (A=1, B=1, C=0 skipped, D=2, E=1) |
 | `off` | none — `[DELIBERATION-SKIPPED: depth=off]` + current brainstorm | 0 | (operator opt-out only) | zero |
 
 `* Phase C is a no-op at any depth when there is ≤1 decision-unit cluster (nothing to integrate). See ## Phase C no-op rule.`

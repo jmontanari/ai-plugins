@@ -186,10 +186,10 @@ The decision unit for this skill is the **candidate piece / decomposition bounda
    On any Phase B `STATUS: BLOCKED` → log the blocked cluster; proceed with remaining cluster outputs (non-fatal partial).
 
 4. **Dispatch Phase C** (`agents/deliberation-synthesis.md`): inject all Phase B per-cluster findings.
-   **Skip when ≤1 cluster** — single-cluster output is already integrated.
+   **Skip when ≤1 cluster** — single-cluster output is already integrated. On skip, record single-cluster coherence in the `## Integration Check` section of `deliberation.md`; the Phase B single-cluster viability output becomes the anchor for Phase D and Phase E in place of a Phase C recommendation.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-C-blocked]`, fall back to Step 4 Brainstorm.
 
-5. **Dispatch Phase D in parallel, exactly five lens agents** (`agents/deliberation-lens.md` dispatched 5×): inject Phase C recommendation + one lens label per agent. Full depth lens labels (one agent per label):
+5. **Dispatch Phase D in parallel, exactly five lens agents** (`agents/deliberation-lens.md` dispatched 5×): inject Phase C recommendation + one lens label per agent (when Phase C was skipped at ≤1 cluster, inject the Phase B single-cluster viability output as the recommendation anchor — the single-cluster coherence summary — in place of the Phase C recommendation). Full depth lens labels (one agent per label):
    - `architecture-integrity` — structural / layering / dependency-direction review
    - `scope/simplicity` — YAGNI / over-engineering / unnecessary abstraction review
    - `user-intent` — does the recommendation serve the operator's stated goal?
@@ -199,15 +199,15 @@ The decision unit for this skill is the **candidate piece / decomposition bounda
    **Barrier:** wait for all dispatched Phase D agents.
    On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
 
-6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in the `## Investigation Summary` section.
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase C recommendation + all Phase D verdicts (when Phase C was skipped at ≤1 cluster, inject the Phase B single-cluster viability output as the recommendation anchor — the single-cluster coherence summary — in place of the Phase C recommendation). Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth in the `## Investigation Summary` section.
    On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to Step 4 Brainstorm.
    On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back to Step 4 Brainstorm.
-   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back to Step 4 Brainstorm.
+   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → remove the uncommitted `deliberation.md` before falling back (e.g. `rm -f <path>` if it was not previously committed, or `git checkout -- <path>` if it was) so downstream consumers cannot pick up the disowned artifact → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back to Step 4 Brainstorm.
 
 7. **First Step 4 message:** present Investigation Summary + Recommendation + "I have N validated questions for you." Draw questions from the `## Validated Open Questions` section in order.
 
-8. **Questions:** each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation's `## Decomposition Check`: …").
+8. **Questions:** each question cites its `VOQ-N` ID (or a named deliberation section for an emergent follow-up, e.g. "Following deliberation's `## Integration Check`: …").
 
 On the `[DELIBERATION-UNAVAILABLE]` or `[DELIBERATION-SKIPPED]` path: run Step 4 Brainstorm as written (today's behavior — interactive sub-steps 4a–4l in order, no deliberation pre-seed).
 
@@ -386,6 +386,7 @@ For each open question the user identifies:
 After all steps: write the PRD using `${CLAUDE_PLUGIN_ROOT}/templates/prd.md` as the structural guide, populated with all elicited content. Set front-matter `slug: <prd-slug>`, `status: drafting`, `version: 1`.
 
 Then proceed through:
+- **Deliberation** (the `[Deliberation protocol]` block from Import mode — runs before Step 4 in both Import and Create modes; the deliberation pass precedes Step 4 Brainstorm in all modes)
 - **Brainstorm** (Import mode Step 4, sub-steps 4a–4k)
 - **qa-prd gate** (Import mode Step 5)
 - **Create manifest** (Import mode Step 6)

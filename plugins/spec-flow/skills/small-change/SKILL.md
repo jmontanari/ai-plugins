@@ -83,20 +83,20 @@ Small-change is excluded from the model capability check that runs in other skil
 2. **Consume decision-unit cluster from Phase A:** the decision unit is **the change** (singular). At `lite` depth the whole change is treated as one cluster regardless of what Phase A returned — collapse to a single cluster.
 
 3. **Dispatch Phase B** — single `agents/deliberation-viability.md` agent over the one cluster: inject Phase A investigation seed + change description + charter constraints. The agent enumerates reuse/extend-existing paths, not only greenfield.
-   On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-B-blocked]`, fall back to current Step-6 brainstorm (non-fatal if partial output is available — proceed with available output).
+   On `STATUS: BLOCKED` → the only cluster is blocked; no viability output exists. Fall back to the current Step-6 focused brainstorm. Surface a plain one-line note (e.g., "Deliberation could not complete — Phase B produced no viable paths; proceeding with the standard focused brainstorm."). Do NOT emit `[DELIBERATION-UNAVAILABLE]` — Phase B BLOCKED is non-fatal per condition (f) in `reference/deliberation-artifact.md`; the single-cluster fallback is surfaced as a plain note, not a marker.
 
-4. **Phase C — skipped (≤1 cluster, no-op).** The whole change is one cluster; there is nothing to synthesize across clusters. The `## Integration Check` section of `deliberation.md` records single-cluster coherence rather than a cross-cluster composition analysis.
+4. **Phase C — skipped (≤1 cluster, no-op).** The whole change is one cluster; there is nothing to synthesize across clusters. The `## Integration Check` section of `deliberation.md` records single-cluster coherence rather than a cross-cluster composition analysis. The Phase B single-cluster viability output serves as the recommendation anchor for Phase D and Phase E (the single-cluster coherence summary, in the role that a Phase C recommendation would occupy in multi-cluster runs).
 
-5. **Dispatch Phase D** — configured lens subset (`agents/deliberation-lens.md` dispatched 2×): inject Phase B viability output + one lens label per agent.
+5. **Dispatch Phase D** — configured lens subset (`agents/deliberation-lens.md` dispatched 2×): inject the Phase B single-cluster viability output, serving as the recommendation anchor (single-cluster coherence summary) that the lens agents expect in the Phase-C-recommendation slot, + one lens label per agent.
    Default lite subset: `scope/simplicity` + `risk` (see `reference/deliberation-depth.md`).
    **Barrier:** wait for both Phase D agents.
    On any/all Phase D `STATUS: BLOCKED` → log blocked lens(es); proceed to Phase E with available verdicts (non-fatal).
 
-6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject Phase B viability output + Phase D lens verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth (`lite`) in the `## Investigation Summary` section.
+6. **Dispatch Phase E** (`agents/deliberation-convergence.md`): inject the Phase B single-cluster viability output, serving as the recommendation anchor (single-cluster coherence summary) that the convergence agent expects in the Phase-C-recommendation slot, + Phase D lens verdicts. Phase E tags each validated open question with a stable `VOQ-N` ID and records the resolved depth (`lite`) in the `## Investigation Summary` section.
    On `STATUS: OK` and `deliberation.md` present + non-empty: commit `deliberation.md`.
    On `STATUS: BLOCKED` → emit `[DELIBERATION-UNAVAILABLE: phase-E-blocked]`, fall back to current Step-6 brainstorm.
    On `deliberation.md` missing or zero-length after dispatch → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-empty-after-dispatch]`, fall back.
-   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back.
+   On `git commit` of `deliberation.md` failing (zero files staged or non-zero exit) → remove the uncommitted `deliberation.md` before falling back (e.g. `rm -f <path>` if it was not previously committed, or `git checkout -- <path>` if it was) so downstream consumers cannot pick up the disowned artifact → emit `[DELIBERATION-UNAVAILABLE: deliberation.md-commit-failed]`, fall back.
 
 7. **First Step-6 message:** present Investigation Summary + Recommendation + "I have N validated questions for you."
 

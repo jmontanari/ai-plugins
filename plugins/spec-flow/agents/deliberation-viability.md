@@ -19,9 +19,9 @@ Every input you need is provided directly in this prompt by the dispatching skil
 The dispatching skill injects:
 
 - **Phase A investigation seed** — the structured investigation seed returned by `deliberation-coordinator`, including identified decision-unit clusters, prior art findings, and input summaries.
-- **Assigned cluster** — the specific decision-unit cluster assigned to this agent instance, including all decision units within it.
+- **Assigned cluster** — the specific decision-unit cluster assigned to this agent instance, including all decision units within it. The decision-unit type varies by caller: **spec** → FRs; **prd** → candidate pieces / decomposition boundaries; **charter** → domain rules / principles; **small-change** → the change (singular).
 - **Charter constraints** — the binding project charter (architecture, non-negotiables, coding rules, tools, processes, flows).
-- **`research.md` conventions** — the codebase investigation findings (file inventory, patterns, conventions) used to surface reuse/extend-existing paths.
+- **Caller-specific context** — the decision-context variant for the calling skill: **spec** → `research.md` conventions (file inventory, patterns) used to surface reuse/extend-existing paths; **prd** → normalized PRD draft with FRs/NFRs; **charter** → Signal Summary + codebase patterns; **small-change** → change description + L-10 conventions.
 
 Work only from these injected inputs. Do not reference any external context or prior session state.
 
