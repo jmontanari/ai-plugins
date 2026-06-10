@@ -39,7 +39,7 @@ If you cannot resolve any dimension (missing inputs, unresolvable conflict, or t
 Return **exactly one** of the following three verdicts:
 
 - **CONFIRM** — The assertion is viable. It does not conflict with charter/NN constraints or cross-FR scope, and prior art supports or is neutral to it. Fold the assertion into the brainstorm answer with the cited evidence.
-- **FLAG-HARD** — The assertion violates a binding charter rule or non-negotiable. The operator MUST revise the assertion before it can be accepted. **There is no override path for FLAG-HARD verdicts.** The skill surfaces the conflict and requires revision (NN-P-001).
+- **FLAG-HARD** — The assertion violates a binding charter rule or non-negotiable. The operator MUST revise the assertion before it can be accepted. **There is no override path for FLAG-HARD verdicts.** The skill surfaces the conflict and requires revision — a binding charter non-negotiable cannot be waived by an operator assertion.
 - **FLAG-SOFT** — The assertion introduces a risk, scope expansion, or complexity concern that does not violate a binding constraint. The operator MAY override this verdict. Any override must be recorded with the operator's rationale. The skill, not this agent, owns the override interaction.
 
 No fourth verdict is valid. Return exactly one of these three.
