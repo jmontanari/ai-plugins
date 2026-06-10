@@ -38,11 +38,12 @@ Invoked as `/spec-flow:status [--include-drift]`. The `--include-drift` flag ena
    For each matching worktree:
    - Derive the manifest path within that worktree:
      `<worktree_path>/docs/prds/<prd-slug>/manifest.yaml`.
-   - Read the fields `id:`, `name:`, `status:`, and `depends_on:` from that manifest.
+   - Read the fields `slug:`, `name:`, `status:`, and the dependency field
+     (`dependencies:` or `depends_on:`) from that manifest.
      If the manifest exceeds 10 KB (`wc -c` output > 10240), use targeted extraction
      instead of a full read:
      ```bash
-     grep -E '^\s{0,4}(id|name|status|depends_on):' \
+     grep -E '^\s{0,4}(slug|name|status|dependencies|depends_on):' \
          <worktree_path>/docs/prds/<prd-slug>/manifest.yaml
      ```
    - **Active-worktree guard:** If the manifest status is `merged` but the worktree is

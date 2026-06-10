@@ -4,6 +4,18 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.9.0] — 2026-06-09
+
+### Added
+- **`scripts/manifest-query` (manifest query/mutation tool):** new tool with subcommands `open`, `deps [--reverse]`, `ready`, `table`, and `set-status`. Ships with a `python3` fast path for performance and a complete pure-bash/awk fallback that requires no installed runtime — zero-install guarantee preserved when python3 is absent. Handles both `dependencies:` and `depends_on:` dependency-field schemas and both inline and block-style YAML lists.
+
+  > **NN-C-002 exception (owner-accepted):** the python3 fast path is a knowing, documented exception to the no-runtime-dependencies rule. The mandatory complete bash/awk fallback preserves the zero-install guarantee; the python path is a performance optimisation only. This exception is explicit and owner-accepted — it is not hidden.
+
+- **`skills/manifest/` (manifest skill):** new `manifest` skill wrapping the `scripts/manifest-query` tool, providing operator-facing subcommands for querying and mutating piece status in a PRD manifest.
+
+### Fixed
+- **`status` skill manifest-read schema drift:** the `status` skill read non-existent field `id:` (piece manifests use `slug:`, not `id:`) and recognised only `depends_on:` as the dependency field name. The skill now reads `slug:` and accepts both `dependencies:` and `depends_on:` — matching the dual-schema reality across real spec-flow manifests (`docs/prds/exec-ready/manifest.yaml` uses `dependencies:`; other repos use `depends_on:`).
+
 ## [5.8.0] — 2026-06-09
 
 ### Added

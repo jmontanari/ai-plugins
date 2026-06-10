@@ -1,0 +1,375 @@
+schema_version: 1
+generated: 2026-04-21
+last_updated: 2026-06-05
+prd_source: "docs/prd/prd.md"
+
+pieces:
+  - name: spec-flow-v2.0.0
+    description: Charter stage + codified docs structure + two NN namespaces (NN-C / NN-P) + CR coding rules. Seven internal pieces, shipped across commits 78991dc..cd1eb7a.
+    prd_sections: [G-2, FR-004, FR-005, FR-006, FR-007, NFR-003, NN-P-001, NN-P-002]
+    dependencies: []
+    status: done
+    notes: |
+      Released 2026-04-20 as a single major version. Shipped commits:
+      78991dc piece 1 - charter skill + templates + qa-charter agent
+      598e015 piece 2 - templates + config + session-start doctrine load
+      572d6d8 piece 3 - downstream skill charter wiring
+      b177748 piece 4 - agent updates
+      3db6de1 piece 5 - update mode + divergence resolution
+      fe7355b piece 6 - retrofit mode + migration pipeline
+      cd1eb7a piece 7 - README + consolidated CHANGELOG + version bump
+
+  - name: PI-001-marketplace-version-sync
+    description: Update `.claude-plugin/marketplace.json` to reflect spec-flow's actual version (2.0.0). Was stale at 1.1.1 — caught during charter bootstrap. First NN-C-001 violation in the history of the repo; fixing it was straightforward.
+    prd_sections: [FR-001, NN-C-001]
+    dependencies: []
+    status: done
+    notes: |
+      Fixed 2026-04-21. marketplace.json spec-flow entry bumped 1.1.1 → 2.0.0
+      to match plugins/spec-flow/.claude-plugin/plugin.json. No plugin-level
+      version bump for this change since the edit is outside plugins/*/
+      scope (NN-C-009 scope exclusion).
+
+  - name: PI-002-version-sync-ci
+    description: Minimal CI job (or pre-commit hook) that enforces NN-C-001 across all plugins in the marketplace. Compares `plugin.json` version to the matching `marketplace.json` entry. Fails if any plugin drifts. Shell + `jq` only.
+    prd_sections: [FR-001, NFR-003, NN-C-001]
+    dependencies: [PI-001-marketplace-version-sync]
+    status: superseded
+    superseded_by: pi-022-vsync-ci
+
+  - name: PI-003-charter-dogfood-lessons
+    description: After using charter on a few real pieces of work (PI-001 and PI-002 themselves are good candidates), capture what worked and what didn't. Feed findings into spec-flow's improvement backlog — likely some are backlog items that land in a future spec-flow release.
+    prd_sections: [G-4, NN-P-003, SC-003]
+    dependencies: [PI-001-marketplace-version-sync, PI-002-version-sync-ci]
+    status: superseded
+    superseded_by: pi-022-vsync-ci
+
+  - name: PI-004-second-plugin-pilot
+    description: Pilot a second, intentionally-small plugin in this marketplace to validate that the extension mechanism generalizes and that plugin isolation (the no-cross-plugin-references rule from charter/architecture.md) holds up in practice. Candidate plugins are intentionally undecided — the point is to pick something small enough to ship without a full spec-flow cycle.
+    prd_sections: [G-1, G-3, SC-004]
+    dependencies: []
+    status: open
+
+  - name: PI-005-copilot-cli-parity-map
+    description: Produce docs/architecture/copilot-cli-parity.md — a reference document mapping every marketplace-level and plugin-internal Claude Code capability to its GitHub Copilot CLI equivalent, with conversion recipes and a DIRECT/APPROXIMATE/GAP tier classification per row. Every GAP row specifies a degradation strategy (INLINE-INTO-INSTRUCTIONS, DROP-WITH-WARNING, EMIT-SHIM, or HARD-ERROR). Desk research only; empirical dogfood deferred to a separate maintainer-controlled project during/after PI-006. Source-of-truth input for PI-006.
+    prd_sections: [G-3]
+    dependencies: []
+    status: superseded
+    notes: |
+      Aborted during execute (2026-04-21) after the mapping document reached the 5-agent Final Review stage. Root cause: the piece's core premise — "convert Claude Code plugin artifacts to Copilot CLI equivalents on a mirror branch" — turned out to be the wrong architecture.
+
+      Discovery: the superpowers plugin (github.com/obra/superpowers, v5.0.7) demonstrates an alternative "co-ship dual-configuration" pattern where a single source tree ships per-host manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `gemini-extension.json`, `package.json`) side-by-side with per-host hook-registration files (`hooks/hooks.json`, `hooks/hooks-cursor.json`) and shared content directories (`skills/`, `agents/`, `commands/`). `AGENTS.md` is a symlink to `CLAUDE.md` — Copilot CLI reads the same instruction file Claude does with zero transformation. For distribution to a different canonical marketplace (e.g., OpenAI Codex), a single rsync-plus-exclude-plus-regenerate-overlay script handles publishing (see `scripts/sync-to-codex-plugin.sh` in superpowers). No mirror branch, no conversion pipeline.
+
+      PI-005's feature branch `spec/PI-005-copilot-cli-parity-map` is preserved with full execute history (spec + plan + 217-line deliverable + all phase commits + fix-code commits from 3 QA iterations). Not merged. Reference for the next spec cycle.
+      Successor: PI-007-copilot-coship (shipped 2026-04-21).
+
+  - name: PI-006-copilot-mirror-ci
+    description: CI/CD pipeline plus bash conversion script that encodes PI-005's mapping doc and produces a `master-copilot` branch mirroring `master` on every commit with Claude→Copilot conversions applied. Dogfooded in a separate maintainer-controlled project, not in this repo.
+    prd_sections: [G-3]
+    dependencies: [PI-005-copilot-cli-parity-map]
+    status: superseded
+    notes: |
+      Aborted 2026-04-21 as part of the PI-005 abort. The mirror-branch conversion pipeline this piece proposed is the wrong pattern — the superpowers multi-host plugin demonstrates that co-shipping all hosts' manifests and hook-registrations in one tree eliminates the need for conversion entirely. See PI-005's notes for the discovery detail. Successor: PI-007-copilot-coship (shipped 2026-04-21).
+
+  - name: PI-007-copilot-coship
+    description: |
+      Apply a superpowers-style co-ship pattern to the `spec-flow` plugin so GitHub Copilot CLI users can install and invoke it. Delivered as a single-path dual-host co-ship — one `plugins/spec-flow/` tree with plain-`.md` agent files serves both Claude Code and Copilot CLI. Copilot CLI users install via subdirectory syntax (`/plugin install jmontanari/ai-plugins:plugins/spec-flow`) or via the marketplace 2-step flow (`/plugin marketplace add jmontanari/ai-plugins` → `/plugin install spec-flow@shared-plugins`). No mirror branch, no sync scripts, no content translation. Supersedes PI-005 and PI-006 with a strictly simpler architecture. Three smoketests on Copilot CLI v1.0.34 recorded in `docs/specs/PI-007-copilot-coship/learnings.md` — install + `/spec-flow:status` (PASS), `/agents` discovery (PASS), `/agents` listing + frontmatter hygiene (PASS). Fixed a path-duplication bug in `metadata.pluginRoot` during review.
+    prd_sections: [G-3]
+    dependencies: []
+    status: done
+
+  - name: PI-008-multi-prd-v3.0.0
+    description: |
+      Multi-PRD support — restructures the spec-flow docs layout so a project can hold multiple PRDs in parallel under a single shared charter. Replaces today's single `docs/prd/` + flat `docs/specs/` with `docs/prds/<prd-slug>/{prd.md, manifest.yaml, specs/<piece-slug>/, backlog.md}` sibling namespaces. Adds:
+        - PRD lifecycle states (drafting / active / shipped / archived) carried in the PRD's front-matter
+        - Dual backlog: per-PRD `backlog.md` for capability-scoped items, global `docs/improvement-backlog.md` for cross-PRD learnings and spec-flow process findings
+        - Short-slug naming for worktrees (`worktrees/prd-<prd-slug>/piece-<piece-slug>/`) and branches (`spec/<prd-slug>-<piece-slug>` etc.)
+        - Automatic charter-drift detection in every skill's Phase-1 context load (no new user-facing skill; inline resolution via focused qa-spec mode)
+        - Cross-PRD piece dependencies via qualified references (`depends_on: <prd-slug>/<piece-slug>`) — declarative only; orchestration stays manual for v3.0
+        - Migration flow (new `/spec-flow:migrate` skill) that upgrades existing v1.x (`docs/prd.md` flat) and v2.x (`docs/prd/prd.md` + `docs/prd/manifest.yaml`) projects to the v3 layout using `git mv` to preserve history
+      Breaking change — ships as spec-flow v3.0.0 (major bump per NN-C-003 and NN-C-009). Ad-hoc task work (lightweight spec→plan→execute for out-of-band work) is out of scope and deferred to a separate future PRD (captured in improvement-backlog.md).
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-001, NN-P-003, NN-C-003]
+    dependencies: []
+    status: merged
+    notes: |
+      Merged 2026-04-25. Delivered the spec-flow v3.0.0 multi-PRD layout: docs/prds/<prd-slug>/{prd.md, manifest.yaml, backlog.md, specs/<piece-slug>/} sibling namespaces under singular docs/charter/. New /spec-flow:migrate skill (370 LOC) handles v0/v1/v2 → v3 transitions via history-preserving git mv with --inspect (dry-run) and --force (override safety) flags. Three new reference docs (slug-validator, v3-path-conventions, charter-drift-check) factor shared rules. SessionStart hook emits a non-blocking yellow warning when layout_version is missing or pre-v3 (NN-C-005-compliant 6-scenario smoke test).
+      NN-C-009 three-place version bump landed in commit 8ed685e (plugin.json + marketplace.json + CHANGELOG header all at 3.0.0). Final Review (5 parallel reviewers) returned: PRD-alignment + spec-compliance both 0 must-fix; architecture/edge-case/blind surfaced 11 distinct must-fix items, all applied in commit 40876e6 (hook layout_version regex robustness, slug minimum-length rule, charter-drift missing-field handling, 7 migrate-skill safety fixes including the critical missing `mkdir -p docs/prds`, execute structural-failure dependency refusal contract).
+      Two intentional deferrals: (a) FR-005 branch-design ambiguity (spec lists 3 branches per piece vs v2 single-branch reality preserved in code) — captured in learnings.md as v3.1.0 spec-amendment candidate; (b) AC-15/AC-18 dog-food run + release commit — procedure documented in plugins/spec-flow/docs/release-v3.0.0.md, executed at human-driven release time per NN-P-003 framing.
+      Reflection findings persisted to docs/specs/PI-008-multi-prd-v3.0.0/learnings.md (8 process-retro items, 6 future-opportunities). High-severity process-retro items (skip-predicate calibration, mid-piece Opus pass for ≥6-phase pieces, deferred-finding tracking) should migrate to global docs/improvement-backlog.md at release time.
+
+  - name: pi-011-branch-fix
+    description: |
+      v3.x — Branch integrity: eliminate all direct-main writes during pipeline execution.
+      Fixes the root cause behind the status-friction problem log (session b4f2fafa).
+      The execute, spec, and plan skills contain `git checkout main` patterns that silently
+      fail inside git worktrees (main is already checked out in the parent) and create
+      manifest.yaml divergence between main and the feature branch, causing squash-merge
+      conflicts in PR-based repos.
+
+      Fixes: (1) execute Pre-Loop writes manifest in-progress on the execute branch, not
+      main; (2) execute Final Review writes manifest merged on the execute branch before
+      merge/PR; (3) execute writes plan.md Status: final-review-pending on the execute
+      branch; (4) adds merge_strategy: squash_local | pr config key so PR-based repos can
+      describe their topology; (5) spec and plan skills remove the git checkout main
+      manifest-update step — feature branches carry their own manifest state; (6) status
+      skill is reordered to run git worktree list first and read each execute-branch
+      worktree's manifest as authoritative for in-progress pieces; (7) status uses targeted
+      field extraction for manifests > 10KB.
+    prd_sections: [FR-004, NN-P-002]
+    dependencies: []
+    status: merged
+
+  - name: pi-012-single-branch
+    description: |
+      v3.7.0 — Collapse 3-branch-per-piece model into a single piece/<prd-slug>-<piece-slug>
+      branch. The spec skill creates the branch and worktree once; plan and execute inherit
+      both. One PR per piece after execute completes. Eliminates worktree teardown/recreation
+      between pipeline stages and the 30-branch overhead per 10-piece PRD.
+
+      Also: execute Step 5.5 hardened to write merged_at: <date> and carry a mandatory-gate
+      warning; status skill gains a stale-in-progress guard for pieces showing in-progress
+      with no active worktree (branch merged without Step 5.5).
+
+      Files changed: reference/v3-path-conventions.md, reference/slug-validator.md,
+      skills/spec/SKILL.md, skills/plan/SKILL.md, skills/execute/SKILL.md,
+      skills/status/SKILL.md, CHANGELOG.md, plugin.json.
+    prd_sections: [FR-004, FR-005]
+    dependencies: [pi-011-branch-fix]
+    status: merged
+    merged_at: 2026-05-01
+
+  - name: pi-010-discovery
+    description: |
+      v3.2.0 — Synchronous discovery triage. Eliminates silent backlog deferrals by making the execution that finds new work also fix it. Today the pipeline writes deferred QA findings, "NOT COVERED — deferred" AC matrix rows, and reflection-future-opportunities findings to backlog files at end-of-piece, surfacing them only at the next piece's spec brainstorm. Operators have no signal that prerequisite work is undone until much later. This piece restructures discovery → resolution as a synchronous flow with operator triage at discovery time.
+
+      Operator principle (binding): "the execution that found the work also fixes it." Inline plan amendment is the default response to discovery, not a separate skill. The piece bundles five distinct sub-areas as Phase Groups:
+
+      Capability (user-visible):
+        - **`/spec-flow:defer` skill** (sub-area F) — sole supported path for writing to backlog files. Records source piece, source phase, finding text, operator's rationale for non-blocking. After this lands, every other skill's automatic backlog-write code path is removed.
+
+      Orchestrator (no new user-facing surface):
+        - **depends_on enforcement at spec/plan time** (sub-area A) — `/spec-flow:spec` and `/spec-flow:plan` gain a precondition check that surfaces unmet `depends_on` to the operator with three triage options (pull-deps-in as Phase 0, fork to manifest piece, proceed with `--ignore-deps`). Recorded as a `## Dependency triage` section in the spec or plan file. Today only `execute` reads `depends_on`.
+        - **AC matrix deferred-row rejection at Verify gate** (sub-area B) — verify-agent rejects any `NOT COVERED — deferred to ...` row by default. New required `Reason:` field with three values (`does-not-block-goal | requires-amendment | requires-fork`). Phase-in via `legacy_deferred_rows: true` plan flag for one release cycle, then strict.
+        - **Discovery triage + inline plan amendment** (sub-area D, load-bearing) — new step in `skills/execute/SKILL.md` between phase-complete and next-phase-start. Aggregates discoveries from the just-finished phase's QA review and AC matrix gate; on each discovery, prompts operator with amend / fork / defer. The amend path dispatches a new `plan-amend` agent (Sonnet) that emits a unified diff inserting suffix-named phases (`phase_<n>_amend_<k>`) before the next original phase, then the orchestrator commits `amend(plan): <reason>` and resumes. Budget: 2 amendments per piece. qa-plan re-review on diff + neighborhood. Auto-mode default: amend if absorption < 50% of cumulative diff, escalate otherwise. New `.discovery-log.md` artifact per piece records every discovery and its triage outcome. Final-Review-board misses route through the same triage flow (re-opening the piece for amendment phases instead of writing deferred-finding stubs).
+        - **Reflection agents emit triage reports** (sub-area E) — `reflection-future-opportunities` and `reflection-process-retro` stop writing directly to backlog files. They emit findings to the orchestrator at Step 4.5; orchestrator dispatches the same triage UX from sub-area D for each finding. Operator's `defer` choice invokes `/spec-flow:defer`. Process-retro `process-improvement` category items batch-confirm at end of piece (cross-PRD learnings get one batched defer prompt rather than per-finding triage).
+
+      Architectural shape: 5 Phase Groups (A, B, C-as-D-prep, D, E+F bundled). Plan-amend agent is a new Sonnet agent under `plugins/spec-flow/agents/plan-amend.md`. Discovery-log artifact is a new per-piece file. All other changes modify existing skill / agent prose plus minor templates.
+
+      Backwards-compatibility: minor bump (NN-C-003: additive + opt-in stricter behavior). The `legacy_deferred_rows: true` flag preserves today's AC matrix behavior for one release. Existing `backlog.md` entries are grandfathered (no one-time triage pass forced); operators may invoke a `--triage-existing-backlog` mode of /spec-flow:defer manually if desired (out of scope for this piece — captured for future).
+
+      Risks called out for spec brainstorm:
+        - Amendment loops bounded by per-piece budget (2). Hitting the budget escalates to "scope was wrong; abandon and re-spec."
+        - Triage prompt fatigue mitigated by auto-mode defaults and the principle that better specs/plans (which this feature's adoption pressures) produce fewer discoveries.
+        - Plan-amend agent's diff+neighborhood scope must include any phase that scopes the same SKILL.md block as an amended phase — inherits the cross-phase content-dependency lesson from pi-009 (Phase B.1 → B.4 collateral damage).
+        - Spec amendments (vs plan amendments) handled identically but with stricter budget (1 per piece) and full qa-spec re-dispatch since spec drift has PRD impact.
+    prd_sections: [FR-004, NFR-003, NFR-004, NN-P-002]
+    dependencies: [pi-009-hardening]
+    status: merged
+
+  - name: pi-009-hardening
+    description: |
+      v3.1.0 — bundles all v3.0.0-reflection-driven follow-up work into one minor release. Single bigger piece by design: ships a coherent v3.1.0 rather than 3+ point releases that each pay the spec/plan/release ceremony cost. Slug renamed from PI-009-v3.1.0-hardening to comply with v3 slug-validator rules ([a-z0-9-]+, ≤20 chars). Spec authored 2026-04-25 in worktree spec/shared-pi-009-hardening; QA cleared after 3 iterations.
+
+      Capability (user-visible):
+        - FR-005 branch-design resolution — pick single-branch (current code reality) or three-branch (spec text). Update spec OR SKILL.md and add ACs covering the chosen model.
+        - Charter-drift deep scan — extend `/spec-flow:status` with `--include-drift` mode that parses NN/CR citations in each spec and verifies them against current charter bodies (semantic drift, not just timestamp).
+        - Worktree-token sweep — add `{{worktree_root}}` template token; replace hard-coded `worktrees/` references across all 17 implementer agent prompts.
+        - Migrate-skill environment precondition — formally document "the migrate skill runs in an LLM environment with `yq`/`python3` available" as a precondition; update NFR-004 and clarify NN-C-002 scope. Path 2 (ship an embedded helper script) is deferred — it would need a charter brainstorm before being specced.
+
+      Orchestrator (no user-visible surface change):
+        - Sharpen Opus QA skip-predicate — skip only for additive markdown/YAML/config; default to Opus when phase touches shell/branching logic or new skill body.
+        - Mid-piece Opus QA pass for ≥6-phase pieces — insert at half-way commit; reviewer reads cumulative diff vs. spec.
+        - "Deferred to reflection" finding tracking — orchestrator appends stub to PRD-local backlog at deferral time so reflection agents see them as input.
+        - Plan-skill phase-sizing rule — split phases >150 LOC of new behavioral prose into Phase Groups.
+        - Plan-skill exit-gate semantics rule — "X ran" cannot downgrade to "X is documented to run later."
+        - Default `[Verify]` commands to `python3 -c` for YAML/JSON validation (drop yq/jq dependency in pipeline self-checks).
+        - Iter-until-clean QA loop, applied universally — every QA gate (spec, plan, charter, execute per-phase, mid-piece Opus, Final Review fix-up) keeps iterating until the reviewer returns no must-fix findings. Iter-1 is full review; iter-2+ is focused re-review on the diff. Today's `qa_iter2: auto` skip predicate is retired; the 3-iter circuit breaker stays as the escalation guard, not as auto-stop. Codified in a single shared reference doc that all QA-running skills cite.
+
+      Minor bump (NN-C-003: backwards-compatible additions). 11 items, plan likely splits into 2-3 Phase Groups (capability vs. orchestrator vs. plan-skill rules) so per-area QA stays focused. Brainstorm during spec authoring will negotiate FR-005 path-pick and confirm migrate-skill stays on path 1.
+    prd_sections: [FR-004, NFR-003, NFR-004]
+    dependencies: [PI-008-multi-prd-v3.0.0]
+    status: done
+
+  - name: pi-013-goal-exec
+    slug: pi-013-goal-exec
+    description: |
+      v4.7.0 — Wire four Claude Code v2.1.139+ capabilities into the execute skill for
+      unattended full-piece runs: (1) GoalCreate at Step 0 sets a goal that runs through all
+      phases, QA gates, discovery triage, and Final Review fix-up, stopping at the merge gate;
+      (2) background:true on all six review-board agents enables TeammateIdle-based aggregation;
+      (3) PushNotification fires informational alerts at Step 6c and action-required alerts at
+      hard stops and the merge gate; (4) Monitor arms on plan.md at Step 0 and emits one-line
+      notifications per checkbox transition. All four features degrade silently when tools are
+      absent (NN-C-005). Minor version bump (NN-C-009).
+    prd_sections: [FR-004, G-2, NFR-003]
+    dependencies: [pi-010-discovery, pi-012-single-branch]
+    status: merged
+    merged_at: 2026-05-14
+
+  - name: pi-014-integ-tests
+    slug: pi-014-integ-tests
+    description: |
+      v4.12.0 — Integration tests as a first-class pipeline primitive (path coverage as a peer of AC
+      coverage). Adds the `[integration]` test tag, the `[Integration-Test]` phase block, mandated
+      contract tests for doubled true externals, and a new `review-board-integration` reviewer (two
+      axes: boundary correctness + path coverage incl. mock-avalanche) default everywhere — piece board
+      7→8 (fast 8→9), change-track 6→7. Ordering is true double-loop (R1 + R3): the outer integration
+      test is authored up front, drives the unit cycles, and is greened in the integration-completing
+      phase, implemented via M1–M4 machinery — M1 cross-phase integration-test registry (table in
+      plan.md, built from plan+Red, never Build), M2 tag-separated suites (per-phase gate + fast mode
+      run the non-integration suite), M3 immutability-gate edit window (single plan-authorized,
+      path-confined, phase-gated skeleton→completed edit — the one anti-cheat-gate change), M4 oracle
+      split. Threads through the doctrine (single source of truth for the definitions), spec/plan
+      authoring + qa-spec/qa-plan, the RBVR agents (tdd-red/implementer/verify/refactor), the QA gates,
+      execute orchestration + integrity gate, and the review board wiring. Inspired by the prop_firm
+      calibration-2 adversarial audit (integration-boundary defects survived a green unit suite).
+      Design fully drafted in plugins/spec-flow/proposals/review-board-integration/ (spec, plan,
+      concerns map, testing-foundations, alignment-findings). Minor bump (NN-C-009, NN-C-003 additive).
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-002, NN-P-003]
+    dependencies: []
+    status: merged
+    merged_at: 2026-06-04
+
+  - name: pi-015-defer-commit
+    slug: pi-015-defer-commit
+    description: |
+      Deferred-commit / git-free parallel TDD section + journal-based resume. Fixes the
+      shared-index races that force Phase Group sub-phases (e.g. B.2–B.7) to run serially.
+      Two races identified during the 2026-06-05 research session:
+        - Race 1 (commit): a bare `git commit` commits the whole shared index, sweeping
+          siblings' staged files; `git add` itself also collides on `.git/index.lock`. Both
+          empirically confirmed. Real hit in pi-009 (A.4's commit attribution lost to the A.2
+          staging race). Current mitigation is detect-after-the-fact (Step 3.7b reconciliation),
+          which thrashes at fan-out.
+        - Race 2 (oracle, previously undocumented anywhere in the repo): the per-phase oracle
+          invariant (a) "0 failed across the suite" sees siblings' red tests on the shared
+          working tree and fails spuriously. Not fixed by any commit-side change.
+      Approach — Option D (chosen over A=per-sub-phase worktrees, rejected by operator; B=pathspec
+      commit + mutex; C=batch followers): keep the parallel section git-free — sub-phases do pure
+      file I/O + a per-sub-phase-SCOPED oracle, and recovery is plain rm/rewrite (no git, no ref,
+      no lock). Commit ONCE per Phase Group at the G5 barrier after a whole-suite green check. This
+      eliminates Race 1 + the index.lock contention outright; Race 2 is handled by scoping each
+      sub-phase oracle to its own test IDs and restoring the whole-suite-green guarantee at the
+      barrier. The one cost — coarser crash recovery, since a commit is today's only durable
+      checkpoint — is mitigated by a resume JOURNAL recording group_start_sha (the starting point)
+      + per-sub-phase status (where we are), aligned with the existing .orchestra-state.json
+      precedent. Tier 1 = journal only (content rides the surviving working tree). Tier 2
+      (config-gated) = + dangling `commit-tree` checkpoints via a private GIT_INDEX_FILE — no ref
+      advance, no index.lock contention, survives a working-tree wipe (confirmed recoverable via
+      `git checkout <sha> -- .`).
+      Touch-point map (deep-dived): execute/SKILL.md (Phase Group Loop G4 git-free / G5 barrier
+      full-suite + single commit / G10, per-phase Steps 2–3 commit semantics, post-commit gates
+      3.7b → working-tree-hash, oracle Race-2 scoping composed with pi-014's M2/M4 non-integration
+      split, auto-triage matrix → file-scoped `git restore`, Session Resumability → journal),
+      agents/implementer.md (Rule 8 unified-commit contract), agents/tdd-red.md (staging contract),
+      reference/spec-flow-doctrine.md (commit-cadence section), .spec-flow.yaml +
+      templates/pipeline-config.yaml (new `deferred_commit` / `journal_tier` knobs), and a new
+      reference/deferred-commit-journal.md (journal schema + resume algorithm + Tier-1/2 mechanics).
+      Backward-compatible default preserves today's per-phase-commit behavior (NFR-003) — likely a
+      config-gated minor bump (NN-C-009 additive); major only if the default flips to deferred.
+      Two decisions deferred to spec: (1) Tier-1-only vs Tier-1+Tier-2 in v1; (2) whether the
+      Race-2 scoped-oracle change rides this piece or carves into its own.
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
+    dependencies: [pi-014-integ-tests]
+    status: merged
+    merged_at: 2026-06-05
+
+  - name: pi-020-dc-harden
+    slug: pi-020-dc-harden
+    description: |
+      Execute-robustness hardening. Combines the two pi-015 deferred-commit follow-ons
+      (supersedes pi-016 + pi-017) AND the pi-021 base-ref finding (supersedes pi-023) — all on the
+      execute/SKILL.md surface (Phase Group Loop + reference/deferred-commit-journal.md + agent
+      contracts + the `git diff <base>..HEAD` sites), so one codebase exploration and one review
+      board cover all three. Sequenced HARDENING-FIRST:
+      (1) Anti-cheat hash-object anchoring (was pi-017, reflection F1): at `red-done`, `git hash-object -w`
+      each Red test file and store the immutable git blob SHA in the journal `red_manifest_hashes`
+      (alongside/instead of the bare sha256sum); at the G9b barrier verify the working-tree file hashes
+      to the same git object — a digest the Build agent cannot forge by editing the journal. Closes the
+      "manifest self-asserted by the policed actor" hole the pi-015 Final Review board flagged (Security
+      CWE-345). MUST precede (2) because concurrency widens the tamper window.
+      (2) Safe concurrency re-enable + Race-2 scoped oracle (was pi-016, ADR-1 carve-out): restore
+      concurrent Phase Group dispatch on the git-free foundation without reintroducing the shared-index
+      race (Race-1, already removed); fix Race-2 (per-phase "0 failed across the suite" spuriously failing
+      on a sibling's still-red tests) by scoping each sub-phase oracle to its own test IDs + restoring the
+      whole-suite-green guarantee at the barrier; plus INV-9 lightweight runtime isolation (TMPDIR/port/DB
+      injection + parallel-safety contract + serial-replay-on-failure backstop → slower-never-wrong).
+      Runtime model validated by the pi-015 9-invariant harness (specs/pi-015-defer-commit/VALIDATION.md).
+      (3) Base-ref parameterization (was pi-023, pi-021 Final Review integration finding): the skill
+      hardcodes `git diff main..HEAD` in ~5 sites (final-review-pending marker, Step 1a scope detection,
+      iter-1/amend diff captures), so a repo whose default branch is `master` (this one) makes
+      `main..HEAD` fail to resolve — breaking the Final Review diff capture and the pi-021 coherence
+      self-check. Resolve the base ref once (default-branch detection, or a `.spec-flow.yaml` key) and
+      thread it through every `git diff <base>..HEAD` site. Low-risk; independent of (1)/(2).
+    prd_sections: [G-2, FR-004, NFR-003, NN-P-002]
+    dependencies: [pi-015-defer-commit]
+    status: merged
+    merged_at: 2026-06-05
+
+  - name: pi-021-coherence
+    slug: pi-021-coherence
+    description: |
+      Combines the two pi-015 review-process follow-ons (supersedes pi-018 + pi-019) — same surface
+      (execute + plan + qa-plan skills), both targeting the cross-step wiring gaps pi-015 exposed (every
+      per-phase QA passed clean, yet the end-of-piece board found ~6 must-fix gaps). Human gates + a
+      tooling gate:
+      (P1) a mandatory whole-file coherence pass for single-file multi-phase pieces (≥3 phases all editing
+      one orchestration file), dispatched between the last such phase's QA and end-of-piece Final Review;
+      (P2) a plan-authoring requirement that a phase introducing a new conditional path through an existing
+      loop/state-machine enumerate EVERY pre-existing step the new path traverses/invalidates, not just the
+      steps it edits;
+      (P3) a dispatch-site census — when a piece changes a cross-cutting agent-dispatch contract, the plan
+      must list every (re-)dispatch site of the affected agents;
+      (LINT) a charter-tools-compliant structural linter (bash + grep/awk, no runtime deps) over
+      skills/*/SKILL.md asserting cross-step invariants — referenced `Step G<n>` exist, `auto`/`off` branch
+      parity, journal/state field producer↔consumer matching — run as a qa-plan gate / execute self-check
+      (the mechanized form of P1). Source: pi-015 reflection P1/P2/P3 + F2 (fix-as-found, not deferred).
+    prd_sections: [G-2, FR-004, NN-P-002]
+    dependencies: []
+    status: merged
+
+  - name: pi-023-base-ref
+    slug: pi-023-base-ref
+    description: |
+      Parameterize the merge-base ref across execute/SKILL.md. SUPERSEDED — folded into
+      pi-020-dc-harden item (3): same execute/SKILL.md surface, amortized under one exploration +
+      one review board. See pi-020-dc-harden.
+    prd_sections: [FR-004, NN-P-002]
+    dependencies: []
+    status: superseded
+    superseded_by: pi-020-dc-harden
+
+  - name: pi-022-vsync-ci
+    slug: pi-022-vsync-ci
+    description: |
+      Combines PI-002 + PI-003 (PI-003 already depended on PI-002) — same marketplace-tooling surface.
+      (CI) a minimal CI job / pre-commit hook (shell + jq only) enforcing NN-C-001 across all marketplace
+      plugins: compare each plugin.json version to its matching marketplace.json entry, fail on drift.
+      (RETRO) after using charter on real pieces (PI-001/PI-002 themselves are candidates), capture what
+      worked / didn't with charter; actionable findings become tracked spec-flow improvements
+      (fix-as-found per the no-defer-in-ai-plugins policy, not backlog rot).
+    prd_sections: [FR-001, NFR-003, NN-C-001, G-4, NN-P-003, SC-003]
+    dependencies: [PI-001-marketplace-version-sync]
+    status: open
+
+coverage:
+  total_prd_sections: 15
+  covered_sections: 8
+  uncovered_sections:
+    - G-1
+    - G-3
+    - FR-002
+    - FR-003
+    - NFR-001
+    - NFR-002
+    - NFR-004
+    - SC-001
+    - SC-002
+    - SC-004
+    - NN-P-003
+  percentage: 53
+  notes: |
+    Uncovered-but-intentional: many of G-1/G-3/FR-002/FR-003/NFR-001/NFR-002/NFR-004 are already satisfied by the repo's existing structure (marketplace.json exists, plugin.json exists, install mechanism works, no runtime deps). These don't need dedicated pieces — they're verified by the existence and correctness of the current files. Charter-enforcement keeps them satisfied going forward.
+    SC-001/SC-002/SC-003/SC-004 are measurement goals, not implementable pieces. They come true (or don't) over time as users adopt.
+    NN-P-003 ("dog-food before recommend") is a process rule enforced at release time, not a piece.
+    PI-005 (design) and PI-006 (implementation) were intended as the prerequisite pieces for SC-002, but both were superseded on 2026-04-21 when the mirror-branch conversion pattern they assumed was discovered to be inferior to the co-ship dual-configuration pattern demonstrated by the superpowers plugin (github.com/obra/superpowers). PI-007-copilot-coship shipped on 2026-04-21 as the design+implementation prerequisite for SC-002, using a single-path dual-host co-ship (plain-`.md` agent files, subdirectory and marketplace install paths, no mirror branch). SC-002 remains in uncovered_sections as a measurement goal — its Copilot-CLI install leg now has three documented smoketest PASS outcomes (see `docs/specs/PI-007-copilot-coship/learnings.md`), and the real-world-adoption signal will accumulate as users install spec-flow on Copilot CLI in the wild.
