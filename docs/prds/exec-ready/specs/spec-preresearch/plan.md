@@ -210,7 +210,7 @@ Why serial: the three files are disjoint but each cites the Phase-1 artifact con
 - CR-008 (single-task, no sub-agents): each agent runs one phase and dispatches nothing.
 - NN-P-005 (Opus thinking): all three are `model: opus`.
 
-- [ ] **[Implement]** Author the coordinator, viability, and synthesis agents
+- [x] **[Implement]** Author the coordinator, viability, and synthesis agents
   - Architecture constraints: each file clones `agents/research.md` (introspection.md §10) — frontmatter shape + the six H2 sections (`## Role / Single Task` → `## Injected Inputs (No History)` → `## Procedure` → `## Output Contract` → `## No Secrets` → `## Return Contract`) + the verbatim STATUS final-line block. All schema/marker detail is CITED from `reference/deliberation-artifact.md`, never restated.
 
   **Change Specifications:**
@@ -258,7 +258,7 @@ Why serial: the three files are disjoint but each cites the Phase-1 artifact con
   - Done: file exists; bare name; `model: opus`; compose-check + conflict-documentation + narrow-to-composable procedure; cites artifact §Integration Check; STATUS contract.
   - Verify: phase `[Verify]` greps name/model + "compose"/"conflict".
 
-- [ ] **[Verify]** Confirm the three agent contracts
+- [x] **[Verify]** Confirm the three agent contracts
   **Per-change checks:**
   - T-1: `grep -E "^name: deliberation-coordinator$" plugins/spec-flow/agents/deliberation-coordinator.md && grep -E "^model: opus$" plugins/spec-flow/agents/deliberation-coordinator.md` — Expected: both match.
   - T-1: `grep -ci "web\|search" plugins/spec-flow/agents/deliberation-coordinator.md` — Expected: ≥1 (web-research procedure present, AC-4).
@@ -271,7 +271,7 @@ Why serial: the three files are disjoint but each cites the Phase-1 artifact con
   - Expected: all true.
   - Failure: a restated schema, a prefixed name, a missing branch, or any sub-agent dispatch.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-1, AC-3, AC-4, AC-5, AC-17
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
