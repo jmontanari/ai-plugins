@@ -399,7 +399,7 @@ Why serial: a single shared file cited by all four calling skills; must land bef
 - CR-009 (heading hierarchy): new sections are H3 under `## Core Brainstorm Building Blocks`, carrying the `[shared]` tag idiom.
 - NN-C-008 (self-contained dispatch): the validate agent is dispatched with the assertion + deliberation context injected; no history assumed.
 
-- [ ] **[Implement]** Wire the deliberation invocation item, the Tier-2 loop, and the C-2 amendment
+- [x] **[Implement]** Wire the deliberation invocation item, the Tier-2 loop, and the C-2 amendment
   - Architecture constraints: the loop lives ONCE here and is shared by all four calling skills; new sections carry `[shared]` (introspection.md §6 Pattern Catalog). Cite `agents/deliberation-validate.md` and `reference/deliberation-artifact.md`; restate neither the verdict semantics beyond the branch nor the Validation-Round schema.
 
   **Change Specifications:**
@@ -435,7 +435,7 @@ Why serial: a single shared file cited by all four calling skills; must land bef
   - Done: the Tier-2 section exists with `[shared]`, the five-step loop, the default-bias-don't-fire rule, the three-verdict branch with hard=no-override/soft=override, the Validation-Round append citation, the human-paced termination, the no-fire-without-deliberation.md condition, AND the worked example.
   - Verify: phase `[Verify]` greps the section + verdicts + override + sign-off + the example comment.
 
-- [ ] **[Verify]** Confirm the shared brainstorm wiring
+- [x] **[Verify]** Confirm the shared brainstorm wiring
   **Per-change checks:**
   - T-1: `grep -ni "deliberation pass\|deliberation protocol" plugins/spec-flow/reference/brainstorm-procedure.md` — Expected: ≥1 (invocation item present).
   - T-2: `grep -n "never silently skip" plugins/spec-flow/reference/brainstorm-procedure.md` — Expected: still present (rule preserved); AND `grep -ni "auto-skip is not silent\|Amendment (v5.8.0" …` — Expected: ≥1 (amendment appended; AC-11).
@@ -448,7 +448,7 @@ Why serial: a single shared file cited by all four calling skills; must land bef
   - Expected: all true.
   - Failure: the "never silently skip" rule deleted, Tier-2 fires without a deliberation.md, a wrong override semantic, or a missing worked example.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-8, AC-11, AC-21, AC-22, AC-23
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
