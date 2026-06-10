@@ -467,7 +467,7 @@ Why serial: the canonical 5-phase orchestration block lands here and the other t
 - NN-C-008 (self-contained dispatch): each agent is dispatched with its injected inputs per the agent contracts.
 - CR-008 (thin orchestrator): the skill dispatches/sequences/commits; no design logic moves into it.
 
-- [ ] **[Implement]** Wire the Opus pre-flight, the deliberation block, the step-1b rewrite, and the question gate
+- [x] **[Implement]** Wire the Opus pre-flight, the deliberation block, the step-1b rewrite, and the question gate
   - Architecture constraints: the deliberation block follows the existing numbered-step dispatch+branch convention of the pre-brainstorm setup (introspection.md §1 Pattern Catalog). The orchestration prose is the spec.md §Skill wiring steps 0–8 (lines 244–285). The pre-flight is execute's L13–45 block inverted to Opus (introspection.md §8).
 
   **Change Specifications:**
@@ -508,7 +508,7 @@ Why serial: the canonical 5-phase orchestration block lands here and the other t
   - TARGET: augment step 3's "ask only about what remains genuinely unclear" with: "When `deliberation.md` exists, design questions are **restricted to §Validated Open Questions**; each question presented MUST carry a citation — either a `VOQ-N` ID (for a listed validated open question) or a named deliberation section (for an emergent follow-up, e.g. 'Following deliberation §Integration Check: …'). Mandatory blocks (C-1, C-2, H-4, M-7) follow the auto-skip / confirmation-not-discovery logic in `reference/brainstorm-procedure.md` (cite, do not restate)."
   - Done: the VOQ-N / named-section citation requirement + the mandatory-block reference are present in step 3.
 
-- [ ] **[Verify]** Confirm the spec wiring
+- [x] **[Verify]** Confirm the spec wiring
   **Per-change checks:**
   - T-1: `grep -n -i "opus" plugins/spec-flow/skills/spec/SKILL.md | grep -i "pre-flight\|model check\|Override\|Cancel spec"` — Expected: the pre-flight block lines; AND `grep -c "Override\|Change now\|Cancel" plugins/spec-flow/skills/spec/SKILL.md` — Expected: ≥3 (three choices; AC-24).
   - T-2: `grep -nE "Phase A|Phase B|barrier|Phase C|Phase D|Phase E" plugins/spec-flow/skills/spec/SKILL.md` — Expected: all six tokens present in the pre-brainstorm block (AC-2).
@@ -522,7 +522,7 @@ Why serial: the canonical 5-phase orchestration block lands here and the other t
   - Failure: phase order wrong, no barrier, a missing fallback branch, fewer than five lenses, or a hard-refusing pre-flight.
   - Manual smoke (operator, optional — the spec's only live run): run `/spec-flow:spec` on a scratch piece; confirm the first brainstorm message is the Investigation Summary (not a question) and `deliberation.md` has the 7 H2 sections.
 
-- [ ] **[QA]** Phase review
+- [x] **[QA]** Phase review
   - Review against: AC-1, AC-2, AC-8, AC-11, AC-12, AC-17, AC-18, AC-24
   - Diff baseline: git diff {{phase_start_tag}}..HEAD
 
