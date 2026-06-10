@@ -30,7 +30,7 @@ At `lite` depth, Phase D runs over a reduced lens subset rather than the full 5-
 - `scope/simplicity` — is this the simplest solution? any scope creep or under-scope?
 - `risk` — key failure modes, hidden assumptions, external dependencies?
 
-This subset is overridable via the optional `.spec-flow.yaml deliberation.lenses` list. Absent the override, `[scope-simplicity, risk]` applies.
+This subset is overridable via the optional `.spec-flow.yaml deliberation.lenses` list. Absent the override, `[scope/simplicity, risk]` applies.
 
 ## Resolution order
 
