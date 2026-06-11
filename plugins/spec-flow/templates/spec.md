@@ -51,10 +51,8 @@ Cite relevant `CR-xxx` entries from `<charter_root>/skills/charter-coding-rules/
 - {{cr_id}} ({{short_name}}): {{how_this_piece_honors_it}}
 
 ## Acceptance Criteria
-<!-- Every AC's Independent Test line MUST carry exactly one verifiability tag: [machine: <named check>] (a deterministic grep/script/test decides) or [judgment: <named arbiter>] (a named human decides). Untagged/empty-valued ACs are qa-spec #17 must-fix. -->
 AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}}
-  Independent Test [machine: <named check — a grep/script/test that decides>]: <how to verify>
-  — or — Independent Test [judgment: <named arbiter — who decides>]: <what they inspect>
+  Independent Test: {{how_to_verify_in_isolation}} (for an integration-bearing AC, the Independent Test may assert the real wired path, not isolation)
 
 ## Technical Approach
 {{architecture_decisions_patterns_data_flow}}
