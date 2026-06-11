@@ -111,3 +111,21 @@ The no-re-spike guard (Step 1c) is piece-scoped: `spikes/<phase-id>.md` lookup i
 **FO-4: flywheel-global dependency gate is now cleared.** flywheel-global (manifest `status: open`) required flywheel-refresh to be merged (lifecycle mechanics precondition). This piece satisfies that gate. Start of flywheel-global is further gated on: (1) at least one real threshold-triggered hardening on live pieces (per manifest ordering note), and (2) resolution of open questions FW-1 (`hardenings` schema variant for cross-repo context) and FW-3 (resolved/blocked exclusion ACs) — both already in this backlog (2026-06-09). No new piece needed; this is a tracking note.
 
 **Captured:** 2026-06-11
+
+---
+
+## Deferred from exec-ready/gate-scaling step-4.5-reflection (2026-06-11)
+
+**Source:** `exec-ready/gate-scaling` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`). Deferred via operator triage 2026-06-11 — all are future-scope enhancements, none are current defects.
+
+**GS-1: Coherence linter — enforce `<<<...>>>` delimiters at triage dispatch sites.** Add a linter invariant that verifies triage dispatch sites in `execute/SKILL.md` use all three required structural delimiters (`<<<JUST_FIXED_FINDINGS>>>`, `<<<FIX_DIFF>>>`, `<<<PRIOR_MUSTFIX_SET>>>` with matching `<<<END>>>` markers). A missing delimiter silently corrupts triage input without any parse error. Candidate: BLOCK-level invariant (same tier as invariant-1). **Deps:** gate-scaling (merged); self-contained linter extension.
+
+**GS-2: Coherence linter — `known-violations` suppression for cross-file step refs.** Provide a `.linter-known-violations` file or inline annotation (`# lint: cross-file-step-ref`) so pre-existing and intentional invariant-1 cross-file step references can be suppressed without masking real new violations. Unblocks clean linter exits for all future execute runs. **Deps:** gate-scaling (merged); see also improvement-backlog MF-GS-3 for the repair of pre-existing violations.
+
+**GS-3: Pre-5.14 metrics backfill convention.** When a piece's spec/plan gates ran before gate-scaling shipped, `metrics.yaml` should carry an explicit comment at the omitted `spec_gate`/`plan_gate` block site (e.g. `# gate ran before gate-scaling shipped`). The gate-scaling piece itself demonstrates this pattern — its own spec/plan gate blocks are absent with a prose comment. Candidate: add a note to `reference/metrics-artifact.md §gate_scaling` formalizing the pre-5.14 omission convention so all future backfill-authors use consistent form. **Deps:** gate-scaling (merged); self-contained reference amendment.
+
+**GS-4: `#advisory-fields` anchor in `reference/gate-scaling.md`.** The `machine_checkable_ratio` at spec-gate is the first advisory-only field in the gate-scaling contract — present but non-blocking, silently omitted if unavailable, never raises a must-fix. Future gates adding advisory fields will need to define the same contract. Candidate: add an `## advisory-fields` section to `reference/gate-scaling.md` with a concise definition of the advisory-field contract so all gates can cite-by-reference rather than restating it inline. **Deps:** gate-scaling (merged); self-contained reference amendment.
+
+**GS-5: Additional spec-gate digest advisory signals.** The current spec-gate digest carries three fields (QA-iteration count, zero-marker scan result, `machine_checkable_ratio` if available). Candidates for additional advisory fields already computable at spec Phase 5: `spec_line_count` vs soft/hard budget, `qa_round_count` (operator Q→A exchanges during brainstorm), `research_artifact_present`. All are in `metrics.yaml` after Phase 5 — adding them broadens operator context at sign-off with no predicate impact. **Deps:** gate-scaling (merged); gate-scaling GS-4 (advisory-fields anchor is a natural prerequisite).
+
+**Captured:** 2026-06-11

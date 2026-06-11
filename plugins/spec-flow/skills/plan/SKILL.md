@@ -335,9 +335,9 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     3. **Enumerate branches.** For Implement-track / Non-TDD phases, every conditional branch in the deliverable (if/when/unless/otherwise/either, or an enumerated case) gets its own numbered AC (reference §3).
     Reference `plugins/spec-flow/reference/plan-concreteness.md` for all definitions — do not restate them here.
 
-2g. **Test Data contract for test-authoring phases (FR-003).** Every phase that authors tests — a phase containing a `[TDD-Red]` step (TDD track) or a `[Write-Tests]` step (Non-TDD mode) — must carry a complete `Test Data` block (one entry per behavior-under-test: case id + concrete input + expected outcome/oracle), defined authoritatively in `reference/plan-concreteness.md §5. Test Data contract`. As you author each such phase:
-    1. **Author the oracle.** Give each behavior a concrete input and expected outcome; the `[TDD-Red]`/`[Write-Tests]` test entries reference cases by id so the oracle is written once (reference/plan-concreteness.md §5. Test Data contract).
-    2. **Mark unpredictable outcomes.** A case whose expected outcome genuinely cannot be predicted carries a per-case `[SPIKE: <unknown>]` in its expected-outcome position (reference/plan-concreteness.md §2. The [SPIKE: <unknown>] marker — same marker, no new token); predictable cases keep concrete data.
+2g. **Test Data contract for test-authoring phases (FR-003).** Every phase that authors tests — a phase containing a `[TDD-Red]` step (TDD track) or a `[Write-Tests]` step (Non-TDD mode) — must carry a complete `Test Data` block (one entry per behavior-under-test: case id + concrete input + expected outcome/oracle), defined authoritatively in `plugins/spec-flow/reference/plan-concreteness.md` (Test Data contract). As you author each such phase:
+    1. **Author the oracle.** Give each behavior a concrete input and expected outcome; the `[TDD-Red]`/`[Write-Tests]` test entries reference cases by id so the oracle is written once (see Test Data contract in plan-concreteness.md).
+    2. **Mark unpredictable outcomes.** A case whose expected outcome genuinely cannot be predicted carries a per-case `[SPIKE: <unknown>]` in its expected-outcome position (see the [SPIKE:] marker section in plan-concreteness.md — same marker, no new token); predictable cases keep concrete data.
     3. **Completeness.** Every named behavior must have a covering case and every case both an input and an expected outcome (or a per-case `[SPIKE]`) — `qa-plan` #31 must-fixes an absent or incomplete block. A pure `[Implement]` phase (no test step) requires no block.
     Reference `plugins/spec-flow/reference/plan-concreteness.md` for all definitions — do not restate them here.
 
@@ -534,7 +534,7 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     - **P3 (dispatch sites):** a piece changing a cross-cutting agent-dispatch contract must enumerate, in a `**Dispatch sites (P3):**` header field, every (re-)dispatch site of the affected agents; if none, state "none."
     - Both header fields are REQUIRED only when the edited file is a multi-step orchestration file (per the Definition above); otherwise they may be omitted.
 
-9d. **Doc-as-code branch-enumeration ACs (FR-002c).** For each Implement-track / Non-TDD phase, before finalizing the AC Coverage Matrix, scan the phase's deliverable prose for conditional branches (if/when/unless/otherwise/either, or an enumerated case) and confirm each has a matching numbered AC. See `reference/plan-concreteness.md §3. Doc-as-code branch-enumeration-AC rule`. A conditional branch with no covering AC is a concreteness defect the author must fix before the Phase 3 QA dispatch.
+9d. **Doc-as-code branch-enumeration ACs (FR-002c).** For each Implement-track / Non-TDD phase, before finalizing the AC Coverage Matrix, scan the phase's deliverable prose for conditional branches (if/when/unless/otherwise/either, or an enumerated case) and confirm each has a matching numbered AC. See the branch-enumeration-AC rule section of `plugins/spec-flow/reference/plan-concreteness.md`. A conditional branch with no covering AC is a concreteness defect the author must fix before the Phase 3 QA dispatch.
 
 10. **Contracts section generation (FR-PLAN-004 / FR-PLAN-005 / FR-PLAN-006 / FR-PLAN-007).** After all phases are drafted, generate the `## Contracts` section. Steps:
 
@@ -646,7 +646,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 **Metrics — concreteness_floor:** Record `plan.concreteness_floor = passed` when this QA loop reaches clean with no circuit-breaker escalation; `overridden` when the piece advances via the 3-iter circuit-breaker human override. `plan.qa_iterations` = the iteration count to clean. Both fields are persisted in Phase 4 per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
 
-4. Print the following sign-off review block, then present the approve / request-changes prompt (Phase 4 step 1 behavior).
+4. When QA returns clean: print the following sign-off review block, then evaluate the plan gate (`reference/gate-scaling.md#plan-gate`).
 
    **Sign-off review block (plan):**
    ```
@@ -660,6 +660,14 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
      Ask the orchestrator to print the full plan in chat (on demand only)
    ```
    The orchestrator does NOT auto-print the full plan document. The full document is printed only when the operator explicitly requests it (via `!cat`, `!open`, or an in-chat request).
+
+   - **If the plan-gate predicate holds** (see `reference/gate-scaling.md#plan-gate`):
+     Render the evidence digest per `reference/gate-scaling.md#evidence-digest-payload`. Then offer a single-key summary-confirm to the user. A keystroke is always required — nothing auto-advances (NN-P-001).
+   - **Else** (predicate fails — see `reference/gate-scaling.md#plan-gate`):
+     Present plan to user for sign-off using today's full sign-off prompt unchanged. A keystroke is always required (NN-P-001).
+   - On QA-clean but un-assemblable evidence (e.g. an AC-Coverage-Matrix `file:line` pointer is absent or unresolvable): fall back to the full sign-off prompt. In the Phase 4 step 5a metrics upsert, record `gate_scaling.plan_gate.offered_summary_confirm: false, fell_back: false` (conjunct iii failed — this is not a fallback from a clean predicate). Cite anchors; do NOT restate the predicate.
+
+**Limitation:** The QA agent cannot assess implementation trade-offs not captured in the plan. The human sign-off covers this gap.
 
 ### Phase 4: Finalize
 
@@ -711,7 +719,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    > **Branch ownership:** The manifest update stays on `piece/<prd-slug>-<piece-slug>`.
    > Main's manifest advances when this branch is merged or a PR is opened.
 5. Commit plan on worktree branch:
-   **5a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, upsert the `plan:` block into the existing `metrics.yaml` (created at spec stage; create with the envelope if absent) with: `qa_iterations`, `concreteness_floor`, and `budget_compliance` — for each artifact measured in the Phase-3 budget-resolution sub-step (`plan_md_total` and `plan_md_max_phase`), write `{lines: N, soft: S, hard: H, status: pass|over}` — `status` is `pass` when N ≤ H, `over` otherwise; `soft` and `hard` are the resolved thresholds (override or reference-doc default). `budget_compliance` is passive metadata (ADR-3) — `scripts/metrics-aggregate` does NOT consume it. Refresh `last_updated`, and stage it with the plan commit. `off` ⇒ skip; write failure ⇒ emit `[METRICS-DEGRADED: <reason>]` and continue.
+   **5a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, upsert the `plan:` block into the existing `metrics.yaml` (created at spec stage; create with the envelope if absent) with: `qa_iterations`, `concreteness_floor`, and `budget_compliance` — for each artifact measured in the Phase-3 budget-resolution sub-step (`plan_md_total` and `plan_md_max_phase`), write `{lines: N, soft: S, hard: H, status: pass|over}` — `status` is `pass` when N ≤ H, `over` otherwise; `soft` and `hard` are the resolved thresholds (override or reference-doc default). `budget_compliance` is passive metadata (ADR-3) — `scripts/metrics-aggregate` does NOT consume it. Also upsert `gate_scaling.plan_gate:` with `offered_summary_confirm`, `fell_back`, and `reason` based on the step 4 gate outcome: `offered_summary_confirm: true` when the predicate held and summary-confirm was offered; `false` otherwise. `fell_back: true` only when the predicate held (all three conjuncts) but the full prompt was shown anyway for reasons outside the predicate (operator choice, runtime error, edge case); `false` in all other cases — including when conjunct (iii) failed (un-assemblable evidence). `reason: null` when `fell_back == false`; free-text string explaining why when `fell_back == true`. Refresh `last_updated`, and stage it with the plan commit. `off` ⇒ skip; write failure ⇒ emit `[METRICS-DEGRADED: <reason>]` and continue.
    ```bash
    git add <docs_root>/prds/<prd-slug>/specs/<piece-slug>/plan.md <docs_root>/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml
    git commit -m "plan: add <prd-slug>/<piece-slug> implementation plan"

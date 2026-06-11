@@ -1710,9 +1710,18 @@ Before dispatching the review board, run a mechanical coherence self-check over 
 
 (Each board prompt also begins with the `WORKTREE: <abs-path>` preamble per the Dispatch Preamble standing rule — the `+ diff only` shorthand below describes the review payload, not an exhaustive prompt spec.)
 
+Before composing the dispatch roster, read `review_board_variant` from the plan's front-matter. **Allowlist check:** the only recognised values are `doc-as-code` and absent (key not present). Any other value (typo, unknown variant) MUST be treated as absent — emit `WARNING: unrecognised review_board_variant "<value>"; falling back to standard roster (blind retained)` and proceed with the standard roster. Never silently omit the blind reviewer on an unrecognised value. When `review_board_variant: doc-as-code`, apply the swap from `reference/gate-scaling.md#board-swap-rule`:
+- OMIT the blind reviewer dispatch
+- ADD a second edge-case reviewer; the two edge-case dispatches carry differentiated seeds per `reference/gate-scaling.md#board-swap-rule` (seed-A injected into edge-case#1 prompt; seed-B injected into edge-case#2 prompt)
+When `review_board_variant` is absent (or falls back to absent per the allowlist check), dispatch the roster exactly as today (blind retained, single un-seeded edge-case).
+
 Read each template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<role>.md` and dispatch ALL EIGHT concurrently with `Input Mode: Full`:
 
 ```
+# doc-as-code variant (review_board_variant: doc-as-code):
+Agent({ description: "Edge case review seed-A (iter 1, full)", prompt: <review-board-edge-case.md + Input Mode: Full + diff + codebase note + seed-A from reference/gate-scaling.md#board-swap-rule>, model: "opus" })
+Agent({ description: "Edge case review seed-B (iter 1, full)", prompt: <review-board-edge-case.md + Input Mode: Full + diff + codebase note + seed-B from reference/gate-scaling.md#board-swap-rule>, model: "opus" })
+# standard variant (absent / any other value):
 Agent({ description: "Blind review (iter 1, full)", prompt: <review-board-blind.md + Input Mode: Full + diff only>, model: "opus" })
 Agent({ description: "Edge case review (iter 1, full)", prompt: <review-board-edge-case.md + Input Mode: Full + diff + codebase note>, model: "opus" })
 Agent({ description: "Spec compliance review (iter 1, full)", prompt: <review-board-spec-compliance.md + Input Mode: Full + diff + spec + plan + (charter NN-C/CR + prd NN-P for claim verification)>, model: "opus" })
@@ -1735,7 +1744,9 @@ When `track = "change"`, dispatch exactly **7 agents** (not 8 or 9):
 
 SKIP: `review-board-prd-alignment` — no PRD in change-track; this agent is explicitly excluded for `track = "change"`.
 
-When `track = "piece"`, the existing 8-standard-agent dispatch runs unchanged.
+**`review_board_variant` does NOT apply to change-track.** The `doc-as-code` board-swap (which replaces the blind seat with a second seeded edge-case seat) is a piece-track-only feature. For change-track, the 7-agent roster above is always used unchanged regardless of any `review_board_variant` annotation.
+
+When `track = "piece"`, the existing 8-standard-agent dispatch runs unchanged (with board-swap applied if `review_board_variant: doc-as-code` — see the read block above).
 
 **Fast mode — 9th board member:** if `orchestrator_fast_mode: true`, additionally dispatch concurrently:
 
@@ -1773,7 +1784,11 @@ If must-fix findings exist:
   git commit -m "fix: final-review iter M must-fix"
   ```
   Hooks run normally. If a hook fails, re-dispatch the fix agent with the hook output appended; don't bypass.
-- Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 7-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth, integration) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 8 standard agents. Note: the 9th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
+- **Triage meta-router (AC-19/AC-20).** Before triggering a full-board re-dispatch, dispatch `review-board-triage` (Opus, `agents/review-board-triage.md`) with the three context blocks **wrapped in structural delimiters** matching the names the agent expects: wrap the just-fixed must-fix findings in `<<<JUST_FIXED_FINDINGS>>> … <<<END_JUST_FIXED_FINDINGS>>>`, wrap `review_iter_M_fix_diff` in `<<<FIX_DIFF>>> … <<<END_FIX_DIFF>>>`, and wrap the deduped prior board must-fix set in `<<<PRIOR_MUSTFIX_SET>>> … <<<END_PRIOR_MUSTFIX_SET>>>` (see `plugins/spec-flow/agents/review-board-triage.md` for the contract). The triage agent returns `route-to-full-board: yes` or `no`:
+  - **`route-to-full-board: yes`** (any contested, new finding signal, or out-of-locus trigger) → proceed to the existing full-board re-dispatch below. Decrement `L`.
+  - **`route-to-full-board: no`** (all fixed findings settled; no new signals) → SKIP the full-board re-dispatch for this iteration. Do NOT decrement `L` — a triage-only cycle is not a full review cycle.
+  Note: `L` decrements only on a full-board re-dispatch, never on a triage-only cycle.
+- Re-dispatch reviewers (fresh) with `Input Mode: Focused re-review`, that reviewer's own prior must-fix findings, and `review_iter_M_fix_diff`. Do NOT re-send the full worktree diff. For `track = "change"` pieces: re-dispatch the same 7-agent set (security, blind, architecture, edge-case, spec-compliance, ground-truth, integration) — do NOT include review-board-prd-alignment. For piece-track: re-dispatch all 8 standard agents. (When `review_board_variant: doc-as-code` is active, use the swapped roster from the Step-1 read block above (per `reference/gate-scaling.md#board-swap-rule`) — two seeded edge-case agents, no blind. For track = "change": the 7-agent set is unaffected by the variant.) Note: the 9th board member (`verify-piece-full`) does NOT participate in the fix loop — test quality findings from that reviewer route to Step 8 triage rather than through fix-code, since test file rewrites require plan amendments, not production code fixes.
 - Re-triage the new findings (still deduplicate across reviewers).
 - **Circuit breaker:** `qa_max_iterations` (`L`) full review cycles maximum (`L` = the piece-wide resolved value from Step 0; `auto` resolves to 5 for `tdd: false` pieces and 3 for `tdd: true` pieces).
 - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
@@ -1823,10 +1838,16 @@ Each finding is processed as a separate Step 6c invocation (one Step 6c invocati
 
 ### Step 4: Human Sign-Off
 
-Present to user:
-- Summary of what was built (phases, files, test counts)
-- Final review results (clean or deferred items)
-- Request approval to merge
+Evaluate the final-review gate (`reference/gate-scaling.md#final-review-gate`).
+- **If the final-review-gate predicate holds** (see `reference/gate-scaling.md#final-review-gate`):
+  Render the evidence digest per `reference/gate-scaling.md#evidence-digest-payload`. Then offer a single-key summary-confirm to merge. A keystroke is always required — nothing auto-advances (NN-P-001).
+- **Else** (predicate fails — see `reference/gate-scaling.md#final-review-gate`):
+  Present to user:
+  - Summary of what was built (phases, files, test counts)
+  - Final review results (clean or deferred items)
+  - Request approval to merge
+  A keystroke is always required (NN-P-001).
+- On QA-clean but un-assemblable evidence (e.g. HEAD freshness cannot be verified, or machine-checkable AC evidence is stale): fall back to the full prompt. In the Step 5 metrics upsert, record `gate_scaling.final_review_gate.offered_summary_confirm: false, fell_back: false` (conjunct iii failed — this is not a fallback from a clean predicate).
 
 **If human APPROVES:** proceed to Step 4.5.
 
@@ -1955,7 +1976,7 @@ If Step 4.5 was skipped (`reflection: off`), fall back to pre-v1.5 behavior: orc
 
 Commit on worktree branch before merge:
 
-**Metrics — completion checkpoint:** By this Step-5 learnings commit the `execute` and `final_review` blocks of `metrics.yaml` MUST be complete. Co-stage `metrics.yaml` with `learnings.md`:
+**Metrics — completion checkpoint:** By this Step-5 learnings commit the `execute` and `final_review` blocks of `metrics.yaml` MUST be complete. Also upsert `gate_scaling.final_review_gate:` with `offered_summary_confirm`, `fell_back`, and `reason` based on the Step 4 gate outcome: `offered_summary_confirm: true` when the predicate held and summary-confirm was offered; `false` otherwise. `fell_back: true` only when the predicate held (all three conjuncts) but the full prompt was shown anyway for reasons outside the predicate (operator choice, runtime error, edge case); `false` in all other cases — including when conjunct (iii) failed (un-assemblable evidence). `reason: null` when `fell_back == false`; free-text string explaining why when `fell_back == true`. Co-stage `metrics.yaml` with `learnings.md`:
 ```bash
 git add docs/prds/<prd-slug>/specs/<piece-slug>/learnings.md docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml
 git commit -m "learnings: <prd-slug>/<piece-slug>"

@@ -18,6 +18,7 @@ The table below documents the model assigned to each in-execute dispatch stage. 
 | qa-phase (full, per-phase) | opus | Step 6 |
 | mid-piece QA pass | opus | Step 0a |
 | Final Review board (8–9 agents) | opus | Final Review Step 2 |
+| review-board-triage (meta-router) | opus | Final Review Step 3 (triage pre-filter) |
 | spec / plan authoring | opus | upstream of execute — excluded from the dispatch-site diff |
 
 Exactly two exceptions upgrade an in-execute stage to Opus and are the only assignments the policy *flags* (vs silently reports): (1) **spike phase → Opus** — a `[SPIKE]` phase dispatches the spike agent on Opus (mechanism wired by the `spike-agent` piece, FR-005); (2) **operator override → Opus** — the operator forces Opus for a named phase via the `--opus=<phase-id|all>` execute invocation flag (wired by `spike-agent`, FR-005 AC-3). No other path upgrades a non-`[SPIKE]` stage to Opus (NN-P-005).

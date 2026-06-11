@@ -41,7 +41,9 @@ Record the changed-file set (`git diff --name-only` on the resolved range, or th
 
 ## Step 2: Resolve context and select lenses
 
-**Default lens set (no spec/PRD needed):** `blind`, `edge-case`, `security`, `ground-truth`, `architecture`, `integration`.
+Before resolving the lens set, read `review_board_variant` from the target's plan front-matter (if a plan is available). **Allowlist check:** the only recognised values are `doc-as-code` and absent (key not present or plan unavailable). Any other value (typo, unknown variant) MUST be treated as absent — emit `WARNING: unrecognised review_board_variant "<value>"; falling back to standard lens set (blind retained)` and use today's default. Never silently omit the blind lens on an unrecognised value. When `review_board_variant: doc-as-code`, apply the swap from `reference/gate-scaling.md#board-swap-rule`: replace `blind` in the default lens set with a second `edge-case`; the two edge-case dispatches carry differentiated seeds per `reference/gate-scaling.md#board-swap-rule` (seed-A injected into edge-case#1 prompt; seed-B injected into edge-case#2 prompt). When `review_board_variant` is absent (or falls back to absent per the allowlist check) or the plan is unavailable, use today's default set unchanged (`blind` retained, single un-seeded `edge-case`). Cite the anchor; do NOT restate the seeds or the predicate.
+
+**Default lens set (no spec/PRD needed):** `blind`, `edge-case`, `security`, `ground-truth`, `architecture`, `integration`. (When `review_board_variant: doc-as-code` is in effect: `edge-case` [seed-A], `edge-case` [seed-B], `security`, `ground-truth`, `architecture`, `integration` — per `reference/gate-scaling.md#board-swap-rule`.)
 - `architecture` runs by default because layering, coupling, and dependency-direction judgments apply to almost any code. Discover the charter skills at the resolved charter root (`.github/skills/charter-*/SKILL.md` or `.claude/skills/charter-*/SKILL.md`, per `plugins/spec-flow/reference/charter-location.md`) and pass whatever exists; if none, tell the architecture reviewer to apply general architecture principles (no charter available) rather than skip.
 - `ground-truth` always runs — its oracle/correctness lens is the one most likely to catch defects that survive functional tests, and it needs only the diff (plus any worked examples from a spec, if supplied).
 - `integration` runs by default — why default: path coverage applies to almost any wired change; it needs only the diff to enumerate integration boundaries.
@@ -63,6 +65,11 @@ Log the resolved lens set and why each context-bound lens was included or skippe
 Read each selected template from `${CLAUDE_PLUGIN_ROOT}/agents/review-board-<lens>.md` and dispatch ALL selected lenses **concurrently** with `Input Mode: Full` and `model: "opus"`. Compose each prompt with the resolved diff plus that lens's required context:
 
 ```
+# doc-as-code variant (review_board_variant: doc-as-code):
+Agent({ description: "Edge case review seed-A", prompt: <review-board-edge-case.md + Input Mode: Full + diff + codebase note + seed-A from reference/gate-scaling.md#board-swap-rule>, model: "opus" })
+Agent({ description: "Edge case review seed-B", prompt: <review-board-edge-case.md + Input Mode: Full + diff + codebase note + seed-B from reference/gate-scaling.md#board-swap-rule>, model: "opus" })
+# security, ground-truth, architecture, integration — dispatched for both variants (unchanged):
+# standard variant (absent / any other value):
 Agent({ description: "Blind review",        prompt: <review-board-blind.md        + Input Mode: Full + diff only>, model: "opus" })
 Agent({ description: "Edge case review",    prompt: <review-board-edge-case.md    + Input Mode: Full + diff + codebase note>, model: "opus" })
 Agent({ description: "Security review",      prompt: <review-board-security.md     + Input Mode: Full + diff (+ spec for trust-boundary context if available)>, model: "opus" })

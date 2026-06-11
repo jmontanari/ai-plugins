@@ -12,6 +12,11 @@ fast: false                  # true = fast mode: skips per-phase QA agents (qa-t
                              # verify Mode: Piece Full as 9th board member at Final Review.
                              # Use for: config/infra/scaffolding, moderate-complexity, non-security-critical work.
                              # Do NOT use for: auth, payments, compliance, or pieces > 12 phases.
+# review_board_variant: doc-as-code  # optional; absent = standard board (blind seat retained).
+                                      # doc-as-code: swaps blind reviewer for a second seeded edge-case reviewer
+                                      # (seed-A: structural/pointer-integrity; seed-B: content/semantic).
+                                      # Use for doc-as-code pieces where skill/reference markdown IS the deliverable.
+                                      # Allowed values: doc-as-code | <absent>. Any other value falls back to standard.
 ---
 
 <!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->

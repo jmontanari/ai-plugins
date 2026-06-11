@@ -52,7 +52,8 @@ Cite relevant `CR-xxx` entries from `<charter_root>/skills/charter-coding-rules/
 
 ## Acceptance Criteria
 AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}}
-  Independent Test: {{how_to_verify_in_isolation}} (for an integration-bearing AC, the Independent Test may assert the real wired path, not isolation)
+  Independent Test [machine: <named check — a grep/script/test that decides>]: <how to verify>
+  <!-- Alternative form: Independent Test [judgment: <named arbiter — who decides>]: <what they inspect> -->
 
 ## Technical Approach
 {{architecture_decisions_patterns_data_flow}}

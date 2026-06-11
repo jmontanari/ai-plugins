@@ -224,7 +224,8 @@ pieces:
       baseline (operator interactions per clean piece) must be measured before this ships.
     prd_sections: [FR-012, SC-008, G-6]
     dependencies: [metrics]
-    status: open
+    status: merged
+    merged_at: 2026-06-11
 
   - name: pipeline-e2e
     slug: pipeline-e2e

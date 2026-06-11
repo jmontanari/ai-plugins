@@ -284,7 +284,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    - **Circuit breaker:** After 3 QA iterations, escalate to human.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
-4. When QA returns clean: print the following sign-off review block, then present the approve / request-changes prompt (Phase 5 step 1 behavior).
+4. When QA returns clean: print the following sign-off review block, then evaluate the spec gate (`reference/gate-scaling.md#spec-gate`).
 
    **Sign-off review block (spec):**
    ```
@@ -297,6 +297,11 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
      Ask the orchestrator to print the full spec in chat (on demand only)
    ```
    The orchestrator does NOT auto-print the full spec document. The full document is printed only when the operator explicitly requests it (via `!cat`, `!open`, or an in-chat request).
+
+   - **If the spec-gate predicate holds** (see `reference/gate-scaling.md#spec-gate`):
+     Render the evidence digest per `reference/gate-scaling.md#evidence-digest-payload` — for spec, the evidence digest lists the QA iteration count and the zero-marker scan result; if `spec.ac_verifiability` metrics have already been computed, the advisory `machine_checkable_ratio` MAY be included as a third field (see `reference/gate-scaling.md#spec-gate`). Then offer a single-key summary-confirm to the user. A keystroke is always required — nothing auto-advances (NN-P-001).
+   - **Else** (predicate fails — see `reference/gate-scaling.md#spec-gate`):
+     Present spec to user for sign-off using today's full sign-off prompt unchanged. A keystroke is always required (NN-P-001).
 
 **Limitation:** The QA agent cannot assess brainstorming trade-offs not captured in the spec. The human sign-off covers this gap.
 
@@ -319,7 +324,7 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    > full PRD ships — **never commit PRD piece work directly to `merge_target:` while
    > `feature_branch:` is set.**
 3. Commit spec on worktree branch:
-   **3a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, create/upsert `docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml` with the `schema_version`/`generated`/`last_updated`/`piece` envelope (on first write) and the `spec:` block — `qa_rounds` from the Phase-2 counter, `qa_iterations` = the Phase-4 QA-loop iteration count to clean, `research_artifact` = `true` iff a `research.md` exists at the canonical path for this piece. Also upsert `spec.budget_compliance`: for each artifact measured in the Phase-4 budget-resolution sub-step (`spec_md`, and `deliberation_md` if it exists), write `{lines: N, soft: S, hard: H, status: pass|over}` — `status` is `pass` when N ≤ H, `over` otherwise; the `hard` value is the resolved ceiling (override or reference-doc default). `budget_compliance` is passive metadata (ADR-3) — `scripts/metrics-aggregate` does NOT consume it. If `metrics: off`, skip. On write failure, emit `[METRICS-DEGRADED: <reason>]` and continue.
+   **3a. Write metrics (`metrics: auto`):** per `plugins/spec-flow/reference/metrics-artifact.md` `## Write procedure`, create/upsert `docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml` with the `schema_version`/`generated`/`last_updated`/`piece` envelope (on first write) and the `spec:` block — `qa_rounds` from the Phase-2 counter, `qa_iterations` = the Phase-4 QA-loop iteration count to clean, `research_artifact` = `true` iff a `research.md` exists at the canonical path for this piece. Also upsert `spec.budget_compliance`: for each artifact measured in the Phase-4 budget-resolution sub-step (`spec_md`, and `deliberation_md` if it exists), write `{lines: N, soft: S, hard: H, status: pass|over}` — `status` is `pass` when N ≤ H, `over` otherwise; the `hard` value is the resolved ceiling (override or reference-doc default). `budget_compliance` is passive metadata (ADR-3) — `scripts/metrics-aggregate` does NOT consume it. Also compute `spec.ac_verifiability` from the finalized `spec.md` AC section: count ACs whose `Independent Test` line carries a `[machine: …]` tag (non-empty named value) → `machine`; count ACs with a `[judgment: …]` tag → `judgment`; compute `machine_checkable_ratio = machine / (machine + judgment)` as a float. When `machine + judgment == 0` (zero tagged ACs), do NOT write the `ac_verifiability` block — emit `[METRICS-ABSENT]` (not a divide-by-zero error) instead. Also upsert `gate_scaling.spec_gate.{offered_summary_confirm, fell_back, reason}` reflecting this run's sign-off path: `offered_summary_confirm: true` when the spec-gate predicate held and summary-confirm was offered; `fell_back: true` (with `reason: <string>`) when the gate rendered the full prompt despite the predicate holding; `false/null` otherwise. If `metrics: off`, skip. On write failure, emit `[METRICS-DEGRADED: <reason>]` and continue.
    ```bash
    git add docs/prds/<prd-slug>/specs/<piece-slug>/spec.md docs/prds/<prd-slug>/specs/<piece-slug>/metrics.yaml
    git commit -m "spec: add <prd-slug>/<piece-slug> specification"

@@ -30,6 +30,10 @@ spec:
       soft: 200
       hard: 350
       status: pass
+  ac_verifiability:
+    machine: 4            # count of ACs tagged [machine: …]
+    judgment: 2           # count of ACs tagged [judgment: …]
+    machine_checkable_ratio: 0.67  # machine / (machine + judgment); float 0..1
 plan:
   qa_iterations: 2        # plan QA gate (qa-plan) loops to clean
   concreteness_floor: passed   # passed | overridden — qa-plan concreteness floor; gates SC-002's denominator
@@ -69,9 +73,22 @@ execute:
 final_review:
   iterations: 1
   must_fix: 0
+gate_scaling:
+  spec_gate:
+    offered_summary_confirm: true  # clean predicate held — summary-confirm was offered
+    fell_back: false               # gate still rendered the full prompt despite clean predicate
+    reason: null                   # null when not fell_back; string describing why when fell_back
+  plan_gate:
+    offered_summary_confirm: true
+    fell_back: false
+    reason: null
+  final_review_gate:
+    offered_summary_confirm: false # clean predicate did NOT hold — full prompt rendered
+    fell_back: false
+    reason: null
 ```
 
-**Block-style / no-inline-flow-maps invariant:** Every leaf must be on its own indented line; no inline flow maps (`{a: 1}`). This makes the file parseable by both `python3 -c 'yaml.safe_load'` (fast path) and pure grep/awk (fallback). Inline `#` comments are permitted and are stripped by the parsers before value extraction; comments must not carry semantic data (they are advisory only).
+**Block-style / no-inline-flow-maps invariant:** Every leaf must be on its own indented line; no inline flow maps (`{a: 1}`). This makes the file parseable by both `python3 -c 'yaml.safe_load'` (fast path) and pure grep/awk (fallback). Inline `#` comments are permitted and are stripped by the parsers before value extraction; comments must not carry semantic data (they are advisory only). `schema_version` stays `1` — both `ac_verifiability` and `gate_scaling` blocks are additive leaves (no existing field removed or renamed). NN-C-003.
 
 ## Field semantics
 
@@ -119,6 +136,12 @@ One entry per field; DEFINED fields (per ADR-5) include their full derivation.
 - `execute.resume[].outcome` — `clean` (reached the correct next action without re-running a passing phase) or `state-incomplete` (hit the `[STATE-INCOMPLETE]` escalation).
 - `final_review.iterations` — board cycle count (1 = clean first pass).
 - `final_review.must_fix` — deduped must-fix count from the Final Review triage.
+- `spec.ac_verifiability.machine` — count of ACs in the spec whose `Independent Test` line carries a `[machine: …]` tag with a non-empty value. Written by the spec skill at spec finalize. Omitted (not written) when the spec carries no tagged ACs — the spec skill emits `[METRICS-ABSENT]` in that case. Additive passive metadata (ADR-3) — not consumed by `scripts/metrics-aggregate`.
+- `spec.ac_verifiability.judgment` — count of ACs in the spec whose `Independent Test` line carries a `[judgment: …]` tag with a non-empty value. Written alongside `machine` at spec finalize.
+- `spec.ac_verifiability.machine_checkable_ratio` — `machine / (machine + judgment)`; float in range [0, 1]. When `machine + judgment == 0` (no tags), this field is omitted alongside the parent block. Written at spec finalize.
+- `gate_scaling.<gate>.offered_summary_confirm` — `true` when the gate's clean predicate held and a summary-confirm was offered to the operator; `false` when the full prompt was rendered. Written by the respective gate (spec → `spec_gate`, plan → `plan_gate`, execute Final Review → `final_review_gate`) at each gate's checkpoint.
+- `gate_scaling.<gate>.fell_back` — `true` when the gate rendered the full prompt despite its clean predicate holding (the gate's clean predicate as defined in `reference/gate-scaling.md#<gate>-gate`) for reasons outside the predicate (operator-choice, runtime error, edge case). `false` in the normal case (including when the predicate itself failed). Written at the same checkpoint as `offered_summary_confirm`. The three cases are exhaustive and mutually exclusive: Case A (`offered_summary_confirm: true, fell_back: false`) — predicate held, summary-confirm offered; Case B (`offered_summary_confirm: false, fell_back: true`) — predicate held but full prompt shown (the fallback); Case C (`offered_summary_confirm: false, fell_back: false`) — predicate failed. `offered_summary_confirm` and `fell_back` are never both `true`. **This is the gate_scaling fallback rate leaf (AC-6):** `scripts/metrics-aggregate` or any consumer can compute the nominally-clean fallback rate as `Σ fell_back / (Σ offered_summary_confirm + Σ fell_back)` (i.e., Case B / (Case A + Case B) — the denominator is the predicate-held population, not only the offered-confirm population).
+- `gate_scaling.<gate>.reason` — free-text string explaining why `fell_back == true`; `null` when `fell_back == false`. Advisory only.
 
 ## Write procedure
 

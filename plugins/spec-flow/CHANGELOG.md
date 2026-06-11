@@ -4,6 +4,17 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.14.0] — 2026-06-11
+
+### Added
+- **FR-012: Verifiability-scaled sign-off gates + review-board cost controls.**
+  - **`reference/gate-scaling.md` (SSOT):** Seven-anchor reference doc defining the clean-gate predicate, spec gate (QA-clean ∧ zero-markers; Option B — tags metrics-only at spec time), plan gate (+ AC-Coverage-Matrix `file:line` evidence), final-review gate (+ HEAD freshness), evidence-digest payload (four per-AC fields), failure-mode fallback, and `doc-as-code` board-swap rule. Consuming skills cite by anchor only.
+  - **`qa-spec` criterion #17:** AC verifiability-tag enforcement — every AC `Independent Test` line must carry `[machine: <name>]` or `[judgment: <arbiter>]`; delta-conditioned in focused re-review mode; legacy untagged specs skipped. Mirrored to `agents/qa-spec.agent.md`.
+  - **Tiered evidence-digest sign-off gates:** spec skill (Phase-4 step-4), plan skill (Phase-3 step-4), and execute Final Review Step 4 each branch on their respective gate predicate; predicate-holds path offers a single-key summary-confirm with evidence digest; fallback always-keystroke (NN-P-001 preserved at both branches).
+  - **`review_board_variant: doc-as-code`:** Swaps the blind reviewer for a second edge-case reviewer with differentiated lens seeds (seed-A: structural/pointer-integrity; seed-B: content/semantic) at both surfaces — execute Final Review Step 1 and the out-of-band `review-board` skill. Absent annotation → board composition identical to today.
+  - **`agents/review-board-triage.md` + mirror:** Opus meta-routing agent pinned inside execute Final Review Step 3 fix loop. Consults the just-fixed findings and prior board set; returns `route-to-full-board: yes/no`; on `no`, skips the full-board re-dispatch and does NOT decrement the `L` circuit-breaker — a triage-only cycle is not a full review cycle.
+  - **Metrics leaves:** `spec.ac_verifiability.{machine,judgment,machine_checkable_ratio}` and `gate_scaling.{spec_gate,plan_gate,final_review_gate}.{offered_summary_confirm,fell_back,reason}` added to `reference/metrics-artifact.md` schema (schema_version stays 1 — additive, NN-C-003).
+
 ## [5.13.0] — 2026-06-11
 
 ### Added

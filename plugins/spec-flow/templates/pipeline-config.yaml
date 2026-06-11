@@ -81,6 +81,16 @@ qa_max_iterations: auto
 #   oracle 2-attempt build budget, or the spike-phase soft-checkpoint.
 amendment_budget: 5
 
+# review_board_variant: per-piece plan-front-matter annotation that swaps the review board
+#   lens composition for pieces with non-standard review needs. Set in the plan's front-matter,
+#   not in this project-level config.
+#   doc-as-code  — swap blind reviewer for a second edge-case reviewer with differentiated
+#                  lens seeds (seed-A: structural/pointer-integrity; seed-B: content/semantic).
+#                  Applied at both the execute Final Review and the out-of-band review-board
+#                  skill. See reference/gate-scaling.md#board-swap-rule.
+#   <absent>     — today's default 8-seat board (blind + single edge-case) — no change.
+# review_board_variant:
+
 # default_branch: the base branch for `git diff <base>..HEAD` in Final Review (new in v5.2.0)
 #   <unset> — auto-detect: git symbolic-ref refs/remotes/origin/HEAD, then git remote show origin (default)
 #   <name>  — explicit override (e.g. master, trunk) when auto-detect cannot resolve

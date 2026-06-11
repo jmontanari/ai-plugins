@@ -428,3 +428,23 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **FR-2: qa-plan verbatim-heading cross-check for citation-only phases.** qa-plan focuses on AC coverage and phase-boundary ambiguity but does not verify that section headings cited in `[Implement]` T-steps exist verbatim in the referenced SSOT files. For citation-only doc-as-code phases this is a cheap structural check (grep the target file for the exact heading string). The Phase 4 `[Verify]` cross-phase oracle DID catch the defect — but only after the implementer committed the wrong string. Moving the check to qa-plan (pre-execute) would eliminate the extra QA iteration. **Fix:** add a qa-plan heuristic — for `[Implement]` T-steps that contain a `see <file> ## <Heading>` pattern, grep the target file and flag any heading that does not appear verbatim as a must-fix.
 
 **Captured:** 2026-06-11
+
+---
+
+### Process-retro findings (exec-ready/gate-scaling, 2026-06-11)
+
+**Source:** `exec-ready/gate-scaling` phase `step-4.5-reflection` (agent: `reflection-process-retro`). Deferred via operator triage 2026-06-11. Category: process-improvement.
+
+**MF-GS-1: Separate must-fix and should-fix commits in fix loop.** The iter-2 fix commit bundled delimiter wiring and formula corrections (must-fix) with `machine_checkable_ratio` SSOT additions and triage output-format clause (should-fix). Triage trigger-2 (new signal introduced by should-fix work) fired, routing to a full board re-dispatch that inflated `L` by 1 — an avoidable iter. **Fix:** execute Step 3 fix-code guidance should require separate commits per severity tier when both tiers are present. Must-fix commit first; should-fix in a follow-on commit after triage settles the must-fix pass.
+
+**MF-GS-2: SSOT-then-consumers review pass for conditional language.** The SSOT (`reference/gate-scaling.md`) correctly defined `machine_checkable_ratio` as an advisory-only field with "if available / MAY" conditional language. However, `skills/spec/SKILL.md` Phase 4 unconditionally listed the ratio — diverging from the SSOT because the spec-gate in Phase 4 runs before Phase 5 (where the metric is computed). Seed-B (content/semantic edge-case) caught this at Final Review rather than at plan QA. **Fix:** when a phase introduces an SSOT + consuming skills, the plan's `[Verify]` step at the SSOT phase should include a grep-based assertion that consuming skill gate-sites match the conditional/advisory language of the SSOT — not just that the SSOT itself is present.
+
+**MF-GS-3: Coherence linter false-positive suppression.** `plugins/spec-flow/hooks/lint-skill-coherence` invariant-1 exits non-zero due to pre-existing cross-file step references in `metrics-artifact.md` and a false-positive on `gate-scaling.md:70`. Both pre-exist this piece (confirmed at base commit `b72a6a9`). Every execute run in this repo sees non-zero linter exit without any actionable violation, creating noise that could mask real future invariant-1 failures. **Fix:** add a `.linter-known-violations` suppression file or inline `# lint: cross-file-step-ref` annotation mechanism to isolate intentional cross-file references from genuine invariant-1 violations — and repair the pre-existing `metrics-artifact.md` violations in a dedicated clean-up piece.
+
+**observation (board-swap + 3 iterations):** The doc-as-code board variant (two seeded edge-case reviewers, no blind) caught the ordering drift issue (seed-B) that a standard blind reviewer would likely have missed. Three board iterations ran; iter-2 was avoidable via MF-GS-1 — a process issue, not a gate-scaling design defect. Iter-3 settled cleanly with no circuit-breaker pressure (L was 3 of 5).
+
+**observation (triage agent):** The triage agent routed correctly on both passes — triggered full-board re-dispatch at iter-2 (new signal + out-of-locus findings from bundled commit), settled at iter-3 (no new signals, all findings addressed). No false-settle on genuinely unresolved items.
+
+**observation (differentiated seeds ROI):** Seed-B (content/semantic) surfaced the SSOT-consumer ordering drift (SB-EC-1, SB-EC-2) that became must-fix items. Seed-A (structural/pointer-integrity) found the dangling `T-1` reference (SA-MF-1). Both differentiated seeds contributed actionable must-fix findings on the same piece — validating the board-swap rationale for doc-as-code pieces.
+
+**Captured:** 2026-06-11

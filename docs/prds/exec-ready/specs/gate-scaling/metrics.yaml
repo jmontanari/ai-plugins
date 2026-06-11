@@ -1,0 +1,49 @@
+schema_version: 1
+generated: 2026-06-10
+last_updated: 2026-06-10
+piece: gate-scaling
+
+spec:
+  qa_rounds: 2             # Phase-2 question→answer exchanges (2 AskUserQuestion cards)
+  qa_iterations: 1         # spec QA gate (Phase 4) loops to clean
+  research_artifact: true  # research.md present for this piece
+  budget_compliance:
+    spec_md:
+      lines: 170
+      soft: 300
+      hard: 520
+      status: pass         # pass | over
+    deliberation_md:
+      lines: 98
+      soft: 200
+      hard: 350
+      status: pass
+
+  ac_verifiability:
+    machine: 19
+    judgment: 5
+    machine_checkable_ratio: 0.79
+
+gate_scaling:
+  # spec_gate and plan_gate blocks omitted — those gates ran before gate-scaling
+  # (this piece) was implemented; the feature did not exist at sign-off time.
+  final_review_gate:
+    offered_summary_confirm: true
+    fell_back: false
+    reason: null
+    board_iterations: 3    # iter-1 + iter-2 (triage→full) + iter-3 (triage→settled)
+
+plan:
+  qa_iterations: 2         # plan QA gate (qa-plan) loops to clean
+  concreteness_floor: passed   # reached clean with no circuit-breaker override
+  budget_compliance:
+    plan_md_total:
+      lines: 504
+      soft: 750
+      hard: 1000
+      status: pass
+    plan_md_max_phase:
+      lines: 68
+      soft: 90
+      hard: 220
+      status: pass
