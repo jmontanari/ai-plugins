@@ -44,6 +44,8 @@ For each criterion, actively look for violations:
 
     **Waiver mechanism:** A term may be waived by the spec author by adding an inline HTML comment immediately after the flagged term in spec.md: `<!-- weasel-waived: "<term>" — <justification> -->`. When a `<!-- weasel-waived:` comment appears immediately adjacent to a previously flagged term (within the same sentence), skip that occurrence and do NOT flag it. Evidence of the waiver: quote the comment text in the acceptable section. Terms in non-AC/FR prose (e.g., goal statements, testing strategy, open questions) are not scanned — only AC and FR text.
 
+17. **AC verifiability tag (FR-012).** Every AC's Independent Test line must carry exactly one tag — `[machine: <named check>]` or `[judgment: <named arbiter>]` — with a non-empty named value. An AC whose Independent Test line lacks a tag, or carries an empty value, is must-fix. **Delta-conditioning:** in Focused re-review mode, apply #17 only to ACs added or modified in the supplied delta. In Full mode, apply #17 only when the spec carries ≥1 tagged AC; a spec with zero tagged ACs is a legacy untagged spec and #17 is skipped (no finding) — NN-C-003. Evidence: quote the untagged AC id and its Independent Test line.
+
 ## Output Format
 
 Return findings as a structured list:
