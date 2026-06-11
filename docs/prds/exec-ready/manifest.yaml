@@ -201,7 +201,8 @@ pieces:
       soft checkpoints, for unattended runs. Precondition for safe loop-driven execute.
     prd_sections: [FR-011, SC-002, G-2, G-6]
     dependencies: []
-    status: open
+    status: merged
+    merged_at: 2026-06-10
 
   - name: gate-scaling
     slug: gate-scaling

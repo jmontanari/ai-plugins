@@ -73,7 +73,7 @@ If the `Mode:` line is missing or not one of the two values above: STOP and repo
 
    **Opt-out (rare).** For exceptionally large phases (>200 LOC delta OR where a hook failure on the batched diff would be hard to debug), you MAY split into multiple commits at public-surface boundaries — but the default is the single unified commit. Each additional commit costs another hook run without earning meaningful benefit for AI-driven TDD (agents don't bisect intra-phase SHAs; the orchestrator retries at phase scope).
 
-   **What "Red test modification" means.** Any change to a file in Red's `## Staged test manifest` — including auto-formatting via an editor, accidental save, or attempting to "fix" a test that looks wrong. If a Red test really is wrong, STOP and report BLOCKED; do not edit it. The content-hash integrity check (orchestrator-produced `git hash-object -w` blob anchor in deferred groups; HEAD-hash in flat phases) is strict and unforgiving by design.
+   **What "Red test modification" means.** Any change to a file in Red's `## Staged test manifest` — including auto-formatting via an editor, accidental save, or attempting to "fix" a test that looks wrong. The manifest now includes fixture/helper files and same-tree `conftest.py` paths — editing those is equally rejected. If a Red test or manifest-listed fixture really is wrong, STOP and report BLOCKED; do not edit it. On rejection, the orchestrator names the violating paths explicitly in the re-dispatch. The content-hash integrity check (orchestrator-produced `git hash-object -w` blob anchor in deferred groups; HEAD-hash in flat phases) is strict and unforgiving by design.
 
 ## Rule: orchestrator pre-decisions are binding
 

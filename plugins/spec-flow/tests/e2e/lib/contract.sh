@@ -2,6 +2,7 @@
 # Sourced by run-e2e.sh after assert.sh.
 # Functions defined: check_commit_order, check_transitions, check_test_data,
 #   check_spike, check_discovery_log, check_learnings, check_no_journal,
+#   check_red_manifest_conftest, check_gate_fixtures, check_authored_tests_criterion,
 #   l2_replay_checks, audit_checks.
 
 # ---------------------------------------------------------------------------
@@ -212,8 +213,127 @@ check_no_journal() {
 }
 
 # ---------------------------------------------------------------------------
+# (h) check_red_manifest_conftest
+#   The Red-stage manifest fixture must include a conftest.py entry in
+#   `- path: sha` format, confirming fixture/conftest enrichment (AC-4 manifest half).
+#   Cross-checked by Phase 3's trip test (AC-4 trip half).
+# ---------------------------------------------------------------------------
+check_red_manifest_conftest() {
+  local fixture="${PLUGIN_ROOT}/tests/e2e/fixtures/replay/tdd-red-manifest-with-conftest.md"
+  assert_file "$fixture" "L2(h) Red-stage manifest fixture with conftest present"
+
+  if grep -qE '^- [^ ]+/conftest\.py: [0-9a-f]' "$fixture" 2>/dev/null; then
+    pass "L2(h) Red-manifest fixture includes conftest.py as a protected path"
+  else
+    fail "L2(h) Red-manifest fixture missing conftest.py in '- path: sha' format"
+  fi
+
+  if grep -qE '^- [^ ]+\.py: [0-9a-f].+\(directly imported' "$fixture" 2>/dev/null; then
+    pass "L2(h) Red-manifest fixture includes directly-imported helper as a protected path"
+  else
+    fail "L2(h) Red-manifest fixture missing directly-imported helper in '- path: sha (directly imported...)' format"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# (i) check_gate_fixtures
+#   Gate scenario fixtures (AC-4 trip / AC-5 exempt / AC-6 smuggling) must:
+#   - Exist as fixture files in fixtures/replay/
+#   - Contain the expected gate-outcome keywords confirming the scenario narrative
+# ---------------------------------------------------------------------------
+check_gate_fixtures() {
+  local fix_dir="${PLUGIN_ROOT}/tests/e2e/fixtures/replay"
+
+  # AC-4 trip: conftest.py in manifest → integrity fail (conftest is protected)
+  local f4="${fix_dir}/gate-ac4-trip.md"
+  assert_file "$f4" "L2(i) AC-4 trip gate fixture present"
+  if grep -qF "integrity fail" "$f4" 2>/dev/null; then
+    pass "L2(i) AC-4 trip fixture asserts 'integrity fail' outcome"
+  else
+    fail "L2(i) AC-4 trip fixture missing 'integrity fail' outcome"
+  fi
+  if grep -qF "conftest.py" "$f4" 2>/dev/null; then
+    pass "L2(i) AC-4 trip fixture names conftest.py as the violating path"
+  else
+    fail "L2(i) AC-4 trip fixture does not name conftest.py as the violating path"
+  fi
+
+  # AC-5 exempt: Authored-tests declared test passes reconciliation (no stray-file flag)
+  local f5="${fix_dir}/gate-ac5-exempt.md"
+  assert_file "$f5" "L2(i) AC-5 exempt gate fixture present"
+  if grep -qF "pass" "$f5" 2>/dev/null && grep -qF "exempt_authored" "$f5" 2>/dev/null; then
+    pass "L2(i) AC-5 exempt fixture asserts pass via exempt_authored"
+  else
+    fail "L2(i) AC-5 exempt fixture missing 'pass' + 'exempt_authored' outcome"
+  fi
+  if grep -qF "Authored-tests" "$f5" 2>/dev/null; then
+    pass "L2(i) AC-5 exempt fixture references Authored-tests field"
+  else
+    fail "L2(i) AC-5 exempt fixture missing Authored-tests reference"
+  fi
+
+  # AC-6 smuggling: Authored-tests lists Red-manifest path → HARD REJECT
+  local f6="${fix_dir}/gate-ac6-smuggling.md"
+  assert_file "$f6" "L2(i) AC-6 smuggling gate fixture present"
+  if grep -qF "HARD REJECT" "$f6" 2>/dev/null; then
+    pass "L2(i) AC-6 smuggling fixture asserts HARD REJECT outcome"
+  else
+    fail "L2(i) AC-6 smuggling fixture missing 'HARD REJECT' outcome"
+  fi
+  if grep -qF "exemption ignored" "$f6" 2>/dev/null; then
+    pass "L2(i) AC-6 smuggling fixture confirms exemption is ignored"
+  else
+    fail "L2(i) AC-6 smuggling fixture missing 'exemption ignored' confirmation"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# (j) check_authored_tests_criterion
+#   qa-plan.md criterion 32 must handle all three AC-6 qa-plan scenarios:
+#   - collision (must-fix)   — "smuggling" keyword in criterion body
+#   - clean (no finding)     — activation guard "absence is never a finding"
+#   - no-field (no finding)  — same activation guard
+#   The three fixture files confirm the scenario narratives exist on disk.
+# ---------------------------------------------------------------------------
+check_authored_tests_criterion() {
+  local qa_plan="${PLUGIN_ROOT}/agents/qa-plan.md"
+  local qa_plan_agent="${PLUGIN_ROOT}/agents/qa-plan.agent.md"
+  local fix_dir="${PLUGIN_ROOT}/tests/e2e/fixtures/replay"
+
+  # Criterion text checks
+  if grep -qF "Authored-tests declaration" "$qa_plan" 2>/dev/null; then
+    pass "L2(j) qa-plan.md has Authored-tests declaration criterion"
+  else
+    fail "L2(j) qa-plan.md missing Authored-tests declaration criterion"
+  fi
+  if grep -qF "absence is never a finding" "$qa_plan" 2>/dev/null; then
+    pass "L2(j) qa-plan.md criterion states absence-is-never-a-finding (no-field case)"
+  else
+    fail "L2(j) qa-plan.md criterion missing 'absence is never a finding'"
+  fi
+  if grep -qF "smuggling" "$qa_plan" 2>/dev/null; then
+    pass "L2(j) qa-plan.md criterion flags collision as smuggling (must-fix)"
+  else
+    fail "L2(j) qa-plan.md criterion missing 'smuggling' keyword for collision case"
+  fi
+  if grep -qF "Authored-tests declaration" "$qa_plan_agent" 2>/dev/null; then
+    pass "L2(j) qa-plan.agent.md mirrors Authored-tests declaration criterion"
+  else
+    fail "L2(j) qa-plan.agent.md missing Authored-tests declaration criterion"
+  fi
+
+  # Fixture files confirm scenario narratives exist
+  assert_file "${fix_dir}/plan-authored-tests-collision.md" \
+    "L2(j) Authored-tests collision scenario fixture present"
+  assert_file "${fix_dir}/plan-authored-tests-clean.md" \
+    "L2(j) Authored-tests clean scenario fixture present"
+  assert_file "${fix_dir}/plan-no-authored-tests.md" \
+    "L2(j) Authored-tests no-field scenario fixture present"
+}
+
+# ---------------------------------------------------------------------------
 # l2_replay_checks()
-#   ① Build clean fixture, run all checks (a)–(g), clean up.
+#   ① Build clean fixture, run all checks (a)–(j), clean up.
 #   ② For each of 6 break cases: build fixture, assert targeted check FAILS,
 #      report as pass "break:<case> fires <check>".
 #      Also: isolation spot-check on journal-survives — other six checks pass.
@@ -233,6 +353,9 @@ l2_replay_checks() {
   check_discovery_log "$piece"
   check_learnings "$piece"
   check_no_journal "$t"
+  check_red_manifest_conftest
+  check_gate_fixtures
+  check_authored_tests_criterion
   e2e_cleanup "$t"
 
   # ② Break loop — targeted check must FAIL (expected-fail wrapper)
@@ -299,7 +422,8 @@ _assert_break_fires() {
 }
 
 # _run_isolation_checks <repo> <piece>
-#   Run the six checks OTHER than check_no_journal on the journal-survives fixture.
+#   Run all checks OTHER than check_no_journal on the journal-survives fixture.
+#   (h) and (i) are static PLUGIN_ROOT checks — always pass on any fixture variant.
 #   All should pass (single-defect isolation).
 _run_isolation_checks() {
   local repo="$1" piece="$2"
@@ -309,6 +433,9 @@ _run_isolation_checks() {
   check_spike "$piece"
   check_discovery_log "$piece"
   check_learnings "$piece"
+  check_red_manifest_conftest
+  check_gate_fixtures
+  check_authored_tests_criterion
 }
 
 # ---------------------------------------------------------------------------

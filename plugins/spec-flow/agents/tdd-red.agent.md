@@ -57,6 +57,8 @@ You **stage** your tests with `git add` but **do not commit**. The implementer a
    - An authored `[integration]` test must exercise **one wired path** with **nothing in-boundary doubled** (only true externals stubbed/faked); do not mock in-boundary components in an integration test.
 10. **Emit a `## Staged test manifest` with SHA-256 hashes.** For every path in `## Tests Written`, compute the content hash of the staged file and list it as `<path>: <sha256>`. The orchestrator snapshots this manifest before dispatching qa-tdd-red and the implementer. After the implementer's unified commit lands, the orchestrator re-hashes each of your test files at HEAD and rejects the commit if any hash drifted — that's the anti-tampering safeguard that replaces the old Red-commit-SHA diff. Emit sha256 for the advisory manifest; the orchestrator's git-blob anchor is authoritative in deferred groups. In a deferred Phase Group the ORCHESTRATOR independently anchors each test file with `git hash-object -w` at red-done; your manifest is an advisory cross-check, not the integrity baseline.
 
+   Additionally, for each staged test file, resolve and include in the manifest — with their `<path>: <sha256>` — the fixture/helper files that file **directly imports** (parse `from X import …` / `import X` statement lines; resolve the module name to a repo-relative file path; skip any import that does not resolve to an existing file in the repo) and any `conftest.py` found by walking from the staged test's directory up to the test root (typically the directory containing `pytest.ini`, `setup.cfg`, or `pyproject.toml`; stop at repo root if not found). This is a best-effort byte-immutability enrichment, **NOT a transitive closure** — deep transitive imports and by-name fixture injection (e.g., pytest parametrize) are documented residuals (spec Out-of-Scope / backlog EG-1). Skip non-resolving imports silently; do not error.
+
 ## Rule: literal file list when staging
 
 Your `git add` MUST stage files by literal path, never by pattern. Use:
@@ -126,9 +128,11 @@ not stage.
 Each test fails because: <expected missing feature, not setup error>
 
 ## Staged test manifest
-<one line per staged test file — `<path>: <sha256>` — emitted verbatim into the orchestrator's state for integrity reconciliation after the implementer's unified commit>
+<one line per staged test file, directly-imported fixture/helper, and same-tree conftest.py — `<path>: <sha256>` — emitted verbatim into the orchestrator's state for integrity reconciliation after the implementer's unified commit>
 - tests/path/test_foo.py: a3f5c891...
 - tests/path/test_bar.py: b71d2a4e...
+- tests/path/conftest.py: 9c2e5f3a... (conftest.py — consumed by tests in this directory)
+- tests/path/_helpers.py: 4d8a1b7c... (directly imported by test_foo.py)
 ```
 
 ## Anti-Patterns (DO NOT)

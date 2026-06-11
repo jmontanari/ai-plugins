@@ -408,3 +408,11 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **observation (NN-P-005):** the execute coordinator ran on Opus via operator override of the Sonnet-class pre-flight check. No observable effect on this doc-as-code piece, but the override is an NN-P-005 deviation worth tagging — consider requiring an explicit rationale field in the session log when the pre-flight model check is overridden, for cross-piece comparison.
 
 **Captured:** 2026-06-09
+
+## Process retro from exec-guardrails (2026-06-10)
+
+**PR-EG-1: Plan `[Write-Tests]` must specify ERE syntax when targeting `assert_grep`.** The exec-guardrails piece introduced a `\|` vs `|` ERE alternation bug in 14 `assert_grep` call sites (Phases 2-7), caught only at Final Review. Root cause: plan `[Write-Tests]` task descriptions used BRE syntax (`\|`) copied from adjacent `[Verify]` grep shell commands, and the implementer carried it across the boundary. `assert_grep` uses `grep -E` (ERE), where `|` is alternation and `\|` is a literal two-character string. **Fix:** whenever a plan `[Write-Tests]` task writes calls to `assert_grep`, include an explicit note that alternation uses `|` (not `\|`), and use `|` verbatim in any pattern examples in the task description.
+
+**PR-EG-2: `[Verify]` for phases writing to the e2e test harness must include `run-e2e.sh` execution.** The exec-guardrails `tests/e2e/run-e2e.sh` harness existed throughout the piece but was never invoked in any `[Verify]` step — only file contents were inspected via LLM-agent steps. The 14-occurrence ERE bug survived five phases because no runtime validation fired. **Fix:** for any phase whose `[Write-Tests]` output lands in `tests/e2e/lib/static.sh` or `tests/e2e/lib/contract.sh`, the `[Verify]` step must include a literal `bash plugins/spec-flow/tests/e2e/run-e2e.sh` command (or an equivalent scoped invocation). LLM-agent-step inspection of test file contents does not substitute for harness execution.
+
+**Captured:** 2026-06-10

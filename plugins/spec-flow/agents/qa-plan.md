@@ -198,6 +198,11 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
     Do NOT flag:
     - Counts at/under soft; no supplied budget (skip).
     Evidence: quote the supplied count and the exceeded ceiling. **Must-fix on hard-ceiling breach only.**
+33. **Authored-tests declaration (activate only when a phase carries an `**Authored-tests:**` field; absence is never a finding; do not flag a phase that omits the field).** When a phase includes `**Authored-tests:**`:
+    (a) **No phantom declaration:** each declared path must be cited in that phase's `[Implement]`, `[Write-Tests]`, `[Verify]`, `**Scope:**`, or `**In scope:**` body as a path the phase actually authors. A path listed in `**Authored-tests:**` that does not appear in any of those sections is a phantom declaration — must-fix. Evidence: quote the `**Authored-tests:**` field and show the absence of the path in the phase body.
+    (b) **No Red-manifest collision:** no declared path may collide with any Red-manifest path (derivable from the plan's `[TDD-Red]` or Red-stage phases in this piece) or any `integration_registry` row. A collision means the path was Red-authored or integration-registered and is also being declared as an Implement-track authored test — that is a smuggling attempt that the runtime gate (AC-6) will hard-reject. Flag it here before execute ever runs. Evidence: quote the colliding path, the `[TDD-Red]` or registry row, and the `**Authored-tests:**` declaration.
+
+    **Must-fix** for either (a) or (b).
 
 ## Output Format
 

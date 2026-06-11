@@ -1,0 +1,21 @@
+schema_version: 1
+generated: 2026-06-10
+last_updated: 2026-06-10
+piece: exec-ready/exec-guardrails
+spec:
+  qa_rounds: 6            # Phase-2 VOQ question→answer exchanges
+  qa_iterations: 1        # spec QA gate (qa-spec) loops to clean
+  research_artifact: true # research.md present for this piece
+plan:
+  qa_iterations: 1        # qa-plan gate loops to clean
+  concreteness_floor: passed   # qa-plan reached clean with no circuit-breaker escalation
+execute:
+  track: implement         # tdd: false — all 8 phases on Implement track
+  phases_total: 8
+  phases_tdd: 0
+  phases_implement: 8
+  phase_qa_must_fix_commits: 3  # phases 2, 3, 5 each had one QA must-fix rework commit
+  final_review_must_fix_items: 9  # 14-occurrence ERE bug + 8 other items addressed in one fix commit
+  amendments_total: 0      # no plan/spec amendments during execution
+  discoveries_triaged: 0   # no in-flight Step 6c discoveries (reflection findings deferred to backlog)
+  status: complete

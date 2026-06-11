@@ -189,6 +189,10 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
     - A pure `[Implement]` phase with no `[TDD-Red]`/`[Write-Tests]` step — out of scope for this criterion
 
     Evidence: quote the phase's `Test Data` block (or its absence) and the uncovered/incomplete case. **Must-fix.**
+32. **Authored-tests declaration (activate only when a phase carries an `**Authored-tests:**` field; absence is never a finding):**
+    (a) Each declared path is cited in that phase's `[Implement]`/`[Write-Tests]`/`[Verify]`/`**Scope:**`/`**In scope:**` body (no phantom declaration).
+    (b) No declared path collides with any Red-manifest path or `integration_registry` row (collision = smuggling → runtime hard-reject, must-fix here).
+    Evidence: quote the field and the offending path.
 
 ## Output Format
 

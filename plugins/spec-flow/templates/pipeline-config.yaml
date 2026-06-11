@@ -69,6 +69,18 @@ model_policy: auto
 #   SKILL self-lint loop.
 qa_max_iterations: auto
 
+# amendment_budget: per-piece amendment hard-cap (new in v5.12.0)
+#   <int> — the total number of amendments allowed for one piece before execute
+#           HALTS with a diagnostic "why are we here?" escalation (default 5).
+#           Reaching it is a hard stop, not a soft checkpoint — there is no
+#           per-event continuation. The operator may raise this value and resume
+#           (an attended decision) or route to fork/block. There is NO off/unlimited
+#           sentinel — the cap is always a finite integer.
+#   Governs: the per-piece amendment checkpoint (Step 6c, Final Review, reflection).
+#   Does NOT govern: the 1-spec-amendment sub-cap (a fixed documented constant), the
+#   oracle 2-attempt build budget, or the spike-phase soft-checkpoint.
+amendment_budget: 5
+
 # default_branch: the base branch for `git diff <base>..HEAD` in Final Review (new in v5.2.0)
 #   <unset> — auto-detect: git symbolic-ref refs/remotes/origin/HEAD, then git remote show origin (default)
 #   <name>  — explicit override (e.g. master, trunk) when auto-detect cannot resolve

@@ -64,6 +64,8 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 <!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
 **Steps traversed (P2):** {{steps_or_na}}
 **Dispatch sites (P3):** {{sites_or_none}}
+<!-- OPTIONAL: list the literal test paths this phase legitimately authors. Omit if none. Listed paths are exempt from the Red-immutability reject (Implement-track only); a path that is ALSO in Red's staged manifest is a hard reject (smuggling), never an exemption. qa-plan verifies this field iff present. -->
+**Authored-tests:** {{authored_test_paths_or_omit}}
 **Charter constraints honored in this phase:**
 - {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 
@@ -141,6 +143,8 @@ concreteness defect (qa-plan criterion 30). -->
 <!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
 **Steps traversed (P2):** {{steps_or_na}}
 **Dispatch sites (P3):** {{sites_or_none}}
+<!-- OPTIONAL: list the literal test paths this phase legitimately authors. Omit if none. Listed paths are exempt from the Red-immutability reject (Implement-track only); a path that is ALSO in Red's staged manifest is a hard reject (smuggling), never an exemption. qa-plan verifies this field iff present. -->
+**Authored-tests:** {{authored_test_paths_or_omit}}
 **Charter constraints honored in this phase:**
 - {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 
@@ -204,6 +208,8 @@ concreteness defect (qa-plan criterion 30). -->
 <!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
 **Steps traversed (P2):** {{steps_or_na}}
 **Dispatch sites (P3):** {{sites_or_none}}
+<!-- OPTIONAL: list the literal test paths this phase legitimately authors. Omit if none. Listed paths are exempt from the Red-immutability reject (Implement-track only); a path that is ALSO in Red's staged manifest is a hard reject (smuggling), never an exemption. qa-plan verifies this field iff present. -->
+**Authored-tests:** {{authored_test_paths_or_omit}}
 **Charter constraints honored in this phase:**
 - {{nn_c_id_or_cr_id}} ({{short_name}}): {{how_this_phase_honors_it}}
 

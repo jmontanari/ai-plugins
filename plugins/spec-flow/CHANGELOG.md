@@ -4,6 +4,19 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.12.4] — 2026-06-10
+
+### Added
+- **Test-immutability mechanical reject (FR-EG-01 – FR-EG-09):** Build agents can no longer silently modify Red-staged test files. The SHA-256 integrity gate (a) now hard-rejects any Build diff that touches a path in the Red-stage manifest, names each violating path explicitly, and has no warn-and-proceed branch. The Phase Group barrier (G9b) mirrors this enforcement for deferred commits.
+- **Fixture/conftest manifest enrichment (FR-EG-10):** The `tdd-red` agent extends its manifest to include directly-imported fixture/helper files and same-tree `conftest.py` files found by walking up to the test root. Bounded — NOT a transitive closure; skip non-resolving imports silently.
+- **`**Authored-tests:**` exemption field (FR-EG-05):** Non-TDD (Implement-track) phases may declare test paths they author in `**Authored-tests:**`. Declared paths are exempt from the immutability gate; a path present in both the Red manifest and `Authored-tests` is a HARD REJECT (smuggling guard). Absent field ⇒ empty exemption, no error.
+- **`qa-plan` criterion 32/27 — Authored-tests validation:** The plan QA agent now checks that every `**Authored-tests:**` declared path is cited in the phase's `[Implement]`/`[Write-Tests]`/`[Verify]`/`**Scope:**` body (no phantom declaration) and that no declared path collides with any Red-manifest path (collision = smuggling, must-fix).
+- **`amendment_budget` config key (FR-EG-07):** New `.spec-flow.yaml` key (default 5, no off/unlimited sentinel) controls the per-piece amendment hard-cap read at Step 0. Documents governs/does-not-govern scope.
+
+### Changed
+- **Removed per-event `(c) continue` soft-checkpoint at amendment budget.** Reaching `amendment_budget` (default 5) now HALTS execute with a diagnostic escalation that summarises amendment history (git log count + `.discovery-log.md` amend rows) and offers: raise `amendment_budget` in `.spec-flow.yaml` and resume, fork, defer, or block. There is no per-event continue affordance.
+  - **Migration:** Set `amendment_budget: <n>` in `.spec-flow.yaml` to tune the cap. To continue past the default threshold, raise the value and re-run execute — raise-and-resume replaces per-event continue. Unattended `--auto` runs that previously auto-chose `(c)` now default to `(d)` defer at threshold.
+
 ## [5.12.3] — 2026-06-10
 
 ### Added
@@ -36,7 +49,6 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 - **Agent input contracts extended with WORKTREE and manifest-ownership fields:** the implementer, tdd-red, fix-code, and refactor `.agent.md` / `.md` twin files each gain a `WORKTREE:` input field and a manifest-ownership line. The appended blocks are identical across each pair; the 22 already-identical pairs stay byte-identical; the 4 pre-existing divergent pairs (plan-amend, qa-plan, tdd-red, review-board-security) are not unified by this change.
 - **4 previously-divergent agent twins reconciled to byte-identical:** `plan-amend`, `qa-plan`, `tdd-red`, and `review-board-security` `.agent.md` files were stale relative to their `.md` counterparts; the canonical `.md` is now copied over each, making all 4 pairs byte-identical alongside the existing 22.
 - **Final Review diff base now uses `git merge-base`:** the 4-tier `$default_branch` resolver is preserved (still needed to compute the merge-base), but all diff invocations in Final Review (Step 1a scope detection, Step 1 full diff, fast-mode 9th board member, CHANGELOG re-verification, and Step 8 re-entry prose) now diff against `$diff_base=$(git merge-base "$default_branch" HEAD)` rather than `"$default_branch"..HEAD`. This is robust to the default branch advancing mid-branch, which would otherwise include intervening main commits as spurious diff.
-
 ## [5.11.0] — 2026-06-10
 
 ### Added

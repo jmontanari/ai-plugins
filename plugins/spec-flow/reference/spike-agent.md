@@ -64,21 +64,18 @@ The 50% diff-ratio gate (absorption-size ÷ cumulative-diff) is evaluated for ev
 
 No new config key. Reuses the value at `plugins/spec-flow/skills/execute/SKILL.md` threshold computation.
 
-## Soft-checkpoint budget
+## Amendment budget (spike-phase soft-checkpoint + execute hard-cap)
 
 Two counters track amendment pressure within a piece:
 
 - `piece_amendment_count` — total amendments this piece
 - `piece_spec_amendment_count` — spec amendments this piece
 
-Default thresholds: 5 total; 1 spec sub-cap.
+Default thresholds: `amendment_budget` total (configurable in `.spec-flow.yaml`, default 5); 1 spec sub-cap (fixed constant, not configurable).
 
-At threshold: prompt the operator `continue / fork / defer / block`. Re-surface on each subsequent amendment.
+At threshold: HALT and prompt the operator `raise amendment_budget and resume / fork / defer / block`. No per-event continue option — raise-and-resume is an operator-level config change.
 
-- `continue` → dispatch proceeds
-- `block` → operator-chosen halt
-
-Count never resets within a piece; never hard-blocks (only the operator's `block` choice halts execution).
+Count never resets within a piece. The spike-phase soft-checkpoint never hard-blocks (the operator's `continue` choice dispatches the spike); the configurable `amendment_budget` amendment hard-cap halts at its threshold (no per-event continuation — only raise-and-resume, fork, defer, or block).
 
 Recovery grep: count committed amendments in branch history to recompute on resume.
 
