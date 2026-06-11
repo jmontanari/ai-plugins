@@ -4,6 +4,13 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.13.0] — 2026-06-11
+
+### Added
+- **Flywheel pattern lifecycle (FR-015):** `reference/flywheel.md` `## Pattern lifecycle` — derived `state` (`active`/`hardened`/`archived`, only `archived` stored), derived `last_seen`, `ineffective-hardening` computed (exclusion-rule #2 negated) surfaced in an elevated regressions block, and an operator-gated end-of-piece refresh pass (Step 4.5) with two archival arms (stale-active + clean-hardened) on a piece-count `staleness_window` (default 8). Archived patterns leave the auto-match candidate set; a near-match surfaces a revive option. Atomic write + post-write verification; malformed-lifecycle / torn-write → `[FLYWHEEL-DEGRADED: lifecycle unavailable]` (non-blocking; absence of lifecycle fields derives `active`, never degraded).
+- **`staleness_window:` config key** in `templates/pipeline-config.yaml` (read from `.spec-flow.yaml`; absent/null/empty/≤0 ⇒ 8; NN-C-003).
+- **`execute/SKILL.md` citations** at the match hook and batched hardening proposal pointing at the new lifecycle sections (cite-only, CR-008).
+
 ## [5.12.4] — 2026-06-10
 
 ### Added

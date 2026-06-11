@@ -416,3 +416,15 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **PR-EG-2: `[Verify]` for phases writing to the e2e test harness must include `run-e2e.sh` execution.** The exec-guardrails `tests/e2e/run-e2e.sh` harness existed throughout the piece but was never invoked in any `[Verify]` step — only file contents were inspected via LLM-agent steps. The 14-occurrence ERE bug survived five phases because no runtime validation fired. **Fix:** for any phase whose `[Write-Tests]` output lands in `tests/e2e/lib/static.sh` or `tests/e2e/lib/contract.sh`, the `[Verify]` step must include a literal `bash plugins/spec-flow/tests/e2e/run-e2e.sh` command (or an equivalent scoped invocation). LLM-agent-step inspection of test file contents does not substitute for harness execution.
 
 **Captured:** 2026-06-10
+
+---
+
+### Process-retro findings (exec-ready/flywheel-refresh, 2026-06-11)
+
+**Source:** `exec-ready/flywheel-refresh` phase `step-4.5-reflection` (agent: `reflection-process-retro`). Deferred via operator triage 2026-06-11. Category: process-improvement.
+
+**FR-1: Citation-norm for plan template — doc-as-code wiring phases must verify section headings verbatim.** The Phase 4 must-fix (commit 64f3fe1) was a citation-truncation defect: the plan's T-1 prose named `## Match + confirm flow` but the actual section heading in `flywheel.md` is `## Match + confirm flow (no silent write)`. The implementer faithfully reproduced the truncated string from the plan. Root cause: the plan author didn't read the target file to verify the heading verbatim before writing the T-step. **Fix:** add a doc-as-code citation norm to the plan template — any `[Implement]` T-step citing a section heading must include a note: "read the target file first and verify this heading verbatim before authoring the citation." This applies to all citation-only wiring phases (common in doc-as-code SSOT+caller-cites patterns). Candidate: add to `plugins/spec-flow/reference/plan-quality.md` (or equivalent) as a named norm, and to the qa-plan rubric.
+
+**FR-2: qa-plan verbatim-heading cross-check for citation-only phases.** qa-plan focuses on AC coverage and phase-boundary ambiguity but does not verify that section headings cited in `[Implement]` T-steps exist verbatim in the referenced SSOT files. For citation-only doc-as-code phases this is a cheap structural check (grep the target file for the exact heading string). The Phase 4 `[Verify]` cross-phase oracle DID catch the defect — but only after the implementer committed the wrong string. Moving the check to qa-plan (pre-execute) would eliminate the extra QA iteration. **Fix:** add a qa-plan heuristic — for `[Implement]` T-steps that contain a `see <file> ## <Heading>` pattern, grep the target file and flag any heading that does not appear verbatim as a must-fix.
+
+**Captured:** 2026-06-11

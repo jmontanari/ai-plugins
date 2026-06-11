@@ -97,6 +97,12 @@ reflection: auto
 #   See plugins/spec-flow/reference/flywheel.md `## Threshold + batched proposal`.
 flywheel_threshold: 2
 
+# staleness_window: flywheel pattern lifecycle — distinct flywheel-active pieces since a pattern's
+#   last occurrence after which the refresh pass proposes it for archival (new in v5.13.0; FR-015).
+#   <int> — distinct-piece staleness window (default 8). Absent / null / empty / ≤0 ⇒ 8 (non-blocking; NN-C-003; values ≤ 0 are nonsensical).
+#   See plugins/spec-flow/reference/flywheel.md `## Pattern lifecycle`.
+staleness_window: 8
+
 # metrics: per-piece pipeline instrumentation (new in v5.11.0; FR-010).
 #   auto — stages write docs/prds/<prd>/specs/<piece>/metrics.yaml; /spec-flow:status renders SC-001..SC-006 (default).
 #   off  — stages skip the metrics write entirely; the piece renders [METRICS-ABSENT] (identical to a pre-instrumentation piece).

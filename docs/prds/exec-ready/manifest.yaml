@@ -286,7 +286,7 @@ pieces:
       built on them.
     prd_sections: [FR-015, SC-003, SC-005, G-5]
     dependencies: [flywheel-repo]
-    status: open
+    status: merged
 
   - name: gate-evals
     slug: gate-evals

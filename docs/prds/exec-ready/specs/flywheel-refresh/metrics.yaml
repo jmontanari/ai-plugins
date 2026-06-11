@@ -1,0 +1,33 @@
+schema_version: 1
+generated: 2026-06-10
+last_updated: 2026-06-10
+piece: exec-ready/flywheel-refresh
+spec:
+  qa_rounds: 2
+  qa_iterations: 1
+  research_artifact: true
+  budget_compliance:
+    spec_md:
+      lines: 141
+      soft: 300
+      hard: 520
+      status: pass
+    deliberation_md:
+      lines: 129
+      soft: 200
+      hard: 350
+      status: pass
+plan:
+  qa_iterations: 2
+  concreteness_floor: passed
+  budget_compliance:
+    plan_md_total:
+      lines: 345
+      soft: 750
+      hard: 1000
+      status: pass
+    plan_md_max_phase:
+      lines: 90
+      soft: 90
+      hard: 220
+      status: pass

@@ -1101,6 +1101,8 @@ For all mechanics — the match/confirm interaction, the count rule, and the occ
 
 No registry write is performed. Execute is NOT blocked or failed. The triggering finding still flows through its normal Step 6c triage / reflection resolution path unchanged. See `plugins/spec-flow/reference/flywheel.md` `## Degraded path`.
 
+Archived patterns are excluded from the auto-match candidate set and a near-match surfaces a revive option — see `plugins/spec-flow/reference/flywheel.md` `## Match + confirm flow (no silent write)` and `## Pattern lifecycle`. Do NOT restate the rules here (CR-008 / NN-C-008).
+
 #### Auto-mode threshold (FR-17)
 
 **Universal threshold (spike-vs-direct decision).** For every admitted change — whether in operator mode or `--auto` mode — the 50% diff-ratio gate determines whether a scope spike runs before `plan-amend` (see T-3 below). This gate is orthogonal to the auto-amend-vs-escalate decision: the scope-spike decision is evaluated first; the auto-mode amend-vs-escalate semantics (below) are a SEPARATE, subsequent decision layered on top.
@@ -1937,6 +1939,8 @@ For each pattern in the proposal the operator may **approve** or **reject**:
   **On `STATUS: OK`:** read the spike artifact at `spikes/flywheel-<pattern-id>.md`, then route the scoped fix through the **existing** Step 6c reflection-finding `amend` dispatch (the behavior at `#### What gets committed (and what does not)` "On amend / amend-spec" — `plan-amend` appends the scoped hardening phases at a dependency-correct position; those phases run through the full Per-Phase Loop and re-enter the Final Review board before merge; the amendment consumes the standard per-piece amendment budget: 5 amendments total / 1 spec). Record a `hardenings` entry (outcome: resolved, spike_artifact: `spikes/flywheel-<pattern-id>.md`, amend_commit, at_count) against the pattern in `docs/patterns.yaml` — NOT a new occurrence entry. Append the standard `.discovery-log.md` row with source-phase token `step-4.5-reflection`. See `plugins/spec-flow/reference/flywheel.md` `## Hardening dispatch (reuse)`.
 
   **On `STATUS: BLOCKED`:** escalate to the operator with the spike's findings. Produce **no** plan amendment. Apply **no** mid-stream patch. Record a `hardenings` entry (outcome: blocked, at_count) against the pattern in `docs/patterns.yaml` — this is **not** a rejection (do not write a `rejections` entry; the pattern remains eligible for future proposals). See `plugins/spec-flow/reference/flywheel.md` `## Hardening dispatch (reuse)`.
+
+**Flywheel refresh pass (FR-015).** After the batched hardening proposal, run the operator-gated refresh pass — one batched archival proposal (stale-active + clean-hardened arms), the ineffective-hardening regressions block, in-proposal lifecycle rendering, and revive — all per `plugins/spec-flow/reference/flywheel.md` `## Pattern lifecycle`. Read `staleness_window` from `.spec-flow.yaml` (default 8). On malformed-lifecycle or torn write, emit `[FLYWHEEL-DEGRADED: lifecycle unavailable]` and continue (non-blocking) per `plugins/spec-flow/reference/flywheel.md` `## Degraded path`. Do NOT restate the mechanics here (CR-008 / NN-C-008).
 
 ### Step 5: Capture Learnings
 

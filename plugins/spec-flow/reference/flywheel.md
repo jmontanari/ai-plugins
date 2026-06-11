@@ -22,6 +22,7 @@ patterns:
         # originating_repo: <reserved — flywheel-global only>
     rejections: []                      # each: { date, rationale, rejected_at_count }
     hardenings: []                      # each: { date, outcome (resolved|blocked), spike_artifact, amend_commit, at_count }
+      # state: derived (active|hardened|archived); last_seen: derived = max(occurrences[].date); archived: stored marker, operator-set only
 ```
 
 **Field rules:**
@@ -33,6 +34,9 @@ patterns:
   - `originating_repo` — RESERVED for the flywheel-global piece (FR-007); no path in this piece writes it.
 - `rejections` — a list of rejection records; each carries `{date, rationale, rejected_at_count}`. See `## Rejection rule`.
 - `hardenings` — a list of hardening-outcome records; each carries `{date, outcome: resolved|blocked, spike_artifact: <path or — for blocked>, amend_commit: <sha, resolved only>, at_count: <distinct-piece count at the time of the hardening>}`. This is the schema home for both accepted-outcome (resolved) and proposed-but-unresolved (blocked) hardening records — symmetric with `rejections`. See `## Hardening dispatch (reuse)`.
+- `state` — DERIVED, never stored except `archived`. Values `active | hardened | archived`. If the stored `archived` marker is present, `state = archived` (takes precedence over hardening status); the `hardened`/`active` derivation applies only when `archived` is absent. `hardened` (when `archived` absent) iff the pattern is currently resolved-suppressed per `## Threshold + batched proposal` exclusion-rule #2 — the `at_count ≥ count` check applies to the highest resolved `at_count`; that rule is the single definition; there is no separate "latest hardening" or date-ordering formulation. Otherwise `active`. `archived` is the lone STORED lifecycle marker (operator-set; archival is an operator decision with no data antecedent — NN-P-004). A registry with no lifecycle fields reads as `active` with no migration (NN-C-003); absence of lifecycle fields is NOT malformed (see `## Degraded path`).
+- `last_seen` — DERIVED `= max(occurrences[].date)`. No stored field.
+- `archived` — optional stored marker; present only on operator-confirmed archival. **Sanctioned form: `archived: true` (boolean).** Any other value type — string, date, integer — is invalid and triggers the lifecycle degraded path (see `## Degraded path`). Archived patterns stay in-file for audit and leave the auto-match candidate set (see `## Match + confirm flow`, `## Pattern lifecycle`).
 
 ## Count rule
 
@@ -55,6 +59,8 @@ At the Step 6c hook the flywheel proposes a match against `docs/patterns.yaml`. 
 - **"New" + proposed kebab slug:** when no existing pattern fits, the flywheel proposes a new `id` (kebab slug, LLM-authored).
 
 The flywheel writes **nothing** to `docs/patterns.yaml` until the operator confirms both the classification (which pattern) and the scope (`charter | qa | prd`). On a "new" confirmation the operator may rename the proposed slug, and the rename becomes the stored `id`.
+
+An `archived` pattern is EXCLUDED from the auto-match candidate set. Archived patterns are included in the LLM's match context (labelled `[archived]`) so near-match proposals can surface — they are excluded only from the auto-accept candidate set (operator confirmation is still required for revive — NN-P-004). When a Step 6c finding near-matches an archived pattern, the flywheel surfaces a revive option (`resembles archived pattern <id> — revive or mint new?`) immediately at that Step 6c prompt so historical correlation is not silently lost. Revive (clearing the `archived` marker) is also offered in the Step 4.5 refresh prompt for patterns already archived before the current piece runs; archived entries are never deleted.
 
 Matches are LLM-proposed, human-confirmed (NN-P-004). The match line is additive to the existing single-aggregated-prompt-per-phase convention (NFR-6) — it does not add a separate prompt round-trip per finding; it is folded into the phase's existing Step 6c triage prompt.
 
@@ -91,6 +97,27 @@ Note: a pattern hardened (resolved) at count 2 is excluded while count stays 2; 
 Patterns with count < threshold are not included.
 
 The batched proposal fires at the **end-of-piece** Step 4.5 Reflection juncture — after the Final Review board and Human Sign-Off, before merge — using the existing point at which reflection findings already route through Step 6c. This is not a new pipeline step.
+
+## Pattern lifecycle
+
+**Derived state:** `state` and `last_seen` derive per `## Registry schema`; `hardened` and `active` use exclusion-rule #2 (see `## Threshold + batched proposal`).
+
+**Ineffective hardening:** A pattern whose `count` has since exceeded the highest resolved `at_count` across all its `hardenings` entries (exclusion-rule #2 read in the negative — see `## Threshold + batched proposal`). This is a COMPUTED condition and label — not a stored flag. It is surfaced in a DISTINCT, elevated "regressions" block at the batched review (not a peer proposal row), honoring FR-015 "elevated priority". An ineffective hardening derives `active` (count > at_count) and a recurrence advances derived `last_seen`; it is excluded from both archival arms.
+
+**Staleness window:** `pieces_since_last_seen` = count of distinct `piece` values across ALL patterns' `occurrences` whose `date` is after this pattern's `last_seen` (flywheel-active-piece cadence; registry-internal; no global ordinal, no manifest read). The window is `staleness_window` (default `8`, read from `.spec-flow.yaml`). An absent key, a present-but-null, a present-but-empty value, and a value ≤ 0 ALL resolve to `8` (zero and negative windows are nonsensical — NN-C-003); a null is never read as `0`.
+
+```
+Worked example (staleness_window = 8):
+  pattern P, last_seen = exec-ready/metrics; distinct pieces recorded after it = 8 (in other patterns' occurrences; P itself had none after exec-ready/metrics' date) → pieces_since_last_seen 8 ≥ 8 → stale; if state active → stale-active arm; if state hardened → clean-hardened arm
+  pattern Q, last_seen = exec-ready/gate-scaling; distinct pieces after it = 3 → 3 < 8 → not stale, no proposal
+  pattern R, hardened at_count 2, recurs in a new piece → count 3 > 2 → derives active, last_seen advances → ineffective-hardening regressions block, NOT archival
+```
+
+**Refresh pass:** At end-of-piece Step 4.5, after the existing batched hardening proposal, surface ONE operator-gated batched archival proposal listing: (a) stale-active (`state: active`, `pieces_since_last_seen ≥ staleness_window`); (b) clean-hardened (`state: hardened`, `pieces_since_last_seen ≥ staleness_window`). Both arms use the single `pieces_since_last_seen` clock (differ only by derived state). The single clock is a correct proxy for the clean-hardened arm because hardening appends only a `hardenings` entry — never an occurrence (see `## Hardening dispatch (reuse)`) — so `last_seen` does not advance at hardening time. Nothing archives until the operator confirms (NN-P-004). Ineffective-hardening patterns (count > at_count) are excluded from both arms and appear in the regressions block.
+
+**In-proposal rendering:** The proposal renders, per listed pattern, its derived `state`, `last_seen`, and ineffective-hardening status.
+
+**Read-never-write invariant:** Deriving `state`/`last_seen`/`ineffective-hardening` and computing `pieces_since_last_seen` are READS; they never write the registry. The only refresh writes are the operator-confirmed `archived` flip and revive flip (atomicity per `## Degraded path`).
 
 ## Hardening dispatch (reuse)
 
@@ -130,11 +157,13 @@ When `docs/patterns.yaml` is **unwritable** (filesystem permission error) OR **u
 
 The degraded path also covers the **Step 4.5 batched proposal**: if `docs/patterns.yaml` is unwritable OR unparseable at batched-proposal time (whether reading the count, or writing a reject/hardening entry), emit `[FLYWHEEL-DEGRADED: repo registry unavailable]`, skip the batched proposal entirely (no read, no write, no proposal surfaced), and do NOT block merge — the piece proceeds to Step 5 / merge.
 
+**Lifecycle degraded path:** A lifecycle field that is PRESENT but invalid (an `archived` marker not in the sanctioned form, or an otherwise malformed lifecycle field) → emit `[FLYWHEEL-DEGRADED: lifecycle unavailable]`, propose nothing, and leave the file untouched; recording (occurrence append, rejection, hardening) continues per the steps above. ABSENCE of lifecycle fields is NOT malformed — it derives `active` (see `## Registry schema`) and MUST NOT trip the marker. **Atomic write:** Any refresh write (archival flip, revive flip) is atomic: write to a temp file then rename (all-or-nothing). After the write, re-read the file; if the write did not fully land, emit `[FLYWHEEL-DEGRADED: lifecycle unavailable]` with an explicit `archival not applied` notice. After emitting the degraded marker, discard the in-memory change and re-read the registry state from disk before continuing — the session state must match the on-disk state. The pre-flight gate above covers torn reads; this covers torn writes.
+
 This mirrors the `[RESEARCH-UNAVAILABLE]` / `[TEST-DATA-ABSENT]` marker convention used elsewhere in the pipeline. The degraded marker is informational; it surfaces the fault without creating a blocking condition.
 
 ## No secrets
 
-When transcribing finding text into an occurrence `source`, or into a `hardenings` or `rejections` rationale, never copy credentials, tokens, private keys, or connection strings verbatim — summarize the finding's nature instead.
+When transcribing finding text into an occurrence `source`, or into a `hardenings` or `rejections` rationale, or into an archival rationale or regression/revive note, never copy credentials, tokens, private keys, or connection strings verbatim — summarize the finding's nature instead.
 
 ## See also
 

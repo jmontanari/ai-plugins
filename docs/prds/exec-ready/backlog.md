@@ -95,3 +95,19 @@ The no-re-spike guard (Step 1c) is piece-scoped: `spikes/<phase-id>.md` lookup i
 **EG-4: gate-evals cheater scenarios should cover the flat-path transient-commit window.** ADR-1 (plan §Architectural Decisions) accepts that on the flat/`deferred_commit: off` path a tampered commit transiently exists on HEAD before the orchestrator's revert. The `gate-evals` piece (manifest open, prd_sections FR-017) describes ≥10 cheater scenarios but its description does not include this flat-path window as a distinct scenario class. **Resolution point:** when `gate-evals` is specced, include a scenario where a cheat reads tampered content from HEAD in the window between implementation and the gate (a) revert — else the ADR-1-accepted asymmetry goes untested.
 
 **Captured:** 2026-06-10
+
+---
+
+## Deferred from exec-ready/flywheel-refresh step-4.5-reflection (2026-06-11)
+
+**Source:** `exec-ready/flywheel-refresh` step-4.5 reflection. Deferred via operator triage 2026-06-11.
+
+**FO-1: On-demand flywheel refresh skill.** ADR-4 deferred this (no `commands/` host, YAGNI at spec time). As the registry accumulates entries across multiple PRDs, operators will want to inspect and prune patterns outside the end-of-piece cadence — e.g. mid-PRD when a batch of pieces ships rapidly and several stale patterns accumulate before any Step 4.5 fires. Candidate: `/spec-flow:flywheel` (or `/spec-flow:status --flywheel`) — reads `docs/patterns.yaml`, derives lifecycle state per `reference/flywheel.md ## Pattern lifecycle`, presents the operator-gated archival prompt. Read-only view arm is minimum; full refresh arm (operator-confirmed archival) is stretch goal. **Deps:** flywheel-refresh (merged); real registry data (at least one threshold-triggered hardening).
+
+**FO-2: `/spec-flow:status` lifecycle rendering.** `status/SKILL.md` renders SC-001–SC-006 from `metrics.yaml` but has no flywheel-aware section. Now that lifecycle fields + schema are stable, the natural home for a `Flywheel:` summary row is the status output: active/hardened/archived counts, pending stale-active or clean-hardened proposals, ineffective-hardening regressions. Without this, flywheel health is invisible between end-of-piece passes. Candidate: extend `status/SKILL.md` to derive state from `docs/patterns.yaml` (when present) and emit a compact summary. **Deps:** flywheel-refresh (merged); metrics (merged).
+
+**FO-3: FW-2 scope expansion for flywheel-global spec brainstorm.** FW-2 (registry-integrity lint) was deferred in ADR-5 to flywheel-global. The lifecycle fields added by flywheel-refresh expand the structural-validity surface: `archived` non-boolean, `hardenings.at_count` non-integer, `hardenings.outcome` outside `resolved|blocked`, duplicate `piece` values in `occurrences` (inflates `pieces_since_last_seen`). During flywheel-global spec brainstorm, expand FW-2 scope to cover lifecycle fields and add a `## Registry invariants` grep recipe to `reference/flywheel.md` covering both base schema and lifecycle fields. **Deps:** flywheel-global spec (open); extends existing FW-2 backlog entry (2026-06-09) — not a duplicate.
+
+**FO-4: flywheel-global dependency gate is now cleared.** flywheel-global (manifest `status: open`) required flywheel-refresh to be merged (lifecycle mechanics precondition). This piece satisfies that gate. Start of flywheel-global is further gated on: (1) at least one real threshold-triggered hardening on live pieces (per manifest ordering note), and (2) resolution of open questions FW-1 (`hardenings` schema variant for cross-repo context) and FW-3 (resolved/blocked exclusion ACs) — both already in this backlog (2026-06-09). No new piece needed; this is a tracking note.
+
+**Captured:** 2026-06-11
