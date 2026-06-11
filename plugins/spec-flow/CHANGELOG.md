@@ -4,6 +4,11 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.12.3] — 2026-06-10
+
+### Added
+- **Operator-driven full-document view at sign-off gates (spec and plan):** `!open <path>` and `!cat <path>` commands let the operator request full-document rendering at any spec or plan sign-off gate; the orchestrator also supports an on-demand print triggered by the operator mid-gate. Default gate behavior remains token-cheap — the full document is NOT auto-printed. Addresses the UX gap where operators had no way to inspect the full artifact before approving without scrolling through accumulated conversation output.
+
 ## [5.12.2] — 2026-06-10
 
 ### Added

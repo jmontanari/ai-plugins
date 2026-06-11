@@ -335,9 +335,9 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     3. **Enumerate branches.** For Implement-track / Non-TDD phases, every conditional branch in the deliverable (if/when/unless/otherwise/either, or an enumerated case) gets its own numbered AC (reference §3).
     Reference `plugins/spec-flow/reference/plan-concreteness.md` for all definitions — do not restate them here.
 
-2g. **Test Data contract for test-authoring phases (FR-003).** Every phase that authors tests — a phase containing a `[TDD-Red]` step (TDD track) or a `[Write-Tests]` step (Non-TDD mode) — must carry a complete `Test Data` block (one entry per behavior-under-test: case id + concrete input + expected outcome/oracle), defined authoritatively in `plugins/spec-flow/reference/plan-concreteness.md` §5. As you author each such phase:
-    1. **Author the oracle.** Give each behavior a concrete input and expected outcome; the `[TDD-Red]`/`[Write-Tests]` test entries reference cases by id so the oracle is written once (reference §5).
-    2. **Mark unpredictable outcomes.** A case whose expected outcome genuinely cannot be predicted carries a per-case `[SPIKE: <unknown>]` in its expected-outcome position (reference §2 — same marker, no new token); predictable cases keep concrete data.
+2g. **Test Data contract for test-authoring phases (FR-003).** Every phase that authors tests — a phase containing a `[TDD-Red]` step (TDD track) or a `[Write-Tests]` step (Non-TDD mode) — must carry a complete `Test Data` block (one entry per behavior-under-test: case id + concrete input + expected outcome/oracle), defined authoritatively in `reference/plan-concreteness.md §5. Test Data contract`. As you author each such phase:
+    1. **Author the oracle.** Give each behavior a concrete input and expected outcome; the `[TDD-Red]`/`[Write-Tests]` test entries reference cases by id so the oracle is written once (reference/plan-concreteness.md §5. Test Data contract).
+    2. **Mark unpredictable outcomes.** A case whose expected outcome genuinely cannot be predicted carries a per-case `[SPIKE: <unknown>]` in its expected-outcome position (reference/plan-concreteness.md §2. The [SPIKE: <unknown>] marker — same marker, no new token); predictable cases keep concrete data.
     3. **Completeness.** Every named behavior must have a covering case and every case both an input and an expected outcome (or a per-case `[SPIKE]`) — `qa-plan` #31 must-fixes an absent or incomplete block. A pure `[Implement]` phase (no test step) requires no block.
     Reference `plugins/spec-flow/reference/plan-concreteness.md` for all definitions — do not restate them here.
 
@@ -534,7 +534,7 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
     - **P3 (dispatch sites):** a piece changing a cross-cutting agent-dispatch contract must enumerate, in a `**Dispatch sites (P3):**` header field, every (re-)dispatch site of the affected agents; if none, state "none."
     - Both header fields are REQUIRED only when the edited file is a multi-step orchestration file (per the Definition above); otherwise they may be omitted.
 
-9d. **Doc-as-code branch-enumeration ACs (FR-002c).** For each Implement-track / Non-TDD phase, before finalizing the AC Coverage Matrix, scan the phase's deliverable prose for conditional branches (if/when/unless/otherwise/either, or an enumerated case) and confirm each has a matching numbered AC. See §3 of `plugins/spec-flow/reference/plan-concreteness.md`. A conditional branch with no covering AC is a concreteness defect the author must fix before the Phase 3 QA dispatch.
+9d. **Doc-as-code branch-enumeration ACs (FR-002c).** For each Implement-track / Non-TDD phase, before finalizing the AC Coverage Matrix, scan the phase's deliverable prose for conditional branches (if/when/unless/otherwise/either, or an enumerated case) and confirm each has a matching numbered AC. See `reference/plan-concreteness.md §3. Doc-as-code branch-enumeration-AC rule`. A conditional branch with no covering AC is a concreteness defect the author must fix before the Phase 3 QA dispatch.
 
 10. **Contracts section generation (FR-PLAN-004 / FR-PLAN-005 / FR-PLAN-006 / FR-PLAN-007).** After all phases are drafted, generate the `## Contracts` section. Steps:
 
@@ -646,7 +646,20 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 **Metrics — concreteness_floor:** Record `plan.concreteness_floor = passed` when this QA loop reaches clean with no circuit-breaker escalation; `overridden` when the piece advances via the 3-iter circuit-breaker human override. `plan.qa_iterations` = the iteration count to clean. Both fields are persisted in Phase 4 per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
 
-4. Present to user for sign-off.
+4. Print the following sign-off review block, then present the approve / request-changes prompt (Phase 4 step 1 behavior).
+
+   **Sign-off review block (plan):**
+   ```
+   ✅ plan ready for sign-off: <repo-root-relative path to plan.md>
+      <N> lines · Sections: <comma-separated top-level ## section names from plan.md>
+      (e.g. Overview, Architectural Decisions, Phases, Testing, Integration Coverage)
+
+   View options (operator-initiated — orchestrator does NOT auto-print the full plan):
+     !open <path>   — open plan.md in a separate window
+     !cat <path>    — print plan.md to the terminal
+     Ask the orchestrator to print the full plan in chat (on demand only)
+   ```
+   The orchestrator does NOT auto-print the full plan document. The full document is printed only when the operator explicitly requests it (via `!cat`, `!open`, or an in-chat request).
 
 ### Phase 4: Finalize
 

@@ -284,7 +284,19 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    - **Circuit breaker:** After 3 QA iterations, escalate to human.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
-4. When QA returns clean: present spec to user for sign-off.
+4. When QA returns clean: print the following sign-off review block, then present the approve / request-changes prompt (Phase 5 step 1 behavior).
+
+   **Sign-off review block (spec):**
+   ```
+   ✅ spec ready for sign-off: <repo-root-relative path to spec.md>
+      <N> lines · Sections: <comma-separated top-level ## section names from spec.md>
+
+   View options (operator-initiated — orchestrator does NOT auto-print the full spec):
+     !open <path>   — open spec.md in a separate window
+     !cat <path>    — print spec.md to the terminal
+     Ask the orchestrator to print the full spec in chat (on demand only)
+   ```
+   The orchestrator does NOT auto-print the full spec document. The full document is printed only when the operator explicitly requests it (via `!cat`, `!open`, or an in-chat request).
 
 **Limitation:** The QA agent cannot assess brainstorming trade-offs not captured in the spec. The human sign-off covers this gap.
 
