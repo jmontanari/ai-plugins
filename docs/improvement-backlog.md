@@ -448,3 +448,39 @@ None — this is orthogonal to multi-PRD and the lightweight-task PRDs above. Pl
 **observation (differentiated seeds ROI):** Seed-B (content/semantic) surfaced the SSOT-consumer ordering drift (SB-EC-1, SB-EC-2) that became must-fix items. Seed-A (structural/pointer-integrity) found the dangling `T-1` reference (SA-MF-1). Both differentiated seeds contributed actionable must-fix findings on the same piece — validating the board-swap rationale for doc-as-code pieces.
 
 **Captured:** 2026-06-11
+
+---
+
+## Meta Plugins — standalone + bundle distribution model
+
+**Status:** concept — awaiting dedicated PRD brainstorm
+**Captured:** 2026-06-11
+
+### Idea
+
+spec-flow has grown into a large, deeply integrated plugin. Some of its capabilities have clear standalone value independent of the full spec-flow pipeline:
+
+| Candidate meta-plugin | Standalone value |
+|---|---|
+| **review-board** | Any project wanting a multi-agent adversarial code review before merge, without needing spec/plan/execute |
+| **qa** (`qa:attack-plan`, `qa:spot-check`, `qa:validate`) | Lightweight QA harness for any project — not just spec-flow pieces |
+| **small-change** | Lightweight disciplined change flow (spec → test → implement) for projects that don't need the full PRD pipeline |
+
+### Shape
+
+Each meta-plugin ships as its own plugin manifest (`.claude-plugin/plugin.json`) with a scoped skills tree. They can be:
+- **Installed standalone** — a team installs just `review-board` for any repo
+- **Bundled with spec-flow** — spec-flow's manifest references or re-exports them, preserving today's integrated behavior
+
+The superpowers multi-host co-ship pattern (see `reference_superpowers_coship.md`) is the canonical prior art here: single source tree, per-manifest scoping, shared skills content. The same "adding a new host = add a manifest file" principle applies to "adding a standalone mode = add a standalone plugin.json that references the relevant skill subset."
+
+### Open questions for PRD brainstorm
+
+- **Versioning contract:** how do standalone plugins version independently vs. in lock-step with spec-flow?
+- **Dependency direction:** can spec-flow depend ON standalone meta-plugins (cleaner) or do they remain co-located sub-trees?
+- **Skill overlap:** some skills (e.g., `qa-spec`) are tightly coupled to spec-flow's pipeline model — do those stay in spec-flow core or get a compatibility shim for standalone use?
+- **Discovery / marketplace:** standalone plugins need their own marketplace entries; what's the publication workflow?
+
+### Pipeline-on-ramp
+
+When ready to execute: `/spec-flow:prd meta-plugins` to kick off brainstorm.
