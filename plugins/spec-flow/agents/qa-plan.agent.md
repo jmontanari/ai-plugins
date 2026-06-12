@@ -1,6 +1,7 @@
 ---
 name: qa-plan
 description: "Internal agent — dispatched by spec-flow:plan. Do NOT call directly. Adversarial Opus review of an implementation plan before execute begins. Finds missing ACs, phase-boundary ambiguity, non-concrete Verify commands, and missing semantic anchors. Read-only — never modifies files."
+rubric_version: 1
 ---
 
 # Plan QA Agent
@@ -189,10 +190,20 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
     - A pure `[Implement]` phase with no `[TDD-Red]`/`[Write-Tests]` step — out of scope for this criterion
 
     Evidence: quote the phase's `Test Data` block (or its absence) and the uncovered/incomplete case. **Must-fix.**
-32. **Authored-tests declaration (activate only when a phase carries an `**Authored-tests:**` field; absence is never a finding):**
-    (a) Each declared path is cited in that phase's `[Implement]`/`[Write-Tests]`/`[Verify]`/`**Scope:**`/`**In scope:**` body (no phantom declaration).
-    (b) No declared path collides with any Red-manifest path or `integration_registry` row (collision = smuggling → runtime hard-reject, must-fix here).
-    Evidence: quote the field and the offending path.
+
+32. **Plan over budget (FR-014) (activate when the orchestrator supplies budget values; skip if absent — not an error).** The orchestrator interpolates plan.md's total line count and its largest per-phase line count, each with soft + hard budgets (`plugins/spec-flow/reference/artifact-budgets.md`). Judge from the supplied counts — do NOT count lines yourself.
+    Flag (Must-fix):
+    - Total OR any per-phase count over its HARD ceiling → name which (total / largest phase), actual vs hard, and split/condense guidance (split the piece per the qa-prd ≤7-AC rule, or hoist detail to a reference doc). NO waiver.
+    Advisory only (NOT must-fix):
+    - A count over SOFT but under HARD → advisory note.
+    Do NOT flag:
+    - Counts at/under soft; no supplied budget (skip).
+    Evidence: quote the supplied count and the exceeded ceiling. **Must-fix on hard-ceiling breach only.**
+33. **Authored-tests declaration (activate only when a phase carries an `**Authored-tests:**` field; absence is never a finding; do not flag a phase that omits the field).** When a phase includes `**Authored-tests:**`:
+    (a) **No phantom declaration:** each declared path must be cited in that phase's `[Implement]`, `[Write-Tests]`, `[Verify]`, `**Scope:**`, or `**In scope:**` body as a path the phase actually authors. A path listed in `**Authored-tests:**` that does not appear in any of those sections is a phantom declaration — must-fix. Evidence: quote the `**Authored-tests:**` field and show the absence of the path in the phase body.
+    (b) **No Red-manifest collision:** no declared path may collide with any Red-manifest path (derivable from the plan's `[TDD-Red]` or Red-stage phases in this piece) or any `integration_registry` row. A collision means the path was Red-authored or integration-registered and is also being declared as an Implement-track authored test — that is a smuggling attempt that the runtime gate (AC-6) will hard-reject. Flag it here before execute ever runs. Evidence: quote the colliding path, the `[TDD-Red]` or registry row, and the `**Authored-tests:**` declaration.
+
+    **Must-fix** for either (a) or (b).
 
 ## Output Format
 

@@ -1,6 +1,7 @@
 ---
 name: qa-tdd-red
 description: Internal agent — dispatched by spec-flow:execute between Step 2 (TDD-Red) and Step 3 (Build). Do NOT call directly. Sonnet-tier narrow review of Red's authored tests against a theater-pattern catalog and the phase's spec ACs. Read-only — never modifies code. Rejects theater tests before Build wastes a dispatch writing production code fit to weak assertions.
+rubric_version: 1
 ---
 
 # QA-TDD-Red Agent

@@ -1,0 +1,42 @@
+schema_version: 1
+generated: 2026-06-11
+last_updated: 2026-06-12
+piece: exec-ready/gate-evals
+
+spec:
+  # Re-aligned 2026-06-12: pivoted from fabricated fixture corpus to real-session
+  # transcript-mining (see spec.md re-alignment note + deliberation.md addendum).
+  qa_rounds: 6             # re-align brainstorm operator turns (2 AskUserQuestion cards + 4 free-form steering replies)
+  qa_iterations: 1         # spec QA gate (Phase 4) clean on iteration 1 (0 must-fix; 2 should-fix applied)
+  research_artifact: true  # research.md present for this piece
+  budget_compliance:
+    spec_md:
+      lines: 161
+      soft: 300
+      hard: 520
+      status: pass         # pass | over
+    deliberation_md:
+      lines: 155
+      soft: 200
+      hard: 350
+      status: pass         # includes the 2026-06-12 re-alignment addendum
+  ac_verifiability:
+    machine: 12            # ACs whose Independent Test carries a [machine:] tag
+    judgment: 4            # ACs carrying a [judgment:] tag (AC-3, AC-5, AC-6, AC-11)
+    machine_checkable_ratio: 0.75  # machine / (machine + judgment) = 12/16
+
+plan:
+  # The prior fabricated-corpus plan.md was discarded at plan stage and the plan regenerated
+  # against the re-aligned transcript-mining spec (commit 7b3cd10). These metrics reflect the regen.
+  qa_iterations: 2         # iter1 full clean (0 must-fix); iter2 focused clean after adding Phase 10 baseline capstone
+  concreteness_floor: passed  # QA reached clean with no circuit-breaker escalation
+
+gate_scaling:
+  spec_gate:
+    offered_summary_confirm: true  # spec-gate predicate held (QA-clean + zero markers)
+    fell_back: false               # full prompt NOT rendered despite the clean predicate
+    reason: null
+  plan_gate:
+    offered_summary_confirm: false # conjunct (iii) not assemblable — AC matrix uses phase refs, not file:line
+    fell_back: false               # NOT a fallback from a clean predicate (iii failed); full prompt rendered
+    reason: null

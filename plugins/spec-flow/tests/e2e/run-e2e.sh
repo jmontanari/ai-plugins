@@ -38,6 +38,7 @@ Modes:
     [--transcript <jsonl>]             Optional: path to session transcript .jsonl
   --record-golden <target> <jsonl>   Record a new golden footprint from a verified live run
   --break <case>                     Build a single-defect fixture (delegates to build-fixture.sh)
+  --cheater                          Run the reconstructed cheater-oracle scenarios
   --help                             Show this usage text
 
 Break cases: research-after-spec | no-test-data | no-spike-artifact |
@@ -92,6 +93,10 @@ while [ $# -gt 0 ]; do
       BREAK_CASE="$2"
       shift 2
       ;;
+    --cheater)
+      MODE="cheater"
+      shift
+      ;;
     *)
       printf 'ERROR: unknown flag: %s\n' "$1" >&2
       usage
@@ -133,6 +138,12 @@ case "$MODE" in
 
   record-golden)
     run_mode record_golden "$GOLDEN_TARGET" "$GOLDEN_TRANSCRIPT"
+    summary
+    exit $?
+    ;;
+
+  cheater)
+    run_mode cheater_oracle_checks
     summary
     exit $?
     ;;

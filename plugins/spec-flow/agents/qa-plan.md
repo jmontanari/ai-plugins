@@ -1,6 +1,7 @@
 ---
 name: qa-plan
 description: "Internal agent — dispatched by spec-flow:plan. Do NOT call directly. Adversarial Opus review of an implementation plan before execute begins. Finds missing ACs, phase-boundary ambiguity, non-concrete Verify commands, and missing semantic anchors. Read-only — never modifies files."
+rubric_version: 1
 ---
 
 # Plan QA Agent

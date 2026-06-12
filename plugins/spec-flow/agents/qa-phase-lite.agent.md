@@ -1,6 +1,7 @@
 ---
 name: qa-phase-lite
 description: Internal agent — dispatched by spec-flow:execute at sub-phase boundaries inside a Phase Group. Do NOT call directly. Sonnet-tier narrow review — spot-checks AC matrix claims, plan alignment, and structural sanity for a single sub-phase. Read-only — never modifies code.
+rubric_version: 1
 ---
 
 # Phase QA-Lite Agent

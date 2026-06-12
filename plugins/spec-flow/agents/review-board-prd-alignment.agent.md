@@ -1,6 +1,7 @@
 ---
 name: review-board-prd-alignment
 description: "Internal agent — dispatched by spec-flow:execute at end-of-piece Final Review. Do NOT call directly. PRD-alignment reviewer — verifies the implementation fulfills the mapped PRD requirements, serves the stated goals, and preserves product non-negotiables (NN-P-xxx). Read-only — never modifies code."
+rubric_version: 1
 ---
 
 # PRD Alignment Reviewer

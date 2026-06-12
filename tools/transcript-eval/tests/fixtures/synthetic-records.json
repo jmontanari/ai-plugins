@@ -1,0 +1,181 @@
+[
+  {
+    "seat": "spec-flow:review-board-security",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rbs_001",
+    "findings": [
+      {"text": "FINDING: issue-SHARED SQL injection risk", "accept_reject": "accepted"},
+      {"text": "FINDING: rbs-finding-2 missing auth check", "accept_reject": "accepted"},
+      {"text": "FINDING: rbs-finding-3 open redirect", "accept_reject": "accepted"},
+      {"text": "FINDING: rbs-finding-4 weak cipher", "accept_reject": "rejected"}
+    ],
+    "dispatch_ts": 1000.0,
+    "result_ts": 1200.0,
+    "reviewer_notes": "four findings noted above"
+  },
+
+  {
+    "seat": "spec-flow:review-board-edge-case",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rbec_001",
+    "findings": [
+      {"text": "FINDING: issue-SHARED SQL injection risk", "accept_reject": "accepted"},
+      {"text": "FINDING: rbec-finding-2 off-by-one in loop", "accept_reject": "rejected"}
+    ],
+    "dispatch_ts": 1000.0,
+    "result_ts": 1200.0,
+    "reviewer_notes": "two findings"
+  },
+
+  {
+    "seat": "spec-flow:review-board-ground-truth",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rbgt_001",
+    "findings": [
+      {"text": "FINDING: finding-UNIQUE-GT incorrect formula result", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 1000.0,
+    "result_ts": 1200.0,
+    "reviewer_notes": "one unique finding"
+  },
+
+  {
+    "seat": "spec-flow:review-board-blind",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rbb_001",
+    "findings": [
+      {"text": "FINDING: rbb-unique-1 resource leak in handler", "accept_reject": "accepted"},
+      {"text": "FINDING: rbb-unique-2 unvalidated input path", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 1000.0,
+    "result_ts": 1200.0,
+    "reviewer_notes": "two findings"
+  },
+
+  {
+    "seat": "spec-flow:review-board-integration",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rbi_001",
+    "findings": [
+      {"text": "FINDING: issue-SHARED SQL injection risk", "accept_reject": "accepted"},
+      {"text": "FINDING: rbs-finding-2 missing auth check", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 1000.0,
+    "result_ts": 1200.0,
+    "reviewer_notes": "both findings duplicated from other seats"
+  },
+
+  {
+    "seat": "spec-flow:review-board-spec-compliance",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rbsc_001",
+    "findings": [
+      {"text": "FINDING: rbsc-finding-1 AC not implemented", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 3000.0,
+    "result_ts": 3300.0,
+    "reviewer_notes": ""
+  },
+
+  {
+    "seat": "spec-flow:review-board-prd-alignment",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rbpa_001",
+    "findings": [
+      {"text": "FINDING: rbpa-finding-1 PRD story not covered", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 1000.0,
+    "result_ts": 1030.0,
+    "reviewer_notes": "one finding"
+  },
+
+  {
+    "seat": "spec-flow:review-board-architecture",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_rba_001",
+    "findings": [
+      {"text": "FINDING: rba-finding-1 layer violation", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 2000.0,
+    "result_ts": 2120.0,
+    "reviewer_notes": "one finding"
+  },
+
+  {
+    "seat": "spec-flow:qa-phase",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_qap_001",
+    "findings": [
+      {"text": "FINDING: qap-finding-1 missing AC coverage", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 100.0,
+    "result_ts": 200.0,
+    "reviewer_notes": "finding noted"
+  },
+  {
+    "seat": "spec-flow:qa-phase",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_qap_002",
+    "findings": [
+      {"text": "FINDING: qap-finding-2 type annotation wrong", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 200.0,
+    "result_ts": 300.0,
+    "reviewer_notes": "finding noted"
+  },
+  {
+    "seat": "spec-flow:qa-phase",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_qap_003",
+    "findings": [
+      {"text": "FINDING: qap-finding-3 import path broken", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 300.0,
+    "result_ts": 400.0,
+    "reviewer_notes": "finding noted"
+  },
+  {
+    "seat": "spec-flow:qa-phase",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_qap_004",
+    "findings": [
+      {"text": "FINDING: qap-finding-4 docstring missing", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 400.0,
+    "result_ts": 500.0,
+    "reviewer_notes": "finding noted"
+  },
+  {
+    "seat": "spec-flow:qa-phase",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_qap_005",
+    "findings": [
+      {"text": "FINDING: qap-finding-5 edge case unhandled", "accept_reject": "accepted"}
+    ],
+    "dispatch_ts": 500.0,
+    "result_ts": 600.0,
+    "reviewer_notes": "finding noted"
+  },
+  {
+    "seat": "spec-flow:qa-phase",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_qap_006",
+    "findings": [
+      {"text": "FINDING: qap-finding-6 config key misspelled", "accept_reject": "rejected"}
+    ],
+    "dispatch_ts": 600.0,
+    "result_ts": 700.0,
+    "reviewer_notes": "rejected finding"
+  },
+  {
+    "seat": "spec-flow:qa-phase",
+    "session_id": "sess-001",
+    "tool_use_id": "toolu_qap_007",
+    "findings": [
+      {"text": "FINDING: qap-finding-7 test naming inconsistency", "accept_reject": "rejected"}
+    ],
+    "dispatch_ts": 700.0,
+    "result_ts": 800.0,
+    "reviewer_notes": "rejected finding"
+  }
+]

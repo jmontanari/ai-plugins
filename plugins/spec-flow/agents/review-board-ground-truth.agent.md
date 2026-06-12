@@ -1,6 +1,7 @@
 ---
 name: review-board-ground-truth
 description: "Internal agent — dispatched by spec-flow:execute at end-of-piece Final Review. Do NOT call directly. Ground-truth reviewer — audits computational, measurement, and transform components against INDEPENDENTLY-DERIVED correct answers, not against the plan or the code's own logic. Hunts the failure mode where a green test suite + clean review coexist with a component that produces confidently-wrong output: degenerate/dead-knob results, lookahead leakage, scope contamination, domain-model/parity mismatch, silent truncation, and result misattribution. Emits a per-component solidity verdict. Read-only — never modifies code."
+rubric_version: 1
 ---
 
 # Ground-Truth Reviewer

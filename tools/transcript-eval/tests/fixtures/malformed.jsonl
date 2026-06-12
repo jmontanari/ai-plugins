@@ -1,0 +1,2 @@
+{"type":"assistant","sessionId":"sess-002","uuid":"msg-010","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_qa_spec_01","name":"Agent","input":{"subagent_type":"spec-flow:qa-spec","description":"QA spec review","prompt":"Review the spec for completeness."}}]}}
+{"type":"user","sessionId":"sess-002","uuid":"msg-011","parentUuid":"msg-010","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_qa_spec_01","content":"FINDING: AC-3 is not testable as written — needs a concrete measurable criterion.

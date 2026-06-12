@@ -4,16 +4,23 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
-## [5.15.0] — 2026-06-11
+## [5.16.0] — 2026-06-12
 
-### Removed
-- **Plan length budget gate (retires FR-014 for plan.md).** `qa-plan` no longer flags a plan for total or per-phase line count. Removed: the `qa-plan` "Plan over budget" criterion (its Authored-tests criterion is renumbered #33 → #32, bringing `qa-plan.md` into alignment with `qa-plan.agent.md` which already carried Authored-tests at #32); the `plan.md (total)`/`plan.md (per-phase)` rows + `plan_md_total`/`plan_md_per_phase` override keys in `reference/artifact-budgets.md`; the Phase-3 `wc -l` budget-resolution sub-step and the `plan.budget_compliance` metrics write in `skills/plan/SKILL.md`; the `plan.budget_compliance` schema in `reference/metrics-artifact.md`; and the documented keys in `templates/pipeline-config.yaml`.
+### Added
+- **FR-017: Gate-effectiveness evaluation tooling (`tools/transcript-eval/`).**
+  - Session transcript extraction + secret-scrub pipeline (JSONL → gate dispatches → findings → accept/reject inference via ADR-6 heuristic).
+  - Per-seat effectiveness metrics: precision-from-usage, verdict-overlap, leave-one-out unique-catch, rubber-stamp detection, activity count.
+  - Cross-repo pipeline-health story (`story-latest.md`) persisted to external insight store (`/Volumes/joeData/spec-flow-insights/`). SF-6: no mined content ever written into repo.
+  - Extraction-validation spike (`transcript_eval spike`) with operator-gated coverage + agreement checks (AC-6 operator gate: 99.8% coverage across 254 sessions, verdict PROCEED).
+  - **Cheater oracle** (`tests/e2e/lib/cheater-oracle.sh`): reconstructs the live gate predicates (gate-a hash integrity, gate-b reconciliation) from `execute/SKILL.md`; 9 cheat scenarios (FR-017 taxonomy: assertion-drift, file-deletion, exception-suppression, function-stubbing, tolerance-weakening, empty-diff, EG-4 transient-commit, smuggling, EG-2 cross-subphase) — 100% detection; 5 allow-set scenarios — 0 false rejections. EG-1 residual (closure tamper) documented and excluded from headline.
+  - `rubric_version: 1` additive frontmatter tag on 13 measured gate-agent pairs (26 files: `.md` + `.agent.md` mirrors).
+  - Citation obligation (`reference/gate-scaling.md#board-swap-rule`): seat cuts/model downgrades must cite mined per-seat precision/verdict-overlap/leave-one-out evidence AND cheater-track detection.
 
 ### Changed
-- Plan scope is now gated solely by the `qa-prd ≤7-AC` piece-split rule; plan detail is governed solely by the `qa-plan` #22–31 concreteness floors. Length is no longer judged — dense, exec-ready plans no longer draw a length must-fix.
+- **SC-009 re-scoped:** distinguishes precision-from-usage (mined, published per measured seat — not a catch rate) from true recall (cheater track only). No "published catch rate" claim for mined gates.
 
-### Notes
-- **Backward compatibility (NN-C-003):** `spec.md`/`deliberation.md`/`research.md`/`learnings.md` budgets and the `qa-spec` #16 gate are unchanged. Existing `.spec-flow.yaml` projects that set `artifact_budgets.plan_md_total` or `plan_md_per_phase` keep parsing — those keys are now silently ignored (no error) via the absent-⇒-default escape hatch.
+### Fixed
+- **EG-2 per-sub-phase `exempt_authored` attribution (`execute/SKILL.md` G9b):** each sub-phase's `exempt_authored` is derived from its own `**Authored-tests:**` field; cross-sub-phase exemption inheritance is forbidden. Multi-sub-phase locking fixture added (`fixtures/cheater/lock-eg2-cross-subphase.md`).
 
 ## [5.14.0] — 2026-06-11
 

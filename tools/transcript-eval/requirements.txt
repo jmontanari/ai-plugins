@@ -1,0 +1,2 @@
+# internal maintainer tool — repo-root tools/, NOT shipped (NN-C-002 by location, ADR-3)
+# stdlib-only: json, pathlib, argparse, re, os — no third-party deps required

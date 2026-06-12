@@ -2,6 +2,7 @@
 name: review-board-integration
 description: "Internal agent — dispatched by spec-flow:execute at end-of-piece Final Review. Do NOT call directly. Integration / path-coverage reviewer — audits each wired path across an integration boundary on two axes: boundary correctness (does the wired path match what the tests assert?) and path coverage (is the wired path exercised at all, or only unit-tested with collaborators mocked?). Hunts the failure mode where a green unit suite coexists with an integration boundary that was never exercised end-to-end. Read-only — never modifies code."
 model: opus
+rubric_version: 1
 ---
 
 # Integration / Path-Coverage Reviewer

@@ -206,15 +206,15 @@ l1_static_checks() {
   # AC-11: version sync
   local pluginjson="${PLUGIN_ROOT}/plugin.json"
   local marketplace="${REPO_ROOT}/.claude-plugin/marketplace.json"
-  assert_grep '"version": "5\.12\.4"' "$pluginjson" \
-    "AC-11: plugin.json version is 5.12.4"
-  assert_grep '"version": "5\.12\.4"' "$marketplace" \
-    "AC-11: marketplace.json spec-flow entry is 5.12.4"
+  assert_grep '"version": "5\.16\.0"' "$pluginjson" \
+    "AC-11: plugin.json version is 5.16.0"
+  assert_grep '"version": "5\.16\.0"' "$marketplace" \
+    "AC-11: marketplace.json spec-flow entry is 5.16.0"
 
-  # AC-11: CHANGELOG has 5.12.4 and (c) continue removal under ### Changed
+  # AC-11: CHANGELOG has 5.16.0 and (c) continue removal under ### Changed
   local changelog="${PLUGIN_ROOT}/CHANGELOG.md"
-  assert_grep "\[5\.12\.4\]" "$changelog" \
-    "AC-11: CHANGELOG.md has 5.12.4 section"
+  assert_grep "\[5\.16\.0\]" "$changelog" \
+    "AC-11: CHANGELOG.md has 5.16.0 section"
   assert_grep "\(c\) continue" "$changelog" \
     "AC-11: CHANGELOG.md documents (c) continue removal"
 
@@ -234,4 +234,27 @@ l1_static_checks() {
     "AC-11: qa-plan.md has Authored-tests declaration criterion"
   assert_grep "Authored-tests declaration" "${PLUGIN_ROOT}/agents/qa-plan.agent.md" \
     "AC-11: qa-plan.agent.md mirrors Authored-tests declaration criterion"
+
+  # --- AC-10 (gate-evals): rubric_version on all 13 measured pairs + byte-identity ---
+  local _agents_dir="${PLUGIN_ROOT}/agents"
+  local -a _measured_pairs
+  _measured_pairs=(
+    "qa-phase-lite" "qa-phase" "qa-plan" "qa-spec" "qa-tdd-red"
+    "review-board-architecture" "review-board-blind" "review-board-edge-case"
+    "review-board-ground-truth" "review-board-integration" "review-board-prd-alignment"
+    "review-board-security" "review-board-spec-compliance"
+  )
+  local _pair _diff_out
+  for _pair in "${_measured_pairs[@]}"; do
+    assert_grep "rubric_version:" "${_agents_dir}/${_pair}.md" \
+      "AC-10 (gate-evals): ${_pair}.md has rubric_version"
+    assert_grep "rubric_version:" "${_agents_dir}/${_pair}.agent.md" \
+      "AC-10 (gate-evals): ${_pair}.agent.md has rubric_version"
+    _diff_out=$(diff "${_agents_dir}/${_pair}.md" "${_agents_dir}/${_pair}.agent.md" 2>&1)
+    if [ -z "$_diff_out" ]; then
+      pass "AC-10 (gate-evals): ${_pair} .md/.agent.md are byte-identical"
+    else
+      fail "AC-10 (gate-evals): ${_pair} .md/.agent.md differ (unexpected non-rubric_version change)"
+    fi
+  done
 }

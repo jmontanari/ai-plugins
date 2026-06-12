@@ -68,3 +68,13 @@ The two edge-case dispatches carry differentiated lens seeds injected into their
 When the `review_board_variant` annotation is absent, the board composition is today's roster — including the blind seat — unchanged.
 
 This swap applies at two dispatch surfaces: execute Final Review Step 1 (in-pipeline) and the out-of-band `spec-flow:review-board` skill.
+
+### Citation obligation for seat cuts and model downgrades (FR-016 / AC-11)
+
+Any **board-seat cut or model downgrade** MUST cite two evidence classes before taking effect:
+
+1. **Mined per-seat evidence** from `tools/transcript-eval/` (the durable insight store): per-seat **precision** (accepted / raised), **verdict-overlap** (findings co-raised by other seats), and **leave-one-out unique-catch** count (defects covered only by this seat). This evidence is labeled `precision-from-usage` — it is a usage-derived proxy, NOT a true recall or catch rate.
+
+2. **cheater-track detection** for every integrity guardrail the affected seat participates in: the scripted scenario must pass (DETECTED) for the cut/downgrade to be evidence-backed. Mechanically-detectable cheats must reach 100% detection; EG-1 residual scenarios are excluded from this headline.
+
+A seat cut that lacks both (1) and (2) is an unevidenced capacity reduction and is rejected per NN-P-001.
