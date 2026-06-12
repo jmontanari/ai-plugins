@@ -1,19 +1,15 @@
 # Artifact size budgets
 
-This document is the single source of truth for per-artifact-class size budgets. It is cited by `plugins/spec-flow/agents/qa-spec.md` (criterion #16), `plugins/spec-flow/agents/qa-plan.md` (criterion #32), `plugins/spec-flow/reference/metrics-artifact.md` (budget_compliance), `plugins/spec-flow/skills/spec/SKILL.md` and `plugins/spec-flow/skills/plan/SKILL.md` (resolve overrides + `wc -l` interpolation). Any definition, threshold, or budget value lives here and nowhere else; the consuming files cite this document and do not restate its definitions.
+This document is the single source of truth for per-artifact-class size budgets. It is cited by `plugins/spec-flow/agents/qa-spec.md` (criterion #16), `plugins/spec-flow/reference/metrics-artifact.md` (budget_compliance), `plugins/spec-flow/skills/spec/SKILL.md` (resolve overrides). Any definition, threshold, or budget value lives here and nowhere else; the consuming files cite this document and do not restate its definitions.
 
 ## 1. Budget table
 
 | Class | Soft (advisory) | Hard (must-fix) | Gate | Approx tokens (hard) |
 |---|---|---|---|---|
 | spec.md | 300 | 520 | qa-spec #16 | ~13k |
-| plan.md (total) | 750 | 1000 | qa-plan #32 | ~25k |
-| plan.md (per-phase) | 90 | 220 | qa-plan #32 | ~5.5k |
 | research.md | 200 | 320 | documented-only | ~8k |
 | deliberation.md | 200 | 350 | qa-spec #16 | ~9k |
 | learnings.md | 30 | 50 | documented-only | ~1.5k |
-
-<!-- Worked example: a plan.md with total 940 lines (under hard 1000, over soft 750) and a worst phase of 210 lines (under hard 220) → qa-plan #32 emits an advisory note on total, no must-fix. A plan.md total 1050 → must-fix with "split the piece or hoist detail to reference". -->
 
 ## 2. Derivation
 
@@ -52,12 +48,6 @@ artifact_budgets:
   spec_md:
     soft: 400
     hard: 650
-  plan_md_total:
-    soft: 900
-    hard: 1200
-  plan_md_per_phase:
-    soft: 120
-    hard: 280
   research_md:
     soft: 250
     hard: 400
@@ -69,7 +59,7 @@ artifact_budgets:
     hard: 70
 ```
 
-Override keys: `spec_md`, `plan_md_total`, `plan_md_per_phase` (stored in metrics.yaml as `plan_md_max_phase` — the budget class name and the metrics field name differ by intent: the config key names the measurement scope, the metrics field records the actual measurement), `research_md`, `deliberation_md`, `learnings_md`. Each key supports `soft` and/or `hard` independently; omitted sub-keys fall back to the table defaults.
+Override keys: `spec_md`, `research_md`, `deliberation_md`, `learnings_md`. Each key supports `soft` and/or `hard` independently; omitted sub-keys fall back to the table defaults.
 
 `Absent ⇒ table defaults (non-blocking; NN-C-003)` — a missing `artifact_budgets:` block or a missing per-class key never blocks the pipeline.
 

@@ -37,17 +37,6 @@ spec:
 plan:
   qa_iterations: 2        # plan QA gate (qa-plan) loops to clean
   concreteness_floor: passed   # passed | overridden — qa-plan concreteness floor; gates SC-002's denominator
-  budget_compliance:
-    plan_md_total:
-      lines: 664
-      soft: 750
-      hard: 1000
-      status: pass
-    plan_md_max_phase:
-      lines: 91
-      soft: 90
-      hard: 220
-      status: pass
 execute:
   sonnet_default: true    # coordinator + implementer ran Sonnet-default with no global Opus override — SC-004's second conjunct
   phases:
@@ -111,14 +100,6 @@ One entry per field; DEFINED fields (per ADR-5) include their full derivation.
 - `spec.budget_compliance.deliberation_md.lines` — the actual `wc -l` count of `deliberation.md` at the time the spec skill ran. Only written when `deliberation.md` exists on the piece branch.
 - `spec.budget_compliance.deliberation_md.soft` — **DEFINED:** the resolved soft threshold for `deliberation.md` (from `.spec-flow.yaml` override or `reference/artifact-budgets.md` default). Advisory-only ceiling; does not affect `status`.
 - `spec.budget_compliance.deliberation_md.hard` — the resolved hard ceiling for `deliberation.md` (from `.spec-flow.yaml` override or `reference/artifact-budgets.md` default, 350 by default).
-- `plan.budget_compliance.plan_md_total.status` — **DEFINED:** `pass` when `plan.md`'s total `wc -l` count ≤ the resolved hard ceiling (1000 by default); `over` otherwise. Written by the plan skill at plan finalize. **Passive metadata — not consumed by `scripts/metrics-aggregate`; gates no SC.**
-- `plan.budget_compliance.plan_md_total.lines` — the actual total line count of `plan.md`.
-- `plan.budget_compliance.plan_md_total.soft` — **DEFINED:** the resolved soft threshold for `plan.md` total (from `.spec-flow.yaml` override or `reference/artifact-budgets.md` default). Advisory-only ceiling; does not affect `status`.
-- `plan.budget_compliance.plan_md_total.hard` — the resolved hard ceiling.
-- `plan.budget_compliance.plan_md_max_phase.status` — **DEFINED:** `pass` when the largest per-phase line count ≤ the resolved per-phase hard ceiling (220 by default); `over` otherwise.
-- `plan.budget_compliance.plan_md_max_phase.lines` — the largest per-phase line count (max across all `### Phase` / `#### Sub-Phase` sections).
-- `plan.budget_compliance.plan_md_max_phase.soft` — **DEFINED:** the resolved soft threshold for the per-phase max (from `.spec-flow.yaml` override or `reference/artifact-budgets.md` default). Advisory-only ceiling; does not affect `status`.
-- `plan.budget_compliance.plan_md_max_phase.hard` — the resolved per-phase hard ceiling.
 - `execute.sonnet_default` — `true` when the coordinator + implementer ran Sonnet-default with no global Opus override; SC-004's second conjunct.
 - `execute.phases.total` — total phase count dispatched.
 - `execute.phases.clean_sonnet` — phases that completed on Sonnet with no escalation and no unmarked discovery.
@@ -150,7 +131,7 @@ The upsert mechanic cited by all writers.
 1. **Check the `metrics:` key.** Read `.spec-flow.yaml` `metrics:` key (default `auto`). If the value is `off`, skip all writes — the piece renders `[METRICS-ABSENT]`.
 2. **Create the envelope on first write.** If `metrics.yaml` does not yet exist, create it with the `schema_version: 1` / `generated` / `last_updated` / `piece` envelope before writing the calling stage's block.
 3. **Upsert only the calling stage's own block/fields.** Preserve all other blocks unchanged. Refresh `last_updated` on every upsert.
-   `budget_compliance` is upserted by the owning stage (spec writes `spec.budget_compliance`; plan writes `plan.budget_compliance`) and is NOT consumed by `scripts/metrics-aggregate` (ADR-3, passive metadata).
+   `budget_compliance` is upserted by the owning stage (spec writes `spec.budget_compliance`) and is NOT consumed by `scripts/metrics-aggregate` (ADR-3, passive metadata).
 4. **Serial-checkpoint-only constraint (ADR-4).** Writes land only at these execute checkpoints:
    - Step 7 per-phase progress commit
    - Step 6c `.discovery-log.md` commit

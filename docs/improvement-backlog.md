@@ -4,6 +4,56 @@ Cross-PRD learnings and future work candidates. Items here are surfaced during t
 
 ---
 
+## Version-bump phase completeness (plan + qa-plan + execute read releasing.md)
+
+**Status:** candidate — awaiting small-change brainstorm
+**Captured:** 2026-06-12
+**Source:** process-retro on drop-plan-len-cap (5.15.0); second recorded miss of `plugins/spec-flow/plugin.json` in a version bump (first was v3.7.0, documented in releasing.md)
+
+### Problem
+
+The plan skill's version-bump phase template derives its target file list from model memory rather than from `plugins/spec-flow/docs/releasing.md`. This led to `plugins/spec-flow/plugin.json` (the Copilot CLI descriptor) being omitted from Phase 3 of drop-plan-len-cap — caught as a Final Review must-fix, requiring a fix iteration. The same file was missed at v3.7.0. Two hits confirms the pattern is systemic.
+
+Three coupled gaps:
+1. **plan/SKILL.md** — no instruction to read `releasing.md` when authoring version-bump phases; scope list derived from memory.
+2. **qa-plan.md** — no criterion to cross-check whether a version-bump phase's `**In scope:**` block covers all files listed in `releasing.md`.
+3. **execute/SKILL.md** — the CHANGELOG re-verify trigger derives the file list from the plan's declared scope, not from `releasing.md` directly; a mis-scoped plan produces a mis-scoped re-verify.
+
+### Candidate fix shape
+
+- `plan/SKILL.md`: add a "Version-bump phase template" block instructing the plan skill to `Read plugins/spec-flow/docs/releasing.md` and enumerate all files in its release table as explicit `**In scope:**` targets for any phase that touches a version-bearing file.
+- `qa-plan.md`: add a new criterion (or sub-clause to existing version-related criterion): "When a phase's `**In scope:**` contains any version-bearing file, read `releasing.md` and confirm all listed files are present in that phase's scope."
+- `execute/SKILL.md`: update the CHANGELOG-phase re-verify command to grep `releasing.md` for the file list rather than inferring from plan scope.
+
+**Pipeline-on-ramp:** `/spec-flow:small-change version-bump-completeness` when ready.
+
+---
+
+## qa-plan.agent.md body drift at criterion #32 (Authored-tests severity marker)
+
+**Status:** candidate — awaiting small-change brainstorm
+**Captured:** 2026-06-12
+**Source:** future-opportunities reflection on drop-plan-len-cap; confirmed by Integration reviewer and Edge-case-A reviewer in Final Review
+
+### Problem
+
+`plugins/spec-flow/agents/qa-plan.md` (the human-authored source) and `plugins/spec-flow/agents/qa-plan.agent.md` (the production dispatch file injected into qa-plan agent prompts) re-converged on numbering (#32 = Authored-tests) but retain body divergences:
+
+- The `.md` source has a verbose two-paragraph form for criterion #32 with explicit `**No phantom declaration:**` / `**No Red-manifest collision:**` subheadings and a standalone `**Must-fix** for either (a) or (b).` closing line.
+- The `.agent.md` production file has a condensed 3-line form with no subheadings and no explicit `**Must-fix**` severity marker on sub-clause (b).
+
+The risk: a model reading the condensed (b) without a `**Must-fix**` signal may treat a Red-manifest collision as a should-fix or advisory rather than a hard-reject.
+
+Additionally, surrounding sections (Output Format, Rules, Input Modes) diverge between the two files. The `.agent.md` mirror file is intended to be the production path; its condensed form is stale relative to the source.
+
+### Candidate fix shape
+
+Audit `qa-plan.agent.md` criterion-by-criterion against `qa-plan.md`. For every criterion where the `.agent.md` condensed form omits a severity marker, collapses sub-clauses with distinct behavior, or differs in activation conditions — expand to match the source. Add a `<!-- Mirror of qa-plan.md — keep criterion bodies byte-identical to source -->` comment to enforce the sync invariant on future edits.
+
+**Pipeline-on-ramp:** `/spec-flow:small-change qa-plan-agent-mirror-sync` when ready.
+
+---
+
 ## Ad-hoc "task" work — lightweight spec→plan→execute for out-of-band work
 
 **Status:** concept — awaiting dedicated PRD brainstorm

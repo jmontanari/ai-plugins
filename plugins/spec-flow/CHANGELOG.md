@@ -4,6 +4,17 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.15.0] — 2026-06-11
+
+### Removed
+- **Plan length budget gate (retires FR-014 for plan.md).** `qa-plan` no longer flags a plan for total or per-phase line count. Removed: the `qa-plan` "Plan over budget" criterion (its Authored-tests criterion is renumbered #33 → #32, bringing `qa-plan.md` into alignment with `qa-plan.agent.md` which already carried Authored-tests at #32); the `plan.md (total)`/`plan.md (per-phase)` rows + `plan_md_total`/`plan_md_per_phase` override keys in `reference/artifact-budgets.md`; the Phase-3 `wc -l` budget-resolution sub-step and the `plan.budget_compliance` metrics write in `skills/plan/SKILL.md`; the `plan.budget_compliance` schema in `reference/metrics-artifact.md`; and the documented keys in `templates/pipeline-config.yaml`.
+
+### Changed
+- Plan scope is now gated solely by the `qa-prd ≤7-AC` piece-split rule; plan detail is governed solely by the `qa-plan` #22–31 concreteness floors. Length is no longer judged — dense, exec-ready plans no longer draw a length must-fix.
+
+### Notes
+- **Backward compatibility (NN-C-003):** `spec.md`/`deliberation.md`/`research.md`/`learnings.md` budgets and the `qa-spec` #16 gate are unchanged. Existing `.spec-flow.yaml` projects that set `artifact_budgets.plan_md_total` or `plan_md_per_phase` keep parsing — those keys are now silently ignored (no error) via the absent-⇒-default escape hatch.
+
 ## [5.14.0] — 2026-06-11
 
 ### Added

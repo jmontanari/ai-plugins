@@ -204,9 +204,8 @@ charter:
 
 # artifact_budgets: per-artifact-class size budgets (new in v5.12.2; FR-014).
 #   Optional per-class line-count overrides; soft = advisory, hard = must-fix ceiling.
-#   Classes: spec_md, plan_md_total, plan_md_per_phase, research_md, deliberation_md, learnings_md.
+#   Classes: spec_md, research_md, deliberation_md, learnings_md.
 #   Absent ⇒ defaults from plugins/spec-flow/reference/artifact-budgets.md (non-blocking; NN-C-003).
 #   See plugins/spec-flow/reference/artifact-budgets.md `## Overrides`.
 # artifact_budgets:
 #   spec_md: {soft: 300, hard: 520}
-#   plan_md_total: {soft: 750, hard: 1000}
