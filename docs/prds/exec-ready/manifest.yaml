@@ -311,7 +311,8 @@ pieces:
       for every FR-016 board cut and any future seat model-downgrade.
     prd_sections: [FR-017, SC-009, G-6]
     dependencies: [pipeline-e2e, metrics]
-    status: open
+    status: merged
+    merged_at: 2026-06-12
 
   - name: pipeline-economics
     slug: pipeline-economics
@@ -334,9 +335,13 @@ pieces:
       (+14.9pp -> +11.2pp by reviewer 4, R16); same-family correlated blind spots are
       structural (R15); the oracle moved into the plan (FR-003) so Red is transcription and
       the expensive anti-theater ritual can become deterministic. Deliberately sequenced
-      AFTER gate-evals: no cut without its catch-rate evidence.
+      AFTER gate-evals (no cut without catch-rate evidence) AND after discovery-triage and
+      outcome-acs (2026-06-12 re-prioritization): discoveries during pipeline-economics
+      execution route through structured triage, not freeform Opus; new pieces produced here
+      carry outcome ACs by default. The $12.3k/2mo behavior-gate gap is the higher-return
+      fix; construction-gate trimming lands after the larger inefficiency is addressed.
     prd_sections: [FR-016, SC-005, SC-002, G-3, G-6]
-    dependencies: [metrics, exec-guardrails, gate-evals]
+    dependencies: [metrics, exec-guardrails, gate-evals, outcome-acs, discovery-triage]
     status: open
 
   - name: outcome-acs
@@ -393,22 +398,29 @@ pieces:
       Review board: review-board points adversarial lenses at a DIFF; campaign points them at a
       RUNNING SYSTEM's outputs. Per-piece gates structurally cannot see whole-platform seam
       behavior or result-level degeneracy, so those defects today surface only in freeform Opus
-      validation. Invoked out of band like review-board, it: (1) loads in-scope FR-018 outcome
-      ACs + declared product money/safety rules as the ORACLE; (2) runs the system
-      (pilot/backtest/e2e) from the main window on SONNET; (3) dispatches OPUS adversarial
-      lenses — ground-truth (degeneracy/dead-knob on outputs), seam (cross-piece behavior the
-      per-piece gates never exercise), edge-case — as bounded isolated agents grading real
-      output against the oracle; (4) routes every finding synchronously through spec-flow:triage
-      (FR-019); (5) records findings with source=campaign into the FR-010 metrics artifact and
-      the FR-006/FR-015 flywheel. Honors NN-P-005 (system on Sonnet, judgment on Opus), NN-P-002
-      (findings route through triage), NN-P-004 (operator-gated). Seat activation conditional per
-      FR-016(b); omissions reported, never silent. Changes no version-bearing file by itself.
-      SKIPPED-per-capability when the system can't be run. Covers FR-020.
-      WHY (2026-06-12 eval, R22): whole-platform seam/tuning gaps ("in isolation each piece is
-      fine; nothing puts the platform together") + result-level wrongness are the single largest
-      uncovered cost channel, ~5x the addressable cost of the planned board-seat cuts. Sequenced
-      LAST of the three: needs outcome-acs (the oracle), discovery-triage (the routing), and
-      metrics (source=campaign recording).
+      validation (~$12.3k/2mo June uncovered channel per 2026-06-12 eval). Invoked out of band
+      like review-board, it: (1) loads in-scope FR-018 outcome ACs + declared product
+      money/safety rules as the ORACLE; (2) runs the system (pilot/backtest/e2e) from the main
+      window on SONNET; (3) dispatches OPUS adversarial lenses as bounded isolated agents
+      grading real output against the oracle — three always-on lenses: GROUND-TRUTH
+      (degeneracy/dead-knob: does any output column report a forced value while appearing
+      earned?), SEAM (cross-piece integration: do pieces work correctly TOGETHER, not just in
+      isolation — the failure class no per-piece gate sees), EDGE-CASE (boundary/regime behavior
+      at the envelope); (4) routes every finding synchronously through spec-flow:triage (FR-019);
+      (5) records findings with source=campaign into the FR-010 metrics artifact and the
+      FR-006/FR-015 flywheel. Seam analysis is the primary motivation: individual piece
+      construction gates are healthy; the gap is whole-platform wiring and tuning across pieces,
+      currently discovered only by expensive freeform operator-in-main-window sessions.
+      Honors NN-P-005 (system on Sonnet, judgment on Opus), NN-P-002 (findings route through
+      triage, not mid-stream patches), NN-P-004 (operator-gated writes). Seat activation
+      conditional per FR-016(b); omissions reported, never silent. Changes no version-bearing
+      file by itself. SKIPPED-per-capability when the system can't be run. Covers FR-020.
+      WHY (2026-06-12 eval, R22): root-cause decomposition — (1) results-level wrongness
+      invisible to diff gates, (2) whole-platform seam/tuning gaps no per-piece gate addresses,
+      (3) missing outcome ACs so no oracle exists for "wrong" output. All three feed the same
+      expensive venue. Sequenced LAST of the three: needs outcome-acs (oracle) +
+      discovery-triage (routing) + metrics (source=campaign recording) + flywheel-repo
+      (occurrences).
     prd_sections: [FR-020, SC-010, SC-005, G-7]
     dependencies: [outcome-acs, discovery-triage, metrics, flywheel-repo]
     status: open
@@ -453,43 +465,53 @@ coverage:
     gates; this is a new gate CLASS for system behavior. NOTE: pricing/cost figures are
     flagged estimates (per-MTok rates x measured tokens), not billed amounts.
 
-    ORDER OF OPERATIONS (v4 — dependencies encode the hard edges; this note records the
-    sequencing rationale):
-      1. flywheel-repo — MERGED 2026-06-09.
-      2. pipeline-e2e — land EARLY as regression insurance before any further surgery on
-         execute/SKILL.md (exec-guardrails, gate-scaling, pipeline-economics all modify it).
-         No dependencies. Its fixture infra is reused by gate-evals.
-      3. artifact-budgets — land before/alongside spec-preresearch execution: it registers
-         the deliberation.md size budget that binds Spec 2.0's plan. No dependencies.
-      4. spec-preresearch — in progress (specced -> plan/execute). Its plan must carry a
-         deliberation.md budget and SC-001 before/after measurement (self-imposed until
-         artifact-budgets merges; see prd.md FR-014/FR-010).
-      5. metrics — NOW UNBLOCKED (flywheel-repo merged). Highest-priority new piece:
-         baselines before optimization; wires the flywheel `metric` source; records
-         per-reviewer finding provenance that gate-evals/pipeline-economics consume.
-      6. exec-guardrails — parallel-safe with metrics (different surface). Precondition for
-         unattended execute AND for pipeline-economics' combined Red+Build dispatch.
-      7. gate-scaling — after metrics (needs the SC-008 interaction baseline).
-      8. gate-evals — after pipeline-e2e (shared fixture infra) + metrics (finding
-         provenance). Calibrates every gate; runs the verdict-overlap ablation.
-      9. pipeline-economics — after gate-evals + exec-guardrails: the cost cuts land only
-         with catch-rate evidence behind each one. This is the answer to "TDD mode is heavy"
-         — TDD phases drop ~6 -> 2-3 dispatches.
-     10. flywheel-refresh — after flywheel-repo has real entries; lifecycle on live data.
-     11. flywheel-global — after flywheel-refresh + metrics, and only once the repo
-         flywheel has produced at least one genuine threshold-triggered hardening.
-     12. outcome-acs (v5) — the missing oracle; edits spec/qa-spec/deliberation-lens. Depends
-         on spec-preresearch (deliberation protocol must exist to add the lens question).
-         Sequence FIRST of the v5 track — campaign and the ground-truth seat grade against it.
-     13. discovery-triage (v5) — extract Step 6c into spec-flow:triage. Depends on spike-agent
-         (scope mode). Sequence before outcome-campaign, which routes every finding through it.
-     14. outcome-campaign (v5) — the new gate class. Depends on outcome-acs (oracle) +
-         discovery-triage (routing) + metrics (source=campaign) + flywheel-repo (occurrences).
-         Sequence LAST of the v5 track. Largest uncovered-cost payoff per the 2026-06-12 eval.
-    Parallelization: 2+3 independent of everything; 5+6 concurrent; 4 overlaps 2/3/5/6;
-    8 can overlap 7; 10 can run any time after flywheel-repo data exists. The v5 track
-    (12->13->14) is internally ordered but independent of the flywheel-global tail; 12 and 13
-    can run concurrently (different surfaces) once their deps are met, with 14 after both.
+    ORDER OF OPERATIONS (v5 — re-prioritized 2026-06-12 based on token-efficiency evaluation):
+
+    RATIONALE FOR RE-PRIORITIZATION: the 2026-06-12 miner eval showed the dominant cost is
+    NOT in the construction gates (those are healthy and cheap relative to yield) but in the
+    behavior gap — deviation flips + freeform results-validation adding ~$12.3k/2mo in Opus
+    main-window cost that no current gate catches. The v5 behavior-gate track addresses a
+    LARGER inefficiency than pipeline-economics' construction-gate trimming. Land the v5
+    track first so: (a) discoveries during pipeline-economics execution route through
+    structured triage instead of freeform Opus, (b) new pieces carry outcome ACs, (c) seam /
+    results-level wrongness gets a structured gate before we tune construction gates further.
+
+    COMPLETED (as of 2026-06-12):
+      research-unify, plan-concrete, test-data-up, sonnet-coord, spike-agent,
+      spec-preresearch, flywheel-repo, metrics, exec-guardrails, gate-scaling,
+      pipeline-e2e, artifact-budgets, flywheel-refresh, gate-evals
+
+    NEXT — v5 behavior-gate track (BEFORE pipeline-economics):
+      1. outcome-acs — spec must state what bad output looks like; edits spec/qa-spec/
+         deliberation user-intent lens. Deps: spec-preresearch (merged). Run first — campaign
+         and the ground-truth board seat both grade against the oracle it defines.
+      2. discovery-triage — spec-flow:triage reachable from any session; bounded spike
+         scope-mode dispatch instead of 180k-context Opus triage. Deps: spike-agent (merged).
+         Parallel-safe with outcome-acs (different surfaces). Run before outcome-campaign
+         (which routes every finding through this skill) and before pipeline-economics
+         (discoveries during that execution route through this skill).
+      3. outcome-campaign — spec-flow:campaign; the new gate class for running-system
+         behavior. Three always-on adversarial lenses on Opus (GROUND-TRUTH: dead-knob /
+         degeneracy; SEAM: cross-piece integration — the failure class no per-piece gate
+         sees; EDGE-CASE: envelope/boundary). Deps: outcome-acs + discovery-triage + metrics
+         + flywheel-repo (all merged or above). Run last of the three: needs the oracle
+         (outcome-acs) and the routing primitive (discovery-triage).
+
+    AFTER v5 track:
+      4. pipeline-economics — construction gate optimizations: TDD-lean dispatch consolidation,
+         conditional board slots, deliberation depth defaults. Deps now include outcome-acs +
+         discovery-triage so pipeline-economics execution is itself governed by the new
+         primitives. No construction-gate cut without catch-rate evidence from gate-evals
+         (merged) AND structured triage in place.
+
+    TAIL (no strict ordering constraint with pipeline-economics):
+      5. flywheel-global — after flywheel-refresh + metrics, once repo flywheel has produced
+         at least one genuine threshold-triggered hardening.
+
+    Parallelization: outcome-acs and discovery-triage can run concurrently (different
+    surfaces); outcome-campaign after both; pipeline-economics after all three v5 pieces;
+    flywheel-global independent of pipeline-economics.
+
     OPERATOR EXPERIMENT (no piece): run one cross-provider reviewer (GPT/Gemini) via
     /spec-flow:review-board on 3-5 pieces; count unique valid findings vs the weakest Opus
     lens before deciding on a cross-provider board seat ([R15][R16]; charter-tools and
