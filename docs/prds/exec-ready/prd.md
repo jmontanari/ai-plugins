@@ -1,7 +1,7 @@
 ---
 slug: exec-ready
 status: drafting
-version: 4
+version: 5
 ---
 
 # Product Requirements Document — Execution-Ready Plans
@@ -34,6 +34,7 @@ version: 4
 - **G-4: File-based, re-derivable state.** All coordinator state needed to resume lives on disk; a fresh, cheap context re-derives the pipeline from disk. The transcript is disposable, so the large-context-window crutch (and its cost) is removed.
 - **G-5: A self-hardening flywheel.** Recurring avoidable-discovery patterns are counted against a durable registry and routed to the right hardening home — repo (charter/project/PRD) or plugin (machine-global) — operator-gated, driving spikes and Opus cost down piece over piece.
 - **G-6: Oversight scaled to verifiability.** Operator attention is spent only where machine verification cannot decide. Gates are never removed (NN-P-001), but their *cost* scales with what is actually at stake: machine-checkable outcomes get evidence digests and a single confirm; judgment calls get full review. The pipeline itself is measured, so every oversight-reduction claim is backed by on-disk numbers, not vibes.
+- **G-7: Gate behavior, not just construction.** Every gate today inspects an artifact — spec text, plan text, a diff — and nothing inspects the running system's *output* against what the spec said good and bad output look like. The 2026-06-12 efficiency evaluation showed this is where the largest uncovered cost sits: result-level wrongness and whole-platform seam defects pass every construction gate and surface only in expensive freeform Opus validation. Add the missing oracle (outcome ACs), the missing gate class (a results campaign that grades real output), and a discovery-triage primitive reachable from any session, so behavior is caught and routed at bounded cost.
 
 ## Non-Goals
 
@@ -375,6 +376,67 @@ version: 4
 
 **Failure mode:** The eval suite cannot run in the current environment (capability absent) → per-stage `SKIPPED: <capability>` reporting, never a false green; mirrors FR-013's contract.
 
+---
+
+### FR-018: Outcome and negative-space acceptance criteria
+**Statement:** Behavior-bearing pieces must specify what the *running system* must and must **not** produce — not only that a function returns a value. Today's ACs are almost entirely mechanism ("returns X", "writes row Y"); the spec never records the negative space ("a pilot run must never emit a forced $0 as an earned result", "no window may post a loss outside the risk rule"), so confidently-wrong output passes every construction gate. Two additions close this. **(a) Elicitation:** the FR-009 deliberation `user-intent` lens and the spec brainstorm gain a mandatory negative-space question — *"when this runs, what does unacceptable output look like?"* — whose answer is captured as one or more **outcome ACs** tagged distinctly from mechanism ACs. **(b) Enforcement:** `qa-spec` flags as must-fix any behavior-bearing spec whose ACs are all mechanism with zero outcome criteria (pure config/glue/doc pieces are exempt by a declared piece class). These outcome ACs become the oracle that the FR-020 results campaign and the ground-truth board seat grade real output against — the gate that has been missing because no artifact said what "wrong" looks like.
+**Priority:** P1
+**Linked metrics:** SC-010
+**Research basis:** [R22] the 2026-06-12 efficiency evaluation — results-level wrongness ("$0 masquerading as an earned result", "large negative windows") passed every construction gate because no spec recorded the unacceptable-output criterion; [R13] machine-checkable outcomes are the external source of truth — but only if the spec states the outcome; [R4] a flywheel/evaluator needs a verifiable fitness function, and outcome ACs are that function for behavior.
+
+#### User Stories
+**US-018** — As a pipeline operator, I want the spec to force me to name what bad output looks like before any code is written, so that the gates downstream have an oracle and I stop discovering result-level wrongness by hand in an expensive Opus session after the fact.
+
+**Acceptance Criteria:**
+- [ ] The deliberation `user-intent` lens and the spec brainstorm both pose a mandatory negative-space question; a behavior-bearing spec cannot reach sign-off without at least one recorded answer.
+- [ ] Spec ACs carry an outcome-vs-mechanism distinction (tag or section); outcome ACs state a property of the running system's output, including at least one prohibition ("must never …").
+- [ ] `qa-spec` raises a must-fix when a behavior-bearing spec has zero outcome ACs; a piece declared non-behavioral (config/glue/docs) is exempt and the exemption is recorded.
+- [ ] Outcome ACs are addressable as the oracle by FR-020 (campaign) and the ground-truth seat — referenced by ID, not re-derived.
+- [ ] Additive and backward-compatible (NFR-003): specs without outcome-AC tags read as legacy and are not retro-failed; the gate applies to specs authored after this ships.
+
+**Failure mode:** A piece's behavioral status is genuinely ambiguous → it defaults to behavior-bearing (outcome AC required); the operator may declare it non-behavioral with a one-line rationale, recorded — never a silent skip.
+
+---
+
+### FR-019: Standalone discovery-triage skill (`spec-flow:triage`)
+**Statement:** Execute's Step 6c synchronous-discovery triage — the discipline that classifies a discovered change and routes it to amend / sub-phase / new-piece / note / explicit-defer without ever silently writing the backlog — is extracted into a standalone skill invocable from **any** session, not only inside a running execute loop. Today that machinery is reachable only mid-execute, so a discovery made in a validation campaign or an ad-hoc window regresses to freeform handling (the operator hand-rolls "align my questions with existing manifest items; if nothing captures, we're on the hook this session"). The skill takes a discovery (agent-found or operator-stated), classifies it (fix-now via `small-change` / amend an active piece's plan / new manifest piece / note on a scheduled piece / explicit defer with rationale), dispatches the FR-005 spike agent in **scope mode as a bounded isolated dispatch** when the change needs design — never main-window Opus thinking — and writes the routing to the manifest/backlog. It preserves NN-P-002 (no silent mid-stream change) and NN-P-004 (no silent defer). Execute keeps its inline Step 6c; this skill is the same logic made reachable elsewhere, and is the routing primitive FR-020 calls per finding.
+**Priority:** P1
+**Linked metrics:** SC-011
+**Research basis:** [R22] the 2026-06-12 efficiency evaluation — ~$12.3k/2mo of June Opus was deviation + freeform validation, much of it the operator manually performing Step 6c-style triage in a main window because the machinery was execute-only; [R5] gate-hardness ladder and "the work and the grading are different jobs" — triage is the disposition step that must exist wherever a finding is raised; bounded isolated dispatch keeps the design thinking off the 180k-context main loop (NFR-001, G-4).
+
+#### User Stories
+**US-019** — As a pipeline operator who finds problems while validating a running system, I want one disciplined command that classifies the finding and routes it to the manifest the same way execute does, so that nothing dies in a chat scrollback and I stop paying main-window Opus rates to hand-triage.
+
+**Acceptance Criteria:**
+- [ ] A `spec-flow:triage` skill is invocable outside execute and classifies a supplied discovery into exactly one disposition: small-change / plan-amend / new-piece / note-on-scheduled / explicit-defer-with-rationale.
+- [ ] For a change above the size/complexity threshold, it dispatches the FR-005 spike agent in scope mode as a bounded isolated dispatch and consumes the scoping artifact — it never resolves the design in the main window.
+- [ ] Every disposition writes a recorded manifest/backlog entry with provenance (source session/finding); no disposition is applied as a silent mid-stream patch (NN-P-002) and no defer is silent (NN-P-004).
+- [ ] Execute's inline Step 6c behavior is unchanged (the extraction is additive); both paths share one documented triage contract.
+- [ ] The skill is reachable from intake routing (an "investigation/discovery" classification points here).
+
+**Failure mode:** The spike scope-mode dispatch returns `BLOCKED` → triage records the finding as an open new-piece/needs-scoping item with the blocker, and surfaces it to the operator; it never fabricates a disposition or applies a mid-stream fix.
+
+---
+
+### FR-020: Results-campaign gate (`spec-flow:campaign`)
+**Statement:** A new gate **class**, sibling to the Final Review board: where the review board points adversarial lenses at a *diff*, the campaign points them at a *running system's outputs*. Per-piece gates structurally cannot see whole-platform seam behavior ("in isolation each piece is fine; nothing puts the platform together and tunes it") or result-level degeneracy, so those defects today surface only in freeform Opus validation at ~5× the addressable cost of the planned board-seat cuts. The campaign, invoked out of band like `review-board`: (1) loads the in-scope FR-018 outcome ACs + product money/safety rules as the **oracle**; (2) runs the system (pilot / backtest / e2e) from the main window on **Sonnet** — execution and observation need no Opus; (3) dispatches **Opus** adversarial lenses — `ground-truth` (degeneracy / dead-knob on outputs), `seam` (cross-piece behavior the per-piece gates never exercise), `edge-case` — as **bounded isolated agents** reading run outputs against the oracle; (4) routes every finding synchronously through the FR-019 triage skill; (5) records findings with `source: campaign` into the FR-010 metrics artifact and the FR-006/FR-015 flywheel so recurring result-level defects harden like any other pattern. It honors NN-P-005 (system on Sonnet, judgment on Opus), NN-P-002 (findings route through triage, never mid-stream patches), and NN-P-004 (flywheel writes operator-gated).
+**Priority:** P1
+**Linked metrics:** SC-010, SC-005
+**Research basis:** [R22] the 2026-06-12 efficiency evaluation — whole-platform seam/tuning gaps and results-level wrongness are invisible to per-piece construction gates and currently consume the largest single uncovered cost channel; [R16] lens diversity buys category coverage — ground-truth/seam/edge-case are non-overlapping lenses on behavior; [R6] Opus-judges / Sonnet-executes is the proven split, applied here to run-on-Sonnet / grade-on-Opus; [R10] bounded isolated agents return ≤2K summaries instead of accreting a 180k main-window context.
+
+#### User Stories
+**US-020** — As a pipeline operator, I want a structured command that runs the assembled system, has fresh adversarial agents grade its real output against what the specs said good and bad look like, and files every finding into the manifest, so that I get the adversarial validation I currently do by hand — at bounded dispatch cost instead of a freeform Opus arc.
+
+**Acceptance Criteria:**
+- [ ] A `spec-flow:campaign` skill runs out of band (like `review-board`), takes a target piece-set/system entrypoint, and loads the in-scope outcome ACs + declared product rules as the oracle.
+- [ ] The system run (pilot/backtest/e2e) is performed on Sonnet; the adversarial lenses (`ground-truth`, `seam`, `edge-case` over the always-on core) are dispatched as bounded isolated Opus agents grading real outputs against the oracle.
+- [ ] Every campaign finding is routed through the FR-019 triage skill to a recorded disposition; no finding is left only in conversation and none is applied as a mid-stream patch.
+- [ ] Findings are recorded with `source: campaign` in the FR-010 metrics artifact and surfaced to the FR-006/FR-015 flywheel as occurrences.
+- [ ] Seat activation over the always-on core is signal-conditional and consistent with FR-016(b); any seat omission is reported, never silent (mirrors the FR-013/FR-017 SKIPPED contract).
+- [ ] The campaign changes no version-bearing file by itself; it is a gate that produces findings + triage dispositions, not a code-editing path.
+
+**Failure mode:** The system cannot be run in the current environment (entrypoint/capability absent) → `SKIPPED: <capability>` per stage, never a false green; the campaign reports what it could not exercise rather than implying coverage.
+
 ## Non-Functional Requirements
 
 ### NFR-001: Research and spike agents are context-isolated
@@ -430,6 +492,12 @@ version: 4
 | Cheat scenario detected < 100% | Filed as a guardrail bug; scenario retained as a permanent regression | FR-017 |
 | Eval suite lacks a required capability | Per-stage `SKIPPED: <capability>`; never false green | FR-017 |
 | Executor model changes | Cheat-fixture set refreshed (stronger models cheat more subtly) | FR-017 |
+| Behavior-bearing spec has only mechanism ACs | `qa-spec` must-fix: at least one outcome AC required, or a recorded non-behavioral exemption | FR-018 |
+| Piece behavioral status ambiguous | Defaults to behavior-bearing (outcome AC required); operator may declare non-behavioral with recorded rationale | FR-018 |
+| Discovery raised outside an execute loop | Routed through `spec-flow:triage` to a recorded manifest/backlog disposition; never a silent mid-stream patch | FR-019 |
+| Triage spike scope-mode returns BLOCKED | Recorded as open needs-scoping item with the blocker, surfaced to operator; no fabricated disposition | FR-019 |
+| Campaign finding on a running system | Routed synchronously through triage; recorded `source: campaign`; surfaced to the flywheel | FR-020 |
+| Campaign system entrypoint/capability absent | `SKIPPED: <capability>` per stage; reports what was not exercised; never a false green | FR-020 |
 
 ## Success Metrics
 
@@ -442,6 +510,8 @@ version: 4
 - **SC-007:** SC-001 through SC-006 are computable from on-disk artifacts for 100% of pieces executed after instrumentation ships; a single `/spec-flow:status` invocation renders them per PRD with no manual collection. — FR-010
 - **SC-008:** Median operator interactions per *clean* piece (zero must-fix at every gate) drop by ≥50% from the instrumented baseline once verifiability-scaled gates and artifact budgets ship — with the NN-P-001 keystroke preserved at every gate. — FR-012, FR-014
 - **SC-009:** 100% of merge-blocking gates have a published catch rate and clean-fixture flag rate; every board-composition or gate-mechanism change since FR-017 shipped cites fixture/ablation evidence; cheater-track detection is 100% across the scripted scenario set (sub-100% scenarios are open guardrail bugs). — FR-016, FR-017
+- **SC-010:** Behavior-bearing pieces authored after FR-018 ships carry ≥1 outcome AC; a results campaign run against a shipped piece-set produces findings traced to outcome ACs, and 100% of those findings reach a recorded triage disposition (manifest/backlog), not a freeform chat note. — FR-018, FR-020
+- **SC-011:** Discoveries raised outside an execute loop (campaign or ad-hoc session) route through `spec-flow:triage` to a recorded manifest/backlog disposition on 100% of occurrences; none is applied as a silent mid-stream patch. — FR-019
 
 ## Priority Tiers
 
@@ -464,6 +534,9 @@ version: 4
 | FR-015 | Flywheel pattern lifecycle | P1 | Expiry/outcome tracking keeps the registry high-signal; gates flywheel-global |
 | FR-016 | Pipeline economics | P1 | TDD-lean + conditional board + depth defaults; halves TDD phase dispatches; every cut evidence-gated |
 | FR-017 | Gate-efficacy evals + cheater track | P1 | Calibration prerequisite for any seat cut/downgrade; red-teams the FR-011 guardrails |
+| FR-018 | Outcome & negative-space ACs | P1 | The missing oracle — specs must say what bad output looks like; foundation for the campaign and the ground-truth seat |
+| FR-019 | Standalone discovery-triage skill | P1 | Step 6c reachable from any session; bounded-dispatch routing instead of freeform main-window triage |
+| FR-020 | Results-campaign gate | P1 | The missing gate class — grades a running system's output; largest uncovered cost channel (2026-06-12 eval) |
 | NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
 | NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
 | NFR-003 | Backward compat | P0 | NN-C-003 |
@@ -526,6 +599,10 @@ PRD v4 additions (second research pass, 2026-06-09 — judge calibration, teleme
 - **[R20]** Anthropic, "Demystifying evals for AI agents" (2025) — 20–50 tasks drawn from real failures; deterministic code graders preferred over LLM graders; one rubric dimension per judge call; grade end state, not path; kappa over raw accuracy; watch for saturation. Grounds FR-017's metrics and refresh cadence.
 - **[R21]** Claude Code monitoring/costs docs + local transcript verification (2026-06-09) — Agent dispatch results carry `totalTokens`/`agentType`/duration; per-subagent transcripts carry per-message usage with unredacted plugin attribution; all POSIX-parseable. OTel exists but needs a collector and redacts third-party plugin names; Copilot CLI has no per-message usage surface (degrade to wall-clock + dispatch counts). Grounds the FR-010 metrics piece's layered capture design.
 
+PRD v5 additions (2026-06-12 — token-efficiency evaluation against real usage):
+
+- **[R22]** Internal: spec-flow token-efficiency evaluation (2026-06-12; full report `/Volumes/joeData/spec-flow-insights/efficiency-evaluation-2026-06-12.md`; miner baseline `run-20260612T163945Z`) — mined 257 real sessions across two repos using the plugin (prop-firm-repo, ai-plugins). Findings: the main orchestrator loop is ≈73% of pipeline token cost; TDD agent-side overhead is ~1.6% and `qa-tdd-red` catches real theater on 18.5% of TDD phases (keep Red-first, consolidate dispatches per FR-016a); QA gates are the highest-yield spend (`qa-phase` raises must-fix on ~68% of dispatches; doc gates catch ~1,200 items before code exists); the review board is cost-trivial (~$2.9k total — seat cuts are noise/latency moves, not cost moves). The dominant uncovered channel is ~$12.3k/2mo of June Opus spent on deviation + freeform results-validation, decomposing into three classes: result-level wrongness invisible to diff gates, whole-platform seam/tuning gaps no per-piece gate sees, and missing outcome ACs (specs validated mechanism, not outcome). Every existing gate inspects a construction artifact while system behavior goes ungated. Grounds FR-018, FR-019, FR-020 and G-7.
+
 ## Non-Negotiables (Product)
 
 ### NN-P-001: Human approval gate on spec and plan is never removed
@@ -538,8 +615,8 @@ PRD v4 additions (second research pass, 2026-06-09 — judge calibration, teleme
 ### NN-P-002: No silent or mid-stream execute-time change
 - **Type:** Rule
 - **Statement:** Execute never silently resolves a spec/plan ambiguity and proceeds, and never applies a mid-execution scope change as a mid-stream patch. Genuine planned unknowns are explicit `[SPIKE]` markers resolved by a recorded spike agent. ANY mid-execution scope change — whether agent-discovered (Step 6c) or operator-initiated ("add/change/do X" during execute) — enters Step 6c triage: above the size/complexity threshold it is first scoped by a recorded spike agent, below it amends the plan directly; either way it routes through plan amendment for synchronous operator triage and executes in dependency order. There is no in-execute decision log that ships unreviewed and no mid-stream fix that bypasses the Step 6c → amend → execute workflow.
-- **Scope:** FR-002, FR-005, FR-008, and the execute path
-- **Rationale:** An execute-time discovery — or an operator's mid-run change — is a plan-incompleteness or scope-growth signal; applying it mid-stream destroys the feedback the flywheel needs, produces partial fixes, and violates the synchronous-discovery doctrine.
+- **Scope:** FR-002, FR-005, FR-008, FR-019, FR-020, and the execute path. FR-019 extracts this triage into a standalone skill and FR-020's campaign routes every finding through it — the no-silent-mid-stream rule binds those paths identically.
+- **Rationale:** An execute-time discovery — or an operator's mid-run change, or a campaign finding on a running system — is a plan-incompleteness or scope-growth signal; applying it mid-stream destroys the feedback the flywheel needs, produces partial fixes, and violates the synchronous-discovery doctrine.
 - **How QA verifies:** Review-board / `qa-plan` confirm every planned unknown is a `[SPIKE]` (with recorded resolution), and every above-threshold mid-execution change is a scoping spike + Step 6c amendment; no silent decision artifact and no mid-stream patch exists.
 
 ### NN-P-003: Execute loop is operator-invoked only
@@ -552,13 +629,13 @@ PRD v4 additions (second research pass, 2026-06-09 — judge calibration, teleme
 ### NN-P-004: Flywheel writes and promotions are operator-gated
 - **Type:** Rule
 - **Statement:** Both registries (repo `docs/patterns.yaml` and machine-global `~/`) are written only after operator confirmation at triage. Pattern matches are LLM-proposed, human-confirmed. Promotions (charter amendments, QA hardening, spec-flow self-improvement pieces) require operator approval. Rejected proposals are recorded with rationale and not re-proposed. Nothing is auto-applied; nothing is silently deferred.
-- **Scope:** FR-006, FR-007
+- **Scope:** FR-006, FR-007, FR-019, FR-020. FR-019 dispositions and FR-020 campaign findings write the manifest/backlog and surface flywheel occurrences only through the same operator-gated triage — no silent defer, no auto-applied disposition.
 - **Rationale:** Charter rules are binding and manifest pieces are real work; both demand human intent. Silent deferral violates the no-silent-defer doctrine.
 - **How QA verifies:** No flywheel code path writes a registry or proposes a promotion without a confirmation prompt; spec-compliance reviewer checks the gate.
 
 ### NN-P-005: Thinking on Opus, mechanics on Sonnet — no silent upgrade
 - **Type:** Rule
 - **Statement:** Spec authoring, plan authoring, all adversarial gates, and spikes run on Opus. Execute (coordinator, implementer, test transcription) runs on Sonnet by default. Execute never silently upgrades a non-`[SPIKE]` phase to Opus to compensate for an under-specified plan — it halts and routes to plan amendment or a `[SPIKE]`. Operator override is explicit.
-- **Scope:** FR-004, FR-005, FR-009
+- **Scope:** FR-004, FR-005, FR-009, FR-020. FR-020's campaign runs the system on Sonnet and dispatches the adversarial lenses on Opus — the same thinking-on-Opus / mechanics-on-Sonnet split applied to run-vs-grade.
 - **Rationale:** Concentrating thinking upstream is the entire cost model; a silent Opus upgrade in execute hides plan incompleteness and re-introduces the cost this PRD removes.
 - **How QA verifies:** Model-policy check asserts stage→model assignment; any execute path that escalates a non-`[SPIKE]` phase to Opus without halting/override is must-fix.

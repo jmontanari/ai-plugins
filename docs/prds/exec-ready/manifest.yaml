@@ -1,6 +1,6 @@
 schema_version: 1
 generated: 2026-06-06
-last_updated: 2026-06-09
+last_updated: 2026-06-12
 prd_source: "docs/prds/exec-ready/prd.md"
 
 feature_branch: null
@@ -339,13 +339,87 @@ pieces:
     dependencies: [metrics, exec-guardrails, gate-evals]
     status: open
 
+  - name: outcome-acs
+    slug: outcome-acs
+    description: |
+      Outcome & negative-space acceptance criteria — the missing oracle. Behavior-bearing
+      specs must state what the running system must and must NOT produce, not only that a
+      function returns a value. Two additions: (a) ELICITATION — the FR-009 deliberation
+      user-intent lens AND the spec brainstorm gain a mandatory negative-space question
+      ("when this runs, what does unacceptable output look like?"); the answer is captured as
+      one or more outcome ACs tagged distinctly from mechanism ACs; a behavior-bearing spec
+      cannot reach sign-off with zero recorded answers. (b) ENFORCEMENT — qa-spec raises a
+      must-fix when a behavior-bearing spec has only mechanism ACs; a piece declared
+      non-behavioral (config/glue/docs) is exempt with a recorded one-line rationale (ambiguous
+      status defaults to behavior-bearing). Outcome ACs are addressable by ID as the oracle for
+      campaign (outcome-campaign) and the ground-truth board seat — referenced, not re-derived.
+      Additive/backward-compat (NFR-003): legacy specs without tags are not retro-failed.
+      Covers FR-018.
+      WHY (2026-06-12 efficiency eval, R22): result-level wrongness ("$0 masquerading as an
+      earned result", "large negative windows") passed every construction gate because no
+      artifact recorded the unacceptable-output criterion. Foundational — sequenced first;
+      the campaign and the ground-truth seat both grade against the oracle it defines.
+    prd_sections: [FR-018, SC-010, G-7]
+    dependencies: [spec-preresearch]
+    status: open
+
+  - name: discovery-triage
+    slug: discovery-triage
+    description: |
+      Standalone discovery-triage skill (spec-flow:triage) — execute's Step 6c synchronous-
+      discovery triage extracted into a skill invocable from ANY session, not only inside a
+      running execute loop. Given a discovery (agent-found or operator-stated) it classifies to
+      exactly one disposition (small-change / plan-amend / new-piece / note-on-scheduled /
+      explicit-defer-with-rationale), dispatches the FR-005 spike agent in SCOPE MODE as a
+      bounded isolated dispatch when the change needs design (never main-window Opus thinking),
+      and writes a recorded manifest/backlog entry with provenance. Preserves NN-P-002 (no
+      silent mid-stream change) and NN-P-004 (no silent defer). Execute keeps its inline Step
+      6c unchanged (additive extraction); both share one documented triage contract. Reachable
+      from intake routing (an "investigation/discovery" classification points here). Spike
+      scope-mode BLOCKED -> recorded open needs-scoping item with the blocker, never a
+      fabricated disposition. Covers FR-019.
+      WHY (2026-06-12 eval, R22): ~$12.3k/2mo June Opus was deviation + freeform validation,
+      much of it the operator hand-rolling Step 6c-style triage in a 180k-context main window
+      because the machinery was execute-only. Sequenced after spike-agent (scope mode) and
+      before outcome-campaign (which routes every finding through this skill).
+    prd_sections: [FR-019, SC-011, G-7]
+    dependencies: [spike-agent]
+    status: open
+
+  - name: outcome-campaign
+    slug: outcome-campaign
+    description: |
+      Results-campaign gate (spec-flow:campaign) — a new gate CLASS, sibling to the Final
+      Review board: review-board points adversarial lenses at a DIFF; campaign points them at a
+      RUNNING SYSTEM's outputs. Per-piece gates structurally cannot see whole-platform seam
+      behavior or result-level degeneracy, so those defects today surface only in freeform Opus
+      validation. Invoked out of band like review-board, it: (1) loads in-scope FR-018 outcome
+      ACs + declared product money/safety rules as the ORACLE; (2) runs the system
+      (pilot/backtest/e2e) from the main window on SONNET; (3) dispatches OPUS adversarial
+      lenses — ground-truth (degeneracy/dead-knob on outputs), seam (cross-piece behavior the
+      per-piece gates never exercise), edge-case — as bounded isolated agents grading real
+      output against the oracle; (4) routes every finding synchronously through spec-flow:triage
+      (FR-019); (5) records findings with source=campaign into the FR-010 metrics artifact and
+      the FR-006/FR-015 flywheel. Honors NN-P-005 (system on Sonnet, judgment on Opus), NN-P-002
+      (findings route through triage), NN-P-004 (operator-gated). Seat activation conditional per
+      FR-016(b); omissions reported, never silent. Changes no version-bearing file by itself.
+      SKIPPED-per-capability when the system can't be run. Covers FR-020.
+      WHY (2026-06-12 eval, R22): whole-platform seam/tuning gaps ("in isolation each piece is
+      fine; nothing puts the platform together") + result-level wrongness are the single largest
+      uncovered cost channel, ~5x the addressable cost of the planned board-seat cuts. Sequenced
+      LAST of the three: needs outcome-acs (the oracle), discovery-triage (the routing), and
+      metrics (source=campaign recording).
+    prd_sections: [FR-020, SC-010, SC-005, G-7]
+    dependencies: [outcome-acs, discovery-triage, metrics, flywheel-repo]
+    status: open
+
 coverage:
-  total_prd_sections: 20
-  covered_sections: 20
+  total_prd_sections: 23
+  covered_sections: 23
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs (001-008, 010-017) and NFRs (001-004) covered across 16 pieces. FR-009 is
+    All FRs (001-020) and NFRs (001-004) covered across 19 pieces. FR-009 is
     reserved — the spec-preresearch piece adds it to the PRD at merge. FR-008 (scoping spike
     for mid-execution changes) was added in PRD v2 and folded into the spike-agent piece
     alongside FR-005 — both share the agents/spike.md primitive. FR-008 amends NN-P-002.
@@ -362,6 +436,22 @@ coverage:
     docs/autonomous-loops-and-spec-flow.md. A gates attention-queue (cross-lane decision
     queue with evidence cards) was researched and deliberately NOT added — revisit after
     gate-scaling ships if multi-lane operation still hurts.
+
+    PRD v5 (2026-06-12 token-efficiency evaluation against real usage, [R22]) added
+    FR-018/019/020 and G-7 and three pieces: outcome-acs, discovery-triage, outcome-campaign
+    — the "gate behavior, not just construction" track. The evaluation mined 257 real
+    sessions and found the main orchestrator loop is ~73% of pipeline cost, TDD agent
+    overhead is ~1.6% (keep Red-first), QA gates are the highest-yield spend, and the review
+    board is cost-trivial; the dominant UNCOVERED channel (~$12.3k/2mo June Opus) is
+    deviation + freeform results-validation — result-level wrongness invisible to diff gates,
+    whole-platform seam gaps, and missing outcome ACs. These three pieces add the missing
+    oracle (outcome ACs), the missing gate class (results campaign on a running system), and a
+    discovery-triage primitive reachable from any session. Full report + miner baseline:
+    /Volumes/joeData/spec-flow-insights/ (efficiency-evaluation-2026-06-12.md, run-
+    20260612T163945Z) — external insight store, not committed (gate-evals SF-5/SF-6).
+    These do NOT fold into pipeline-economics or gate-evals: those calibrate/cut CONSTRUCTION
+    gates; this is a new gate CLASS for system behavior. NOTE: pricing/cost figures are
+    flagged estimates (per-MTok rates x measured tokens), not billed amounts.
 
     ORDER OF OPERATIONS (v4 — dependencies encode the hard edges; this note records the
     sequencing rationale):
@@ -386,10 +476,20 @@ coverage:
          with catch-rate evidence behind each one. This is the answer to "TDD mode is heavy"
          — TDD phases drop ~6 -> 2-3 dispatches.
      10. flywheel-refresh — after flywheel-repo has real entries; lifecycle on live data.
-     11. flywheel-global — LAST: after flywheel-refresh + metrics, and only once the repo
+     11. flywheel-global — after flywheel-refresh + metrics, and only once the repo
          flywheel has produced at least one genuine threshold-triggered hardening.
+     12. outcome-acs (v5) — the missing oracle; edits spec/qa-spec/deliberation-lens. Depends
+         on spec-preresearch (deliberation protocol must exist to add the lens question).
+         Sequence FIRST of the v5 track — campaign and the ground-truth seat grade against it.
+     13. discovery-triage (v5) — extract Step 6c into spec-flow:triage. Depends on spike-agent
+         (scope mode). Sequence before outcome-campaign, which routes every finding through it.
+     14. outcome-campaign (v5) — the new gate class. Depends on outcome-acs (oracle) +
+         discovery-triage (routing) + metrics (source=campaign) + flywheel-repo (occurrences).
+         Sequence LAST of the v5 track. Largest uncovered-cost payoff per the 2026-06-12 eval.
     Parallelization: 2+3 independent of everything; 5+6 concurrent; 4 overlaps 2/3/5/6;
-    8 can overlap 7; 10 can run any time after flywheel-repo data exists.
+    8 can overlap 7; 10 can run any time after flywheel-repo data exists. The v5 track
+    (12->13->14) is internally ordered but independent of the flywheel-global tail; 12 and 13
+    can run concurrently (different surfaces) once their deps are met, with 14 after both.
     OPERATOR EXPERIMENT (no piece): run one cross-provider reviewer (GPT/Gemini) via
     /spec-flow:review-board on 3-5 pieces; count unique valid findings vs the weakest Opus
     lens before deciding on a cross-provider board seat ([R15][R16]; charter-tools and
