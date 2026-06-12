@@ -646,21 +646,22 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
 
 **Metrics — concreteness_floor:** Record `plan.concreteness_floor = passed` when this QA loop reaches clean with no circuit-breaker escalation; `overridden` when the piece advances via the 3-iter circuit-breaker human override. `plan.qa_iterations` = the iteration count to clean. Both fields are persisted in Phase 4 per `plugins/spec-flow/reference/metrics-artifact.md` `## Field semantics`.
 
-4. When QA returns clean: print the following sign-off review block, then evaluate the plan gate (`reference/gate-scaling.md#plan-gate`).
+4. When QA returns clean, execute the following two sub-steps in order — 4a ALWAYS runs first, 4b follows:
 
-   **Sign-off review block (plan):**
+   **4a. Print the sign-off review block** (unconditional — required before any gate evaluation):
    ```
    ✅ plan ready for sign-off: <repo-root-relative path to plan.md>
       <N> lines · Sections: <comma-separated top-level ## section names from plan.md>
       (e.g. Overview, Architectural Decisions, Phases, Testing, Integration Coverage)
 
-   View options (operator-initiated — orchestrator does NOT auto-print the full plan):
+   View options (to inspect the full plan before approving):
      !open <path>   — open plan.md in a separate window
      !cat <path>    — print plan.md to the terminal
      Ask the orchestrator to print the full plan in chat (on demand only)
    ```
-   The orchestrator does NOT auto-print the full plan document. The full document is printed only when the operator explicitly requests it (via `!cat`, `!open`, or an in-chat request).
+   > The view options above are operator-initiated. The orchestrator does NOT auto-print the full plan.md content — only the compact block above is printed automatically.
 
+   **4b. Evaluate the plan gate** (`reference/gate-scaling.md#plan-gate`):
    - **If the plan-gate predicate holds** (see `reference/gate-scaling.md#plan-gate`):
      Render the evidence digest per `reference/gate-scaling.md#evidence-digest-payload`. Then offer a single-key summary-confirm to the user. A keystroke is always required — nothing auto-advances (NN-P-001).
    - **Else** (predicate fails — see `reference/gate-scaling.md#plan-gate`):

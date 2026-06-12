@@ -284,20 +284,21 @@ Iteration policy: see plugins/spec-flow/reference/qa-iteration-loop.md (iter-unt
    - **Circuit breaker:** After 3 QA iterations, escalate to human.
    - If the fix agent returns `Diff of changes: (none)` (all blocked), escalate.
 
-4. When QA returns clean: print the following sign-off review block, then evaluate the spec gate (`reference/gate-scaling.md#spec-gate`).
+4. When QA returns clean, execute the following two sub-steps in order — 4a ALWAYS runs first, 4b follows:
 
-   **Sign-off review block (spec):**
+   **4a. Print the sign-off review block** (unconditional — required before any gate evaluation):
    ```
    ✅ spec ready for sign-off: <repo-root-relative path to spec.md>
       <N> lines · Sections: <comma-separated top-level ## section names from spec.md>
 
-   View options (operator-initiated — orchestrator does NOT auto-print the full spec):
+   View options (to inspect the full spec before approving):
      !open <path>   — open spec.md in a separate window
      !cat <path>    — print spec.md to the terminal
      Ask the orchestrator to print the full spec in chat (on demand only)
    ```
-   The orchestrator does NOT auto-print the full spec document. The full document is printed only when the operator explicitly requests it (via `!cat`, `!open`, or an in-chat request).
+   > The view options above are operator-initiated. The orchestrator does NOT auto-print the full spec.md content — only the compact block above is printed automatically.
 
+   **4b. Evaluate the spec gate** (`reference/gate-scaling.md#spec-gate`):
    - **If the spec-gate predicate holds** (see `reference/gate-scaling.md#spec-gate`):
      Render the evidence digest per `reference/gate-scaling.md#evidence-digest-payload` — for spec, the evidence digest lists the QA iteration count and the zero-marker scan result; if `spec.ac_verifiability` metrics have already been computed, the advisory `machine_checkable_ratio` MAY be included as a third field (see `reference/gate-scaling.md#spec-gate`). Then offer a single-key summary-confirm to the user. A keystroke is always required — nothing auto-advances (NN-P-001).
    - **Else** (predicate fails — see `reference/gate-scaling.md#spec-gate`):
