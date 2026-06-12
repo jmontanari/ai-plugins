@@ -4,6 +4,16 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.16.1] — 2026-06-12
+
+### Fixed
+- **Co-ship twin drift corrected.** `qa-plan.agent.md` carried a stale "Plan over budget (FR-014)" criterion from the 5.15.0-retired plan-length-budget gate that was never mirrored to `qa-plan.md`; removed. `implementer.agent.md` had drifted from `implementer.md` at the deferred-commit section; corrected. Both files are now exact mirrors of their `.md` sources.
+
+### Changed
+- **All 27 `agents/*.agent.md` files are now relative symlinks** to their `agents/*.md` source — drift is structurally impossible going forward. Editing any `.md` automatically updates both the Claude and Copilot views of the agent.
+- `tests/e2e/lib/static.sh` asserts symlink-ness for all 27 existing agent pairs (AC-10 per-pair check + all-27 drift guard); the static suite (run on demand) catches drift of existing twins but does not automatically enforce twin creation for new agents.
+- `plugins/spec-flow/docs/releasing.md` documents the symlink mechanism, the `rsync -av` preservation guarantee, and the Windows `core.symlinks` caveat. Claude users are unaffected — Claude reads the `.md` files directly.
+
 ## [5.16.0] — 2026-06-12
 
 ### Added

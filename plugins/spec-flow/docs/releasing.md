@@ -54,6 +54,18 @@ v3.7.0 was released with that file still at 3.6.0 — caught post-merge.
 
 ---
 
+## agents/*.agent.md symlinks
+
+Each `plugins/spec-flow/agents/*.agent.md` file is a **relative same-directory symlink** pointing to its `*.md` source (e.g. `implementer.agent.md` → `implementer.md`). There is one authoritative source file; the `.agent.md` view is structurally identical — edit the `.md` and both hosts see the update immediately, drift is structurally impossible.
+
+Key properties:
+
+- **`rsync -av` preserves symlinks** — the `Sync to installed-plugins` step below copies the symlink itself (not the target content), so the relative same-dir target resolves correctly at `~/.copilot/installed-plugins/shared-plugins/spec-flow/agents/`.
+- **Windows caveat** — git without `core.symlinks=true` materializes symlinks as plain text files containing the target path string. This is a **consumer/install exposure**: a Windows user who clones the repo without `core.symlinks=true` gets `.agent.md` files that contain the target path as literal text — a silently-broken Copilot agent on that platform. POSIX baseline is assumed; Windows users (contributors and consumers) must enable `core.symlinks` or use WSL2.
+- **Invariant enforcement** — `tests/e2e/lib/static.sh` asserts symlink-ness for all 27 existing agent pairs (AC-10 per-pair check + an all-27 drift guard). The static suite is run on demand (not in CI); it catches drift of existing twins but does not automatically force a new `.md` agent to have a `.agent.md` twin.
+
+---
+
 ## Sync to installed-plugins
 
 After merging to master, sync the plugin dir to the local installed copy:

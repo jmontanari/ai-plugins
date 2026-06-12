@@ -532,7 +532,7 @@ Once installed, spec-flow exposes the same skills on either host:
 
 - `plugins/spec-flow/CLAUDE.md` is read by both hosts. Copilot CLI reads CLAUDE.md directly as plugin context; Claude Code treats it as the plugin-level overview. No `AGENTS.md` symlink needed.
 - `plugins/spec-flow/skills/<name>/SKILL.md` is the cross-tool Agent Skills open standard — identical file, both hosts.
-- `plugins/spec-flow/agents/<name>.md` are plain Markdown files with YAML frontmatter. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its [Custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) reference, so the same files Claude Code discovers are picked up by Copilot CLI — no symlinks or dual extensions needed. All agents ship flat at `agents/*.md` (no nested subdirectories) with prefixed names (`review-board-<lens>.md`, `reflection-<scope>.md`) so Copilot CLI's flat-glob loader finds every agent.
+- `plugins/spec-flow/agents/<name>.md` are plain Markdown files with YAML frontmatter. Copilot CLI's custom-agent loader scans both `*.md` and `*.agent.md` and deduplicates by basename per its [Custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) reference, so it reads `.md` directly — `.agent.md` is not required. The repo keeps `agents/*.agent.md` as **relative symlinks to the `.md` source** so the co-ship twin is explicit and structurally drift-free (enforced by `tests/e2e/lib/static.sh`). All agents ship flat at `agents/*.md` (no nested subdirectories) with prefixed names (`review-board-<lens>.md`, `reflection-<scope>.md`) so Copilot CLI's flat-glob loader finds every agent.
 
 **Known limitations on Copilot CLI:**
 

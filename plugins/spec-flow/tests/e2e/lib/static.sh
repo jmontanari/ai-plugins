@@ -206,15 +206,15 @@ l1_static_checks() {
   # AC-11: version sync
   local pluginjson="${PLUGIN_ROOT}/plugin.json"
   local marketplace="${REPO_ROOT}/.claude-plugin/marketplace.json"
-  assert_grep '"version": "5\.16\.0"' "$pluginjson" \
-    "AC-11: plugin.json version is 5.16.0"
-  assert_grep '"version": "5\.16\.0"' "$marketplace" \
-    "AC-11: marketplace.json spec-flow entry is 5.16.0"
+  assert_grep '"version": "5\.16\.1"' "$pluginjson" \
+    "AC-11: plugin.json version is 5.16.1"
+  assert_grep '"version": "5\.16\.1"' "$marketplace" \
+    "AC-11: marketplace.json spec-flow entry is 5.16.1"
 
-  # AC-11: CHANGELOG has 5.16.0 and (c) continue removal under ### Changed
+  # AC-11: CHANGELOG has 5.16.1 and (c) continue removal under ### Changed
   local changelog="${PLUGIN_ROOT}/CHANGELOG.md"
-  assert_grep "\[5\.16\.0\]" "$changelog" \
-    "AC-11: CHANGELOG.md has 5.16.0 section"
+  assert_grep "\[5\.16\.1\]" "$changelog" \
+    "AC-11: CHANGELOG.md has 5.16.1 section"
   assert_grep "\(c\) continue" "$changelog" \
     "AC-11: CHANGELOG.md documents (c) continue removal"
 
@@ -250,6 +250,11 @@ l1_static_checks() {
       "AC-10 (gate-evals): ${_pair}.md has rubric_version"
     assert_grep "rubric_version:" "${_agents_dir}/${_pair}.agent.md" \
       "AC-10 (gate-evals): ${_pair}.agent.md has rubric_version"
+    if [ -L "${_agents_dir}/${_pair}.agent.md" ]; then
+      pass "AC-10 (gate-evals): ${_pair}.agent.md is a symlink to its .md source"
+    else
+      fail "AC-10 (gate-evals): ${_pair}.agent.md is a regular file — co-ship twin must be a symlink to ${_pair}.md (drift risk)"
+    fi
     _diff_out=$(diff "${_agents_dir}/${_pair}.md" "${_agents_dir}/${_pair}.agent.md" 2>&1)
     if [ -z "$_diff_out" ]; then
       pass "AC-10 (gate-evals): ${_pair} .md/.agent.md are byte-identical"
@@ -257,4 +262,17 @@ l1_static_checks() {
       fail "AC-10 (gate-evals): ${_pair} .md/.agent.md differ (unexpected non-rubric_version change)"
     fi
   done
+
+  # --- All-27 co-ship twin symlink guard (drift structurally impossible) ---
+  local _agent_md _twin _nonlink=0 _mismatch=0
+  for _agent_md in "${_agents_dir}"/*.agent.md; do
+    _twin="${_agent_md%.agent.md}.md"
+    if [ ! -L "$_agent_md" ]; then _nonlink=$((_nonlink+1)); fi
+    if ! cmp -s "$_agent_md" "$_twin"; then _mismatch=$((_mismatch+1)); fi
+  done
+  if [ "$_nonlink" -eq 0 ] && [ "$_mismatch" -eq 0 ]; then
+    pass "all agents/*.agent.md are symlinks byte-identical to their .md source (27-pair drift guard)"
+  else
+    fail "agent co-ship twin drift: $_nonlink non-symlink, $_mismatch content-mismatch .agent.md files"
+  fi
 }
