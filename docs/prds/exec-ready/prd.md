@@ -1,7 +1,7 @@
 ---
 slug: exec-ready
 status: drafting
-version: 6
+version: 7
 ---
 
 # Product Requirements Document — Execution-Ready Plans
@@ -455,8 +455,31 @@ version: 6
 - [ ] Documentation states the supported-default policy: `tdd: false` is the efficient default for non-adversarial behavior-bearing pieces; `tdd: true` is recommended where the immutable pre-commit lock is wanted; the no-hash-lock tradeoff is named.
 - [ ] Additive/backward-compat (NFR-003): existing Implement-track phases without an expected-outcome block read as legacy and are not retro-failed; the validation applies to phases authored after this ships.
 - [ ] Where a piece also declares outcome ACs (FR-018), the phase's expected-outcome block references them by ID rather than re-deriving (the spec-time oracle and the plan-time oracle are one chain).
+- [ ] **Carve-out (FR-022):** this `tdd: false` default does NOT apply to bug-fix / regression phases — those keep the red-first cycle per NN-P-006 / FR-022, because the fail-against-broken observation is non-substitutable there.
 
 **Failure mode:** The expected outcome is genuinely unpredictable at plan time → `[SPIKE]` resolves it and the resolution becomes the expected-outcome block (mirrors FR-003/FR-005); the validation never accepts a value transcribed from the implementation in place of a planned one.
+
+---
+
+### FR-022: Bug-fix and regression phases use the red-first cycle
+**Statement:** Any phase whose purpose is to fix a defect or guard a regression — a test that asserts *"broken behavior Y no longer happens"* rather than *"the feature does X"* — uses the red-first **reproduce → see it fail → fix → see it pass** cycle, **regardless of the piece's `tdd` setting** (including a `tdd: false` Implement-track piece per FR-021, and the `small-change` and `hotfix` tracks). This is the one case where test-first ordering carries information a detailed-plan tests-after cannot reconstruct: a test authored *after* the fix passes against fixed code with **no evidence it would have caught the original defect** — it may not exercise the buggy path at all — and the broken state is gone, so the regression claim is unverifiable. The non-substitutable artifact is **observing the test fail against the actual broken code.** Red-first is the robust, low-ceremony way to capture it (the broken state is still present because the fix hasn't been written); a tests-after path could only reconstruct it by reverting the fix and re-running, which an agent routinely skips or botches. The boundary is not "bug tickets are special" — it is *any* test whose value depends on exercising a specific failure path. This is the standing carve-out from FR-021's `tdd: false` efficient default and is codified as **NN-P-006**. Classification is at the **phase** level: a feature piece may carry a single regression-guard phase that is red-first while its feature phases use the Implement track. The rule also follows the **out-of-band inter-execution fix routes**: when `spec-flow:triage` (FR-019) routes a bug-classified discovery to a fix (via `small-change`, plan-amend, or a new piece), or a `spec-flow:campaign` (FR-020) result/seam finding becomes a fix, that fix carries the red-first obligation — the temptation to patch a triage- or campaign-surfaced bug and move on is exactly the failure mode NN-P-006 prevents.
+**Priority:** P1
+**Linked metrics:** SC-009
+**Research basis:** `docs/research/tdd-first-vs-test-after-for-ai-agents.md` + [R22] — the "ordering is inert for quality" finding is specific to the greenfield-with-known-oracle regime; the regression regime is distinct because its oracle ("defect Y does not recur") is only *verifiable* by observing the failing state first, which tests-after structurally cannot provide. [R2] reward-hacking: a tests-after bug "fix" can ship a test that never exercised the bug — exactly what observed-red prevents.
+
+#### User Stories
+**US-022** — As a pipeline operator fixing a bug, I want spec-flow to make me write the failing test and watch it go red against the broken code before I fix it, so that the regression test is proven to catch the actual defect instead of passing for the wrong reason — and I want that to hold even in `/small-change` and hotfix work where I'd otherwise be tempted to just patch and move on.
+
+**Acceptance Criteria:**
+- [ ] A plan phase is classifiable as bug-fix/regression at the phase level; a feature piece may contain such a phase alongside Implement-track feature phases.
+- [ ] A bug-fix/regression phase runs the red-first reproduce → fail → fix → pass cycle and records the **observed failure** (the test seen red against the unfixed code) as phase evidence, regardless of the piece's `tdd` setting.
+- [ ] `qa-plan` / `qa-spec` raise a must-fix when a bug-fix/regression phase proposes tests-after, or when the observed-red evidence is absent.
+- [ ] The `small-change` track routes work matching its bug signals (`fix`, `bug`, `broken`, `regression`, `patch`) to the red-first cycle by default; the `hotfix` track likewise defaults bug work to red-first.
+- [ ] The out-of-band inter-execution fix routes honor NN-P-006: when `spec-flow:triage` (FR-019) routes a bug-classified discovery to a fix, or a `spec-flow:campaign` (FR-020) finding becomes a fix, the resulting fix runs the red-first reproduce→fail→fix→pass cycle with observed-red evidence — never a patch-and-move-on.
+- [ ] FR-021's `tdd: false` efficient default explicitly excludes bug-fix/regression phases; the exclusion is documented in both FRs.
+- [ ] Additive/backward-compat (NFR-003): phases without a bug-fix classification read as feature work; existing pieces are not retro-failed.
+
+**Failure mode:** The bug cannot be reproduced by a failing test (environment-only defect, heisenbug) → mark `[SPIKE]` to establish a reliable reproduction first, or record an explicit `no-repro` rationale at triage; never a fabricated test and never a tests-after that was never observed red.
 
 ## Non-Functional Requirements
 
@@ -511,6 +534,12 @@ version: 6
 | Implement-track tests assert the code's actual output, not the plan's expected output | `qa-phase` must-fix: tests must assert the pre-stated expected outcomes, not codify the implementation | FR-021 |
 | Behavior-bearing Implement phase has no expected-outcome block and no `[SPIKE]` | `qa-plan` must-fix (mirrors the FR-003 TDD-phase check) | FR-021 |
 | Implement-track expected outcome genuinely unpredictable at plan time | `[SPIKE]` resolves it → becomes the expected-outcome block; never transcribed from the implementation | FR-021 |
+| Bug-fix/regression phase inside a `tdd: false` piece | Red-first cycle retained (NN-P-006 overrides the FR-021 default); observed-red evidence recorded | FR-022 |
+| Bug-fix/regression phase proposes tests-after | `qa-plan`/`qa-spec` must-fix; the regression test must be observed failing against the broken code | FR-022 |
+| `/small-change` or hotfix work matches bug signals | Routed to the red-first reproduce → fail → fix → pass cycle by default | FR-022 |
+| Defect cannot be reproduced by a failing test | `[SPIKE]` to establish a reproduction, or explicit `no-repro` rationale at triage; never an unobserved-red test | FR-022 |
+| `spec-flow:triage` routes a bug-classified discovery to a fix | The spawned fix runs the red-first cycle (NN-P-006 follows the fix out of band) | FR-019, FR-022 |
+| `spec-flow:campaign` finding becomes a fix | The fix is red-first with observed-red evidence; no patch-and-move-on | FR-020, FR-022 |
 | Diff signal for a conditional board seat is ambiguous | Seat runs (activation errs toward inclusion); the always-on core never deactivates | FR-016 |
 | QA agent prompt/rubric edited | Gold-set re-run required before the plugin version ships; rubric versions frozen otherwise | FR-017 |
 | Cheat scenario detected < 100% | Filed as a guardrail bug; scenario retained as a permanent regression | FR-017 |
@@ -562,6 +591,7 @@ version: 6
 | FR-019 | Standalone discovery-triage skill | P1 | Step 6c reachable from any session; bounded-dispatch routing instead of freeform main-window triage |
 | FR-020 | Results-campaign gate | P1 | The missing gate class — grades a running system's output; largest uncovered cost channel (2026-06-12 eval) |
 | FR-021 | Implement-track oracle (Road A) | P1 | Makes `tdd: false` a supported efficient default — drops the Red ceremony, keeps the independent oracle via a qa-phase check; the actionable TDD cost cut |
+| FR-022 | Bug-fix/regression red-first | P1 | The one non-substitutable case for red-first; the standing carve-out from FR-021, codified as NN-P-006; governs `/small-change` + hotfix bug work |
 | NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
 | NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
 | NFR-003 | Backward compat | P0 | NN-C-003 |
@@ -664,3 +694,10 @@ PRD v5 additions (2026-06-12 — token-efficiency evaluation against real usage)
 - **Scope:** FR-004, FR-005, FR-009, FR-020. FR-020's campaign runs the system on Sonnet and dispatches the adversarial lenses on Opus — the same thinking-on-Opus / mechanics-on-Sonnet split applied to run-vs-grade.
 - **Rationale:** Concentrating thinking upstream is the entire cost model; a silent Opus upgrade in execute hides plan incompleteness and re-introduces the cost this PRD removes.
 - **How QA verifies:** Model-policy check asserts stage→model assignment; any execute path that escalates a non-`[SPIKE]` phase to Opus without halting/override is must-fix.
+
+### NN-P-006: Bug-fix and regression work is red-first
+- **Type:** Rule
+- **Statement:** Any phase or change whose purpose is to fix a defect or guard a regression uses the red-first reproduce → see-it-fail → fix → see-it-pass cycle, and records the observed failure (the test seen red against the unfixed code) as evidence. This holds regardless of the piece's `tdd` setting — it is NOT overridden by the FR-021 `tdd: false` efficient default — and it governs **every fix path**, not just the full pipeline: the `small-change` and `hotfix` tracks, AND the out-of-band inter-execution fix routes — when `spec-flow:triage` (FR-019) routes a bug-classified discovery to a fix, or a `spec-flow:campaign` (FR-020) finding becomes a fix, that fix is red-first too. A bug "fix" whose test was written after the fix and never observed failing against the broken code does not satisfy this rule, because the test's regression coverage is unverifiable. If a defect cannot be reproduced by a failing test, the work routes to a `[SPIKE]` to establish a reliable reproduction or records an explicit `no-repro` rationale at triage — never a test that was never seen red.
+- **Scope:** FR-019, FR-020, FR-021, FR-022, the `small-change` and `hotfix` tracks, and any bug-fix/regression phase or out-of-band fix in the full pipeline. The out-of-band fix routes (triage dispositions, campaign findings) carry the red-first obligation into the fix they spawn — the rule follows the fix, wherever it is raised.
+- **Rationale:** Test-first ordering carries no quality edge for greenfield work (research: ordering is inert once the oracle is known), but for a regression the oracle — "defect Y does not recur" — is only *verifiable* by observing the failing state first. The fail-against-broken observation is information a tests-after path cannot reconstruct once the fix is in; skipping it ships regression tests that pass for the wrong reason. This is the one non-substitutable case for red-first.
+- **How QA verifies:** `qa-plan` / `qa-spec` raise a must-fix when a bug-fix/regression phase proposes tests-after or omits the observed-red evidence; the `small-change` and `hotfix` flows default bug-classified work to the red-first cycle; spec-compliance/ground-truth reviewers confirm the observed-red evidence exists for any regression-guard phase.

@@ -383,7 +383,10 @@ pieces:
       explicit-defer-with-rationale), dispatches the FR-005 spike agent in SCOPE MODE as a
       bounded isolated dispatch when the change needs design (never main-window Opus thinking),
       and writes a recorded manifest/backlog entry with provenance. Preserves NN-P-002 (no
-      silent mid-stream change) and NN-P-004 (no silent defer). Execute keeps its inline Step
+      silent mid-stream change) and NN-P-004 (no silent defer). HONORS NN-P-006: when a
+      discovery is bug-classified and routed to a fix (small-change / plan-amend / new piece),
+      that fix carries the red-first reproduce->fail->fix->pass obligation out of band — a
+      triage-surfaced bug is not patched-and-moved-on. Execute keeps its inline Step
       6c unchanged (additive extraction); both share one documented triage contract. Reachable
       from intake routing (an "investigation/discovery" classification points here). Spike
       scope-mode BLOCKED -> recorded open needs-scoping item with the blocker, never a
@@ -419,7 +422,10 @@ pieces:
       Honors NN-P-005 (system on Sonnet, judgment on Opus), NN-P-002 (findings route through
       triage, not mid-stream patches), NN-P-004 (operator-gated writes). Seat activation
       conditional per FR-016(b); omissions reported, never silent. Changes no version-bearing
-      file by itself. SKIPPED-per-capability when the system can't be run. Covers FR-020.
+      file by itself. SKIPPED-per-capability when the system can't be run. HONORS NN-P-006:
+      a campaign result/seam finding that becomes a fix is red-first (reproduce the bad output
+      with a failing test, see it fail, fix, see it pass) — never a patch-and-move-on on a
+      finding the campaign surfaced. Covers FR-020.
       WHY (2026-06-12 eval, R22): root-cause decomposition — (1) results-level wrongness
       invisible to diff gates, (2) whole-platform seam/tuning gaps no per-piece gate addresses,
       (3) missing outcome ACs so no oracle exists for "wrong" output. All three feed the same
@@ -465,13 +471,52 @@ pieces:
     dependencies: [test-data-up]
     status: open
 
+  - name: bugfix-redfirst
+    slug: bugfix-redfirst
+    description: |
+      Bug-fix / regression red-first (NN-P-006 + FR-022) — the one non-substitutable case for
+      test-first, carved out as a general spec-flow principle. Any phase or change whose purpose
+      is to fix a defect or guard a regression (a test asserting "broken behavior Y no longer
+      happens", not "the feature does X") uses the red-first reproduce -> SEE IT FAIL -> fix ->
+      see it pass cycle and records the OBSERVED FAILURE (test seen red against the unfixed code)
+      as evidence — REGARDLESS of the piece's tdd setting, including a tdd:false Implement piece
+      (FR-021) and the small-change / hotfix tracks. The non-substitutable artifact is observing
+      the test fail against the actual broken code: a test written AFTER the fix passes against
+      fixed code with no evidence it would have caught the original defect (may not exercise the
+      buggy path), and the broken state is gone so the regression claim is unverifiable. Scope of
+      edits: (1) small-change skill routes bug-signal work (fix/bug/broken/regression/patch) to
+      the red-first cycle by default; (2) hotfix track defaults bug work to red-first; (3) plan
+      phase classification gains a phase-level bug-fix/regression tag (a feature piece may carry
+      one regression-guard phase while other phases use the Implement track); (4) qa-plan/qa-spec
+      raise a must-fix when a bug-fix/regression phase proposes tests-after or omits the
+      observed-red evidence; (5) FR-021's tdd:false default documents the exclusion. Defect not
+      reproducible by a failing test -> [SPIKE] to establish a reproduction or explicit no-repro
+      rationale at triage; never an unobserved-red test. Covers FR-022; codifies NN-P-006.
+      OUT-OF-BAND REACH: NN-P-006 follows the fix wherever raised — when discovery-triage
+      (FR-019) routes a bug-classified discovery to a fix, or an outcome-campaign (FR-020)
+      finding becomes a fix, that fix is red-first too. Those pieces HONOR NN-P-006 (noted in
+      their descriptions); this piece owns the rule + its small-change/hotfix/qa implementation.
+      WHY (operator-driven, 2026-06-12): the bug-fix case is the 100%-valid pushback FOR
+      red-first that survives the TDD-vs-test-after research — the ordering-inert finding is
+      specific to greenfield-with-known-oracle; a regression's oracle ("Y does not recur") is
+      only verifiable by observing the failing state first. Important for the plugin in general,
+      especially /small-change and hotfix bug work where the temptation is to patch and move on.
+      SEQUENCING: depends on nothing structural (edits existing small-change/hotfix/qa-plan/qa-spec
+      surfaces) — READY now, independent of implement-oracle and the v5 track. Pairs with
+      implement-oracle as its explicit carve-out; either can ship first (the carve-out language in
+      FR-021 is forward-safe if this lands first, and NN-P-006 stands alone if implement-oracle is
+      not yet built).
+    prd_sections: [FR-022, SC-009, G-6]
+    dependencies: []
+    status: open
+
 coverage:
-  total_prd_sections: 24
-  covered_sections: 24
+  total_prd_sections: 25
+  covered_sections: 25
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs (001-021) and NFRs (001-004) covered across 20 pieces. FR-009 is
+    All FRs (001-022) and NFRs (001-004) covered across 21 pieces. FR-009 is
     reserved — the spec-preresearch piece adds it to the PRD at merge. FR-008 (scoping spike
     for mid-execution changes) was added in PRD v2 and folded into the spike-agent piece
     alongside FR-005 — both share the agents/spike.md primitive. FR-008 amends NN-P-002.
@@ -521,6 +566,18 @@ coverage:
     win (~1.6% of tokens), NOT the big economical win — that remains the main-loop deviation
     channel (FR-019/FR-020). Road A is the actionable answer to "TDD feels heavy."
 
+    PRD v7 (2026-06-12 — bug-fix carve-out) added FR-022 + NN-P-006 and one piece:
+    bugfix-redfirst. The bug-fix scenario is the one place test-first ordering is NOT a rubber
+    stamp and is NOT substitutable by a detailed-plan tests-after: a regression test must be
+    OBSERVED failing against the broken code (reproduce -> fail -> fix -> pass), because a
+    test written after the fix has no evidence it would have caught the original defect and the
+    broken state is gone. NN-P-006 makes red-first binding for all bug-fix/regression work
+    regardless of tdd setting — the standing carve-out from FR-021's tdd:false default — and
+    governs /small-change and hotfix bug work specifically. READY now (edits existing
+    small-change/hotfix/qa surfaces; no structural deps). This is the consistent companion to
+    Road A: tests-after is fine when the test proves the system DOES X; red-first stays when the
+    test proves the system NO LONGER does broken Y.
+
     ORDER OF OPERATIONS (v5 — re-prioritized 2026-06-12 based on token-efficiency evaluation):
 
     RATIONALE FOR RE-PRIORITIZATION: the 2026-06-12 miner eval showed the dominant cost is
@@ -569,6 +626,14 @@ coverage:
          Implement-phase oracle references the spec's outcome ACs by ID. This is the actionable
          answer to "TDD feels heavy" and can run in parallel with the v5 track.
 
+    READY-NOW, INDEPENDENT (v7 — bug-fix carve-out):
+      **. bugfix-redfirst (FR-022 / NN-P-006) — bug-fix & regression work is red-first
+         regardless of tdd setting; edits small-change + hotfix + qa-plan/qa-spec + phase
+         classification. No structural deps — READY now. Pairs with implement-oracle as its
+         explicit carve-out; either can ship first. Arguably sequence this AT or BEFORE
+         implement-oracle so the tdd:false default never ships without its bug-fix exemption
+         already in place.
+
     TAIL (no strict ordering constraint with pipeline-economics):
       5. flywheel-global — after flywheel-refresh + metrics, once repo flywheel has produced
          at least one genuine threshold-triggered hardening.
@@ -576,7 +641,8 @@ coverage:
     Parallelization: outcome-acs and discovery-triage can run concurrently (different
     surfaces); outcome-campaign after both; pipeline-economics after all three v5 pieces;
     flywheel-global independent of pipeline-economics; implement-oracle (Road A) independent of
-    everything (deps only on merged test-data-up) — run it whenever.
+    everything (deps only on merged test-data-up) — run it whenever; bugfix-redfirst independent
+    of everything (no structural deps) — run it whenever, ideally at/before implement-oracle.
 
     OPERATOR EXPERIMENT (no piece): run one cross-provider reviewer (GPT/Gemini) via
     /spec-flow:review-board on 3-5 pieces; count unique valid findings vs the weakest Opus
