@@ -1,7 +1,7 @@
 ---
 slug: exec-ready
 status: drafting
-version: 5
+version: 6
 ---
 
 # Product Requirements Document — Execution-Ready Plans
@@ -437,6 +437,27 @@ version: 5
 
 **Failure mode:** The system cannot be run in the current environment (entrypoint/capability absent) → `SKIPPED: <capability>` per stage, never a false green; the campaign reports what it could not exercise rather than implying coverage.
 
+---
+
+### FR-021: Implement-track oracle — tests-after validated against the plan's pre-stated outcomes
+**Statement:** Make `tdd: false` (Implement track — code first, tests after) a **supported efficient default** for behavior-bearing pieces, instead of a silent integrity downgrade. The 2026-06-12 research pass established that test-first *ordering* has no measured result-quality advantage over test-after; the only separable value of the red-first ritual is an **oracle specified independently of the implementation**, and tests-after captures that value equally — *if and only if* the after-written tests are validated against a pre-stated expected outcome rather than against the code just written. This FR wires exactly that. A behavior-bearing Implement-track phase carries the same independently-designed **expected-outcome block** the FR-003 Test Data contract gives TDD phases (inputs + expected outputs, authored at plan time, independent of the implementation). The `[Write-Tests]` step transcribes those expected values; `qa-phase` raises a must-fix when the authored tests assert the code's *actual* output rather than the plan's *pre-stated* output (the "tests codify the code" failure mode — the one real blind spot of tests-after). This closes that blind spot **without** the Red ceremony: no separate `tdd-red` dispatch, no `qa-tdd-red` review, no SHA hash-lock — dropping ~2 serial dispatches per phase. `tdd: true` remains available and recommended only for adversarial-sensitive pieces where the immutable pre-commit lock (FR-011) is genuinely wanted; the tradeoff (Implement track has no hash-lock immutability) is documented so the choice is explicit, not silent. This is the "Road A" cost path — distinct from FR-016(a)'s "Road B" (keep TDD semantics, collapse the dispatches); an operator picks one per piece.
+**Priority:** P1
+**Linked metrics:** SC-002, SC-005
+**Research basis:** [R22] + the TDD evidence note (`docs/research/tdd-first-vs-test-after-for-ai-agents.md`) — test-first ordering shows no result-quality edge across human controlled studies (Fucci sequencing-inert; Tosun null) and AI evidence (the LLM benefit is oracle-in-context, not ordering); the separable value is the independent oracle, which a validated tests-after captures. [R2] reward-hacking (tests that codify wrong code) is the exact blind spot this validation closes without the hash-lock. [R6]/[R12] design the oracle once upstream (plan/Opus), mechanize downstream.
+
+#### User Stories
+**US-021** — As a pipeline operator who finds the TDD red ceremony slow and costly, I want code-first / tests-after to be a first-class supported mode whose QA still checks my tests against what the plan said the answer should be, so that I drop the red overhead without quietly losing the one thing TDD actually buys.
+
+**Acceptance Criteria:**
+- [ ] A behavior-bearing Implement-track (`tdd: false`) phase carries an expected-outcome block in the plan — the same oracle construct FR-003 defines for TDD phases — authored at plan time independent of the implementation; `qa-plan` flags a behavior-bearing Implement phase that has neither the block nor a `[SPIKE]` marker (mirrors FR-003).
+- [ ] The `[Write-Tests]` step transcribes the planned expected outcomes and invents no expected values absent from the plan; genuinely unpredictable outcomes use `[SPIKE]`, never a fabricated value (mirrors FR-003/FR-005).
+- [ ] `qa-phase` raises a must-fix when an Implement-track phase's authored tests assert the code's actual output instead of the plan's pre-stated expected outcomes, or when a required expected-outcome block is absent.
+- [ ] Documentation states the supported-default policy: `tdd: false` is the efficient default for non-adversarial behavior-bearing pieces; `tdd: true` is recommended where the immutable pre-commit lock is wanted; the no-hash-lock tradeoff is named.
+- [ ] Additive/backward-compat (NFR-003): existing Implement-track phases without an expected-outcome block read as legacy and are not retro-failed; the validation applies to phases authored after this ships.
+- [ ] Where a piece also declares outcome ACs (FR-018), the phase's expected-outcome block references them by ID rather than re-deriving (the spec-time oracle and the plan-time oracle are one chain).
+
+**Failure mode:** The expected outcome is genuinely unpredictable at plan time → `[SPIKE]` resolves it and the resolution becomes the expected-outcome block (mirrors FR-003/FR-005); the validation never accepts a value transcribed from the implementation in place of a planned one.
+
 ## Non-Functional Requirements
 
 ### NFR-001: Research and spike agents are context-isolated
@@ -487,6 +508,9 @@ version: 5
 | Hardened pattern recurs after its fix landed | Re-opened `active` with `ineffective-hardening` flag at next batched review | FR-015 |
 | Pattern stale past the window | Refresh proposes archival; operator-gated; archived entries stay in-file for audit | FR-015 |
 | Red-conformance check can't parse the Test Data block | `[CONFORMANCE-FALLBACK]` → full qa-tdd-red LLM dispatch; never silently skipped | FR-016 |
+| Implement-track tests assert the code's actual output, not the plan's expected output | `qa-phase` must-fix: tests must assert the pre-stated expected outcomes, not codify the implementation | FR-021 |
+| Behavior-bearing Implement phase has no expected-outcome block and no `[SPIKE]` | `qa-plan` must-fix (mirrors the FR-003 TDD-phase check) | FR-021 |
+| Implement-track expected outcome genuinely unpredictable at plan time | `[SPIKE]` resolves it → becomes the expected-outcome block; never transcribed from the implementation | FR-021 |
 | Diff signal for a conditional board seat is ambiguous | Seat runs (activation errs toward inclusion); the always-on core never deactivates | FR-016 |
 | QA agent prompt/rubric edited | Gold-set re-run required before the plugin version ships; rubric versions frozen otherwise | FR-017 |
 | Cheat scenario detected < 100% | Filed as a guardrail bug; scenario retained as a permanent regression | FR-017 |
@@ -537,6 +561,7 @@ version: 5
 | FR-018 | Outcome & negative-space ACs | P1 | The missing oracle — specs must say what bad output looks like; foundation for the campaign and the ground-truth seat |
 | FR-019 | Standalone discovery-triage skill | P1 | Step 6c reachable from any session; bounded-dispatch routing instead of freeform main-window triage |
 | FR-020 | Results-campaign gate | P1 | The missing gate class — grades a running system's output; largest uncovered cost channel (2026-06-12 eval) |
+| FR-021 | Implement-track oracle (Road A) | P1 | Makes `tdd: false` a supported efficient default — drops the Red ceremony, keeps the independent oracle via a qa-phase check; the actionable TDD cost cut |
 | NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
 | NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
 | NFR-003 | Backward compat | P0 | NN-C-003 |

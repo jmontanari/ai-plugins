@@ -340,6 +340,11 @@ pieces:
       execution route through structured triage, not freeform Opus; new pieces produced here
       carry outcome ACs by default. The $12.3k/2mo behavior-gate gap is the higher-return
       fix; construction-gate trimming lands after the larger inefficiency is addressed.
+      NOTE (PRD v6): part (a) is "Road B" — keep TDD semantics + hash-lock, collapse the
+      dispatches. The implement-oracle piece (FR-021) is the alternative "Road A" — abandon the
+      hash-lock and go code-first with a validated tests-after. They are ALTERNATIVES (operator
+      picks one road per piece), not additive; Road A is READY now (gate-evals-independent),
+      Road B's qa-tdd-red-deterministic + board cuts stay gate-evals-gated.
     prd_sections: [FR-016, SC-005, SC-002, G-3, G-6]
     dependencies: [metrics, exec-guardrails, gate-evals, outcome-acs, discovery-triage]
     status: open
@@ -425,13 +430,48 @@ pieces:
     dependencies: [outcome-acs, discovery-triage, metrics, flywheel-repo]
     status: open
 
+  - name: implement-oracle
+    slug: implement-oracle
+    description: |
+      Implement-track oracle (Road A) — make tdd:false a SUPPORTED EFFICIENT DEFAULT for
+      behavior-bearing pieces, not a silent integrity downgrade. The 2026-06-12 research pass
+      (docs/research/tdd-first-vs-test-after-for-ai-agents.md) established that test-first
+      ORDERING has no measured result-quality edge over test-after; the only separable value of
+      the red-first ritual is an oracle specified INDEPENDENTLY of the implementation — and
+      tests-after captures that value equally IF the after-written tests are validated against a
+      pre-stated expected outcome instead of against the code just written. This piece wires
+      exactly that: (1) a behavior-bearing Implement-track phase carries the same expected-outcome
+      block the FR-003 Test Data contract gives TDD phases (inputs + expected outputs, authored at
+      plan time, independent of the implementation); qa-plan flags a behavior-bearing Implement
+      phase with neither the block nor a [SPIKE] (mirrors FR-003). (2) The [Write-Tests] step
+      transcribes those expected values, inventing none absent from the plan. (3) qa-phase raises
+      a must-fix when the authored tests assert the code's ACTUAL output rather than the plan's
+      PRE-STATED output (the "tests codify the code" blind spot — the one real weakness of
+      tests-after). This closes that blind spot WITHOUT the Red ceremony: no separate tdd-red
+      dispatch, no qa-tdd-red review, no SHA hash-lock — dropping ~2 serial dispatches/phase.
+      tdd:true stays available, recommended only for adversarial-sensitive pieces wanting the
+      immutable pre-commit lock (FR-011); the no-hash-lock tradeoff is documented so the choice is
+      explicit. Where the piece also declares outcome ACs (FR-018) the expected-outcome block
+      references them by ID (one oracle chain, spec-time → plan-time). Covers FR-021.
+      WHY (operator-driven, 2026-06-12): the TDD red ceremony is the operator's standing
+      cost/latency pain; the research says the ordering buys no quality and the integrity value is
+      capturable by a validated tests-after. This is "Road A" — distinct from FR-016(a)'s "Road B"
+      (keep TDD semantics, collapse the dispatches). An operator picks one road per piece; this
+      piece makes Road A real. SEQUENCING: depends only on test-data-up (MERGED — the
+      expected-outcome block construct it extends), so it is READY now; synergy with outcome-acs
+      (FR-018) when both ship (the Implement-phase oracle references the spec's outcome ACs), but
+      no hard dependency — Road A can move ahead of the behavior-gate track.
+    prd_sections: [FR-021, SC-002, SC-005, G-3, G-6]
+    dependencies: [test-data-up]
+    status: open
+
 coverage:
-  total_prd_sections: 23
-  covered_sections: 23
+  total_prd_sections: 24
+  covered_sections: 24
   uncovered_sections: []
   percentage: 100
   notes: |
-    All FRs (001-020) and NFRs (001-004) covered across 19 pieces. FR-009 is
+    All FRs (001-021) and NFRs (001-004) covered across 20 pieces. FR-009 is
     reserved — the spec-preresearch piece adds it to the PRD at merge. FR-008 (scoping spike
     for mid-execution changes) was added in PRD v2 and folded into the spike-agent piece
     alongside FR-005 — both share the agents/spike.md primitive. FR-008 amends NN-P-002.
@@ -464,6 +504,22 @@ coverage:
     These do NOT fold into pipeline-economics or gate-evals: those calibrate/cut CONSTRUCTION
     gates; this is a new gate CLASS for system behavior. NOTE: pricing/cost figures are
     flagged estimates (per-MTok rates x measured tokens), not billed amounts.
+
+    PRD v6 (2026-06-12 TDD-vs-test-after deep research, [R22] + docs/research/
+    tdd-first-vs-test-after-for-ai-agents.md) added FR-021 and one piece: implement-oracle
+    (Road A). REFINES the v5 "keep Red-first" parenthetical: adversarially-verified research
+    found test-first ORDERING has no measured result-quality edge over test-after (human
+    controlled studies + AI evidence); the only separable value of red-first is an oracle
+    specified INDEPENDENTLY of the implementation, which a VALIDATED tests-after captures
+    equally. So the durable thing to keep is the independent oracle, not the ordering ritual.
+    Road A (implement-oracle): make tdd:false a supported efficient default — drop the Red
+    ceremony (~2 dispatches/phase), keep the oracle via a qa-phase check that the tests-after
+    assert the plan's pre-stated expected outcomes. READY now (depends only on merged
+    test-data-up). Road B (FR-016a, pipeline-economics): keep TDD semantics + hash-lock, just
+    collapse the dispatches — for adversarial-sensitive pieces. The two are ALTERNATIVES;
+    operator picks one road per piece. Honest magnitude: the TDD lever is a latency/dispatch
+    win (~1.6% of tokens), NOT the big economical win — that remains the main-loop deviation
+    channel (FR-019/FR-020). Road A is the actionable answer to "TDD feels heavy."
 
     ORDER OF OPERATIONS (v5 — re-prioritized 2026-06-12 based on token-efficiency evaluation):
 
@@ -504,13 +560,23 @@ coverage:
          primitives. No construction-gate cut without catch-rate evidence from gate-evals
          (merged) AND structured triage in place.
 
+    READY-NOW, INDEPENDENT (v6 — Road A):
+      *. implement-oracle (FR-021) — make tdd:false a supported efficient default: extend the
+         expected-outcome block + the qa-phase "tests assert the planned outcome, not the code"
+         check to Implement-track phases. Deps: test-data-up (merged) ONLY — so it is ready to
+         spec/plan/execute immediately, independent of the v5 behavior-gate track and of
+         gate-evals. Synergy (not dependency) with outcome-acs: when both ship, the
+         Implement-phase oracle references the spec's outcome ACs by ID. This is the actionable
+         answer to "TDD feels heavy" and can run in parallel with the v5 track.
+
     TAIL (no strict ordering constraint with pipeline-economics):
       5. flywheel-global — after flywheel-refresh + metrics, once repo flywheel has produced
          at least one genuine threshold-triggered hardening.
 
     Parallelization: outcome-acs and discovery-triage can run concurrently (different
     surfaces); outcome-campaign after both; pipeline-economics after all three v5 pieces;
-    flywheel-global independent of pipeline-economics.
+    flywheel-global independent of pipeline-economics; implement-oracle (Road A) independent of
+    everything (deps only on merged test-data-up) — run it whenever.
 
     OPERATOR EXPERIMENT (no piece): run one cross-provider reviewer (GPT/Gemini) via
     /spec-flow:review-board on 3-5 pieces; count unique valid findings vs the weakest Opus
