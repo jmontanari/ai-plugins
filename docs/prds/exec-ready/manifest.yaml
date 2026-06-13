@@ -386,18 +386,20 @@ pieces:
       silent mid-stream change) and NN-P-004 (no silent defer). HONORS NN-P-006: when a
       discovery is bug-classified and routed to a fix (small-change / plan-amend / new piece),
       that fix carries the red-first reproduce->fail->fix->pass obligation out of band — a
-      triage-surfaced bug is not patched-and-moved-on. Execute keeps its inline Step
-      6c unchanged (additive extraction); both share one documented triage contract. Reachable
+      triage-surfaced bug is not patched-and-moved-on. Execute's Step 6c is rewired to CONSUME
+      the shared triage contract (FR-023 fold-in, 2026-06-12 operator decision) and its FR-008
+      mid-execution detection is hardened; both paths share one documented contract. Reachable
       from intake routing (an "investigation/discovery" classification points here). Spike
       scope-mode BLOCKED -> recorded open needs-scoping item with the blocker, never a
-      fabricated disposition. Covers FR-019.
+      fabricated disposition. Covers FR-019 + FR-023 (execute-consume the shared contract +
+      hardened FR-008 detection, folded in by operator decision; extends FR-019 AC-4).
       WHY (2026-06-12 eval, R22): ~$12.3k/2mo June Opus was deviation + freeform validation,
       much of it the operator hand-rolling Step 6c-style triage in a 180k-context main window
       because the machinery was execute-only. Sequenced after spike-agent (scope mode) and
       before outcome-campaign (which routes every finding through this skill).
-    prd_sections: [FR-019, SC-011, G-7]
+    prd_sections: [FR-019, FR-023, SC-011, G-7]
     dependencies: [spike-agent]
-    status: open
+    status: specced
 
   - name: outcome-campaign
     slug: outcome-campaign
