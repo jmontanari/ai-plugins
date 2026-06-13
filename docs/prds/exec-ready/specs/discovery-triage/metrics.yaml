@@ -3,6 +3,8 @@ generated: 2026-06-12
 last_updated: 2026-06-12
 piece: exec-ready/discovery-triage
 
+# (spec block below authored at spec stage; plan block + plan_gate added at plan stage)
+
 spec:
   qa_rounds: 4             # Phase-2 operator-answer cards: VOQ 4-question card; NN-P-004 conflict; mid-exec routing; scope-split
   qa_iterations: 3         # Phase-4 QA loops to clean: iter1 (auto-apply vs NN-P-004); iter2 (NN-C-006 remnant); iter3 full post-fold (FR-T2 remnant) — all fixed + grep-verified
@@ -23,8 +25,16 @@ spec:
     judgment: 9            # AC-1, AC-3, AC-4, AC-5, AC-10, AC-11, AC-12, AC-13, AC-14
     machine_checkable_ratio: 0.36  # machine / (machine + judgment)
 
+plan:
+  qa_iterations: 1           # Phase-3 QA loop to clean: iter1 zero must-fix; two should-fix applied inline (registry AC cols; [Integration-Test] marker)
+  concreteness_floor: passed # QA-clean with no circuit-breaker escalation
+
 gate_scaling:
   spec_gate:
     offered_summary_confirm: true  # predicate held (QA-clean ∧ zero markers)
     fell_back: false
+    reason: null
+  plan_gate:
+    offered_summary_confirm: false # conjunct (iii) failed: doc-as-code AC matrix uses phase refs, not file:line pointers (deliverables created by execute)
+    fell_back: false               # not a fallback from a clean predicate — (iii) failed by design
     reason: null
