@@ -77,6 +77,20 @@ gate_scaling:
     reason: null
 ```
 
+```yaml
+findings_by_source:
+  campaign:
+    total: 3              # findings emitted by campaign lenses
+    verified: 2           # findings confirmed by the theater-guard VERIFY pass
+    suppressed: 1         # findings VERIFY did not confirm (precision-biased)
+    routed_to_triage: 2   # findings handed to /spec-flow:triage as a Form C batch
+    dispatches:
+      lens: 3             # always 3 in v1 (always-on lenses)
+      verify: 3           # 1 per pre-VERIFY finding, may exceed verified count
+```
+
+`findings_by_source` is additive passive metadata (NN-C-003, schema_version unchanged); written by `spec-flow:campaign`; existing readers ignore unknown blocks. Degraded path: `[METRICS-DEGRADED]`.
+
 **Block-style / no-inline-flow-maps invariant:** Every leaf must be on its own indented line; no inline flow maps (`{a: 1}`). This makes the file parseable by both `python3 -c 'yaml.safe_load'` (fast path) and pure grep/awk (fallback). Inline `#` comments are permitted and are stripped by the parsers before value extraction; comments must not carry semantic data (they are advisory only). `schema_version` stays `1` — both `ac_verifiability` and `gate_scaling` blocks are additive leaves (no existing field removed or renamed). NN-C-003.
 
 ## Field semantics

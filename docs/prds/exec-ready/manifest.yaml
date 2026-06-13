@@ -453,8 +453,74 @@ pieces:
       (low surface -> single pass = today's behavior; high surface -> loop-until-dry), via
       gate-scaling.md. The SEAM lens grades against the seam-design surface model rather than
       re-deriving boundaries. Depends on seam-design (sequence it BEFORE this piece).
+      SPEC DECISION (2026-06-13 brainstorm): the convergence loop was SPLIT OUT of this piece to
+      a new `campaign-converge` follow-up (below) — outcome-campaign ships the SINGLE-PASS v1
+      (FR-020's literal ACs: run on Sonnet -> 3 Opus lenses grade output vs oracle -> per-finding
+      theater-guard VERIFY -> triage Form C -> record source=campaign). The surface-metric ->
+      depth-scaling, Pass A/B loop, VOQ-1 (confirm granularity), and VOQ-5 (loop-spec home) move
+      with the loop to campaign-converge. CORRECTION (deliberation-verified): no numeric
+      "seam-design surface model" shipped — seam-design delivered the 3-state boundary-touching
+      predicate; the bucketing->depth metric is campaign-converge's to define. Other spec
+      resolutions: run_mode mandatory (refuse-if-unset) + mandatory pre-run command confirm
+      (run-safety — first spec-flow component to EXECUTE the target); SKIPPED: no-oracle for
+      oracle-bound lenses with ground-truth still running (day-one oracle near-empty on real
+      targets); theater-guard precision-biased; BRF-3 bug_classified Form C field incorporated.
     prd_sections: [FR-020, SC-010, SC-005, G-7]
     dependencies: [outcome-acs, discovery-triage, metrics, flywheel-repo]
+    status: merged
+
+  - name: campaign-converge
+    slug: campaign-converge
+    description: |
+      Running-system convergence loop for spec-flow:campaign — the surface-scaled
+      find -> fix -> re-hunt backstop, SPLIT OUT of outcome-campaign at its 2026-06-13 spec
+      brainstorm (the piece exceeded a single shippable surface; outcome-campaign ships the
+      single-pass v1). SIBLING to review-board-converge (FR-026), which loops on a DIFF/branch/PR;
+      this loops on a RUNNING system via spec-flow:campaign. Adds: Pass A (run the campaign lenses
+      as FINDERS; each finding theater-guard VERIFIED before it becomes a triage item) -> route
+      fixes OUT through triage -> small-change/execute (campaign never patches, NN-P-002) -> QA
+      validate the batch WIRED TOGETHER (not per-fix) -> Pass B re-hunt the FULL surface; terminate
+      on whichever fires FIRST: K consecutive dry rounds (zero VERIFIED findings), verified-count
+      below X% of Pass A, or a hard round/budget cap. Loop DEPTH scaled by an integration-surface
+      metric this piece DEFINES (boundary-touching-state x declared `## Integration Coverage`
+      count, bucketed: low -> single-pass = outcome-campaign's v1 / med -> bounded / high ->
+      loop-until-dry) — it CONSUMES seam-design's shipped 3-state boundary-touching predicate as an
+      input (no numeric surface model shipped from seam-design). CENTRAL OPEN QUESTIONS for this
+      piece's brainstorm: VOQ-1 confirm granularity (per-round vs terminal Form C); VOQ-5 loop-spec
+      home (a `## convergence-loop` section in gate-scaling.md vs a dedicated convergence-loop.md
+      ref — architecture leans dedicated ref to avoid CR-009 anchor collision once FR-026 anchors
+      in). HARD CONSTRAINT: HAND-ROLLED markdown (NN-C-002), NOT the Workflow tool. Covers FR-027
+      (reserved; added to the PRD at merge per the FR-009 / seam-design precedent).
+    prd_sections: [FR-027, SC-005, G-7]
+    dependencies: [outcome-campaign, seam-design]
+    status: open
+
+  - name: model-tiering
+    slug: model-tiering
+    description: |
+      Reinforce correct Sonnet/Opus tier on EVERY sub-agent dispatch — not just execute's
+      named stages. Routed via spec-flow:triage 2026-06-13 (source: operator; new-piece) after
+      the plan Phase-1 introspection (mechanical gathering) was launched on Opus and corrected to
+      Sonnet: NN-P-005 names the model policy but is scoped to execute stages, named agents carry
+      `model:` frontmatter, yet orchestrator-IMPROVISED dispatches (a skill says "the orchestrator
+      explores" with no agent template, e.g. plan Phase-1 introspection) have no tier anchor and
+      default to Opus. Three-layer fix to design at spec time: (1) add `reference/model-tiering.md`
+      single-source taxonomy (gathering / transcription / mechanical-fix -> Sonnet; authoring /
+      adversarial-judgment / spike -> Opus) AND generalize NN-P-005 scope from execute-stages to
+      every sub-agent dispatch, cited by the dispatch-heavy skills (spec / plan / execute /
+      review-board / campaign); (2) extend the SessionStart hook doctrine injection with a one-line
+      dispatch-tiering reminder (bash-only, NN-C-002); (3) give plan Phase-1 introspection a
+      declared-Sonnet dispatch (a thin plan-introspect agent `model: sonnet`, or an explicit
+      Sonnet instruction in the plan skill), and decide at spec whether `agents/research.md` should
+      drop opus->sonnet (mostly gathering + light inference — genuine open question). Optionally a
+      qa-plan/review check flagging a committed dispatch site whose hard-coded tier contradicts its
+      agent template. Enhancement, not a bug (the triage bug-signal scan false-fired on "fix"-as-
+      noun; no blanket red-first — NN-P-006 still applies per-phase if any phase is regression-
+      classified). Additive (NN-C-003), markdown+bash only (NN-C-002), version bump (NN-C-009).
+      Covers G-3 (right model in the right place); reserved FR-028 (added to the PRD at merge per
+      the FR-009 precedent). Relates to sonnet-coord (merged, per-stage execute model policy).
+    prd_sections: [FR-028, G-3]
+    dependencies: []
     status: open
 
   - name: implement-oracle
@@ -599,55 +665,6 @@ pieces:
     prd_sections: [FR-024, G-1, G-7]
     dependencies: [plan-concrete, outcome-acs]
     status: merged
-
-  - name: seam-investigate
-    slug: seam-investigate
-    description: |
-      Forcing up-front integration investigation (shift-left) — the operator-driven expansion of
-      seam-design (2026-06-13). The shipped `## Integration Coverage` block is DECLARATION-only: it
-      records the seams the author already knows; it never forces DISCOVERY of the ones they don't
-      (the prop_firm gap — defects slip through because the up-front investigation was not thorough,
-      e.g. obs-http-wiring's seam was never even declared). This piece makes spec's "Integration
-      surfacing" INVESTIGATION-BACKED and COVERAGE-FORCING: (1) the research pass explicitly
-      enumerates the piece's full integration surface (what it wires to, what existing code it
-      touches/extends), so the surface map is DERIVED, not author-recalled; (2) the author must
-      demonstrate KNOWLEDGE of each identified seam (documented boundary + true externals) and a
-      SUBSTANTIAL-COVERAGE obligation per seam; (3) qa-spec / qa-plan check the investigation was
-      actually DONE (not merely that a block exists). Additive (NN-C-003); hand-rolled markdown only
-      (NN-C-002). Covers FR-025 (reserved; added to the PRD at merge per the FR-009 precedent).
-      Sequence WITH/AFTER seam-design (shares the integration-surface model + the same gate
-      surfaces). Deps: research-unify (the gathering pass it extends) + seam-design.
-    prd_sections: [FR-025, G-1, G-7]
-    dependencies: [research-unify, seam-design]
-    status: open
-
-  - name: review-board-converge
-    slug: review-board-converge
-    description: |
-      review-board `--converge` — the find-after-the-fact backstop loop the operator originally
-      framed ("prove the integration is broken; find every broken seam"). Adds a convergence mode to
-      the spec-flow:review-board skill: Pass A (run the integration + edge-case + ground-truth lenses
-      as FINDERS; each finding adversarially VERIFIED before it becomes a task — theater guard) ->
-      route fixes through the disciplined small-change/execute path -> QA validate the batch WIRED
-      TOGETHER (not per-fix) -> Pass B re-hunt the FULL surface (not just the fix delta) -> terminate
-      on whichever fires first: K dry rounds (zero VERIFIED findings), verified-count below X% of Pass
-      A, or a hard round/budget cap. Loop DEPTH scaled by the seam-design/seam-investigate
-      integration-surface model (low surface -> single pass = today; high surface -> loop-until-dry)
-      via gate-scaling.md. SIBLING to outcome-campaign: this loops on a DIFF/branch/PR (static,
-      available now, no running system needed); outcome-campaign loops on a RUNNING system (its
-      convergence fold stays — operator decision 2026-06-13). HARD CONSTRAINT: the loop is HAND-ROLLED
-      markdown (like execute's Final Review fix loop) for portability — NOT the Workflow tool.
-      CENTRAL OPEN QUESTION for this piece's brainstorm (operator raised 2026-06-13): whether to add
-      an OPTIONAL Claude-Code-only Workflow-accelerated executor that produces the SAME result as the
-      markdown loop. This is a CHARTER-level host-conditional-orchestration decision (does spec-flow
-      permit host-aware execution paths?), with real downsides (feature disparity, dual maintenance,
-      a Copilot-untestable path) — default recommendation is portable markdown for BOTH hosts; do NOT
-      bake host-conditional behavior in without a charter call. Covers FR-026 (reserved; added at
-      merge). Deps: seam-design + review-board (the integration lens it loops). Sequence after
-      seam-design.
-    prd_sections: [FR-026, G-7]
-    dependencies: [seam-design]
-    status: open
 
   - name: seam-investigate
     slug: seam-investigate

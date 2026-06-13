@@ -48,9 +48,22 @@ Bug-signal keyword set: `fix` / `bug` / `broken` / `regression` / `patch` (small
 
 On a bug-classified discovery routed to a **fix** disposition (`small-change` / `plan-amend` / `new-piece`), stamp the red-first reproduce→fail→fix→pass obligation onto **all three** provenance surfaces: (1) the downstream handoff digest, (2) the recorded `.discovery-log.md`-style row, (3) the manifest/backlog entry.
 
-Consumers HONOR the stamp: a bug-classified fix routed to `small-change` / `plan-amend` / `new-piece` runs the red-first cycle (small-change Step 9 routing; plan-amend emits a `**Phase type:** bug-fix|regression` red-first phase; a new piece's spec/plan carries the bug-fix classification). A non-reproducible defect routes to `[SPIKE]` or records an explicit no-repro rationale. Campaign (FR-020) reach remains forward-record only (the campaign skill does not exist).
+Consumers HONOR the stamp: a bug-classified fix routed to `small-change` / `plan-amend` / `new-piece` runs the red-first cycle (small-change Step 9 routing; plan-amend emits a `**Phase type:** bug-fix|regression` red-first phase; a new piece's spec/plan carries the bug-fix classification). A non-reproducible defect routes to `[SPIKE]` or records an explicit no-repro rationale. Campaign (FR-020) findings route through this contract as a Form C batch (see `## Consumed by`): a bug-classified campaign finding routed to a fix disposition is stamped red-first like any other.
 
 Cite PRD NN-P-006 / FR-022; do not restate the red-first cycle mechanics.
+
+## Form B/C schema — campaign-source fields
+
+Form B accepts an optional `bug_classified: true|false` set explicitly by an external caller (the campaign); when present it pre-seeds the Step-2 bug-signal result so triage applies the NN-P-006 red-first stamp without re-deriving it from keywords. Absent ⇒ triage derives `bug_classified` from its own bug-signal scan (backward-compatible).
+
+Campaign findings reach triage as a Form C batch. Each Form B record in the batch carries:
+- `source_phase: campaign` (caller)
+- `source_agent: <lens name>` (which campaign lens emitted the finding)
+- `finding_text` (the finding prose)
+- `discovery_type: degeneracy | seam | edge-case`
+- `bug_classified: true | false` (explicit; triage honors without re-deriving)
+
+**BRF-3:** the `bug_classified` field; absence preserves existing bug-signal derivation (backward-compatible, NN-C-003).
 
 ## FR-008 mid-execution change-signal phrasing set (the documented trigger set — ONE place)
 
@@ -69,4 +82,4 @@ A false positive is a harmless, cancellable confirmation prompt (operator answer
 
 ## Consumed by
 
-`plugins/spec-flow/skills/triage/SKILL.md` (the standalone skill) and `plugins/spec-flow/skills/execute/SKILL.md` Step 6c (the FR-008 admission `y`-path) both classify through this contract.
+`plugins/spec-flow/skills/triage/SKILL.md` (the standalone skill) and `plugins/spec-flow/skills/execute/SKILL.md` Step 6c (the FR-008 admission `y`-path) both classify through this contract. `plugins/spec-flow/skills/campaign/SKILL.md` (FR-020 Form C producer) invokes triage with a campaign-source Form C batch after the theater-guard VERIFY pass.

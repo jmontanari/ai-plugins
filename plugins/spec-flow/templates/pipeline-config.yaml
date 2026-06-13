@@ -209,3 +209,13 @@ charter:
 #   See plugins/spec-flow/reference/artifact-budgets.md `## Overrides`.
 # artifact_budgets:
 #   spec_md: {soft: 300, hard: 520}
+
+# campaign: configures spec-flow:campaign — the running-system results gate (new in v5.21.0)
+#   Out-of-band gate; reads these keys from the project .spec-flow.yaml at run time.
+# campaign:
+#   entrypoint: ""        # (string) bash command that runs the target system (pilot/backtest/e2e).
+#                          #   Absent ⇒ campaign is SKIPPED/unavailable (not an error).
+#   run_mode: ""          # (REQUIRED to run) dry-run | sandbox | live.
+#                          #   dry-run = no side effects (read-only); sandbox = isolated, no prod data/orders;
+#                          #   live = real side effects, requires explicit operator opt-in at run time.
+#                          #   Absent ⇒ campaign REFUSES to run (run-safety; the gate executes the target).

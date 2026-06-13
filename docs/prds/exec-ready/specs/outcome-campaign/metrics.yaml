@@ -1,0 +1,40 @@
+schema_version: 1
+generated: 2026-06-13
+last_updated: 2026-06-13
+piece: exec-ready/outcome-campaign
+
+# (spec block authored at spec stage; plan block + plan_gate added at plan stage)
+
+spec:
+  qa_rounds: 2             # Phase-2 operator-answer cards: (1) VOQ 4-question card (scope-split / run-safety / oracle-absence / BRF-3); (2) 3-question card (theater-guard+VOQ-6 / deferred-loop home)
+  qa_iterations: 2         # Phase-4 QA loops to clean: iter1 full (2 must-fix: prod-callsite shape on 4 integrations; unfalsifiable SC-005 NFR-C3) → fixed; iter2 focused clean
+  research_artifact: true  # research.md present at the canonical path
+  budget_compliance:
+    spec_md:
+      lines: 156
+      soft: 300
+      hard: 520
+      status: pass         # pass | over
+    deliberation_md:
+      lines: 135
+      soft: 200
+      hard: 350
+      status: pass
+  ac_verifiability:
+    machine: 10            # AC-1, AC-2, AC-4, AC-5, AC-6, AC-7, AC-8, AC-10, AC-11, AC-12
+    judgment: 3            # AC-3, AC-6, AC-9 (AC-6 carries both machine + judgment Independent Test tags)
+    machine_checkable_ratio: 0.77  # machine / (machine + judgment) = 10 / 13
+
+plan:
+  qa_iterations: 2           # Phase-3 QA loops to clean: iter1 (2 must-fix: missing Test Data blocks; duplicate NN-C-002/003 + NN-P-005 charter allocation) → fixed; iter2 focused clean
+  concreteness_floor: passed # QA-clean with no circuit-breaker escalation
+
+gate_scaling:
+  spec_gate:
+    offered_summary_confirm: true  # predicate held (QA-clean ∧ zero surviving markers)
+    fell_back: false
+    reason: null
+  plan_gate:
+    offered_summary_confirm: false # conjunct (iii) failed: AC-Coverage-Matrix uses phase refs, not file:line pointers (all deliverables CREATEd by execute)
+    fell_back: false               # not a fallback from a clean predicate — (iii) failed by design (doc-as-code)
+    reason: null

@@ -3,6 +3,8 @@
 # l1_static_checks [skill-file]
 #   $1 = path to SKILL.md (default: $PLUGIN_ROOT/skills/execute/SKILL.md)
 
+assert_file_exists() { [ -f "$1" ] && pass "$2" || fail "$2 (file not found: $1)"; }
+
 l1_static_checks() {
   local skill="${1:-${PLUGIN_ROOT}/skills/execute/SKILL.md}"
 
@@ -206,19 +208,19 @@ l1_static_checks() {
   # AC-11: version sync
   local pluginjson="${PLUGIN_ROOT}/plugin.json"
   local marketplace="${REPO_ROOT}/.claude-plugin/marketplace.json"
-  assert_grep '"version": "5\.19\.0"' "$pluginjson" \
-    "AC-11: plugin.json version is 5.19.0"
-  assert_grep '"version": "5\.19\.0"' "$marketplace" \
-    "AC-11: marketplace.json spec-flow entry is 5.19.0"
-  assert_grep '"version": "5\.19\.0"' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" \
-    "AC-11: .claude-plugin/plugin.json version is 5.19.0"
+  assert_grep '"version": "5\.21\.0"' "$pluginjson" \
+    "AC-11: plugin.json version is 5.21.0"
+  assert_grep '"version": "5\.21\.0"' "$marketplace" \
+    "AC-11: marketplace.json spec-flow entry is 5.21.0"
+  assert_grep '"version": "5\.21\.0"' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" \
+    "AC-11: .claude-plugin/plugin.json version is 5.21.0"
 
   # AC-11: CHANGELOG has 5.16.1 and (c) continue removal under ### Changed
   local changelog="${PLUGIN_ROOT}/CHANGELOG.md"
   assert_grep "\[5\.16\.1\]" "$changelog" \
     "AC-11: CHANGELOG.md has 5.16.1 section"
-  assert_grep "\[5\.19\.0\]" "$changelog" \
-    "AC-8: CHANGELOG carries the 5.19.0 section"
+  assert_grep "\[5\.21\.0\]" "$changelog" \
+    "AC-8: CHANGELOG carries the 5.21.0 section"
   assert_grep "\(c\) continue" "$changelog" \
     "AC-11: CHANGELOG.md documents (c) continue removal"
 
@@ -267,7 +269,7 @@ l1_static_checks() {
     fi
   done
 
-  # --- All-27 co-ship twin symlink guard (drift structurally impossible) ---
+  # --- All-31 co-ship twin symlink guard (drift structurally impossible) ---
   local _agent_md _twin _nonlink=0 _mismatch=0
   for _agent_md in "${_agents_dir}"/*.agent.md; do
     _twin="${_agent_md%.agent.md}.md"
@@ -275,7 +277,7 @@ l1_static_checks() {
     if ! cmp -s "$_agent_md" "$_twin"; then _mismatch=$((_mismatch+1)); fi
   done
   if [ "$_nonlink" -eq 0 ] && [ "$_mismatch" -eq 0 ]; then
-    pass "all agents/*.agent.md are symlinks byte-identical to their .md source (27-pair drift guard)"
+    pass "all agents/*.agent.md are symlinks byte-identical to their .md source (31-pair drift guard)"
   else
     fail "agent co-ship twin drift: $_nonlink non-symlink, $_mismatch content-mismatch .agent.md files"
   fi
@@ -348,4 +350,49 @@ l1_static_checks() {
   assert_grep "18\. \*\*Bug-fix/regression red-first" "${PLUGIN_ROOT}/agents/qa-spec.md" "AC-4: qa-spec criterion 18 present"
   assert_grep "Consumers HONOR the stamp" "${PLUGIN_ROOT}/reference/triage-contract.md" "AC-4: triage-contract consumers honor the stamp"
   # --- end phase8 ---
+
+  # --- outcome-campaign: phase1 reference-doc contracts (AC-10, AC-11) ---
+  assert_no_grep "does not exist" "${PLUGIN_ROOT}/reference/triage-contract.md" "AC-11: campaign placeholder removed"
+  assert_grep "bug_classified" "${PLUGIN_ROOT}/reference/triage-contract.md" "AC-11: bug_classified Form B/C field"
+  assert_grep "findings_by_source" "${PLUGIN_ROOT}/reference/metrics-artifact.md" "AC-10: findings_by_source block"
+  assert_grep "routed_to_triage" "${PLUGIN_ROOT}/reference/metrics-artifact.md" "AC-10: campaign metrics sub-block"
+  assert_grep "campaign" "${PLUGIN_ROOT}/reference/flywheel.md" "AC-10: campaign source_type"
+  assert_grep "metric | campaign" "${PLUGIN_ROOT}/reference/flywheel.md" "AC-10: campaign in flywheel inline enum"
+  # --- end outcome-campaign phase1 ---
+
+  # --- outcome-campaign: phase2 campaign agents (AC-5, AC-6, AC-7, AC-12) ---
+  for agent in campaign-ground-truth campaign-seam campaign-edge-case campaign-verify; do
+    assert_grep "^name: ${agent}" "${PLUGIN_ROOT}/agents/${agent}.md" "AC-6/AC-7: ${agent} agent bare name"
+    assert_grep "model: opus" "${PLUGIN_ROOT}/agents/${agent}.md" "AC-5: ${agent} model opus"
+    assert_no_grep "^name:.*spec-flow-" "${PLUGIN_ROOT}/agents/${agent}.md" "AC-12: ${agent} no plugin prefix"
+  done
+  # --- end outcome-campaign phase2 ---
+
+  # --- outcome-campaign: phase3 campaign SKILL.md (AC-1..AC-10) ---
+  assert_grep "name: campaign" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-1: skill frontmatter"
+  assert_grep "SKIPPED: no-oracle" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-2/AC-3: no-oracle skip"
+  assert_grep "run_mode" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-4: run_mode gate"
+  assert_grep "before first execution" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-4: pre-run confirm"
+  assert_grep "live" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-4: live opt-in"
+  assert_grep 'model: "opus"' "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-5: Opus lens dispatch"
+  assert_grep "campaign-verify" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-7: theater-guard verify"
+  assert_grep "CONFIRMED" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-7: confirmed-only routing"
+  assert_grep "conditional-activation: not-yet-available" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-9: seat omission reported"
+  assert_grep "findings_by_source" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-10: metrics recording"
+  assert_grep "METRICS-DEGRADED" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-10: metrics degraded path"
+  assert_grep "FLYWHEEL-DEGRADED" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-10: flywheel degraded path"
+  assert_grep "spec-flow:triage" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-8: campaign->triage Form C wiring"
+  assert_grep "Form C" "${PLUGIN_ROOT}/skills/campaign/SKILL.md" "AC-8: Form C batch"
+  # --- end outcome-campaign phase3 ---
+
+  # --- outcome-campaign: phase4 campaign config template (AC-4) ---
+  assert_grep "run_mode" "${PLUGIN_ROOT}/templates/pipeline-config.yaml" "AC-4: campaign config documented"
+  # --- end outcome-campaign phase4 ---
+
+  # --- outcome-campaign: phase6 judgment fixtures (AC-3, AC-8, AC-11) ---
+  assert_grep "bug_classified" "${PLUGIN_ROOT}/tests/fixtures/outcome-campaign/brf3-bug-vs-nonbug.md" "AC-11: BRF-3 fixture"
+  assert_file_exists "${PLUGIN_ROOT}/tests/fixtures/outcome-campaign/campaign-triage-seam.md" "AC-8: campaign-triage-seam fixture"
+  assert_file_exists "${PLUGIN_ROOT}/tests/fixtures/outcome-campaign/brf3-bug-vs-nonbug.md" "AC-11: brf3-bug-vs-nonbug fixture"
+  assert_file_exists "${PLUGIN_ROOT}/tests/fixtures/outcome-campaign/skipped-no-false-green.md" "AC-3: skipped-no-false-green fixture"
+  # --- end outcome-campaign phase6 ---
 }

@@ -4,6 +4,15 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.21.0] — 2026-06-13
+
+### Added
+- **Results-campaign gate `spec-flow:campaign` (FR-020).** A new gate class — the running-system sibling of the Final Review board. Runs a target system on Sonnet, grades real output with three new Opus lens agents (`campaign-ground-truth`/`seam`/`edge-case`) + a `campaign-verify` theater-guard against an oracle (in-scope FR-018 outcome ACs + declared money/safety rules), routes findings through `/spec-flow:triage` (Form C), records `source: campaign` to metrics + flywheel. Run-safety: `campaign.run_mode` mandatory + pre-run confirm. Single-pass v1; the convergence loop is split to `campaign-converge`.
+- **BRF-3:** `bug_classified` Form B/C field so triage auto-applies the NN-P-006 red-first stamp to campaign bug findings.
+
+### Fixed
+- **Version drift (NN-C-009):** reconciled `plugins/spec-flow/plugin.json` (was 5.19.0) with the other version-bearing files; all now 5.21.0.
+
 ## [5.20.0] — 2026-06-13
 
 ### Added

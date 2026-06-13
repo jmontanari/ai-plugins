@@ -30,7 +30,7 @@ patterns:
 - `id` — a stable kebab slug; LLM-proposed at the moment of the "new" classification, operator-confirmed or renamed; never reassigned once stored.
 - `scope` — one of `charter | qa | prd`; the flywheel-global piece (FR-007) adds `plugin` without restructuring. Routes the hardening proposal to its home: `charter` → charter amendment, `qa` → local QA hardening, `prd` → PRD work.
 - `occurrences` — a list of occurrence records; each carries `{piece, date, source, source_type}`. Because recording is deduped per piece (see `## Count rule`), the list holds at most one entry per piece.
-  - `source_type` — one of `reflection-finding | execute-discovery | metric`. All three are wired: `metric` occurrences cite a measured `metrics.yaml` trend, written via the operator-confirm flow (FR-010). See `## Source taxonomy`.
+  - `source_type` — one of `reflection-finding | execute-discovery | metric | campaign`. All four are wired: `metric` occurrences cite a measured `metrics.yaml` trend, written via the operator-confirm flow (FR-010). See `## Source taxonomy`.
   - `originating_repo` — RESERVED for the flywheel-global piece (FR-007); no path in this piece writes it.
 - `rejections` — a list of rejection records; each carries `{date, rationale, rejected_at_count}`. See `## Rejection rule`.
 - `hardenings` — a list of hardening-outcome records; each carries `{date, outcome: resolved|blocked, spike_artifact: <path or — for blocked>, amend_commit: <sha, resolved only>, at_count: <distinct-piece count at the time of the hardening>}`. This is the schema home for both accepted-outcome (resolved) and proposed-but-unresolved (blocked) hardening records — symmetric with `rejections`. See `## Hardening dispatch (reuse)`.
@@ -64,7 +64,7 @@ An `archived` pattern is EXCLUDED from the auto-match candidate set. Archived pa
 
 Matches are LLM-proposed, human-confirmed (NN-P-004). The match line is additive to the existing single-aggregated-prompt-per-phase convention (NFR-6) — it does not add a separate prompt round-trip per finding; it is folded into the phase's existing Step 6c triage prompt.
 
-## Source taxonomy (schema-open, wire-narrow)
+## Source taxonomy (schema-open)
 
 The `source_type` field on each occurrence admits three values:
 
@@ -73,6 +73,7 @@ The `source_type` field on each occurrence admits three values:
 | `reflection-finding` | **WIRED** | Findings from the two reflection agents routed through Step 6c at end-of-piece Step 4.5 |
 | `execute-discovery` | **WIRED** | Native per-phase Step 6c discoveries: `qa-phase`/`qa-phase-lite` findings, AC-matrix NOT-COVERED rows, Build missing-prerequisite escalations, unmarked execute-time discoveries |
 | `metric` | **WIRED** | An occurrence may cite a measured trend from a piece's `metrics.yaml`; the `source:` field carries a pointer `<prd-slug>/<piece-slug>/metrics.yaml#<field>`. Written only via the existing match/confirm flow (operator-confirmed, NN-P-004). See `plugins/spec-flow/reference/metrics-artifact.md`. |
+| `campaign` | **WIRED** | Findings from spec-flow:campaign's theater-guard VERIFY pass, recorded as occurrences via the existing operator-confirmed match/confirm flow (NN-P-004). See plugins/spec-flow/skills/campaign/SKILL.md. |
 
 FR-010 wired the third source_type (see `## Source taxonomy`). The `originating_repo` occurrence field remains schema-open (representable) but wire-narrow (no path emits it here) — the `flywheel-global` piece (FR-007) adds that emitter.
 
