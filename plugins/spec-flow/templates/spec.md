@@ -9,6 +9,7 @@ charter_snapshot:
   integrations: {{date}}
 piece_class: {{behavior-bearing|non-behavioral}}
 behavior_rationale: {{required only when non-behavioral}}
+integration_rationale: {{required only when behavior-bearing AND the piece declares it touches no integration boundary — see reference/behavior-classification.md}}
 ---
 
 <!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->
@@ -58,6 +59,9 @@ AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}} [mechanism]
   <!-- Alternative form: Independent Test [judgment: <named arbiter — who decides>]: <what they inspect> -->
 <!-- AC-line tag (exactly one): [mechanism] | [outcome:result] | [outcome:integration].
      Per-facet N/A sentinel form: `Outcome N/A [outcome:<facet>]: <reason>`.
+     A declared integration's allocated AC carries a production-call-site pointer on its
+     Independent Test sub-line: `Independent Test [machine: prod-callsite=<production-rooted path>; <check>]: …`
+     (path NOT under a test root). See plugins/spec-flow/reference/spec-flow-doctrine.md.
      Tokens defined in plugins/spec-flow/reference/behavior-classification.md (CR-005). -->
 
 ## Technical Approach

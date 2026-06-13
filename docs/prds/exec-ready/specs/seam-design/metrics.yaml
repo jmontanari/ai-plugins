@@ -1,0 +1,30 @@
+schema_version: 1
+generated: 2026-06-13
+last_updated: 2026-06-13
+piece: exec-ready/seam-design
+
+spec:
+  qa_rounds: 3
+  qa_iterations: 1
+  research_artifact: true
+  budget_compliance:
+    spec_md: {lines: 120, soft: 300, hard: 520, status: pass}
+    deliberation_md: {lines: 77, soft: 200, hard: 350, status: pass}
+  ac_verifiability:
+    machine: 7
+    judgment: 0
+    machine_checkable_ratio: 1.0
+  gate_scaling:
+    spec_gate:
+      offered_summary_confirm: true
+      fell_back: false
+      reason: null
+
+plan:
+  qa_iterations: 2
+  concreteness_floor: passed
+  gate_scaling:
+    plan_gate:
+      offered_summary_confirm: false
+      fell_back: false
+      reason: null

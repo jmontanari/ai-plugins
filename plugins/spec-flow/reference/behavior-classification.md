@@ -76,3 +76,41 @@ address before QA sign-off. `spec-flow-doctrine.md` line 179 is the **phase-leve
 TDD-track default — it governs which implementation track (TDD vs Implement) a plan phase
 uses. The two concerns operate at different stages and different granularities; this document
 does not modify, extend, or supersede `spec-flow-doctrine.md` line 179.
+
+## Boundary-touching predicate
+
+Applies to `behavior-bearing` pieces at spec time. Classifies the piece's relationship to
+integration boundaries into three states:
+
+- **boundary-touching** — the piece's implementation wires, calls, or extends a seam across
+  an integration boundary (a real external, a cross-component call, a filesystem, a network
+  service, a database). These pieces MUST declare their integrations in `## Integration Coverage`
+  OR record an `integration_rationale` front-matter exemption.
+- **non-boundary** — the piece's implementation does not cross an integration boundary at
+  runtime (it may edit markdown, configuration, or static files; it may not call external
+  services or wire components). These pieces MAY declare `integration_rationale: <reason>`
+  to make the non-boundary claim explicit.
+- **ambiguous** — the boundary-touching status is genuinely unclear. Default to
+  `boundary-touching`.
+
+**judgment-backstopped caveat:** This predicate is evaluated at spec time from the author's
+knowledge of the piece's intended implementation. It is not deterministically verifiable from
+static analysis. Gates that apply this predicate challenge non-boundary claims they judge
+inconsistent with the piece's FRs. Rationale PRESENCE (not correctness) is the deterministic
+clean state for gates.
+
+**Front-matter key:**
+
+```yaml
+integration_rationale: {{required only when behavior-bearing AND the piece declares it touches no integration boundary}}
+```
+
+`integration_rationale` is the exemption rationale — it explains why a `behavior-bearing`
+piece that declares no integrations genuinely touches no boundary. It is omitted when the
+piece declares ≥1 integration (the integration block is its own evidence). The
+`behavior_rationale` parallel is explicit: just as `behavior_rationale` is the exemption for
+non-behavioral pieces, `integration_rationale` is the exemption for non-boundary
+behavior-bearing pieces.
+
+For the production-call-site pointer convention that applies to declared integrations, see
+`spec-flow-doctrine.md` §Integration Tests & Path Coverage.

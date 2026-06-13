@@ -138,4 +138,14 @@ The no-re-spike guard (Step 1c) is piece-scoped: `spikes/<phase-id>.md` lookup i
 
 **BRF-4: Document `feature` as the implicit `**Phase type:**` default in template + qa-plan #34.** The `**Phase type:**` absent-tag default (absent ⇒ feature, skip) is enforced by qa-plan #34's three-state predicate but not stated in the plan template's field comment. An author writing `**Phase type:** feature` explicitly will get silent skip (correct behavior, wrong mental model). Candidate: during `implement-oracle` spec brainstorm, add a template comment clarifying that `feature` is the implicit default (absent tag) and need not be written; update qa-plan #34's documented three-state predicate to show all three states explicitly (absent/feature ⇒ skip; bug-fix/regression ⇒ must-fix if not red-first). Low-blast-radius prose amendment; no gate logic change. **Deps:** bugfix-redfirst (merged), implement-oracle (open).
 
+---
+
+## Deferred from exec-ready/seam-design step-4.5-reflection (2026-06-13)
+
+**Source:** `exec-ready/seam-design` phase `step-4.5-reflection` (agent: `reflection-future-opportunities`). Candidate future gate-eval improvements anchored to seam-design's own spec edge-cases.
+
+**SD-FO-1: Multi-seam fixture extension.** All gate-eval fixtures in seam-design contain exactly one declared integration. The per-seam iteration logic in qa-spec #13(d), qa-plan #26(f), and review-board-integration spec-pointer reconciliation is untested for multi-seam specs. Candidate: author a fixture set with ≥2 declared integrations where one seam is valid and one is defective — confirm each gate's must-fix names only the defective seam (no false-positive on the valid seam). Referenced in seam-design spec §"Testing Strategy" edge-cases. **Deps:** seam-design (merged). Scope: small (3 new fixtures, no agent changes).
+
+**SD-FO-2: Passthrough-pointer fixture / known-limitation doc.** The review-board-integration spec-pointer reconciliation (FR-024-B) checks whether a cited `prod-callsite` path appears in the derived inventory — but the check is string-presence, not path-reachability. A cited path that appears in the diff only as an import line (not as a wired-path caller) would not appear in the inventory and would correctly fire a must-fix. But it is untested. Candidate: add a fixture `rbi-passthrough-pointer-diff.patch` where the cited path appears only in an import block, confirm must-fix fires; OR document this as an explicit known limitation of the string-presence reconciliation in `reference/spec-flow-doctrine.md`. **Deps:** seam-design (merged). Scope: small.
+
 **Captured:** 2026-06-13

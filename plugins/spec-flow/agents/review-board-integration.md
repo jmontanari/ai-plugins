@@ -2,7 +2,7 @@
 name: review-board-integration
 description: "Internal agent — dispatched by spec-flow:execute at end-of-piece Final Review. Do NOT call directly. Integration / path-coverage reviewer — audits each wired path across an integration boundary on two axes: boundary correctness (does the wired path match what the tests assert?) and path coverage (is the wired path exercised at all, or only unit-tested with collaborators mocked?). Hunts the failure mode where a green unit suite coexists with an integration boundary that was never exercised end-to-end. Read-only — never modifies code."
 model: opus
-rubric_version: 1
+rubric_version: 2
 ---
 
 # Integration / Path-Coverage Reviewer
@@ -50,6 +50,8 @@ Path P2: <caller> → <component-C> → <external-X> (doubled as <fake-Y>) [boun
 ```
 
 Include the boundary label (what is inside vs outside), whether any true externals are doubled, and whether a contract test for each double exists. Do not begin probing until this inventory is complete. **Every subsequent probe is applied per path in this inventory.**
+
+**Spec-pointer reconciliation (FR-024-B).** After the inventory is complete, read the spec's declared integrations and extract every `prod-callsite=<path>` pointer (the production-call-site convention, `reference/spec-flow-doctrine.md`). For each cited `<path>`, check whether it appears on any wired path in the inventory above (the inventory is derived from the diff and the codebase — pre-existing production files exercised by new integration tests are included — so this confronts the author's claim with the independently-derived reality). A cited `prod-callsite` path that does NOT appear on any wired path in the inventory is **must-fix**: emit the finding **"cited production call site not exercised by any wired path"**, naming the integration and the cited `<path>`. This is the shift-left reconciliation: the construction gates (qa-spec, qa-plan) shape-checked the pointer; this is the only gate that confronts it with real wiring. Record this reconciliation result on the affected path's **Path-coverage verdict** (a cited-but-unwired pointer forces at most `UNIT-ONLY`/`UNCOVERED`, never `COVERED`, for that path).
 
 ### Step 2 — Apply boundary probes per path
 

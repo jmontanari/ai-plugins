@@ -634,3 +634,19 @@ Plans will silently pass qa-plan and reach execute already out of compliance wit
 Add a qa-plan criterion: "If the plan has a Change Specification Block, verify it explicitly names any constructor signatures, method signatures, or usage patterns that the implementer will need — i.e., that no coordinator-read dependency was deferred to 'orchestrator can look it up'. For each phase, check that every file in `[Change Specification Block]` carries enough detail that the implementer can proceed without the coordinator opening full source bodies."
 
 Scope: `plugins/spec-flow/skills/qa-plan/SKILL.md`.
+
+---
+
+## Deferred from exec-ready/seam-design step-4.5-reflection (2026-06-13)
+
+**Source:** `exec-ready/seam-design` phase `step-4.5-reflection` (agent: `reflection-process-retro`). Process improvements for gate-hardening doc-as-code pieces.
+
+**SD-1: Exemption-control fixture internal consistency.** Exemption-control fixtures (behavior-bearing + `integration_rationale`) must have FRs and ACs that describe a scenario genuinely consistent with the exemption claim — not a copy-paste from a boundary-touching defect fixture with the exemption key appended. The seam-design piece shipped a fixture (qaspec-omission-with-rationale.md) whose FRs described SMTP boundary-crossing while `integration_rationale` claimed "no runtime boundary crossed" — a Final Review SECURITY MUST-FIX. Plan guidance for exemption-control fixtures should explicitly require: "FRs/ACs must describe a scenario that genuinely does not cross the declared boundary."
+
+**SD-2: Test-root exclusion list conventions audit.** When a gate-hardening piece introduces or updates a test-root exclusion list, the plan should include a "conventions audit" step that cross-checks the list against common testing idioms in the target ecosystem (Python: `test_*`, `*_test.py`; JS/TS: `*.test.ts`, `*.spec.ts`; Go: `*_test.go`). The seam-design piece omitted the `test_*` leading-prefix pattern (Python convention), which surfaced as a Final Review MAJOR finding. The plan's `[Verify]` block should enumerate all expected conventions as explicit grep targets.
+
+**SD-3: Corner-case audit for sentinels and exemption keys.** When a gate-hardening piece introduces a new sentinel or exemption key, the plan's change specification and `[Verify]` block should explicitly enumerate the corner cases: "empty value treated as absent", "ambiguous state defaults to stricter", "key present + thing-it-exempts-from present = contradiction must-fix". The seam-design piece's plan did not enumerate these for `integration_rationale` — all three surfaced as Final Review MAJOR findings that required a post-board fix batch.
+
+**SD-4: Contradiction detection for exemption keys.** When introducing an exemption key (e.g. `integration_rationale`, `behavior_rationale`), the plan should ask: "what happens when a spec carries both the exemption key and the thing the key exempts from?" and add a must-fix clause for that contradiction. The absence of such a clause for `integration_rationale` (present alongside a declared integration) was a Final Review MAJOR gap not in the plan's original change specification.
+
+**Captured:** 2026-06-13

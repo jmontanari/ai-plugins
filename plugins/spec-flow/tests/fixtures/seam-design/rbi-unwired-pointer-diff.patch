@@ -1,0 +1,63 @@
+diff --git a/src/report/formatter.py b/src/report/formatter.py
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/src/report/formatter.py
+@@ -0,0 +1,12 @@
++"""Report formatter — formats raw data for output."""
++
++
++def format_data(raw_records):
++    """Format a list of raw records into report lines."""
++    lines = []
++    for record in raw_records:
++        lines.append(f"{record['id']}: {record['value']}")
++    return lines
++
++
++def format_summary(total):
++    return f"Total: {total}"
+diff --git a/tests/test_formatter.py b/tests/test_formatter.py
+new file mode 100644
+index 0000000..b2c3d4e
+--- /dev/null
++++ b/tests/test_formatter.py
+@@ -0,0 +1,18 @@
++"""Tests for report formatter."""
++import pytest
++from src.report.formatter import format_data, format_summary
++
++
++def test_format_data_single_record():
++    records = [{"id": "r1", "value": "hello"}]
++    result = format_data(records)
++    assert result == ["r1: hello"]
++
++
++def test_format_data_empty():
++    assert format_data([]) == []
++
++
++def test_format_summary():
++    assert format_summary(5) == "Total: 5"
+diff --git a/tests/test_formatter_integration.py b/tests/test_formatter_integration.py
+new file mode 100644
+index 0000000..c3d4e5f
+--- /dev/null
++++ b/tests/test_formatter_integration.py
+@@ -0,0 +1,16 @@
++"""Integration tests for the formatter pipeline."""
++import pytest
++from src.report.formatter import format_data, format_summary
++
++
++class TestFormatterIntegration:
++    """Integration tests — wires formatter.format_data → formatter.format_summary."""
++
++    def test_full_format_pipeline(self):
++        """format_data feeds into format_summary via the formatter module."""  # [integration]
++        records = [{"id": "r1", "value": "alpha"}, {"id": "r2", "value": "beta"}]
++        lines = format_data(records)
++        summary = format_summary(len(lines))
++        assert lines == ["r1: alpha", "r2: beta"]
++        assert summary == "Total: 2"

@@ -4,6 +4,26 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.20.0] — 2026-06-13
+
+### Added
+- **Production-call-site obligation (FR-024-A/B/C).** A declared integration's allocated
+  AC now carries a `prod-callsite=<path>` pointer on its `Independent Test [machine:]`
+  sub-line (production-rooted, not under a test root). Defined in
+  `reference/spec-flow-doctrine.md`; surfaced in `templates/spec.md`. Shape-checked at
+  qa-spec (#13) and qa-plan (#26); reconciled against the diff-derived wired-path
+  inventory at `review-board-integration` (new must-fix "cited production call site not
+  exercised by any wired path"). Closes integration failure class 3 (untested-unused seam)
+  at spec/plan time.
+- **Silent-omission closure (FR-024-D).** A behavior-bearing, boundary-touching spec can
+  no longer pass by omitting `## Integration Coverage` or free-text-N/A-ing the
+  `[outcome:integration]` facet — qa-spec #17 now rejects that unless an
+  `integration_rationale` front-matter exemption is recorded.
+- **Boundary-touching predicate (FR-024-E).** Three-state, judgment-backstopped predicate
+  added to `reference/behavior-classification.md`; `integration_rationale` front-matter
+  key emitted by `templates/spec.md` + `skills/spec/SKILL.md` for new specs.
+- Agent `rubric_version` bumps: qa-spec 2→3, qa-plan 2→3, review-board-integration 1→2.
+
 ## [5.19.0] — 2026-06-13
 
 ### Added

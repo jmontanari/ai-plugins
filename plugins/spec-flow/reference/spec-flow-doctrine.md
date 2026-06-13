@@ -136,6 +136,20 @@ Otherwise, the default is the single unified commit. Per-file commits are not th
 - **M3 — Immutability-gate edit window.** An integration test file has a single plan-authorized edit window: skeleton authored by Red (phase it is registered) → completed by Build in `completes_in_phase`. The edit window is path-confined (including fixture/helper closure) and phase-gated. Outside the window, the file is immutable to Build agents.
 - **M4 — Oracle split + completing-phase `[Integration-Test]` sub-cycle.** The completing phase's `[Verify]` block is split into a non-integration oracle (per-phase gate) and an integration oracle (runs `[integration]`-tagged tests). The `[Integration-Test]` sub-cycle in the completing phase confirms the wired path is green before advancing.
 
+**Production-call-site pointer convention (FR-024-A).** A declared integration's allocated AC MUST carry a `prod-callsite=<path>` pointer on its `Independent Test [machine:]` sub-line, in the form:
+
+```
+Independent Test [machine: prod-callsite=<production-rooted path>; <check>]: …
+```
+
+`<path>` MUST NOT resolve under a test root. Test roots are: any path starting with `tests/`, any file whose name ends in `_test.<ext>` or starts with `test_`, or any path containing a `/test/` or `/tests/` path segment. Paths resolving under a test root are rejected.
+
+**Purpose:** the pointer names the production call site that wires the seam, killing the FO-16 failure mode (an AC satisfiable by test-side wiring while the seam has zero production callers).
+
+**Scope:** this is a SHAPE check (pointer present + production-rooted + not-under-test-root). Caller-existence verification is NOT performed at construction time (NN-C-002 — no AST/call-graph tooling). Truthfulness is reconciled by `review-board-integration` at review time.
+
+For the boundary-touching predicate that determines when a seam must be declared, see `reference/behavior-classification.md`.
+
 ## Verification Checklist
 
 Used by QA agents and the orchestrator before marking any phase complete:

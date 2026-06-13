@@ -1,0 +1,103 @@
+diff --git a/src/report/formatter.py b/src/report/formatter.py
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/src/report/formatter.py
+@@ -0,0 +1,10 @@
++"""Report formatter."""
++
++
++def format_data(records):
++    """Format a list of raw records into report lines."""
++    lines = []
++    for record in records:
++        lines.append(f"{record['id']}: {record['value']}")
++    return lines
++
+diff --git a/src/report/exporter.py b/src/report/exporter.py
+new file mode 100644
+index 0000000..b2c3d4e
+--- /dev/null
++++ b/src/report/exporter.py
+@@ -0,0 +1,25 @@
++"""Report exporter — submits formatted data to the archive service."""
++
++
++class ArchiveClient:
++    """Thin client wrapping the external ArchiveService API."""
++
++    def __init__(self, base_url):
++        self.base_url = base_url
++
++    def submit(self, data):
++        """Submit data payload to the archive service."""
++        import urllib.request
++        import json
++        req = urllib.request.Request(
++            f"{self.base_url}/submit",
++            data=json.dumps(data).encode(),
++            method="POST",
++        )
++        urllib.request.urlopen(req)
++
++
++def export_archive(data, client):
++    """Export formatted report data to the external archive service."""
++    client.submit({"records": data})
++
+diff --git a/tests/test_archive_contract.py b/tests/test_archive_contract.py
+new file mode 100644
+index 0000000..c3d4e5f
+--- /dev/null
++++ b/tests/test_archive_contract.py
+@@ -0,0 +1,18 @@
++"""Contract tests — FakeArchive faithfully implements ArchiveService."""
++
++
++class FakeArchive:
++    """Test double for ArchiveService — captures submitted payloads."""
++
++    def __init__(self):
++        self.submitted = []
++
++    def submit(self, data):
++        self.submitted.append(data)
++
++
++class TestArchiveContract:
++    def test_fake_implements_submit(self):
++        """FakeArchive.submit accepts the same payload shape as ArchiveService."""
++        fake = FakeArchive()
++        fake.submit({"records": ["r1: alpha"]})
++        assert fake.submitted == [{"records": ["r1: alpha"]}]
++
+diff --git a/tests/test_report_integration.py b/tests/test_report_integration.py
+new file mode 100644
+index 0000000..d4e5f6a
+--- /dev/null
++++ b/tests/test_report_integration.py
+@@ -0,0 +1,24 @@
++"""Integration tests — wires formatter → exporter → FakeArchive."""
++
++from src.report.formatter import format_data
++from src.report.exporter import export_archive
++
++
++class FakeArchive:
++    """Contract-tested double for the external ArchiveService."""
++
++    def __init__(self):
++        self.submitted = []
++
++    def submit(self, data):
++        self.submitted.append(data)
++
++
++class TestReportIntegration:
++    def test_export_pipeline(self):
++        """Wires format_data → export_archive → FakeArchive end-to-end."""  # [integration]
++        records = [{"id": "r1", "value": "alpha"}, {"id": "r2", "value": "beta"}]
++        lines = format_data(records)
++        fake = FakeArchive()
++        export_archive(lines, fake)
++        assert fake.submitted == [{"records": ["r1: alpha", "r2: beta"]}]
