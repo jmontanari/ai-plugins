@@ -1,0 +1,35 @@
+schema_version: 1
+generated: 2026-06-13
+last_updated: 2026-06-13
+piece: exec-ready/bugfix-redfirst
+plan:
+  qa_iterations: 2        # plan QA gate (qa-plan) loops to clean
+  concreteness_floor: passed   # reached clean with no circuit-breaker escalation
+spec:
+  qa_rounds: 3            # Phase-2 operator-answer turns (free-text + 2 AskUserQuestion cards)
+  qa_iterations: 2        # spec QA gate (Phase 4) loops to clean
+  research_artifact: true # research.md present for this piece
+  budget_compliance:
+    spec_md:
+      lines: 140
+      soft: 300
+      hard: 520
+      status: pass
+    deliberation_md:
+      lines: 165
+      soft: 200
+      hard: 350
+      status: pass
+  ac_verifiability:
+    machine: 9            # ACs whose Independent Test carries [machine: …] (AC-1..9; AC-5 carries both)
+    judgment: 1           # ACs whose Independent Test carries [judgment: …] (AC-5)
+    machine_checkable_ratio: 0.9  # machine / (machine + judgment)
+gate_scaling:
+  spec_gate:
+    offered_summary_confirm: true  # clean predicate held (QA clean, zero markers) — summary-confirm offered
+    fell_back: false
+    reason: null
+  plan_gate:
+    offered_summary_confirm: true  # clean predicate held (QA clean, 9/9 ACs with assemblable evidence) — summary-confirm offered
+    fell_back: false
+    reason: null

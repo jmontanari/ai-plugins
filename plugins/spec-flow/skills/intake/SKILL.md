@@ -204,7 +204,7 @@ Choices:
 - "Exploration — read-only, no changes"
 - "Investigation / discovery to triage"
 
-- **Hotfix / regression / CI / infra** → `type: hotfix` → Q5
+- **Hotfix / regression / CI / infra** → `type: hotfix` → Q5 (bug-fix/regression sub-type → red-first per NN-P-006; see the hotfix handoff message)
 - **Charter / docs** → `type: charter` → skip to Step 4
 - **Exploration** → `type: exploratory` → skip to Step 4
 - **Investigation / discovery to triage** → route to `/spec-flow:triage` (operator-selected; do NOT auto-route) → exit intake
@@ -372,7 +372,7 @@ After context is loaded, emit a clear next-action recommendation:
 | `pipeline-entry` | `spec` | `Run /spec-flow:spec <prd>/<piece>` |
 | `pipeline-entry` | `plan` | `Run /spec-flow:plan <prd>/<piece>` |
 | `pipeline-entry` | `execute` | `Run /spec-flow:execute <prd>/<piece>` |
-| `hotfix` | — | `Branch [branch] ready. Work directly — charter constraints are active.` |
+| `hotfix` | — | `Branch [branch] ready. Charter constraints are active. Bug-fix / regression work is **red-first** (NN-P-006): reproduce → see-it-fail → fix → see-it-pass, recording the observed red against the unfixed code. A non-behavioral change (no observable broken behavior) records a one-line exemption; a non-reproducible defect routes to [SPIKE] / no-repro rationale.` |
 | `charter` | — | `Run /spec-flow:charter --update, or edit the charter skills under the resolved charter root (<charter_root>/skills/charter-*/SKILL.md) directly.` |
 | `exploratory` | — | `No branch or constraint requirements. Proceed with read-only exploration.` |
 

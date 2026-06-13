@@ -77,6 +77,16 @@ For each criterion, actively look for violations:
     liveness-only, so it is NOT flagged.) This is a fixed enumerated list, NOT open-ended
     semantic judgment of oracle quality.
 
+18. **Bug-fix/regression red-first (NN-P-006).** Three-state, legacy-safe, decided by the spec's
+    declared bug-fix/regression nature (a regression-guard deliverable / Goal, or an AC asserting
+    "broken behavior Y no longer happens"):
+    - **Not a bug-fix/regression spec** → skip (not a finding).
+    - **Bug-fix/regression spec** → must-fix when the spec proposes tests-after, or commits the
+      work to `tdd: false` without the red-first obligation; the spec must commit to red-first
+      (the plan will resolve to `tdd: true`). Quote the offending line.
+    - **No classification signal** (legacy) → skip; never retro-failed.
+    Cite PRD NN-P-006 / FR-022; do not restate the cycle mechanics.
+
 ## Output Format
 
 Return findings as a structured list:

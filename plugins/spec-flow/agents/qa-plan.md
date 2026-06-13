@@ -207,6 +207,12 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
     field (legacy) → skip (not an error). When `piece_class: behavior-bearing` → not
     applicable (a behavior-bearing piece may legitimately use either track).
 
+34. **Bug-fix/regression red-first (NN-P-006).** Read each phase's `**Phase type:**` field.
+    Three-state, legacy-safe:
+    - **Absent** (no `**Phase type:**` on the phase, or value `feature`) → skip; feature work, never retro-failed (not a finding).
+    - **`bug-fix` / `regression`** → the phase MUST be red-first: a `[TDD-Red]` step (or, in `tdd: false` plans, the piece must have resolved to `tdd: true` per the Bug-fix/regression precedence). A bug-fix/regression phase that uses `[Implement]`/`[Write-Tests]` (tests-after), or whose plan front-matter is `tdd: false`, is must-fix → quote the `**Phase type:**` line and the contradicting track/front-matter. The observed-red EVIDENCE itself is an execute-time artifact (`tdd-red` Oracle block) — do NOT require it here; gate the DECLARATION only.
+    Cite PRD NN-P-006 / FR-022; do not restate the cycle mechanics.
+
 ## Output Format
 
 Same structure: must-fix and acceptable sections. Every must-fix must cite a criterion and explain what's wrong.

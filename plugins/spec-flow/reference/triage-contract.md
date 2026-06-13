@@ -48,7 +48,7 @@ Bug-signal keyword set: `fix` / `bug` / `broken` / `regression` / `patch` (small
 
 On a bug-classified discovery routed to a **fix** disposition (`small-change` / `plan-amend` / `new-piece`), stamp the red-first reproduce→fail→fix→pass obligation onto **all three** provenance surfaces: (1) the downstream handoff digest, (2) the recorded `.discovery-log.md`-style row, (3) the manifest/backlog entry.
 
-Forward-record only — NO dependency on the unmerged `bugfix-redfirst` machinery.
+Consumers HONOR the stamp: a bug-classified fix routed to `small-change` / `plan-amend` / `new-piece` runs the red-first cycle (small-change Step 9 routing; plan-amend emits a `**Phase type:** bug-fix|regression` red-first phase; a new piece's spec/plan carries the bug-fix classification). A non-reproducible defect routes to `[SPIKE]` or records an explicit no-repro rationale. Campaign (FR-020) reach remains forward-record only (the campaign skill does not exist).
 
 Cite PRD NN-P-006 / FR-022; do not restate the red-first cycle mechanics.
 

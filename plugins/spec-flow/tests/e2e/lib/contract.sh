@@ -332,6 +332,76 @@ check_authored_tests_criterion() {
 }
 
 # ---------------------------------------------------------------------------
+# (k) check_bugfix_redfirst_criterion
+#   gate-evals: qa-plan #34 / qa-spec #18 — 2 defective + 2 clean controls; catch-rate slot.
+#   Fixtures must exist and carry the structural markers their expected outcomes key on.
+# ---------------------------------------------------------------------------
+check_bugfix_redfirst_criterion() {
+  local fix_dir="${PLUGIN_ROOT}/tests/e2e/fixtures/replay"
+
+  # Plan defective fixture: regression phase with tdd:false + tests-after → must-fix
+  local fp_def="${fix_dir}/plan-bugfix-tests-after.md"
+  assert_file "$fp_def" "L2(k) qa-plan #34 defective fixture present"
+  if grep -qF "Phase type:" "$fp_def" 2>/dev/null && grep -qF "regression" "$fp_def" 2>/dev/null; then
+    pass "L2(k) defective fixture carries Phase type: regression"
+  else
+    fail "L2(k) defective fixture missing Phase type: regression"
+  fi
+  if grep -qF "tdd: false" "$fp_def" 2>/dev/null; then
+    pass "L2(k) defective fixture carries tdd: false"
+  else
+    fail "L2(k) defective fixture missing tdd: false"
+  fi
+  if grep -qF "[Write-Tests]" "$fp_def" 2>/dev/null; then
+    pass "L2(k) defective fixture carries tests-after [Write-Tests] step"
+  else
+    fail "L2(k) defective fixture missing [Write-Tests] step"
+  fi
+
+  # Plan clean control: regression phase with tdd:true + [TDD-Red] → clean
+  local fp_cln="${fix_dir}/plan-bugfix-redfirst-clean.md"
+  assert_file "$fp_cln" "L2(k) qa-plan #34 clean control fixture present"
+  if grep -qF "[TDD-Red]" "$fp_cln" 2>/dev/null; then
+    pass "L2(k) clean control carries [TDD-Red] step"
+  else
+    fail "L2(k) clean control missing [TDD-Red] step"
+  fi
+  if grep -qF "tdd: true" "$fp_cln" 2>/dev/null; then
+    pass "L2(k) clean control carries tdd: true"
+  else
+    fail "L2(k) clean control missing tdd: true"
+  fi
+
+  # Spec defective fixture: regression spec with tdd:false → must-fix
+  local fs_def="${fix_dir}/spec-bugfix-tests-after.md"
+  assert_file "$fs_def" "L2(k) qa-spec #18 defective spec fixture present"
+  if grep -qF "regression" "$fs_def" 2>/dev/null; then
+    pass "L2(k) defective spec fixture carries regression signal"
+  else
+    fail "L2(k) defective spec fixture missing regression signal"
+  fi
+  if grep -qF "tdd: false" "$fs_def" 2>/dev/null; then
+    pass "L2(k) defective spec fixture carries tdd: false"
+  else
+    fail "L2(k) defective spec fixture missing tdd: false"
+  fi
+
+  # Spec clean control: regression spec with tdd:true → clean
+  local fs_cln="${fix_dir}/spec-bugfix-redfirst-clean.md"
+  assert_file "$fs_cln" "L2(k) qa-spec #18 clean spec fixture present"
+  if grep -qF "regression" "$fs_cln" 2>/dev/null; then
+    pass "L2(k) clean spec fixture carries regression signal"
+  else
+    fail "L2(k) clean spec fixture missing regression signal"
+  fi
+  if grep -qF "tdd: true" "$fs_cln" 2>/dev/null; then
+    pass "L2(k) clean spec fixture carries tdd: true"
+  else
+    fail "L2(k) clean spec fixture missing tdd: true"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # l2_replay_checks()
 #   ① Build clean fixture, run all checks (a)–(j), clean up.
 #   ② For each of 6 break cases: build fixture, assert targeted check FAILS,
@@ -356,6 +426,7 @@ l2_replay_checks() {
   check_red_manifest_conftest
   check_gate_fixtures
   check_authored_tests_criterion
+  check_bugfix_redfirst_criterion
   e2e_cleanup "$t"
 
   # ② Break loop — targeted check must FAIL (expected-fail wrapper)

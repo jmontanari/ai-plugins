@@ -16,6 +16,7 @@ This document governs all implementation work in the spec-flow plugin. It is loa
 - Arrange-Act-Assert structure
 - Must fail for the right reason: feature is missing, not typo/setup error
 - Agent reports the failure message; orchestrator validates it
+- **Bug-fix/regression carve-out:** a phase classified bug-fix/regression (plan **Phase type:** field) runs RED regardless of the piece's `tdd` setting — the RED cycle is not gated to TDD mode for such a phase. See `## TDD Is Opt-In`. (NN-P-006 / FR-022.)
 
 ### BUILD — Minimal Code (TDD mode only)
 - Simplest possible code to pass the test
@@ -177,6 +178,8 @@ Examples are Python/pytest because it's the reference stack — adapt the syntax
 The Three Laws govern TDD discipline when TDD mode is selected. TDD is **not mandatory** — the plan skill can generate phases using the Implement track (config, infra, scaffolding, glue code), and a piece can use non-TDD mode entirely (`tdd: false` in the plan front-matter). The Non-TDD mode skips Red, QA-Red, and the AC Coverage Matrix gate, but retains Phase QA and Final Review for quality assurance.
 
 TDD is the default for behavior-bearing code. Non-TDD is the default for configuration, infrastructure, and glue. The plan skill picks the right track for each phase.
+
+**Bug-fix and regression work is always red-first (NN-P-006).** This is the one carve-out from "TDD is opt-in": any phase or change whose purpose is to fix a defect or guard a regression uses the red-first reproduce → see-it-fail → fix → see-it-pass cycle and records the observed failure (the test seen red against the unfixed code) as evidence — regardless of the piece's `tdd` setting and regardless of a consuming repo's `.spec-flow.yaml tdd:` value. This precedence is **not opt-out-able** (the single deliberate exception to the otherwise-opt-out config surface). Producers resolve such work to `tdd: true` wholesale (plan skill + `small-change`); the QA gates forbid a bug-fix/regression phase that is not red-first. See PRD NN-P-006 / FR-022 — do not restate the cycle mechanics.
 
 ## First Action
 

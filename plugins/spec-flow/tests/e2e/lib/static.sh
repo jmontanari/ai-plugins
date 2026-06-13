@@ -206,17 +206,19 @@ l1_static_checks() {
   # AC-11: version sync
   local pluginjson="${PLUGIN_ROOT}/plugin.json"
   local marketplace="${REPO_ROOT}/.claude-plugin/marketplace.json"
-  assert_grep '"version": "5\.18\.0"' "$pluginjson" \
-    "AC-11: plugin.json version is 5.18.0"
-  assert_grep '"version": "5\.18\.0"' "$marketplace" \
-    "AC-11: marketplace.json spec-flow entry is 5.18.0"
-  assert_grep '"version": "5\.18\.0"' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" \
-    "AC-11: .claude-plugin/plugin.json version is 5.18.0"
+  assert_grep '"version": "5\.19\.0"' "$pluginjson" \
+    "AC-11: plugin.json version is 5.19.0"
+  assert_grep '"version": "5\.19\.0"' "$marketplace" \
+    "AC-11: marketplace.json spec-flow entry is 5.19.0"
+  assert_grep '"version": "5\.19\.0"' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" \
+    "AC-11: .claude-plugin/plugin.json version is 5.19.0"
 
   # AC-11: CHANGELOG has 5.16.1 and (c) continue removal under ### Changed
   local changelog="${PLUGIN_ROOT}/CHANGELOG.md"
   assert_grep "\[5\.16\.1\]" "$changelog" \
     "AC-11: CHANGELOG.md has 5.16.1 section"
+  assert_grep "\[5\.19\.0\]" "$changelog" \
+    "AC-8: CHANGELOG carries the 5.19.0 section"
   assert_grep "\(c\) continue" "$changelog" \
     "AC-11: CHANGELOG.md documents (c) continue removal"
 
@@ -298,4 +300,52 @@ l1_static_checks() {
     "FR-019: triage-contract.md notes: schema has source field"
   assert_grep "source:" "${PLUGIN_ROOT}/skills/triage/SKILL.md" \
     "FR-019: triage/SKILL.md notes: schema has source field"
+
+  # --- bugfix-redfirst: phase1 ---
+  assert_grep "Bug-fix and regression work is always red-first" "${PLUGIN_ROOT}/reference/spec-flow-doctrine.md" "NN-P-006: doctrine carries the bug-fix red-first governance statement"
+  assert_grep "runs RED regardless of the piece" "${PLUGIN_ROOT}/reference/spec-flow-doctrine.md" "NN-P-006 RED carve-out: RED section carve-out present"
+  # --- end phase1 ---
+
+  # --- bugfix-redfirst: phase2 ---
+  assert_grep "Phase type:" "${PLUGIN_ROOT}/templates/plan.md" "AC-1: plan template carries the Phase type field"
+  assert_grep "### Phase 1 \(TDD track example\):" "${PLUGIN_ROOT}/templates/plan.md" "CR-009: counted phase heading unchanged"
+  # --- end phase2 ---
+
+  # --- bugfix-redfirst: phase3 ---
+  assert_grep "Bug-fix/regression precedence" "${PLUGIN_ROOT}/skills/plan/SKILL.md" "AC-2: plan skill forces tdd:true for bug-fix work"
+  assert_grep "does NOT apply to bug-fix" "${PLUGIN_ROOT}/skills/plan/SKILL.md" "AC-7: FR-021 carve-out documented in plan/SKILL.md"
+  # --- end phase3 ---
+
+  # --- bugfix-redfirst: phase4 ---
+  assert_grep "Bug-signal red-first routing" "${PLUGIN_ROOT}/skills/small-change/SKILL.md" "AC-5: small-change routes bug-signal work to red-first"
+  assert_grep "write \`tdd: true\` into the inline" "${PLUGIN_ROOT}/skills/small-change/SKILL.md" "AC-2: small-change writes tdd:true front-matter"
+  assert_grep "Red-first obligation" "${PLUGIN_ROOT}/skills/small-change/SKILL.md" "NN-C-008: cites the triage-contract keyword set"
+  # --- end phase4 ---
+
+  # --- bugfix-redfirst: phase5 ---
+  assert_grep "Bug-fix / regression work is \*\*red-first\*\*" "${PLUGIN_ROOT}/skills/intake/SKILL.md" "AC-5: intake hotfix path carries the red-first obligation"
+  # --- end phase5 ---
+
+  # --- bugfix-redfirst: phase6 ---
+  assert_grep "34\. \*\*Bug-fix/regression red-first" "${PLUGIN_ROOT}/agents/qa-plan.md" "AC-3: qa-plan criterion 34 present"
+  assert_grep "18\. \*\*Bug-fix/regression red-first" "${PLUGIN_ROOT}/agents/qa-spec.md" "AC-3: qa-spec criterion 18 present"
+  assert_grep "Consumers HONOR the stamp" "${PLUGIN_ROOT}/reference/triage-contract.md" "AC-6: triage consumers honor the red-first stamp"
+  assert_exit 0 "qa-plan.agent.md is symlink-identical to qa-plan.md" -- diff "${PLUGIN_ROOT}/agents/qa-plan.md" "${PLUGIN_ROOT}/agents/qa-plan.agent.md"
+  # --- end phase6 ---
+
+  # --- bugfix-redfirst: phase7 ---
+  for f in plan-bugfix-tests-after plan-bugfix-redfirst-clean spec-bugfix-tests-after spec-bugfix-redfirst-clean; do
+    assert_grep "Phase type:|red-first|regression" "${PLUGIN_ROOT}/tests/e2e/fixtures/replay/$f.md" "AC-9: fixture $f present"
+  done
+  # --- end phase7 ---
+
+  # --- bugfix-redfirst: phase8 cross-surface sweep (AC-4) ---
+  assert_grep "always red-first" "${PLUGIN_ROOT}/reference/spec-flow-doctrine.md" "AC-4: doctrine carries red-first obligation"
+  assert_grep "Bug-fix/regression precedence" "${PLUGIN_ROOT}/skills/plan/SKILL.md" "AC-4: plan/SKILL.md carries red-first precedence"
+  assert_grep "Bug-signal red-first routing" "${PLUGIN_ROOT}/skills/small-change/SKILL.md" "AC-4: small-change carries red-first routing"
+  assert_grep "red-first" "${PLUGIN_ROOT}/skills/intake/SKILL.md" "AC-4: intake carries red-first obligation"
+  assert_grep "34\. \*\*Bug-fix/regression red-first" "${PLUGIN_ROOT}/agents/qa-plan.md" "AC-4: qa-plan criterion 34 present"
+  assert_grep "18\. \*\*Bug-fix/regression red-first" "${PLUGIN_ROOT}/agents/qa-spec.md" "AC-4: qa-spec criterion 18 present"
+  assert_grep "Consumers HONOR the stamp" "${PLUGIN_ROOT}/reference/triage-contract.md" "AC-4: triage-contract consumers honor the stamp"
+  # --- end phase8 ---
 }

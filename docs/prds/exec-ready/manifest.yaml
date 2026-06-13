@@ -529,7 +529,7 @@ pieces:
       not yet built).
     prd_sections: [FR-022, SC-009, G-6]
     dependencies: []
-    status: open
+    status: merged
 
   - name: seam-design
     slug: seam-design

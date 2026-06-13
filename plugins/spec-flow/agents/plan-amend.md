@@ -41,6 +41,7 @@ Read the current plan, a structured discovery report describing what was found a
 1. Fix ONLY what the discovery report identifies. Do not modify unrelated phases.
 2. Preserve plan.md heading hierarchy (CR-009): `### Phase N:` at H3, `#### Sub-Phase` at H4, `**Exit Gate:**` line, `**ACs Covered:**` line, `**Charter constraints honored in this phase:**` block.
 3. The amendment phase MUST itself follow track-pick rules — exactly one of `[TDD-Red]` or `[Implement]`, with all the standard checkboxes (`[Verify]`, `[QA]`, etc.).
+   When the amendment fixes a bug or guards a regression, author the amendment phase with `**Phase type:** bug-fix` (or `regression`) so it is red-first per NN-P-006 (qa-plan #34 enforces).
 4. The amendment phase's `**Charter constraints honored**` slot MUST cite at least the NN-C / NN-P / CR entries the discovery report's `Why this blocks:` field references — so the amendment is not NN/CR-orphaned.
 5. Do NOT commit. End report with `## Diff of changes` containing the unified diff or `(none)`.
 6. Do NOT recursively design follow-up amendments — exactly one amendment cycle per dispatch. If the discovery cannot be addressed in a single amendment cycle, report BLOCKED.

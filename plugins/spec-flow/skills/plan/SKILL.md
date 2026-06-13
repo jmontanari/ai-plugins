@@ -58,6 +58,8 @@ Read the `tdd` key from `.spec-flow.yaml` (valid values: `auto`, `true`, `false`
 - **`true`**: Generate all phases as TDD track (default behavior). Record `tdd: true` in plan front-matter.
 - **`false`**: Generate all phases with non-TDD structure (`[Implement]` → `[Write-Tests]` → `[Verify]` → `[Refactor]` (optional) → `[QA]`). Record `tdd: false` in plan front-matter.
 
+**Bug-fix/regression precedence (NN-P-006 — overrides the above).** Independent of the `tdd` key value (`auto`/`true`/`false`) and of any consuming repo's `.spec-flow.yaml tdd:`, when the spec/work is classified bug-fix or regression (a regression-guard deliverable, or a phase the author tags `**Phase type:** bug-fix|regression`), the piece resolves to `tdd: true` and the bug-fix/regression phase uses the red-first `[TDD-Red]` track. Record `tdd: true` in plan front-matter. This precedence is not opt-out-able (`reference/spec-flow-doctrine.md` `## TDD Is Opt-In`). A feature piece carrying one regression-guard phase is therefore `tdd: true` with its feature phases marked `[Implement]` (per-phase override).
+
 This preference is piece-level: the plan front-matter captures the decision, and the execute skill reads it to orchestrate correctly. Per-phase track overrides remain possible (a phase can always use `[Implement]` even when TDD is true).
 
 ### Fast Mode Preference
@@ -270,6 +272,7 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
    - `[Implement]`: same structure as Implement track (exact file paths, signatures, patterns).
    - `[Write-Tests]`: write tests for what was implemented. No "fail first" requirement. No theater-pattern review. No SHA-256 manifest. Just write tests that verify the implementation is correct, with reasonable coverage of the phase's ACs.
    - Update the Overview section to state: "Non-TDD mode: all phases use Implement track + Write-Tests; AC Coverage Matrix is not required; QA and Final Review remain intact."
+   - **FR-021 carve-out (NN-P-006).** The `tdd: false` efficient default does NOT apply to bug-fix/regression work: a bug-fix/regression-classified phase is excluded from this override and is emitted as a red-first `[TDD-Red]` phase (the piece resolves to `tdd: true` per the Bug-fix/regression precedence above). See `reference/spec-flow-doctrine.md` `## TDD Is Opt-In` and PRD FR-021/FR-022.
 
    **Non-TDD integration double-loop.** In `tdd: false` mode, the outer `[integration]` test for an integration is authored and greened within its completing phase's `[Write-Tests]`/`[Integration-Test]` step — there is no cross-phase Red step. The completing phase's step sequence is: `[Implement]` → `[Write-Tests]` (unit tests) → `[Integration-Test]` (outer integration test authored and run inline) → `[Verify]` (confirms both unit and integration tests pass). The `completes_in_phase` marker is still required on the `[Integration-Test]` block for the execute skill and QA agents.
 

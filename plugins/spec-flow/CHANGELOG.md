@@ -6,6 +6,9 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [5.19.0] — 2026-06-13
 
+### Added
+- **NN-P-006: Bug-fix/regression red-first governance (FR-022).** Bug-fix and regression work is now always red-first regardless of `tdd: false` config — not opt-out-able. Wired at every fix-origination surface: doctrine statement (`## TDD Is Opt-In` carve-out), plan `**Phase type:** bug-fix|regression` field (template + plan skill precedence), `small-change` Step 9 bug-signal routing + `tdd: true` front-matter write, intake hotfix handoff obligation, `qa-plan` criterion #34 (three-state must-fix gate), `qa-spec` criterion #18 (three-state must-fix gate), triage-contract consumer-honor clause, `plan-amend` amendment authoring note. Gate-evals: 4 fixtures (2 defective + 2 clean controls for #34 and #18).
+
 ### Changed
 - **Execute pre-flight probe budget.** Step 1b ("Phase Pre-Flight") and the
   Orchestrator Role section now explicitly cap the coordinator to bounded probes
@@ -17,6 +20,9 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
   raw file bodies in agent *returns*) to pre-flight *reads*, keeping the
   orchestrator lean over long pieces. No change to probe items 1–8, plan format,
   or config keys.
+
+### Notes for upgraders
+- Bug-fix/regression work is now red-first regardless of `.spec-flow.yaml tdd: false` — this is the single deliberate exception to the otherwise-opt-out config surface; it is **not opt-out-able** (NN-P-006 / FR-022). Rubric change: gate-evals gold-set re-run required (NN-C-009).
 
 ## [5.18.0] — 2026-06-12
 

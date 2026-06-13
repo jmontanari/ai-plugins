@@ -51,6 +51,8 @@ Each phase uses exactly ONE of two tracks:
 
 A phase must have exactly one of these markers. The executor branches mechanically on the checkbox it finds.
 
+**Phase type:** classifies the phase as `bug-fix` / `regression` / `feature` (absent ⇒ feature work, never retro-failed). A `bug-fix`/`regression` phase is red-first regardless of the piece's `tdd` setting (NN-P-006); the qa-plan/qa-spec gates enforce it. The field is metadata in the phase body — it does NOT alter the counted `### Phase N:` heading (CR-009).
+
 ## Integration-Test Registry (M1)
 
 Built from plan + Red authoring (never from Build); carried across phases by execute; absent ⇒ no integrations declared (NFR-INT-02).
@@ -64,6 +66,7 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 ### Phase 1 (TDD track example): {{phase_name}}
 **Exit Gate:** {{exit_criteria}}
 **ACs Covered:** {{ac_list}}
+**Phase type:** {{phase_type}}  <!-- bug-fix | regression | feature (default; absent ⇒ feature) — a bug-fix/regression phase is always red-first per NN-P-006 -->
 **In scope:** {{explicit_scope_list}}
 **NOT in scope:** {{explicit_exclusions_with_forward_phase_references}}
 <!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
@@ -139,6 +142,7 @@ Columns `registered_in_phase` and `completes_in_phase` are plan-authored. Column
 ### Phase 2 (Implement track example): {{phase_name}}
 **Exit Gate:** {{exit_criteria}}
 **ACs Covered:** {{ac_list}}
+**Phase type:** {{phase_type}}  <!-- bug-fix | regression | feature (default; absent ⇒ feature) — a bug-fix/regression phase is always red-first per NN-P-006 -->
 <!-- Branch-enumeration ACs (doc-as-code; see plugins/spec-flow/reference/plan-concreteness.md §3):
 every conditional branch in this phase's deliverable (if/when/unless/otherwise/either, or an
 enumerated case) MUST have its own numbered AC listed above. A branch without a covering AC is a
@@ -208,6 +212,7 @@ concreteness defect (qa-plan criterion 30). -->
 ### Phase 2 (Non-TDD mode): {{phase_name}}
 **Exit Gate:** {{exit_criteria}}
 **ACs Covered:** {{ac_list}}
+**Phase type:** {{phase_type}}  <!-- bug-fix | regression | feature (default; absent ⇒ feature) — a bug-fix/regression phase is always red-first per NN-P-006 -->
 **In scope:** {{explicit_scope_list}}
 **NOT in scope:** {{explicit_exclusions_with_forward_phase_references}}
 <!-- The two fields below are REQUIRED only when this phase edits a multi-step orchestration file (a skills/*/SKILL.md with ≥3 headings matching `^#{3,4} (Step|Phase|Sub-Phase)\b`); omit otherwise. See plan SKILL.md §9c. -->
@@ -245,6 +250,7 @@ concreteness defect (qa-plan criterion 30). -->
     - No "fail first" requirement — tests are written for existing code.
     - Aim for reasonable coverage of the phase's ACs.
     - Stage tests via `git add` (do NOT commit) so Verify can run them.
+    - `assert_grep` uses `grep -E` (ERE): alternation is bare `|`, not `\|`.
     <!-- Test Data contract (see plugins/spec-flow/reference/plan-concreteness.md §5): a Write-Tests
     phase MUST carry a Test Data block — one case per behavior-under-test; the Step 2.7 dispatch
     transcribes it and invents nothing. Unpredictable outcome → per-case [SPIKE: <unknown>] (reference §2). -->
