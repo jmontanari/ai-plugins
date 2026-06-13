@@ -4,6 +4,20 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.19.0] — 2026-06-13
+
+### Changed
+- **Execute pre-flight probe budget.** Step 1b ("Phase Pre-Flight") and the
+  Orchestrator Role section now explicitly cap the coordinator to bounded probes
+  (`wc -l`, bounded `head -N`, `git grep -l`/`-n`, and small structured
+  config/doc files) and forbid reading full source/test file bodies into the
+  coordinator's long-lived context to discover signatures or usage. Signatures
+  the implementer needs up front belong in the plan's Change Specification Block.
+  This extends the existing Coordinator Return Discipline (which already barred
+  raw file bodies in agent *returns*) to pre-flight *reads*, keeping the
+  orchestrator lean over long pieces. No change to probe items 1–8, plan format,
+  or config keys.
+
 ## [5.18.0] — 2026-06-12
 
 ### Added

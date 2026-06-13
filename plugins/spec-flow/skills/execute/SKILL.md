@@ -129,7 +129,7 @@ You (the main window) are a PURE CONDUCTOR. You:
 - Decide: proceed / retry / escalate
 - Track progress via BOTH plan.md checkboxes AND a harness task list (`TaskCreate` once at start, `TaskUpdate` per phase) — see "Pre-Loop: Build Task List" below. Both are required; neither alone is sufficient.
 
-You write ZERO implementation code. Fact-gathering probes (`wc`, `head`, `git grep`, reading `.pre-commit-config.yaml`) are explicitly part of the conductor role — they are cheap reads that collapse 5–15 agent tool calls per dispatch. Synthesis and code-writing still come from subagents.
+You write ZERO implementation code. Fact-gathering probes (`wc -l`, bounded `head -N`, `git grep -l`/`-n` for paths and line numbers, and reading small structured config/doc files like `.pre-commit-config.yaml`) are explicitly part of the conductor role — they are cheap reads that collapse 5–15 agent tool calls per dispatch. This is a **bounded-probe budget, not a license to read source**: the coordinator MUST NOT `Read` full source or test file bodies to discover signatures or usage — that is the implementer's job, and any signature it needs belongs in the plan. See Step 1b → **Probe budget** for the binding enumeration. Synthesis and code-writing still come from subagents.
 
 ### Dispatch Preamble (all agent dispatches)
 
@@ -440,6 +440,28 @@ See `plugins/spec-flow/reference/spike-agent.md` `## Agent modes` for the full m
 ### Step 1b: Phase Pre-Flight (read-only)
 
 Before dispatching Red or Implement, the orchestrator collects facts the agents would otherwise rediscover. Scope every probe to the phase's declared scope — files and symbols named in the plan's [TDD-Red], [Build], or [Implement] blocks. Pre-flight should take seconds; if any probe is slow (e.g. `git grep` on a monorepo), use path filters targeting scope directories or skip it.
+
+**Probe budget (read discipline).** Pre-flight is a *bounded-probe* step, not a
+code-reading step. Scoped to the phase's declared files/symbols, the coordinator
+MAY use only these read forms:
+
+- `wc -l <file>` — line counts.
+- `head -N <file>` / `tail -N <file>` — a **bounded** sample only (the item-2
+  schema probe is the canonical use; keep N ≤ ~20).
+- `git grep -l` / `git grep -n` / `grep -n` — match **paths and line numbers**,
+  never whole-file bodies.
+- Reading the small structured config/doc files the items below already name:
+  `.pre-commit-config.yaml` (item 4) and `introspection.md` (item 8), plus
+  `plan.md` and `spec.md`.
+
+The coordinator MUST NOT `Read` full source or test file bodies during
+pre-flight to discover a signature, constructor shape, or usage example. That
+work belongs to the implementer — it reads the files it edits — and any signature
+the implementer genuinely needs up front belongs in the plan's Change
+Specification Block, not a coordinator file-body read. Reading file bodies into
+the coordinator's long-lived context is the same defect the **Coordinator Return
+Discipline** (above) forbids for agent returns: raw file bodies live on disk and
+are referenced by path, never pasted into the coordinator's context.
 
 1. **LOC snapshot** — for each file the phase touches, run `wc -l <file>`. Attach as "LOC headroom" context.
 2. **Schema shape** — if the plan references a config family (`configs/<X>/`, schemas, templates), sample one existing sibling: `head -20 configs/<X>/<any_existing>`. Attach as "Existing schema" context.
