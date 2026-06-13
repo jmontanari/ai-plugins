@@ -578,8 +578,75 @@ pieces:
       orchestration (no Workflow tool — Copilot CLI portability + charter no-runtime-deps). May
       split at spec time if it exceeds the qa-prd <=7-AC rule (operator chose "one piece,
       re-scoped" 2026-06-13).
+      SCOPE CORRECTION (2026-06-13, research + deliberation): the "four edits" above OVER-CLAIM —
+      verified by grep that doctrine defs, the `## Integration Coverage` block, plan B-lite +
+      `## Integration-Test Registry`, qa-spec #13, qa-plan #26, and the review-board-integration
+      agent ALREADY SHIPPED. seam-design's TRUE scope is the residue + the operator's reconciliation
+      expansion: (A) a PRODUCTION-CALL-SITE pointer on the seam AC's `Independent Test [machine:]`
+      sub-line (NOT overloading the `[outcome:integration]` facet — the shipped lineage put it on the
+      test line) with a deterministic qa-spec present/not-under-tests check; (B) silent-omission
+      closure by TIGHTENING qa-spec #17's free-text N/A `[outcome:integration]` sentinel + extending
+      #13's silently-deferred clause with a boundary-touching predicate (defined in
+      behavior-classification.md, judgment-backstopped; exemption rationale in front-matter); (C)
+      3-PLACE RECONCILIATION (operator 2026-06-13): qa-spec (pointer present/not-test), qa-plan
+      (each declared seam maps to an [integration] phase wiring its prod call site), and
+      review-board-integration (EXTENDED: a cited src/ pointer absent from the diff-derived
+      wired-path inventory is must-fix — the shift-left teeth; rubric_version bump). Honest scope:
+      closes seam failure-class 3 (untested-unused seam) at spec time; classes 1/2/4/5 stay owned by
+      the shipped review-board axis + plan registry. The forcing UP-FRONT INVESTIGATION (discover all
+      seams, not just declared) split OUT to the new seam-investigate piece; the --converge backstop
+      split OUT to review-board-converge. Deliberation: docs/prds/exec-ready/specs/seam-design/deliberation.md.
     prd_sections: [FR-024, G-1, G-7]
     dependencies: [plan-concrete, outcome-acs]
+    status: open
+
+  - name: seam-investigate
+    slug: seam-investigate
+    description: |
+      Forcing up-front integration investigation (shift-left) — the operator-driven expansion of
+      seam-design (2026-06-13). The shipped `## Integration Coverage` block is DECLARATION-only: it
+      records the seams the author already knows; it never forces DISCOVERY of the ones they don't
+      (the prop_firm gap — defects slip through because the up-front investigation was not thorough,
+      e.g. obs-http-wiring's seam was never even declared). This piece makes spec's "Integration
+      surfacing" INVESTIGATION-BACKED and COVERAGE-FORCING: (1) the research pass explicitly
+      enumerates the piece's full integration surface (what it wires to, what existing code it
+      touches/extends), so the surface map is DERIVED, not author-recalled; (2) the author must
+      demonstrate KNOWLEDGE of each identified seam (documented boundary + true externals) and a
+      SUBSTANTIAL-COVERAGE obligation per seam; (3) qa-spec / qa-plan check the investigation was
+      actually DONE (not merely that a block exists). Additive (NN-C-003); hand-rolled markdown only
+      (NN-C-002). Covers FR-025 (reserved; added to the PRD at merge per the FR-009 precedent).
+      Sequence WITH/AFTER seam-design (shares the integration-surface model + the same gate
+      surfaces). Deps: research-unify (the gathering pass it extends) + seam-design.
+    prd_sections: [FR-025, G-1, G-7]
+    dependencies: [research-unify, seam-design]
+    status: open
+
+  - name: review-board-converge
+    slug: review-board-converge
+    description: |
+      review-board `--converge` — the find-after-the-fact backstop loop the operator originally
+      framed ("prove the integration is broken; find every broken seam"). Adds a convergence mode to
+      the spec-flow:review-board skill: Pass A (run the integration + edge-case + ground-truth lenses
+      as FINDERS; each finding adversarially VERIFIED before it becomes a task — theater guard) ->
+      route fixes through the disciplined small-change/execute path -> QA validate the batch WIRED
+      TOGETHER (not per-fix) -> Pass B re-hunt the FULL surface (not just the fix delta) -> terminate
+      on whichever fires first: K dry rounds (zero VERIFIED findings), verified-count below X% of Pass
+      A, or a hard round/budget cap. Loop DEPTH scaled by the seam-design/seam-investigate
+      integration-surface model (low surface -> single pass = today; high surface -> loop-until-dry)
+      via gate-scaling.md. SIBLING to outcome-campaign: this loops on a DIFF/branch/PR (static,
+      available now, no running system needed); outcome-campaign loops on a RUNNING system (its
+      convergence fold stays — operator decision 2026-06-13). HARD CONSTRAINT: the loop is HAND-ROLLED
+      markdown (like execute's Final Review fix loop) for portability — NOT the Workflow tool.
+      CENTRAL OPEN QUESTION for this piece's brainstorm (operator raised 2026-06-13): whether to add
+      an OPTIONAL Claude-Code-only Workflow-accelerated executor that produces the SAME result as the
+      markdown loop. This is a CHARTER-level host-conditional-orchestration decision (does spec-flow
+      permit host-aware execution paths?), with real downsides (feature disparity, dual maintenance,
+      a Copilot-untestable path) — default recommendation is portable markdown for BOTH hosts; do NOT
+      bake host-conditional behavior in without a charter call. Covers FR-026 (reserved; added at
+      merge). Deps: seam-design + review-board (the integration lens it loops). Sequence after
+      seam-design.
+    prd_sections: [FR-026, G-7]
+    dependencies: [seam-design]
     status: open
 
 coverage:
