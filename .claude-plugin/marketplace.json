@@ -25,6 +25,15 @@
       "author": {
         "name": "Joe"
       }
+    },
+    {
+      "name": "timestamp-hooks",
+      "source": "./plugins/timestamp-hooks",
+      "description": "Shows send/receive timestamps and elapsed time for each Claude Code message exchange",
+      "version": "0.1.0",
+      "author": {
+        "name": "Joe"
+      }
     }
   ]
 }

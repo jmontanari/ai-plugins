@@ -1,0 +1,8 @@
+{
+  "name": "timestamp-hooks",
+  "description": "Shows send/receive timestamps and elapsed time for each Claude Code message exchange",
+  "version": "0.1.0",
+  "author": {"name": "Joe"},
+  "license": "MIT",
+  "hooks": "./.claude-plugin/hooks.json"
+}
