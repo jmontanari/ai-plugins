@@ -1,6 +1,6 @@
 schema_version: 1
 generated: 2026-06-06
-last_updated: 2026-06-12
+last_updated: 2026-06-13
 prd_source: "docs/prds/exec-ready/prd.md"
 
 feature_branch: null
@@ -444,6 +444,15 @@ pieces:
       gates: metrics + flywheel-repo. At spec brainstorm, resolve the Form C batch invocation
       schema for the campaign→triage handoff (each finding becomes a Form C item; source/
       phase/agent/finding_text/discovery_type fields need definition against FR-020 AC-2).
+      NOTE (2026-06-13, convergence loop — operator decision): the surface-scaled convergence
+      loop folds INTO this piece's spec — Pass A (find-all, each finding adversarially verified
+      before it becomes a triage item — theater guard) -> fix batch -> QA validate the batch
+      WIRED TOGETHER (not per-fix) -> Pass B re-hunt; terminate on whichever fires first: K
+      consecutive dry rounds (zero VERIFIED findings), verified-count below X% of Pass A, or a
+      hard round/budget cap. Loop DEPTH is scaled by the seam-design integration-surface model
+      (low surface -> single pass = today's behavior; high surface -> loop-until-dry), via
+      gate-scaling.md. The SEAM lens grades against the seam-design surface model rather than
+      re-deriving boundaries. Depends on seam-design (sequence it BEFORE this piece).
     prd_sections: [FR-020, SC-010, SC-005, G-7]
     dependencies: [outcome-acs, discovery-triage, metrics, flywheel-repo]
     status: open
@@ -522,6 +531,57 @@ pieces:
     dependencies: []
     status: open
 
+  - name: seam-design
+    slug: seam-design
+    description: |
+      Shift-left seam / integration design primitive — the spec/plan analog of outcome-acs, for
+      integration boundaries. Resurrects + re-scopes the stalled 4.12.0 "integration tests as a
+      first-class primitive" design (proposals/review-board-integration/) against what shipped
+      since (outcome-acs AC-tagging, gate-scaling machine-checkable tags, behavior-classification,
+      the already-shipped review-board-integration agent). THE GAP (2026-06-13 prop_firm mining,
+      ~10 post-exec seam defects across 6 pieces): seams are found POST-execution (Final Review /
+      post-merge / dedicated fix pieces), not designed up front. Four edits: (1) SPEC builds an
+      integration-surface model — enumerates every seam the piece touches (caller -> collaborator
+      -> external/boundary) and emits seam ACs, including a mandatory PRODUCTION-CALL-SITE AC per
+      seam (kills the FO-16 smoking gun: an AC satisfiable by test-side wiring while the seam has
+      zero production callers). (2) PLAN turns each seam into a [integration]-tagged path-coverage
+      phase under B-lite ordering (scenario declared up front to drive phase ordering; the
+      [integration] test authored AND greened in its completing phase — adopts
+      alignment-findings.md's recommended fix, sidestepping the four anti-cheat / oracle /
+      fast-mode / Red-contract collisions that stalled true double-loop) + mandated contract tests
+      for doubled externals. (3) DOCTRINE becomes single source of truth for integration boundary
+      / integration test / path coverage / [integration] tag / contract test definitions (extends
+      the loose ratios in spec-flow-doctrine.md). (4) ENFORCEMENT — qa-spec / qa-plan raise a
+      must-fix when a behavior-bearing piece touching a boundary lacks a seam inventory,
+      production-call-site ACs, or [integration] coverage; non-boundary pieces exempt with a
+      recorded one-line rationale (mirrors the outcome-acs behavior-bearing default). The surface
+      model is the OBLIGATION outcome-campaign's SEAM lens grades against — one surface model:
+      spec builds -> plan covers -> campaign grades. Additive / backward-compat (NFR-003): legacy
+      specs without seam inventories are not retro-failed. Covers FR-024 (reserved; this piece
+      adds it to the PRD at merge, per the FR-009 / spec-preresearch precedent).
+      WHY (2026-06-13 prop_firm mining): the dominant post-exec defect class is seam wiring —
+      mock-avalanche / fixture short-circuit (fixtures re-supply runner-computed inputs; unit
+      tests green, real path never exercised), cross-phase composition gaps (each phase's QA
+      passes; the bug lives in the interaction), untested-unused seams (zero production callers),
+      post-merge integration conflicts, and spec<->impl contract drift. Cost:
+      phase-4-5-pattern-library-v1 = 62 commits + 3 post-Final-Review amendments; prereqs-phase-3-5
+      = 3 Final Review iterations; THREE manifest pieces (obs-http-wiring, backtest-wire,
+      ingester-health) existed ONLY to wire seams never designed up front. Prevention at spec/plan
+      is the cheaper fix; outcome-campaign's SEAM lens is the backstop. The convergence loop (Pass
+      A find-all-verified -> fix -> QA wired-together -> Pass B re-hunt; stop on dry /
+      diminishing-returns / hard-cap; depth scaled by the integration surface this piece defines)
+      folds INTO outcome-campaign's spec (operator decision 2026-06-13), not here.
+      SEQUENCING: sequence BEFORE outcome-campaign — shift-left reduces backstop load and defines
+      the surface model the SEAM lens consumes. Deps: plan-concrete (the concreteness floor it
+      extends with [integration] phases) + outcome-acs (the behavior-bearing AC-tagging /
+      elicitation pattern it mirrors) — both merged, so READY now. MUST stay hand-rolled markdown
+      orchestration (no Workflow tool — Copilot CLI portability + charter no-runtime-deps). May
+      split at spec time if it exceeds the qa-prd <=7-AC rule (operator chose "one piece,
+      re-scoped" 2026-06-13).
+    prd_sections: [FR-024, G-1, G-7]
+    dependencies: [plan-concrete, outcome-acs]
+    status: open
+
 coverage:
   total_prd_sections: 25
   covered_sections: 25
@@ -590,6 +650,20 @@ coverage:
     Road A: tests-after is fine when the test proves the system DOES X; red-first stays when the
     test proves the system NO LONGER does broken Y.
 
+    PRD v8 (2026-06-13 — shift-left seam design) added FR-024 (reserved; seam-design adds it to
+    the PRD at merge, per the FR-009 precedent) and one piece: seam-design. Grounded in a mining
+    pass over the live prop_firm sessions (~10 post-execution seam defects across 6 pieces): the
+    dominant post-exec defect class is integration-seam wiring, today caught only at Final Review
+    / post-merge / via dedicated fix pieces (obs-http-wiring, backtest-wire, ingester-health all
+    existed only to wire seams never designed up front). seam-design is the spec/plan analog of
+    outcome-acs: spec builds an integration-surface model with mandatory production-call-site ACs
+    (kills the FO-16 "AC satisfiable by test-side wiring" smoking gun); plan emits B-lite
+    [integration] path-coverage phases (the alignment-findings.md fix that sidesteps the four
+    architectural collisions that stalled the 4.12.0 true-double-loop design); qa-spec/qa-plan
+    enforce. The convergence loop the operator originally framed folds into outcome-campaign's
+    spec, depth-scaled by this piece's surface model. Sequence seam-design BEFORE outcome-campaign.
+    Hand-rolled markdown only (no Workflow tool — Copilot CLI portability + charter no-runtime-deps).
+
     ORDER OF OPERATIONS (v5 — re-prioritized 2026-06-12 based on token-efficiency evaluation):
 
     RATIONALE FOR RE-PRIORITIZATION: the 2026-06-12 miner eval showed the dominant cost is
@@ -615,6 +689,12 @@ coverage:
          Parallel-safe with outcome-acs (different surfaces). Run before outcome-campaign
          (which routes every finding through this skill) and before pipeline-economics
          (discoveries during that execution route through this skill).
+      2b. seam-design (NEW, FR-024) — shift-left seam/integration primitive: spec builds the
+         integration-surface model + mandatory production-call-site ACs; plan emits B-lite
+         [integration] path-coverage phases + contract tests; doctrine owns the definitions;
+         qa-spec/qa-plan enforce. Deps: plan-concrete + outcome-acs (both merged) — READY now.
+         Sequence BEFORE outcome-campaign: it defines the surface model the SEAM lens grades
+         against and the convergence loop scales depth on. (2026-06-13 prop_firm seam-mining)
       3. outcome-campaign — spec-flow:campaign; the new gate class for running-system
          behavior. Three always-on adversarial lenses on Opus (GROUND-TRUTH: dead-knob /
          degeneracy; SEAM: cross-piece integration — the failure class no per-piece gate
