@@ -534,3 +534,59 @@ The superpowers multi-host co-ship pattern (see `reference_superpowers_coship.md
 ### Pipeline-on-ramp
 
 When ready to execute: `/spec-flow:prd meta-plugins` to kick off brainstorm.
+
+---
+
+## Negative-match verify command false-positive context (plan + qa-plan)
+
+**Status:** candidate
+**Captured:** 2026-06-13
+**Source:** process-retro on exec-ready/discovery-triage (5.18.0)
+
+### Problem
+
+Phase 2 of the discovery-triage piece had a negative-match verify command (`grep -nE "Edit\(|Write\(|patch the|..."`) that silently matched "dispatch the" as a false positive for "patch the". The regex was slightly wrong and the verify command had no documentation of what strings were being excluded or what a legitimate match would look like, making it hard to triage whether a hit was real or spurious.
+
+### Impact
+
+Required manual investigation during the QA phase to determine whether the V5 (no-code-edit) invariant was actually violated. The false positive caused unnecessary triage time.
+
+### Desired fix
+
+Plan skill and/or qa-plan agent should enforce that negative-match `[Verify]` blocks (grep-for-zero-matches, assert_no_grep) name at least one specific string that WOULD match but is intentionally absent — making the exclusion explicit and the false-positive surface documentable.
+
+---
+
+## Multi-step interactive skill flows not mapped in plans (plan)
+
+**Status:** candidate
+**Captured:** 2026-06-13
+**Source:** process-retro on exec-ready/discovery-triage (5.18.0)
+
+### Problem
+
+The discovery-triage piece defined a multi-step interactive operator flow (Step 4 confirm → conditional Step 5 spike → Step 6 finalize). The plan did not document the conditional path explicitly — only the happy path was described. This surfaced as a Final Review must-fix (batch items requiring a spike were not marked as pending in the confirm prompt).
+
+### Impact
+
+The implementer only handled the single-finding case correctly; the batch+spike interaction was left unspecified and had to be fixed post-Final-Review.
+
+### Desired fix
+
+For doc-as-code (and potentially all) plans that define multi-step operator interactions with conditional branches, the plan should document a decision table per branch: what triggers each branch, what each branch does, and what the `[Verify]` asserts for each path. The correct enforcement point (plan authoring guidance, qa-plan criterion, or somewhere else) needs scoping.
+
+---
+
+## Doc-as-code version-bump checklist incomplete (plan)
+
+**Status:** candidate — related to existing item "Version-bump phase completeness"
+**Captured:** 2026-06-13
+**Source:** process-retro on exec-ready/discovery-triage (5.18.0)
+
+### Problem
+
+The discovery-triage Phase 5 plan only named `plugins/spec-flow/.claude-plugin/plugin.json` for the version bump. It missed `plugins/spec-flow/plugin.json` (the Copilot CLI descriptor), causing a static-suite failure caught during integration testing. A third file (`.claude-plugin/marketplace.json`) was also bumped but not in the plan. This is the same class of issue as the existing "Version-bump phase completeness" item above — the plan derives its target file list from memory rather than from an authoritative source.
+
+### Relationship
+
+This is a second instance of the pattern documented in "Version-bump phase completeness" (captured 2026-06-12). That item proposes the fix as plan + qa-plan + execute reading `releasing.md`. This instance confirms the pattern is systemic across piece types, not just major releases.
