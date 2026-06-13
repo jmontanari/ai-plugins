@@ -590,3 +590,47 @@ The discovery-triage Phase 5 plan only named `plugins/spec-flow/.claude-plugin/p
 ### Relationship
 
 This is a second instance of the pattern documented in "Version-bump phase completeness" (captured 2026-06-12). That item proposes the fix as plan + qa-plan + execute reading `releasing.md`. This instance confirms the pattern is systemic across piece types, not just major releases.
+
+---
+
+## Final Review board WORKTREE anchoring (security agent false-negative)
+
+**Status:** candidate
+**Captured:** 2026-06-13
+**Source:** process-retro on change/preflight-read-cap (5.19.0)
+
+### Problem
+
+The Final Review security agent ran in the main repo root (`/Volumes/joeData/ai-plugins/`) instead of the active worktree (`worktrees/preflight-read-cap/`), producing a false-negative: grep reported 0 matches for "Probe budget" and version checks reported 5.18.0. The WORKTREE dispatch preamble (Rule 0 from `coordinator-contract.md`) was injected into the orchestrator prompt but did not propagate explicitly into each individual board-agent prompt, allowing the security agent to default-resolve to the repo root.
+
+### Impact
+
+One of 7 Final Review board agents reported a spurious FAIL, requiring re-dispatch with explicit worktree anchoring. In a non-interactive run this would surface as a false merge block.
+
+### Desired fix
+
+Two-part hardening:
+1. **Board dispatch template** — each of the 7–9 Final Review board agent prompts should open with a mandatory `WORKTREE: <absolute-path>` first-line assertion (same as Dispatch Preamble), not just the orchestrator-level step text.
+2. **Security-agent Rule 0** — `review-board-security.md`'s Rule 0 (or a new first-turn check) should verify the worktree path resolves correctly and report `[WORKTREE-ABSENT]` immediately if not, rather than silently running against the wrong root.
+
+---
+
+## qa-plan criterion: Change Specification Block signature completeness
+
+**Status:** piece-candidate
+**Captured:** 2026-06-13
+**Source:** future-opportunities on change/preflight-read-cap (5.19.0)
+
+### Problem
+
+The preflight-read-cap change adds a guardrail that forbids the execute coordinator from `Read`ing full source/test file bodies during Step 1b pre-flight. The enforcement point is the orchestrator — it is now REQUIRED to get any signature/usage details from the plan's Change Specification Block rather than discovering them via file-body reads. qa-plan currently has no criterion that checks whether a Change Specification Block carries sufficient signature detail for this new constraint. A plan can be approved today that has silent coordinator-read dependencies (e.g. "read X to find the constructor shape") that will only surface as a `BLOCKED` dispatch at execute time.
+
+### Impact
+
+Plans will silently pass qa-plan and reach execute already out of compliance with the new probe-budget guardrail. The failure surfaces late (at execute Step 1b) rather than early (at qa-plan time), wasting a full execute dispatch.
+
+### Desired fix
+
+Add a qa-plan criterion: "If the plan has a Change Specification Block, verify it explicitly names any constructor signatures, method signatures, or usage patterns that the implementer will need — i.e., that no coordinator-read dependency was deferred to 'orchestrator can look it up'. For each phase, check that every file in `[Change Specification Block]` carries enough detail that the implementer can proceed without the coordinator opening full source bodies."
+
+Scope: `plugins/spec-flow/skills/qa-plan/SKILL.md`.
