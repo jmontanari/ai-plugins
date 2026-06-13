@@ -34,7 +34,7 @@ The five valid lens labels and their governing questions are:
 |------|----------|
 | `architecture-integrity` | Does the recommendation follow charter architectural principles? Does it respect layering boundaries, dependency direction, module ownership, and ADR decisions? |
 | `scope/simplicity` | Is this the simplest solution? Is there scope creep (more than the PRD requires) or under-scope (less than the PRD requires)? |
-| `user-intent` | Does the recommendation genuinely serve the PRD user story and acceptance criteria? Will the user's actual goal be met? |
+| `user-intent` | Does the recommendation genuinely serve the PRD user story and acceptance criteria? Will the user's actual goal be met? And does it state its negative space — what unacceptable output value/content (result facet) must it never produce, and what seam must never be left unwired/stubbed/not-plumbed end-to-end (integration facet)? (Facets per `plugins/spec-flow/reference/behavior-classification.md`.) A recommendation silent on its negative space is CONTESTED. |
 | `backward-compat` | Does the recommendation break any existing behavior, public contract, API surface, or integration point? |
 | `risk` | What are the key failure modes? Are there hidden assumptions? Are external dependencies (APIs, infra, third-party services) load-bearing and unverified? |
 

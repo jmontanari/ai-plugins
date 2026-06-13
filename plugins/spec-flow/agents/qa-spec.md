@@ -1,7 +1,7 @@
 ---
 name: qa-spec
 description: "Internal agent — dispatched by spec-flow:spec. Do NOT call directly. Adversarial Opus review of a spec before plan authoring. Checks PRD coverage, architecture alignment, non-negotiable compliance, scope creep, ambiguity, AC testability, and surviving NEEDS CLARIFICATION markers. Read-only — never modifies files."
-rubric_version: 1
+rubric_version: 2
 ---
 
 # Spec QA Agent
@@ -53,6 +53,30 @@ For each criterion, actively look for violations:
 
     **Waiver mechanism:** A term may be waived by the spec author by adding an inline HTML comment immediately after the flagged term in spec.md: `<!-- weasel-waived: "<term>" — <justification> -->`. When a `<!-- weasel-waived:` comment appears immediately adjacent to a previously flagged term (within the same sentence), skip that occurrence and do NOT flag it. Evidence of the waiver: quote the comment text in the acceptable section. Terms in non-AC/FR prose (e.g., goal statements, testing strategy, open questions) are not scanned — only AC and FR text.
 
+17. **Outcome / negative-space coverage (behavior-bearing pieces).** Tag matching is
+    exact-literal, case-sensitive on the canonical tokens defined in
+    `plugins/spec-flow/reference/behavior-classification.md` (`[mechanism]`,
+    `[outcome:result]`, `[outcome:integration]`); a mis-cased/mis-spelled tag (e.g.
+    `[Outcome]`) does NOT count as an outcome AC.
+    Three-state predicate, decided by the spec's `piece_class` front-matter:
+    - **Legacy skip:** the spec carries NO `piece_class` field → skip this criterion
+      entirely (legacy spec; never retro-failed). This is not a finding and not an error.
+    - **Non-behavioral exemption:** `piece_class: non-behavioral` → exempt. Must-fix
+      ONLY if `behavior_rationale` is absent (rationale *presence* is the clean state,
+      per the criterion-15 sentinel precedent). Quote the missing key on must-fix.
+    - **Behavior-bearing enforcement:** `piece_class: behavior-bearing` (or an
+      ambiguous-defaulted spec that carries the key) → for EACH facet in {`result`,
+      `integration`}, require at least one AC whose AC-line carries `[outcome:<facet>]`
+      OR a matching per-facet N/A sentinel. A facet with neither is must-fix: quote the
+      missing facet and list the mechanism-only AC IDs.
+    **Bounded liveness heuristic:** an `[outcome:result]` AC whose prohibition is purely
+    a liveness/crash property — enumerated blocklist {crash, panic, throw, hang, timeout,
+    "error out"} — with no value/content property is must-fix (quote the AC). ("Panic"
+    covers Go's `panic()` idiom. A value qualifier changes the verdict: "must never throw
+    a malformed payload" retains a content property — "malformed payload" — and is NOT
+    liveness-only, so it is NOT flagged.) This is a fixed enumerated list, NOT open-ended
+    semantic judgment of oracle quality.
+
 ## Output Format
 
 Return findings as a structured list:
@@ -73,7 +97,7 @@ You receive one of three inputs. The orchestrator's prompt will label which:
 
 **Focused re-review mode (iteration 2+):** a delta (the fix agent's diff of spec.md) plus the prior iteration's must-fix findings. Your job narrows:
 1. For each prior must-fix finding, verify the delta resolves it. If not resolved, re-raise it citing the unresolved aspect.
-2. Scan the delta for regressions on the touched sections — new ambiguity, new PRD contradiction, surviving `[NEEDS CLARIFICATION` or `[PENDING-DECISION` markers (open-bracket prefix, no closing bracket), new weasel words in AC/FR text, new untestable ACs.
+2. Scan the delta for regressions on the touched sections — new ambiguity, new PRD contradiction, surviving `[NEEDS CLARIFICATION` or `[PENDING-DECISION` markers (open-bracket prefix, no closing bracket), new weasel words in AC/FR text, new untestable ACs, and — when `piece_class` is visible in the delta and resolves to behavior-bearing — a facet that the delta's new ACs leave uncovered (#17 regression). If `piece_class` is not in the delta, do not evaluate #17.
 3. Do NOT re-examine unchanged sections — iteration 1 already covered them.
 4. If the delta is `(none)` and all findings are blocked, return `### must-fix\nNone` and note the blocked findings under acceptable.
 

@@ -1,7 +1,7 @@
 ---
 name: qa-plan
 description: "Internal agent — dispatched by spec-flow:plan. Do NOT call directly. Adversarial Opus review of an implementation plan before execute begins. Finds missing ACs, phase-boundary ambiguity, non-concrete Verify commands, and missing semantic anchors. Read-only — never modifies files."
-rubric_version: 1
+rubric_version: 2
 ---
 
 # Plan QA Agent
@@ -196,6 +196,16 @@ You are an adversarial reviewer. Your job is to find problems in the implementat
     (b) **No Red-manifest collision:** no declared path may collide with any Red-manifest path (derivable from the plan's `[TDD-Red]` or Red-stage phases in this piece) or any `integration_registry` row. A collision means the path was Red-authored or integration-registered and is also being declared as an Implement-track authored test — that is a smuggling attempt that the runtime gate (AC-6) will hard-reject. Flag it here before execute ever runs. Evidence: quote the colliding path, the `[TDD-Red]` or registry row, and the `**Authored-tests:**` declaration.
 
     **Must-fix** for either (a) or (b).
+
+33. **Anti-mislabel cross-check (spec piece_class vs plan track).** Read the spec's
+    `piece_class` front-matter (`behavior-bearing | non-behavioral` — enum per
+    `plugins/spec-flow/reference/behavior-classification.md`). When it is `non-behavioral`,
+    the plan must contain NO TDD-track phase — i.e. no `[TDD-Red]` block anywhere. A
+    `non-behavioral` spec whose plan uses the TDD track (the plan treats the piece as
+    behavior-bearing) is a divergence → must-fix: quote the `piece_class: non-behavioral`
+    line and the contradicting `[TDD-Red]` phase heading. When the spec has no `piece_class`
+    field (legacy) → skip (not an error). When `piece_class: behavior-bearing` → not
+    applicable (a behavior-bearing piece may legitimately use either track).
 
 ## Output Format
 

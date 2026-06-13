@@ -6,7 +6,7 @@ Invocation order:
 3. **Deliberation pass** — after the research commit (or the `[RESEARCH-UNAVAILABLE]` fallback), the calling skill dispatches the 5-phase deliberation protocol (Phase A coordinator → Phase B parallel per-cluster viability [barrier] → Phase C synthesis [skipped when ≤1 cluster] → Phase D parallel adversarial board [barrier] → Phase E convergence), commits `deliberation.md`, and emits `[DELIBERATION-UNAVAILABLE: <phase>-<reason>]` on any of the 5 fatal triggers (falling back to current brainstorm). Depth resolved per `reference/deliberation-depth.md`; on `off`, emit `[DELIBERATION-SKIPPED: depth=off]` and run the current brainstorm. See `reference/deliberation-artifact.md` for markers/return contract.
 4. L-10 Convention Context Scan — runs only on the `[RESEARCH-UNAVAILABLE]` path (fallback when research did not produce conventions)
 5. Charter Constraint Identification Protocol — its Conventions Block consumes `research.md`'s `## Codebase Conventions` on the OK path, or L-10's output on the `[RESEARCH-UNAVAILABLE]` path
-6. Remaining Core Brainstorm Building Blocks (C-2 always-run, C-3, Approach+Tradeoffs) — run during brainstorm session
+6. Remaining Core Brainstorm Building Blocks (C-2 always-run, C-NS negative-space always-run, C-3, Approach+Tradeoffs) — run during brainstorm session
 
 ## Charter Context Loading Protocol
 
@@ -74,6 +74,19 @@ Inference-first: based on the brainstorm discussion, assess what the work touche
 3. Input validation surface — what user-controlled or external data enters the system, and where is it validated?
 4. Auth/authz model — how is caller identity established, and how are permissions checked?
 5. Secrets handling — are API keys, tokens, or credentials involved, and how are they managed?
+
+### C-NS: Negative-Space Sub-Block (always-run)
+[shared] Always-run, depth-independent — it fires whenever the brainstorm runs and does
+NOT depend on any deliberation lens firing (so lite/off-depth pieces are still covered).
+Pose the two-dimensional negative-space question: *"When this runs end-to-end and integrated
+with its surroundings: (a) what unacceptable output values/content could it produce
+(result facet), and (b) what could be left unwired, stubbed, or not actually plumbed in so
+e2e doesn't really work (integration facet)?"* Record, **per facet**, at least one answer
+or an explicit facet N/A before sign-off; the captured answers become `[outcome:result]` /
+`[outcome:integration]` ACs (tokens per `plugins/spec-flow/reference/behavior-classification.md`).
+**Auto-skip** ONLY when the piece is `piece_class: non-behavioral` with a recorded
+`behavior_rationale` (surfaced to the user as a one-line note, not a silent skip). The
+sign-off keystroke is always required (NN-P-001).
 
 ### C-3: Floor Check Pattern
 [shared] After each design sub-area, verify that the discussion contains one concrete example and one failure mode. Example: "A webhook payload enters the handler, is validated, then produces a normalized event for downstream processing." Failure mode: "The signature is missing or invalid, so the handler rejects the payload and records the rejection path." If either half is missing, ask one targeted follow-up and stop there; allow at most one follow-up per sub-area, and accept explicit `N/A` without pushback.

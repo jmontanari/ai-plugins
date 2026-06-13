@@ -4,6 +4,25 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.17.0] — 2026-06-12
+
+### Added
+- **FR-018: Outcome & negative-space acceptance criteria.** Behavior-bearing specs must
+  now state negative space across two facets — `result` (unacceptable output values) and
+  `integration` (seams plumbed/e2e/no-stub). New `reference/behavior-classification.md`
+  single source of truth (piece-granularity definition + two facets + canonical token
+  glossary). New `piece_class:`/`behavior_rationale:` spec front-matter and the
+  `[mechanism]`/`[outcome:result]`/`[outcome:integration]` AC-line tag scheme.
+- Always-run negative-space brainstorm block (depth-independent) + `user-intent` lens
+  negative-space dimension folding into the `VOQ-N` scheme.
+- `qa-spec` criterion #17 (two-facet presence, bounded liveness heuristic, exact-literal
+  matching, legacy-skip, non-behavioral exemption) and `qa-plan` criterion #33
+  (anti-mislabel: non-behavioral spec must not carry a TDD-track plan). Both
+  `rubric_version` 1→2.
+
+### Changed
+- `tests/e2e/lib/static.sh` version assertions bumped to 5.17.0.
+
 ## [5.16.1] — 2026-06-12
 
 ### Fixed

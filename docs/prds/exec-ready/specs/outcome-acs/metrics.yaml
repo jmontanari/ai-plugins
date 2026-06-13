@@ -1,0 +1,38 @@
+schema_version: 1
+generated: 2026-06-12
+last_updated: 2026-06-12
+piece: exec-ready/outcome-acs
+
+spec:
+  qa_rounds: 2            # Phase-2 operator-answer cards (VOQ forks; seam-enforcement)
+  qa_iterations: 2        # Phase-4 QA loops to clean (iter 1 clean; post-revision iter 2 clean)
+  research_artifact: true # research.md present at the canonical path
+  budget_compliance:
+    spec_md:
+      lines: 164
+      soft: 300
+      hard: 520
+      status: pass
+    deliberation_md:
+      lines: 116
+      soft: 200
+      hard: 350
+      status: pass
+  ac_verifiability:
+    machine: 10
+    judgment: 5
+    machine_checkable_ratio: 0.67  # machine / (machine + judgment)
+
+plan:
+  qa_iterations: 2           # iter 1 full (1 must-fix: dropped Copilot plugin.json descriptor); iter 2 focused clean
+  concreteness_floor: passed # reached clean with no 3-iter circuit-breaker escalation
+
+gate_scaling:
+  spec_gate:
+    offered_summary_confirm: true  # predicate held (QA-clean ∧ zero markers)
+    fell_back: false
+    reason: null
+  plan_gate:
+    offered_summary_confirm: false # conjunct (iii) failed: AC-matrix uses phase/task pointers, not file:line (doc-as-code)
+    fell_back: false               # not a fallback from a held predicate — predicate simply did not hold
+    reason: null

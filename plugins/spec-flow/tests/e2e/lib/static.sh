@@ -206,10 +206,10 @@ l1_static_checks() {
   # AC-11: version sync
   local pluginjson="${PLUGIN_ROOT}/plugin.json"
   local marketplace="${REPO_ROOT}/.claude-plugin/marketplace.json"
-  assert_grep '"version": "5\.16\.1"' "$pluginjson" \
-    "AC-11: plugin.json version is 5.16.1"
-  assert_grep '"version": "5\.16\.1"' "$marketplace" \
-    "AC-11: marketplace.json spec-flow entry is 5.16.1"
+  assert_grep '"version": "5\.17\.0"' "$pluginjson" \
+    "AC-11: plugin.json version is 5.17.0"
+  assert_grep '"version": "5\.17\.0"' "$marketplace" \
+    "AC-11: marketplace.json spec-flow entry is 5.17.0"
 
   # AC-11: CHANGELOG has 5.16.1 and (c) continue removal under ### Changed
   local changelog="${PLUGIN_ROOT}/CHANGELOG.md"

@@ -7,6 +7,8 @@ charter_snapshot:
   flows: {{date}}
   coding-rules: {{date}}
   integrations: {{date}}
+piece_class: {{behavior-bearing|non-behavioral}}
+behavior_rationale: {{required only when non-behavioral}}
 ---
 
 <!-- {{piece_slug}} optional — defaults to kebab-cased {{piece_name}} -->
@@ -51,9 +53,12 @@ Cite relevant `CR-xxx` entries from `<charter_root>/skills/charter-coding-rules/
 - {{cr_id}} ({{short_name}}): {{how_this_piece_honors_it}}
 
 ## Acceptance Criteria
-AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}}
+AC-1: Given {{precondition}}, When {{action}}, Then {{outcome}} [mechanism]
   Independent Test [machine: <named check — a grep/script/test that decides>]: <how to verify>
   <!-- Alternative form: Independent Test [judgment: <named arbiter — who decides>]: <what they inspect> -->
+<!-- AC-line tag (exactly one): [mechanism] | [outcome:result] | [outcome:integration].
+     Per-facet N/A sentinel form: `Outcome N/A [outcome:<facet>]: <reason>`.
+     Tokens defined in plugins/spec-flow/reference/behavior-classification.md (CR-005). -->
 
 ## Technical Approach
 {{architecture_decisions_patterns_data_flow}}

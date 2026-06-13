@@ -34,6 +34,11 @@ Work only from these injected inputs. Do not reference external context or prior
 2. **Generate `§Validated Open Questions`.**
    - Only questions that survived adversarial review **unresolved** belong here. A CONTESTED verdict that was resolved by a recommendation revision is NOT a validated open question — it goes in `§Answered by Investigation`.
    - Assign each surviving question a stable `VOQ-N` ID sequentially starting from `VOQ-1`. ID assignment follows the contract in [`plugins/spec-flow/reference/deliberation-artifact.md`](../reference/deliberation-artifact.md) — `## VOQ-N ID contract`.
+   - A `user-intent` negative-space CONTESTED (the recommendation is silent on an
+     unacceptable result value or an unwired/stubbed integration seam — facets per
+     `plugins/spec-flow/reference/behavior-classification.md`) folds into this same scheme: if unresolved after Phase E revision, it becomes a surviving `VOQ-N`
+     (which the spec brainstorm then surfaces as a negative-space question); if resolved
+     by a recommendation revision, it goes to `§Answered by Investigation`.
    - If no questions survive unresolved, `§Validated Open Questions` records "None — all adversarial challenges were resolved by Phase E convergence."
 
 3. **Generate `§Answered by Investigation`.**

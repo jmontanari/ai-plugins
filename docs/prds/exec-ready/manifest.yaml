@@ -371,7 +371,7 @@ pieces:
       the campaign and the ground-truth seat both grade against the oracle it defines.
     prd_sections: [FR-018, SC-010, G-7]
     dependencies: [spec-preresearch]
-    status: open
+    status: merged
 
   - name: discovery-triage
     slug: discovery-triage
