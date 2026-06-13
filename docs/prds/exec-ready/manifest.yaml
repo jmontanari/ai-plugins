@@ -399,7 +399,7 @@ pieces:
       before outcome-campaign (which routes every finding through this skill).
     prd_sections: [FR-019, FR-023, SC-011, G-7]
     dependencies: [spike-agent]
-    status: specced
+    status: planned
 
   - name: outcome-campaign
     slug: outcome-campaign
