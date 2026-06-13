@@ -4,6 +4,15 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 
 ## [Unreleased]
 
+## [5.18.0] — 2026-06-12
+
+### Added
+- **FR-019/FR-023: Standalone `spec-flow:triage` skill.** New `plugins/spec-flow/skills/triage/SKILL.md` classifies any discovery — agent-found or operator-stated — to exactly one of five dispositions (`small-change` / `plan-amend` / `new-piece` / `note-on-scheduled` / `explicit-defer-with-rationale`), records it with provenance, and routes it to the correct target surface. Standalone — does not require an active piece or running execute loop. Dispatches the spike agent in scope mode when the change needs design; never patches code, merges, or auto-applies.
+- **Shared `reference/triage-contract.md`.** Single source of truth for the context-free discovery-triage contract: the 5-disposition→target map, provenance/recorded-row convention, operator gate (no auto-apply), manifest `notes:` schema, NN-P-006 red-first three-surface stamp convention, and the hardened FR-008 change-signal phrasing set. Both execute's Step 6c and `spec-flow:triage` cite this doc and neither restates the vocabulary.
+- **FR-023: Execute Step 6c consumes the shared contract on the FR-008 admission path.** The `y`-path now sources disposition from the unified 5-disposition vocabulary in `triage-contract.md` (opening `small-change`, `note-on-scheduled`, `new-piece`, and `explicit-defer-with-rationale` as reachable dispositions on operator-initiated changes). The hardened mid-execution change-signal detection set is documented once in the contract and cited by execute.
+- **Additive per-piece manifest `notes:` field.** `note-on-scheduled` disposition appends `{source, date, finding}` to a piece's optional `notes:` list in `manifest.yaml`. A piece entry lacking the field parses unchanged.
+- **Intake Q4 "Investigation / discovery to triage" route.** Operator-selected; routes to `/spec-flow:triage`; distinct from the read-only `exploratory` branch.
+
 ## [5.17.0] — 2026-06-12
 
 ### Added
