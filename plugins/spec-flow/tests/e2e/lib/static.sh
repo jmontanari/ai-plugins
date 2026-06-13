@@ -206,10 +206,12 @@ l1_static_checks() {
   # AC-11: version sync
   local pluginjson="${PLUGIN_ROOT}/plugin.json"
   local marketplace="${REPO_ROOT}/.claude-plugin/marketplace.json"
-  assert_grep '"version": "5\.17\.0"' "$pluginjson" \
-    "AC-11: plugin.json version is 5.17.0"
-  assert_grep '"version": "5\.17\.0"' "$marketplace" \
-    "AC-11: marketplace.json spec-flow entry is 5.17.0"
+  assert_grep '"version": "5\.18\.0"' "$pluginjson" \
+    "AC-11: plugin.json version is 5.18.0"
+  assert_grep '"version": "5\.18\.0"' "$marketplace" \
+    "AC-11: marketplace.json spec-flow entry is 5.18.0"
+  assert_grep '"version": "5\.18\.0"' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" \
+    "AC-11: .claude-plugin/plugin.json version is 5.18.0"
 
   # AC-11: CHANGELOG has 5.16.1 and (c) continue removal under ### Changed
   local changelog="${PLUGIN_ROOT}/CHANGELOG.md"
@@ -275,4 +277,25 @@ l1_static_checks() {
   else
     fail "agent co-ship twin drift: $_nonlink non-symlink, $_mismatch content-mismatch .agent.md files"
   fi
+
+  # --- discovery-triage unified-path contract (FR-019/FR-023) ---
+
+  assert_grep "Dispositions" "${PLUGIN_ROOT}/reference/triage-contract.md" \
+    "FR-019: triage-contract.md has disposition map"
+  assert_grep "triage-contract.md" "${PLUGIN_ROOT}/skills/triage/SKILL.md" \
+    "FR-019: triage skill cites the shared contract"
+  assert_grep "triage-contract.md" "${PLUGIN_ROOT}/skills/execute/SKILL.md" \
+    "FR-023: execute Step 6c cites the shared contract"
+  assert_grep "FR-008 mid-execution change-signal phrasing set" "${PLUGIN_ROOT}/reference/triage-contract.md" \
+    "FR-023: hardened change-signal phrasing set documented in the contract"
+  assert_grep "SUPPRESSED per the suppression rule" "${PLUGIN_ROOT}/skills/execute/SKILL.md" \
+    "FR-023: execute cites suppression rule from contract (not restated inline)"
+  assert_grep "spec-flow:triage" "${PLUGIN_ROOT}/skills/intake/SKILL.md" \
+    "FR-019: intake Q4 routes to spec-flow:triage"
+  assert_grep "red-first" "${PLUGIN_ROOT}/reference/triage-contract.md" \
+    "FR-019: contract documents the NN-P-006 red-first forward-record"
+  assert_grep "source:" "${PLUGIN_ROOT}/reference/triage-contract.md" \
+    "FR-019: triage-contract.md notes: schema has source field"
+  assert_grep "source:" "${PLUGIN_ROOT}/skills/triage/SKILL.md" \
+    "FR-019: triage/SKILL.md notes: schema has source field"
 }

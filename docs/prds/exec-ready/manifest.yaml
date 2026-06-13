@@ -345,6 +345,8 @@ pieces:
       hash-lock and go code-first with a validated tests-after. They are ALTERNATIVES (operator
       picks one road per piece), not additive; Road A is READY now (gate-evals-independent),
       Road B's qa-tdd-red-deterministic + board cuts stay gate-evals-gated.
+      NOTE (2026-06-13): outcome-acs (merged) + discovery-triage (done) satisfied. Remaining
+      gates: metrics + exec-guardrails + gate-evals.
     prd_sections: [FR-016, SC-005, SC-002, G-3, G-6]
     dependencies: [metrics, exec-guardrails, gate-evals, outcome-acs, discovery-triage]
     status: open
@@ -386,18 +388,24 @@ pieces:
       silent mid-stream change) and NN-P-004 (no silent defer). HONORS NN-P-006: when a
       discovery is bug-classified and routed to a fix (small-change / plan-amend / new piece),
       that fix carries the red-first reproduce->fail->fix->pass obligation out of band — a
-      triage-surfaced bug is not patched-and-moved-on. Execute keeps its inline Step
-      6c unchanged (additive extraction); both share one documented triage contract. Reachable
+      triage-surfaced bug is not patched-and-moved-on. Execute's Step 6c is rewired to CONSUME
+      the shared triage contract (FR-023 fold-in, 2026-06-12 operator decision) and its FR-008
+      mid-execution detection is hardened; both paths share one documented contract. Reachable
       from intake routing (an "investigation/discovery" classification points here). Spike
       scope-mode BLOCKED -> recorded open needs-scoping item with the blocker, never a
-      fabricated disposition. Covers FR-019.
+      fabricated disposition. Covers FR-019 + FR-023 (execute-consume the shared contract +
+      hardened FR-008 detection, folded in by operator decision; extends FR-019 AC-4).
       WHY (2026-06-12 eval, R22): ~$12.3k/2mo June Opus was deviation + freeform validation,
       much of it the operator hand-rolling Step 6c-style triage in a 180k-context main window
       because the machinery was execute-only. Sequenced after spike-agent (scope mode) and
       before outcome-campaign (which routes every finding through this skill).
-    prd_sections: [FR-019, SC-011, G-7]
+      ADR-2 tech debt (2026-06-13): execute's agent-discovery aggregation (a)/(f)/(d) menu
+      still uses bespoke 3-option vocabulary rather than the shared 5-disposition contract —
+      explicitly excluded from this piece per the spec's Out of Scope. Future piece or
+      plan-amend to unify.
+    prd_sections: [FR-019, FR-023, SC-011, G-7]
     dependencies: [spike-agent]
-    status: open
+    status: done
 
   - name: outcome-campaign
     slug: outcome-campaign
@@ -432,6 +440,10 @@ pieces:
       expensive venue. Sequenced LAST of the three: needs outcome-acs (oracle) +
       discovery-triage (routing) + metrics (source=campaign recording) + flywheel-repo
       (occurrences).
+      NOTE (2026-06-13): outcome-acs (merged) + discovery-triage (done) satisfied. Remaining
+      gates: metrics + flywheel-repo. At spec brainstorm, resolve the Form C batch invocation
+      schema for the campaign→triage handoff (each finding becomes a Form C item; source/
+      phase/agent/finding_text/discovery_type fields need definition against FR-020 AC-2).
     prd_sections: [FR-020, SC-010, SC-005, G-7]
     dependencies: [outcome-acs, discovery-triage, metrics, flywheel-repo]
     status: open

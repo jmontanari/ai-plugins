@@ -411,7 +411,7 @@ version: 7
 - [ ] A `spec-flow:triage` skill is invocable outside execute and classifies a supplied discovery into exactly one disposition: small-change / plan-amend / new-piece / note-on-scheduled / explicit-defer-with-rationale.
 - [ ] For a change above the size/complexity threshold, it dispatches the FR-005 spike agent in scope mode as a bounded isolated dispatch and consumes the scoping artifact — it never resolves the design in the main window.
 - [ ] Every disposition writes a recorded manifest/backlog entry with provenance (source session/finding); no disposition is applied as a silent mid-stream patch (NN-P-002) and no defer is silent (NN-P-004).
-- [ ] Execute's inline Step 6c behavior is unchanged (the extraction is additive); both paths share one documented triage contract.
+- [ ] Execute's inline Step 6c behavior is unchanged (the extraction is additive); both paths share one documented triage contract. **(EXTENDED by FR-023:** the `discovery-triage` piece folds in the execute-consume-the-contract unification + detection hardening by operator decision; execute's Step 6c is rewired to route through the shared contract — see FR-023. The extraction remains additive for all OTHER consumers.)
 - [ ] The skill is reachable from intake routing (an "investigation/discovery" classification points here).
 
 **Failure mode:** The spike scope-mode dispatch returns `BLOCKED` → triage records the finding as an open new-piece/needs-scoping item with the blocker, and surfaces it to the operator; it never fabricates a disposition or applies a mid-stream fix.
@@ -480,6 +480,26 @@ version: 7
 - [ ] Additive/backward-compat (NFR-003): phases without a bug-fix classification read as feature work; existing pieces are not retro-failed.
 
 **Failure mode:** The bug cannot be reproduced by a failing test (environment-only defect, heisenbug) → mark `[SPIKE]` to establish a reliable reproduction first, or record an explicit `no-repro` rationale at triage; never a fabricated test and never a tests-after that was never observed red.
+
+---
+
+### FR-023: Execute consumes the shared triage contract + hardened mid-execution detection
+**Statement:** Execute's Step 6c is rewired to **consume** the shared `triage-contract.md` (FR-019) rather than carry a bespoke inline copy of the disposition logic: a confirmed operator-initiated mid-execution change (the FR-008 admission `y` path) is classified through the **same** contract the standalone `spec-flow:triage` skill uses, so the disposition vocabulary and routing are unified in and out of execute. Execute-bound mechanics (the cumulative-diff 50% ratio, amendment-budget counters, block-aware placement, WIP-preemption) stay inline — only the classify→disposition→target decision becomes shared. Additionally, the FR-008 admission **detection heuristic** is hardened so mid-execution free-form change-requests are caught more reliably (addresses the imperfect detect-and-confirm gate noted in the spike-agent reflection backlog FO-2), while preserving the rule that free-form input is treated as a structured answer whenever the coordinator is awaiting one. This **extends FR-019 AC-4**: execute's Step 6c is no longer "unchanged" — it conforms to and routes through the shared contract; the extraction remains additive for every OTHER consumer, and execute's externally-observable triage discipline (scope→amend→execute, no mid-stream patch) is preserved. Folded into the `discovery-triage` piece by operator decision (2026-06-12).
+**Priority:** P1
+**Linked metrics:** SC-011
+**Research basis:** [R22] mid-execution operator changes hand-triaged in a 180k main window were part of the uncovered deviation channel; routing them through one shared contract removes the in-vs-out-of-execute behavior split. Backlog FO-2 (spike-agent reflection) flagged the FR-008 admission heuristic as improvable.
+
+#### User Stories
+**US-023** — As a pipeline operator who interrupts a running execute with a change request, I want execute to reliably catch it and classify it through the same disciplined triage I get out of band — including the fuller disposition set — so that a mid-execution "we should also do X" lands as the right disposition (amend / separate piece / note / defer) instead of being missed or forced into amend-only.
+
+**Acceptance Criteria:**
+- [ ] Execute's Step 6c classifies a confirmed operator-initiated mid-execution change through the shared `triage-contract.md`; the disposition vocabulary is the same one the standalone skill uses (execute-bound mechanics — ratio, budget, placement — stay inline).
+- [ ] The FR-008 admission detection heuristic is hardened to catch an expanded, documented set of change-signal phrasings while preserving the suppression-during-structured-answer rule; the heuristic's trigger set is documented in one place.
+- [ ] FR-019 AC-4's "execute unchanged" is explicitly superseded for the Step 6c consume path: the diff to execute is a behavior change (conform-to-contract + hardened detection), not citation-only; `pipeline-e2e` (merged) is the regression net and is extended to cover the unified path.
+- [ ] NN-P-002 preserved: the unified path still routes scope→amend→execute with no mid-stream patch and no silent change; NN-P-004 preserved (no silent defer); the operator confirmation gate is unchanged.
+- [ ] Additive/backward-compat (NFR-003): the shared-contract consumption changes execute's internal routing only; externally-observable execute behavior (prompts, dispositions available mid-execute) is preserved or expanded, never reduced.
+
+**Failure mode:** The hardened heuristic mis-classifies a structured answer as a change-request → the operator's existing `n` response on the admission prompt cancels it as a comment (no routing); false positives remain non-destructive (a prompt, never an auto-apply), and the suppression-during-active-prompt rule bounds the surface.
 
 ## Non-Functional Requirements
 
@@ -592,6 +612,7 @@ version: 7
 | FR-020 | Results-campaign gate | P1 | The missing gate class — grades a running system's output; largest uncovered cost channel (2026-06-12 eval) |
 | FR-021 | Implement-track oracle (Road A) | P1 | Makes `tdd: false` a supported efficient default — drops the Red ceremony, keeps the independent oracle via a qa-phase check; the actionable TDD cost cut |
 | FR-022 | Bug-fix/regression red-first | P1 | The one non-substitutable case for red-first; the standing carve-out from FR-021, codified as NN-P-006; governs `/small-change` + hotfix bug work |
+| FR-023 | Execute consumes the shared triage contract + hardened detection | P1 | Unifies mid-execution operator-change triage with the standalone skill via one shared contract; hardens FR-008 detection; folded into `discovery-triage` (extends FR-019 AC-4) |
 | NFR-001 | Agent isolation | P0 | NN-C-008; ≤2K returns |
 | NFR-002 | File-derivable state | P0 | The property that makes cheap coordination viable |
 | NFR-003 | Backward compat | P0 | NN-C-003 |
