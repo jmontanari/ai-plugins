@@ -202,10 +202,12 @@ Choices:
 - "Infrastructure or tooling change"
 - "Charter or documentation update"
 - "Exploration — read-only, no changes"
+- "Investigation / discovery to triage"
 
 - **Hotfix / regression / CI / infra** → `type: hotfix` → Q5
 - **Charter / docs** → `type: charter` → skip to Step 4
 - **Exploration** → `type: exploratory` → skip to Step 4
+- **Investigation / discovery to triage** → route to `/spec-flow:triage` (operator-selected; do NOT auto-route) → exit intake
 
 ### Q5 — Branch strategy
 *(Hotfix track only)*
