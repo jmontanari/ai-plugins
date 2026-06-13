@@ -254,6 +254,8 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
      ✗ `Run the tests and confirm they pass`
      ✗ `Verify the implementation is correct`
      ✗ `Run: {{lint_command}} — Expected: no errors`
+
+   **Negative-match verify commands.** When a `[Verify]` block asserts the ABSENCE of a pattern (e.g., `grep -c "pattern" file` returns 0, or `assert_no_grep`), the plan must include a comment naming at least one specific string that WOULD match but is intentionally absent. This guards against the check silently passing because the pattern was slightly wrong. Example: `grep -nE "amendment_budget|piece_start_sha" reference/triage-contract.md — expect 0 matches (these execute-bound terms must NOT appear in the context-free contract).`
    - **[Refactor]** (optional): Include only if cleanup is plausibly needed
    - **[QA]**: ACs to review against, diff baseline
 
@@ -272,6 +274,10 @@ Using the spec, `introspection.md` (reading section-by-section to manage context
    - Update the Overview section to state: "Non-TDD mode: all phases use Implement track + Write-Tests; AC Coverage Matrix is not required; QA and Final Review remain intact."
 
    **Non-TDD integration double-loop.** In `tdd: false` mode, the outer `[integration]` test for an integration is authored and greened within its completing phase's `[Write-Tests]`/`[Integration-Test]` step — there is no cross-phase Red step. The completing phase's step sequence is: `[Implement]` → `[Write-Tests]` (unit tests) → `[Integration-Test]` (outer integration test authored and run inline) → `[Verify]` (confirms both unit and integration tests pass). The `completes_in_phase` marker is still required on the `[Integration-Test]` block for the execute skill and QA agents.
+
+   **Multi-step interactive skill flows (doc-as-code).** When a doc-as-code skill defines a multi-step operator interaction with a conditional branch (e.g., confirm → maybe-spike → finalize, or batch-confirm → per-item-spike → finalize), the plan must document each branch path explicitly per phase: what the condition is, what each branch does, and what the `[Verify]` command asserts for each branch. A vague "operator confirms and routing proceeds" is not sufficient — the plan should read like a decision table so the implementer does not leave conditional paths unspecified and the QA agent can assert each path's expected behavior.
+
+   **Doc-as-code version-bump checklist.** When a doc-as-code phase bumps the plugin version, enumerate ALL version-bearing files in that phase's `[Implement]` block. Current set: `plugins/spec-flow/plugin.json`, `plugins/spec-flow/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`. Missing any one breaks the static suite's version-parity assertions silently (the other two pass and no error is emitted until the full suite runs).
 
 2a. **Phase-sizing check (FR-11; v3.1.1+ filter rules).** After defining each phase's or sub-phase's `[Implement]` (or `[Build]`) block, count the **behavioral-prose lines** inside it — the actionable bullets and ordered-list items that prescribe what the implementer agent does. If the count exceeds 150 for any single phase or sub-phase, emit a warning:
 
