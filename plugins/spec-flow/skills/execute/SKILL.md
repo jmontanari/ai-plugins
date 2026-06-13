@@ -1045,7 +1045,7 @@ Read three sources and combine them into a single ordered discovery list keyed b
 
 #### Operator-initiated change admission (FR-008)
 
-When a free-form operator turn (NOT a structured answer to an active execute prompt — triage choice, QA sign-off, BLOCKED escalation response, etc.) reads as a behavior or scope change — imperative phrasing such as "add…", "change…", "we should…", "what if we…", "can you also…" — the coordinator emits ONE confirmation prompt:
+When a free-form operator turn (NOT a structured answer to an active execute prompt — triage choice, QA sign-off, BLOCKED escalation response, etc.) reads as a behavior or scope change — imperative / change-request phrasing per the documented change-signal set in `plugins/spec-flow/reference/triage-contract.md` `## FR-008 mid-execution change-signal phrasing set` (the single documented trigger set — do NOT restate it here, NN-C-008) — the coordinator emits ONE confirmation prompt:
 
 ```
 That reads as a scope change: "<one-line summary of the change>". Route it through scope → amend → execute? (y/n)
@@ -1053,9 +1053,8 @@ That reads as a scope change: "<one-line summary of the change>". Route it throu
 
 - **On `y`:** append the change to the Step 6c discovery list with:
   - `source_agent: operator`
-  - `default_triage: amend`
-  - `row_text` = the operator's change text verbatim (used as input to the scope spike if threshold exceeded)
-  Proceed through the normal triage + amend flow for that discovery.
+  - `row_text` = the operator's change text verbatim
+  Then classify the disposition through `plugins/spec-flow/reference/triage-contract.md` `## Dispositions → target surface` (the same 5-disposition vocabulary `spec-flow:triage` uses) — so the operator change may land on any of the five dispositions in the contract, not only `amend`. Proceed through the normal triage + route flow for that discovery. **Execute-bound mechanics — the 50% ratio→scope-spike pre-step, amendment-budget counters, block-aware placement, and WIP-preemption — stay inline and apply unchanged to the `plan-amend` disposition (see the blocks below); only the classify→disposition→target decision is sourced from the shared contract (FR-T10 / AC-12).**
 
 - **On `n`:** treat the operator turn as a comment; no routing, no discovery appended.
 
@@ -1086,6 +1085,8 @@ A fourth option, `(s) amend-spec`, is offered ONLY for discoveries whose finding
 **Severity label shown in prompt (Final Review findings).** When a finding originates from a Final Review board reviewer, its severity (`must-fix` or `should-fix`) is displayed in the triage prompt so the operator can weigh it. Severity does NOT suppress options — the full menu `(a) amend  (f) fork  (d) defer` is always presented. The operator decides whether a should-fix finding warrants an amendment cycle.
 
 **Aggregate shortcuts decompose into per-discovery dispatches.** The `'A'` (amend all that fit < 50% threshold) and `'D'` (defer all) shortcuts are input sugar — they decompose into the same per-discovery dispatch flow as if the operator had typed `(a)` or `(d)` for each discovery individually. There is no batched-amend or batched-defer code path. `'A'` produces one `plan-amend` (or `spec-amend`) dispatch and one `chore(plan): amend` (or `chore(spec): amend`) commit per amended discovery; `'D'` produces one `/spec-flow:defer` invocation and one `chore: defer` commit per deferred discovery. Per-discovery `.discovery-log.md` rows append per the Resolution-commit cell convention (below) regardless of which input form was used.
+
+**Operator-initiated change disposition (FR-008 `y`-path).** For an **operator-initiated change** admitted via the FR-008 `y`-path above, the disposition is drawn from the unified 5-disposition vocabulary in `plugins/spec-flow/reference/triage-contract.md` `## Dispositions → target surface` (the same set `spec-flow:triage` uses) — not from the agent-discovery `(a)/(f)/(d)` menu above, which governs the four agent-discovered aggregation sources only. Execute-bound mechanics (ratio, budget, placement, WIP-preemption) apply unchanged when the operator change is dispositioned to `plan-amend`. (AC-12, AC-7 execute half.)
 
 #### Flywheel pattern recording (FR-006)
 
