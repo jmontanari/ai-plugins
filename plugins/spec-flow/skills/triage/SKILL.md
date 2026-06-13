@@ -35,6 +35,8 @@ Fields: `source_piece`, `source_phase`, `source_agent`, `finding_text`, `operato
 
 **Form C — batch** (FR-020 campaign): a list of Form A or Form B findings. All findings in a batch proceed through Steps 2–4 together and are presented as a single aggregated confirm prompt.
 
+For Form B the field mapping is: `piece_hint` ← `source_piece`; `rationale` ← `operator_rationale`; `source` ← `<source_phase>:<source_agent>`. A non-null `target?` field is treated as a **classification hint** — present it as the pre-selected disposition at Step 4 but allow the operator to correct it.
+
 Normalize all three forms into an internal record:
 ```
 {finding_text, source, rationale?, piece_hint?, discovery_type?}
@@ -56,7 +58,8 @@ The five dispositions are defined in `plugins/spec-flow/reference/triage-contrac
 **Classification decision tree:**
 
 1. Is the discovery a standalone, bounded fix or improvement that does not depend on an open piece's plan? → `small-change`
-2. Does the discovery require amending the plan of the *current working piece*? → `plan-amend` **only if** `--piece` was supplied AND that piece resolves to a current working piece in the worktree (via defer's reverse-lookup). If `--piece` was not supplied or does not resolve, `plan-amend` is NOT presented as an option. (AC-11, FR-T1)
+   > Note: a bug-signal finding whose natural home is an already-scheduled piece may fit `note-on-scheduled` (item 4) better — do not assume `small-change` is always the right call for bug-signal findings. Present the classification rationale to the operator at Step 4 when both `small-change` and `note-on-scheduled` are viable.
+2. Does the discovery require amending the plan of the *current working piece*? → `plan-amend` **only if** `--piece` was supplied AND that piece resolves to a current working piece in the worktree (via defer's reverse-lookup). If `--piece` was not supplied, `plan-amend` is NOT presented as an option. If `--piece` was supplied but resolves to a manifest piece that is **not** `in-progress` (e.g., `scheduled`, `queued`, `open`, or `done`), withhold `plan-amend` AND surface an advisory before the disposition menu: "Note: `--piece <slug>` names a piece in `<status>` state — `plan-amend` requires an `in-progress` piece; the option is withheld." Record this advisory in the provenance row at Step 7. (AC-11, FR-T1)
 3. Does the discovery warrant a new scoped piece of work in the manifest? → `new-piece`
 4. Is this a finding to attach to an already-scheduled/queued piece without modifying its plan? → `note-on-scheduled`
 5. Is the discovery acknowledged but intentionally deferred with a recorded rationale? → `explicit-defer-with-rationale`
@@ -69,13 +72,15 @@ Present the proposed disposition(s) and require explicit operator confirmation b
 
 For a single finding: present the proposed disposition, target surface, and rationale; wait for `y` / `n` / correction. (When the finding has not yet been scoped — i.e., a spike is pending — confirm "proceed with scope-spike?" here; the actual disposition is finalized after the spike returns `STATUS: OK` and Step 6 routing begins.)
 
-For a batch (FR-020 campaign): present all findings and their proposed dispositions as **one aggregated confirm prompt** — one confirmation event, not one keystroke per finding. (AC-5, contract `## Operator gate`.)
+For a batch (FR-020 campaign): present all findings and their proposed dispositions as **one aggregated confirm prompt** — one confirmation event, not one keystroke per finding. When one or more batch items require a spike (disposition not yet final), mark those items as `disposition: pending scope-spike` in the prompt and include them under "proceed with scope-spike for N item(s)?" alongside the already-classified others. Step 5 spikes run after the batch confirmation; dispositions for spike-pending items are finalized in Step 6 after spikes complete. (AC-5, contract `## Operator gate`.)
 
 If the operator declines (`n`): surface the finding unchanged for manual disposition. Do not write anything.
 
 ## Step 5: Spike scope-mode (when the change needs design)
 
 When the confirmed disposition indicates the change requires design work before it can be routed (i.e., the finding is too ambiguous to map to a concrete target surface without a scoping pass), dispatch the spike agent in scope mode:
+
+For a `plan-amend` disposition **outside execute** (no diff ratio available), the threshold rule at line 91 applies: always dispatch the scope-spike — do NOT treat this as a design-work judgment call.
 
 ```
 Agent({
@@ -114,7 +119,7 @@ depends_on: <operator-specified or []>
 Do NOT set any current piece to `blocked` — this omits fork's "block-current-piece" coupling. The new entry is additive only.
 
 **`note-on-scheduled`**
-Append to the target piece's `notes:` list in `manifest.yaml` per `plugins/spec-flow/reference/triage-contract.md` `## Manifest notes: schema`:
+Append to the target piece's `notes:` list in `manifest.yaml` per `plugins/spec-flow/reference/triage-contract.md` `## Manifest \`notes:\` schema`:
 ```yaml
 notes:
   - source: <source session / finding ref>
@@ -123,8 +128,10 @@ notes:
 ```
 The `notes:` field is additive — a piece entry lacking it parses unchanged. (AC-8)
 
+If no target piece slug can be resolved (neither `piece_hint` from `--piece` nor a `target?` field from Form B): enumerate all `scheduled`/`queued` manifest pieces and ask the operator to select before writing. If still unresolvable (no such pieces exist), **refuse with a recorded message** (matching the `plan-amend` refusal pattern at line 106) and surface for re-classification. Do not silently drop or guess the target.
+
 **`explicit-defer-with-rationale`**
-Invoke `/spec-flow:defer` in structured form. `--rationale` / `operator_rationale` is **mandatory** — refuse if missing, surface the requirement to the operator. (AC-10, AC-4)
+Invoke `/spec-flow:defer` in structured form. Read `rationale` from the normalized internal record (populated by `--rationale` on Form A or `operator_rationale` on Form B). This field is **mandatory** — refuse if `rationale` is absent, empty, or contains only whitespace after trimming; surface the requirement to the operator. (AC-10, AC-4)
 
 ## Step 7: Record provenance (+ red-first stamp)
 

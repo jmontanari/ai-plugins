@@ -1058,7 +1058,7 @@ That reads as a scope change: "<one-line summary of the change>". Route it throu
 
 - **On `n`:** treat the operator turn as a comment; no routing, no discovery appended.
 
-**Detection is SUPPRESSED while the coordinator is awaiting a structured answer** — a y/n triage choice, a model-policy confirmation, a QA sign-off, or any active prompt the coordinator emitted that expects a constrained response. Free-form input during these windows is treated as a structured answer, not as a potential scope change.
+Detection is SUPPRESSED per the suppression rule in `plugins/spec-flow/reference/triage-contract.md` `## FR-008 mid-execution change-signal phrasing set` — do NOT restate it here (NN-C-008).
 
 This path does NOT bypass the 50% threshold gate (T-2 below) or the no-bypass gate (T-3 below) — operator-admitted changes enter Step 6c and are evaluated by the same threshold and spike logic as agent-discovered changes.
 

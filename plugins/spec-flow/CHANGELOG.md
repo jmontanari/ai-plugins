@@ -13,6 +13,9 @@ All notable changes to the `spec-flow` plugin. Format follows [Keep a Changelog]
 - **Additive per-piece manifest `notes:` field.** `note-on-scheduled` disposition appends `{source, date, finding}` to a piece's optional `notes:` list in `manifest.yaml`. A piece entry lacking the field parses unchanged.
 - **Intake Q4 "Investigation / discovery to triage" route.** Operator-selected; routes to `/spec-flow:triage`; distinct from the read-only `exploratory` branch.
 
+### Changed
+- `tests/e2e/lib/static.sh` version assertions bumped to 5.18.0; added 7 new FR-019/FR-023 contract citation assertions
+
 ## [5.17.0] — 2026-06-12
 
 ### Added

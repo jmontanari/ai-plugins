@@ -10,7 +10,7 @@ Single source of truth for the *context-free* discovery-triage contract. Both `s
 | plan-amend | agents/plan-amend.md against the CURRENT working piece's plan.md (only when a current working piece resolves) |
 | new-piece | new manifest.yaml entry (fork's direct-YAML idiom, minus the block-current-piece coupling) |
 | note-on-scheduled | additive per-piece manifest `notes:` field on the target scheduled/queued piece |
-| explicit-defer-with-rationale | /spec-flow:defer structured form (--rationale / operator_rationale required) |
+| explicit-defer-with-rationale | /spec-flow:defer structured form (--rationale / operator_rationale required; empty or whitespace-only value treated as absent — refused) |
 
 ## Exactly-one-disposition rule
 
@@ -63,7 +63,7 @@ Imperative / change-request signals (case-insensitive, leading-phrase match):
   instead of…, make it…, switch to…, drop…, get rid of…, handle… (when phrased as a new requirement)
 Suppression rule (PRESERVED): free-form input is treated as a structured ANSWER — never a change-signal —
   whenever the coordinator is awaiting a constrained response (a y/n triage choice, a model-policy
-  confirmation, a QA sign-off, a BLOCKED-escalation response, or any active prompt expecting a constrained reply).
+  confirmation, a QA sign-off, a BLOCKED-escalation response, or any active prompt expecting a constrained reply — including `spec-flow:triage`'s own Step 4 operator-confirm windows).
 A false positive is a harmless, cancellable confirmation prompt (operator answers n).
 ```
 
